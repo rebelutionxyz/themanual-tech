@@ -2,25 +2,21 @@ import { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { REALM_ORDER, FRONT_ORDER, FRONT_CLASS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import type { Front } from '@/types/manual';
 
 interface RealmBarProps {
   selectedRealm: string | null;
-  selectedFront: string | null;
+  selectedFront: Front | null;
   selectedL2: string | null;
   onSelectRealm: (realm: string | null) => void;
-  onSelectFront: (front: string | null) => void;
+  onSelectFront: (front: Front | null) => void;
   onSelectL2: (l2: string | null) => void;
-  /** Optional: sub-categories per realm (e.g., L2 nodes from the tree) */
   realmSubs?: Record<string, string[]>;
 }
 
-/**
- * Top realm bar for INTEL surface.
- * - 13 realms in flow order, horizontally scrollable
- * - Power is last; selecting Power expands to show 5 Fronts
- * - Selecting a realm reveals its L2 sub-categories below
- * - Retractable scroll arrows on desktop for overflow
- */
+/** The 5 Power Fronts that should NOT appear in L2 list (they get special treatment) */
+const FRONT_SET = new Set<string>(FRONT_ORDER);
+
 export function RealmBar({
   selectedRealm,
   selectedFront,
@@ -34,42 +30,43 @@ export function RealmBar({
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
-  // Update scroll indicators when content changes or container resizes
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-
-    const updateScrollState = () => {
+    const update = () => {
       setCanScrollLeft(el.scrollLeft > 4);
       setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
     };
-
-    updateScrollState();
-    el.addEventListener('scroll', updateScrollState, { passive: true });
-    const ro = new ResizeObserver(updateScrollState);
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    const ro = new ResizeObserver(update);
     ro.observe(el);
-
     return () => {
-      el.removeEventListener('scroll', updateScrollState);
+      el.removeEventListener('scroll', update);
       ro.disconnect();
     };
   }, []);
 
-  const scroll = (direction: 'left' | 'right') => {
+  const scroll = (dir: 'left' | 'right') => {
     const el = scrollRef.current;
     if (!el) return;
-    const amount = el.clientWidth * 0.6;
-    el.scrollBy({ left: direction === 'left' ? -amount : amount, behavior: 'smooth' });
+    const amt = el.clientWidth * 0.6;
+    el.scrollBy({ left: dir === 'left' ? -amt : amt, behavior: 'smooth' });
   };
 
   const isPowerActive = selectedRealm === 'Power';
-  const subs = selectedRealm && selectedRealm !== 'Power' ? realmSubs[selectedRealm] ?? [] : [];
+
+  // L2 subs for current realm, excluding Front names (they get special treatment in Power)
+  const allSubs = selectedRealm ? realmSubs[selectedRealm] ?? [] : [];
+  const nonFrontSubs = allSubs.filter((s) => !FRONT_SET.has(s));
+
+  const showL2Row = selectedRealm && !isPowerActive && nonFrontSubs.length > 0;
+  const showPowerRow = isPowerActive;
 
   return (
     <div className="sticky top-0 z-30 border-b border-border bg-bg-elevated/95 backdrop-blur-md">
-      {/* Main realm row */}
+      {/* Primary realm row */}
       <div className="relative flex items-center">
-        {/* Scroll left arrow */}
         {canScrollLeft && (
           <button
             type="button"
@@ -86,7 +83,6 @@ export function RealmBar({
           className="scrollbar-none flex flex-1 items-center gap-1 overflow-x-auto px-3 py-2"
           style={{ scrollbarWidth: 'none' }}
         >
-          {/* "All" chip — clear realm filter */}
           <RealmChip
             label="All"
             active={selectedRealm === null}
@@ -99,7 +95,6 @@ export function RealmBar({
 
           <div className="h-5 w-px flex-shrink-0 bg-border" aria-hidden="true" />
 
-          {/* 13 Realms in flow order */}
           {REALM_ORDER.map((realm) => (
             <RealmChip
               key={realm}
@@ -114,7 +109,6 @@ export function RealmBar({
           ))}
         </div>
 
-        {/* Scroll right arrow */}
         {canScrollRight && (
           <button
             type="button"
@@ -127,21 +121,18 @@ export function RealmBar({
         )}
       </div>
 
-      {/* Power Fronts — only visible when Power realm is active */}
-      {isPowerActive && (
-        <div className="flex items-center gap-1 overflow-x-auto border-t border-border bg-bg/40 px-3 py-2">
-          <span
-            className="mr-2 flex-shrink-0 font-mono uppercase tracking-wider text-text-muted"
-            style={{ fontSize: '11px' }}
-            data-size="meta"
-          >
-            Fronts:
-          </span>
+      {/* POWER ROW: Fronts + L2s with divider (Option B) */}
+      {showPowerRow && (
+        <div className="scrollbar-none flex items-center gap-1 overflow-x-auto border-t border-border bg-bg/40 px-3 py-2">
+          {/* Fronts */}
           {FRONT_ORDER.map((front) => (
             <button
               key={front}
               type="button"
-              onClick={() => onSelectFront(selectedFront === front ? null : front)}
+              onClick={() => {
+                onSelectFront(selectedFront === front ? null : front);
+                onSelectL2(null);
+              }}
               className={cn(
                 'flex-shrink-0 rounded-md border px-2.5 py-1 transition-colors',
                 'font-display tracking-wide',
@@ -155,27 +146,37 @@ export function RealmBar({
               {front}
             </button>
           ))}
+
+          {/* Vertical divider between Fronts and L2s */}
+          {nonFrontSubs.length > 0 && (
+            <div className="mx-2 h-5 w-px flex-shrink-0 bg-border" aria-hidden="true" />
+          )}
+
+          {/* Power L2 structural categories (non-Front) */}
+          {nonFrontSubs.map((sub) => (
+            <L2Chip
+              key={sub}
+              label={sub}
+              active={selectedL2 === sub}
+              onClick={() => {
+                onSelectL2(selectedL2 === sub ? null : sub);
+                onSelectFront(null);
+              }}
+            />
+          ))}
         </div>
       )}
 
-      {/* L2 sub-categories — shown when a non-Power realm is active AND has subs */}
-      {subs.length > 0 && (
-        <div className="flex items-center gap-1 overflow-x-auto border-t border-border bg-bg/40 px-3 py-2">
-          {subs.map((sub) => (
-            <button
+      {/* L2 row for non-Power realms */}
+      {showL2Row && (
+        <div className="scrollbar-none flex items-center gap-1 overflow-x-auto border-t border-border bg-bg/40 px-3 py-2">
+          {nonFrontSubs.map((sub) => (
+            <L2Chip
               key={sub}
-              type="button"
+              label={sub}
+              active={selectedL2 === sub}
               onClick={() => onSelectL2(selectedL2 === sub ? null : sub)}
-              className={cn(
-                'flex-shrink-0 rounded-md border px-2.5 py-1 text-text-silver transition-colors',
-                selectedL2 === sub
-                  ? 'border-text-silver/40 bg-bg-elevated text-text'
-                  : 'border-transparent hover:border-border hover:bg-bg-elevated',
-              )}
-              style={{ fontSize: '12px' }}
-            >
-              {sub}
-            </button>
+            />
           ))}
         </div>
       )}
@@ -203,6 +204,32 @@ function RealmChip({
           : 'border-transparent text-text-dim hover:bg-bg hover:text-text-silver',
       )}
       style={{ fontSize: '13px' }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function L2Chip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex-shrink-0 rounded-md border px-2.5 py-1 text-text-silver transition-colors',
+        active
+          ? 'border-text-silver/40 bg-bg-elevated text-text'
+          : 'border-transparent hover:border-border hover:bg-bg-elevated',
+      )}
+      style={{ fontSize: '12px' }}
     >
       {label}
     </button>

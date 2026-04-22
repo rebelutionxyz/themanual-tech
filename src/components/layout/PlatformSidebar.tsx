@@ -13,9 +13,8 @@ interface PlatformSidebarProps {
 
 export function PlatformSidebar({ collapsed = false }: PlatformSidebarProps) {
   const location = useLocation();
-const activeSlug = location.pathname.length > 1
-    ? location.pathname.slice(1).split('/')[0]
-    : null;
+  const activeSlug =
+    location.pathname.length > 1 ? location.pathname.slice(1).split('/')[0] : null;
 
   return (
     <nav

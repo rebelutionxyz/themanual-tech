@@ -1,8 +1,10 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from '@/lib/auth';
 import { HomePage } from '@/pages/HomePage';
 import { ManualPage } from '@/pages/ManualPage';
 import { IntelPage } from '@/pages/intel/IntelPage';
+import { NewThreadPage } from '@/pages/intel/NewThreadPage';
+import { ThreadPage } from '@/pages/intel/ThreadPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { SurfacePage } from '@/pages/SurfacePage';
@@ -22,18 +24,19 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/profile" element={<ProfilePage />} />
 
-          {/* Platform surfaces (sidebar wrapped) */}
+          {/* INTEL sub-routes (NO platform sidebar wrap — composer/detail are focused views) */}
+          <Route path="/intel/new" element={<NewThreadPage />} />
+          <Route path="/intel/t/:threadId" element={<ThreadPage />} />
+
+          {/* Platform surfaces (flat URLs, sidebar-wrapped) */}
           <Route element={<PlatformLayout />}>
-            {/* MANUAL surface = full Manual renderer */}
             <Route path="/manual" element={<ManualPage />} />
-            {/* INTEL surface = realm-based forum */}
             <Route path="/intel" element={<IntelPage />} />
-            {/* All other surfaces use generic SurfacePage */}
             <Route path="/:slug" element={<SurfacePage />} />
           </Route>
 
-          {/* Legacy /s/ redirects (support any old links) */}
-          <Route path="/s/:slug" element={<RedirectToFlat />} />
+          {/* Legacy redirects: old /s/foo URLs → /foo */}
+          <Route path="/s/:slug" element={<RedirectSlashS />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -42,9 +45,8 @@ export default function App() {
   );
 }
 
-/** Redirects old /s/foo URLs to /foo */
-function RedirectToFlat() {
-  const path = window.location.pathname;
-  const flat = path.replace(/^\/s\//, '/');
+function RedirectSlashS() {
+  const { pathname } = useLocation();
+  const flat = pathname.replace(/^\/s\//, '/');
   return <Navigate to={flat} replace />;
 }

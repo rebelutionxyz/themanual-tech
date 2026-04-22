@@ -1,38 +1,37 @@
 import { useMemo, useState } from 'react';
-import { MessagesSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { MessagesSquare, Plus } from 'lucide-react';
 import { useManualData } from '@/lib/useManualData';
 import { RealmBar } from '@/components/intel/RealmBar';
 import { IntelSidebar, type IntelView } from '@/components/intel/IntelSidebar';
+import { ThreadList } from '@/components/intel/ThreadList';
 import { REALM_ORDER } from '@/lib/constants';
+import type { Front } from '@/types/manual';
 
 /**
  * INTEL surface — where Bees interact with the Realms.
- * Layout:
- *   [Realm bar top — 13 realms, scrollable, drill-down to L2 / Fronts]
- *   [Left sidebar: retractable] [Content area: realm-filtered feed]
  *
- * This shell has layout wired; content feed comes next turn.
+ * Layout:
+ *   [Left sidebar: retractable icons]
+ *   [Realm bar top — 13 realms, drill-down to L2 / Fronts]
+ *   [Content area: thread list, realm-filtered]
  */
 export function IntelPage() {
+  const navigate = useNavigate();
   const { atoms, loaded } = useManualData();
 
-  // Selection state (lifted here for now; moves to Zustand store later if needed)
   const [selectedRealm, setSelectedRealm] = useState<string | null>(null);
-  const [selectedFront, setSelectedFront] = useState<string | null>(null);
+  const [selectedFront, setSelectedFront] = useState<Front | null>(null);
   const [selectedL2, setSelectedL2] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<IntelView>('home');
 
-  // Compute L2 sub-categories per realm from the loaded atoms
+  // Compute L2 sub-categories per realm from atoms
   const realmSubs = useMemo(() => {
     if (!loaded) return {};
     const subs: Record<string, Set<string>> = {};
-    for (const realm of REALM_ORDER) {
-      subs[realm] = new Set<string>();
-    }
+    for (const realm of REALM_ORDER) subs[realm] = new Set<string>();
     for (const atom of atoms) {
-      if (atom.L2 && subs[atom.realm]) {
-        subs[atom.realm].add(atom.L2);
-      }
+      if (atom.L2 && subs[atom.realm]) subs[atom.realm].add(atom.L2);
     }
     const result: Record<string, string[]> = {};
     for (const [realm, set] of Object.entries(subs)) {
@@ -41,14 +40,23 @@ export function IntelPage() {
     return result;
   }, [atoms, loaded]);
 
+  // Sidebar view → sort mapping
+  const sortBy: 'hot' | 'new' | 'top' =
+    activeView === 'new' ? 'new' : activeView === 'hot' ? 'hot' : 'hot';
+
+  function handleSidebarSelect(view: IntelView) {
+    if (view === 'create') {
+      navigate('/intel/new');
+      return;
+    }
+    setActiveView(view);
+  }
+
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Retractable left sidebar */}
-      <IntelSidebar activeView={activeView} onSelectView={setActiveView} />
+      <IntelSidebar activeView={activeView} onSelectView={handleSidebarSelect} />
 
-      {/* Main content column */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Realm bar (sticky top) */}
         <RealmBar
           selectedRealm={selectedRealm}
           selectedFront={selectedFront}
@@ -59,13 +67,12 @@ export function IntelPage() {
           realmSubs={realmSubs}
         />
 
-        {/* Content area */}
         <main className="flex-1 overflow-y-auto">
-          <IntelContent
+          <IntelFeedContent
             selectedRealm={selectedRealm}
             selectedFront={selectedFront}
             selectedL2={selectedL2}
-            activeView={activeView}
+            sortBy={sortBy}
           />
         </main>
       </div>
@@ -73,21 +80,19 @@ export function IntelPage() {
   );
 }
 
-/**
- * INTEL content area - placeholder for now.
- * Shows current selection state so Butch can verify the navigation works.
- */
-function IntelContent({
+interface IntelFeedContentProps {
+  selectedRealm: string | null;
+  selectedFront: Front | null;
+  selectedL2: string | null;
+  sortBy: 'hot' | 'new' | 'top';
+}
+
+function IntelFeedContent({
   selectedRealm,
   selectedFront,
   selectedL2,
-  activeView,
-}: {
-  selectedRealm: string | null;
-  selectedFront: string | null;
-  selectedL2: string | null;
-  activeView: IntelView;
-}) {
+  sortBy,
+}: IntelFeedContentProps) {
   const contextLabel = selectedFront
     ? `${selectedRealm} · ${selectedFront}`
     : selectedL2
@@ -95,102 +100,50 @@ function IntelContent({
       : selectedRealm ?? 'All Realms';
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8 md:px-10 md:py-12">
-      {/* Surface header */}
-      <div className="mb-8 flex items-center gap-4">
+    <div className="mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">
+      {/* Surface header row */}
+      <div className="mb-6 flex items-center gap-4">
         <div
-          className="flex h-12 w-12 items-center justify-center rounded-xl border-2"
-          style={{
-            borderColor: '#6B94C840',
-            background: '#6B94C80D',
-          }}
+          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border-2"
+          style={{ borderColor: '#6B94C840', background: '#6B94C80D' }}
         >
-          <MessagesSquare size={24} style={{ color: '#6B94C8' }} />
+          <MessagesSquare size={22} style={{ color: '#6B94C8' }} />
         </div>
-        <div>
+        <div className="min-w-0 flex-1">
           <div
             className="font-mono uppercase tracking-wider text-text-muted"
             style={{ fontSize: '11px' }}
             data-size="meta"
           >
-            Social · Surface
+            INTEL · {contextLabel}
           </div>
           <h1
-            className="font-display text-3xl font-semibold tracking-wide"
+            className="font-display text-2xl font-semibold tracking-wide"
             style={{ color: '#6B94C8' }}
           >
-            INTEL
+            {sortBy === 'new' ? 'Newest threads' : 'Discussion'}
           </h1>
-          <p
-            className="mt-0.5 font-mono text-text-silver"
-            style={{ fontSize: '13px' }}
-          >
-            Forum · where Bees interact with the Realms
-          </p>
         </div>
+
+        {/* Quick new thread button */}
+        <a
+          href="/intel/new"
+          className="flex items-center gap-1.5 rounded-md border border-text-silver/30 bg-bg-elevated px-3 py-1.5 text-text-silver-bright transition-colors hover:border-text-silver/60 hover:bg-panel-2"
+          style={{ fontSize: '13px' }}
+        >
+          <Plus size={14} />
+          <span className="hidden md:inline">New Thread</span>
+          <span className="md:hidden">New</span>
+        </a>
       </div>
 
-      {/* Current selection context — shows what realm/view is active */}
-      <div className="rounded-lg border border-border bg-bg-elevated/40 p-6">
-        <div
-          className="mb-2 font-mono uppercase tracking-wider text-text-muted"
-          style={{ fontSize: '11px' }}
-          data-size="meta"
-        >
-          Current view
-        </div>
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
-          <div className="font-display text-2xl text-text-silver-bright">
-            {contextLabel}
-          </div>
-          <div
-            className="font-mono text-text-dim"
-            style={{ fontSize: '12px' }}
-            data-size="meta"
-          >
-            {viewLabel(activeView)}
-          </div>
-        </div>
-      </div>
-
-      {/* Empty state placeholder — content feed comes next */}
-      <div className="mt-6 rounded-lg border border-dashed border-border p-10 text-center">
-        <div
-          className="mx-auto mb-3 h-1.5 w-12 rounded-full"
-          style={{ background: '#6B94C8', opacity: 0.4 }}
-        />
-        <p className="text-text-silver" style={{ fontSize: '14px' }}>
-          No threads in this view yet
-        </p>
-        <p
-          className="mt-2 font-mono text-text-muted"
-          style={{ fontSize: '11px' }}
-          data-size="meta"
-        >
-          Thread feed renders here next. The first Bees to contribute shape it.
-        </p>
-      </div>
+      {/* Thread list */}
+      <ThreadList
+        selectedRealm={selectedRealm}
+        selectedFront={selectedFront}
+        selectedL2={selectedL2}
+        sortBy={sortBy}
+      />
     </div>
   );
-}
-
-function viewLabel(view: IntelView): string {
-  switch (view) {
-    case 'home':
-      return 'feed · recommended';
-    case 'hot':
-      return 'feed · hot · last 24h';
-    case 'new':
-      return 'feed · newest first';
-    case 'create':
-      return 'composer';
-    case 'mythreads':
-      return 'threads I started';
-    case 'following':
-      return 'threads I follow';
-    case 'saved':
-      return 'saved threads';
-    default:
-      return '';
-  }
 }
