@@ -1,0 +1,36 @@
+# ─── Dependencies ───
+node_modules/
+.pnp
+.pnp.js
+
+# ─── Build output ───
+dist/
+dist-ssr/
+*.local
+
+# ─── Environment (never commit keys!) ───
+.env
+.env.local
+.env.*.local
+
+# ─── Editor / OS ───
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+
+# ─── Logs ───
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ─── TypeScript ───
+*.tsbuildinfo
+
+# ─── Optional: keep this if you want to commit the atoms data, otherwise add:
+# public/atoms.json
+# public/theme_index.json
