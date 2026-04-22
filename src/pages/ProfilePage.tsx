@@ -107,7 +107,7 @@ export function ProfilePage() {
           Sources added · kettle votes · comments — coming soon
         </p>
         <Link
-          to="/s/manual"
+          to="/manual"
           className="mt-4 inline-block font-mono text-text-silver hover:text-text-silver-bright"
           style={{ fontSize: '12px' }}
         >

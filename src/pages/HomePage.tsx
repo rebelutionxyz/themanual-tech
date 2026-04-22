@@ -41,7 +41,7 @@ export function HomePage() {
         {/* CTA */}
         <div className="mt-16 flex flex-col items-center gap-4 md:mt-20">
           <Link
-            to="/s/manual"
+            to="/manual"
             className="group inline-flex items-center gap-2 rounded-full border border-border-bright bg-bg-elevated px-6 py-3 text-text-silver-bright transition-all hover:border-text-silver hover:bg-panel-2"
           >
             <span className="font-display text-lg tracking-wide">Enter the Manual</span>

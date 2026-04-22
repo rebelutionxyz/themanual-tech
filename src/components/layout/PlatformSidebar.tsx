@@ -13,8 +13,8 @@ interface PlatformSidebarProps {
 
 export function PlatformSidebar({ collapsed = false }: PlatformSidebarProps) {
   const location = useLocation();
-  const activeSlug = location.pathname.startsWith('/s/')
-    ? location.pathname.split('/')[2]
+const activeSlug = location.pathname.length > 1
+    ? location.pathname.slice(1).split('/')[0]
     : null;
 
   return (
@@ -85,7 +85,7 @@ function SurfaceLink({
 
   return (
     <Link
-      to={`/s/${surface.slug}`}
+      to={`/${surface.slug}`}
       title={`${surface.name} — ${surface.function}`}
       className={cn(
         'group flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors',

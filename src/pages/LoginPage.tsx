@@ -169,7 +169,7 @@ export function LoginPage() {
 
       <div className="mt-8 text-center">
         <Link
-          to="/s/manual"
+          to="/manual"
           className="font-mono text-text-muted hover:text-text-silver"
           style={{ fontSize: '11px' }}
           data-size="meta"

@@ -20,18 +20,18 @@ export function SiteHeader() {
 
         {/* Nav */}
         <nav className="ml-4 flex items-center gap-1">
-          <NavLink to="/s/manual" active={location.pathname === '/s/manual'}>
-            Manual
-          </NavLink>
-          <NavLink to="/s/intel" active={location.pathname === '/s/intel'}>
-            Intel
-          </NavLink>
-          <NavLink to="/s/unite" active={location.pathname === '/s/unite'}>
-            Unite
-          </NavLink>
-          <NavLink to="/s/bazaar" active={location.pathname === '/s/bazaar'}>
-            Bazaar
-          </NavLink>
+          <NavLink to="/manual" active={location.pathname === '/manual'}>
+  Manual
+</NavLink>
+<NavLink to="/intel" active={location.pathname === '/intel'}>
+  Intel
+</NavLink>
+<NavLink to="/unite" active={location.pathname === '/unite'}>
+  Unite
+</NavLink>
+<NavLink to="/bazaar" active={location.pathname === '/bazaar'}>
+  Bazaar
+</NavLink>
         </nav>
 
         <div className="flex-1" />

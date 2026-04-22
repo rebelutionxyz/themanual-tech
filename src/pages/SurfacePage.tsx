@@ -12,7 +12,7 @@ export function SurfacePage() {
   const { slug } = useParams<{ slug: string }>();
   const surface = slug ? SURFACE_BY_SLUG.get(slug) : undefined;
 
-  if (!surface) return <Navigate to="/s/manual" replace />;
+  if (!surface) return <Navigate to="/manual" replace />;
 
   const Icon = surface.icon;
   const isBling = surface.special === 'bling';
@@ -96,7 +96,7 @@ export function SurfacePage() {
                 return (
                   <Link
                     key={s.slug}
-                    to={`/s/${s.slug}`}
+                    to={`/${s.slug}`}
                     className="group flex items-center gap-3 rounded-md border border-border bg-bg-elevated/40 p-3 transition-colors hover:border-border-bright hover:bg-bg-elevated"
                   >
                     <SIcon

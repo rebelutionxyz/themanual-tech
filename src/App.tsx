@@ -25,19 +25,26 @@ export default function App() {
           {/* Platform surfaces (sidebar wrapped) */}
           <Route element={<PlatformLayout />}>
             {/* MANUAL surface = full Manual renderer */}
-            <Route path="/s/manual" element={<ManualPage />} />
+            <Route path="/manual" element={<ManualPage />} />
             {/* INTEL surface = realm-based forum */}
-            <Route path="/s/intel" element={<IntelPage />} />
+            <Route path="/intel" element={<IntelPage />} />
             {/* All other surfaces use generic SurfacePage */}
-            <Route path="/s/:slug" element={<SurfacePage />} />
+            <Route path="/:slug" element={<SurfacePage />} />
           </Route>
 
-          {/* Legacy redirects */}
-          <Route path="/manual" element={<Navigate to="/s/manual" replace />} />
+          {/* Legacy /s/ redirects (support any old links) */}
+          <Route path="/s/:slug" element={<RedirectToFlat />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
     </AuthProvider>
   );
+}
+
+/** Redirects old /s/foo URLs to /foo */
+function RedirectToFlat() {
+  const path = window.location.pathname;
+  const flat = path.replace(/^\/s\//, '/');
+  return <Navigate to={flat} replace />;
 }
