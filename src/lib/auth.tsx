@@ -97,17 +97,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     });
     if (error) return { error };
+    
+    // Bee profile is created automatically by database trigger
+    // (see supabase/schema-v3-trigger.sql)
     if (data.user) {
-      // Create Bee profile
-      const { error: beeError } = await supabase.from('bees').insert({
-        id: data.user.id,
-        handle,
-        email,
-      });
-      if (beeError && !beeError.message.includes('duplicate')) {
-        return { error: beeError };
-      }
+      // Wait for trigger to complete, then verify
+      await new Promise((r) => setTimeout(r, 300));
     }
+
+
     return { error: null };
   };
 
