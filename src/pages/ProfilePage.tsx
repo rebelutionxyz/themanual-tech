@@ -12,7 +12,7 @@ const BLING_RANK_NAMES = [
 ];
 
 const RING_NAMES = [
-  'Seed', 'Worker', 'Scout', 'Builder', 'Scholar',
+  'NewBee', 'Producer', 'Scout', 'Builder', 'Scholar',
   'Sentinel', 'Guardian', 'Elder', 'Queen',
 ];
 
