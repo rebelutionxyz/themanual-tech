@@ -1,5 +1,3 @@
-# Nixpacks build config — used by Railway
-
 [phases.setup]
 nixPkgs = ["nodejs_20"]
 
