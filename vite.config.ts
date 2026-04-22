@@ -9,14 +9,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-server: {
+  server: {
     port: 3000,
     host: true,
-  },
-  preview: {
-    port: 3000,
-    host: true,
-    allowedHosts: true,
   },
   build: {
     target: 'es2022',

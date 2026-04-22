@@ -13,7 +13,7 @@ const BLING_RANK_NAMES = [
 
 const RING_NAMES = [
   'NewBee', 'Producer', 'Scout', 'Builder', 'Scholar',
-  'Sentinel', 'Guardian', 'Elder', 'Queen',
+  'Sentinel', 'Guardian', 'Creator', 'Queen',
 ];
 
 const RING_THRESHOLDS = [0, 500, 2000, 6000, 15000, 35000, 75000, 150000, 300000];

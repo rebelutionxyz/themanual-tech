@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/lib/auth';
 import { HomePage } from '@/pages/HomePage';
 import { ManualPage } from '@/pages/ManualPage';
+import { IntelPage } from '@/pages/intel/IntelPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { SurfacePage } from '@/pages/SurfacePage';
@@ -25,6 +26,8 @@ export default function App() {
           <Route element={<PlatformLayout />}>
             {/* MANUAL surface = full Manual renderer */}
             <Route path="/s/manual" element={<ManualPage />} />
+            {/* INTEL surface = realm-based forum */}
+            <Route path="/s/intel" element={<IntelPage />} />
             {/* All other surfaces use generic SurfacePage */}
             <Route path="/s/:slug" element={<SurfacePage />} />
           </Route>

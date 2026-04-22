@@ -1,10 +1,11 @@
 # Nixpacks build config — used by Railway
+# See: https://nixpacks.com/docs/configuration/file
 
 [phases.setup]
 nixPkgs = ["nodejs_20"]
 
 [phases.install]
-cmds = ["npm install --no-audit --no-fund"]
+cmds = ["npm ci"]
 
 [phases.build]
 cmds = ["npm run build"]

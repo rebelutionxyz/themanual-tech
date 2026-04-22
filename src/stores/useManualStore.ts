@@ -25,7 +25,7 @@ interface ManualState {
   clearFilters: () => void;
 }
 
-export const useManualStore = create<ManualState>((set) => ({
+export const useManualStore = create<ManualState>()((set) => ({
   view: 'outlook',
   searchQuery: '',
   selectedRealm: null,

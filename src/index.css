@@ -152,4 +152,13 @@
     -webkit-user-drag: none;
     user-select: none;
   }
+
+  /* Hide scrollbar but keep scrolling functional */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
 }
