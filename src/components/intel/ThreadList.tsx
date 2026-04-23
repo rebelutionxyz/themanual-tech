@@ -223,7 +223,14 @@ export function ThreadList({
     );
   }
 
-  if (threads === null) return <ThreadListSkeleton />;
+  if (threads === null)
+    return (
+      <ThreadListSkeleton
+        realm={selectedRealm}
+        front={selectedFront}
+        savedMode={savedMode}
+      />
+    );
   if (threads.length === 0)
     return (
       <EmptyThreads
@@ -566,14 +573,93 @@ function MetaPill({ icon, children }: { icon: React.ReactNode; children: React.R
   );
 }
 
-function ThreadListSkeleton() {
+function ThreadListSkeleton({
+  realm,
+  front,
+  savedMode = false,
+}: {
+  realm: string | null;
+  front: Front | null;
+  savedMode?: boolean;
+}) {
+  // Match ThreadCard accent-color logic for visual continuity between
+  // skeleton → real cards. Saved mode uses honey gold.
+  const accentColor = savedMode
+    ? '#FAD15E'
+    : front && FRONT_COLORS[front]
+      ? FRONT_COLORS[front]
+      : realm && REALM_COLORS[realm as keyof typeof REALM_COLORS]
+        ? REALM_COLORS[realm as keyof typeof REALM_COLORS]
+        : '#6B94C8'; // INTEL blue default
+
+  // Randomized widths to feel like real content rather than uniform bars
+  const cards = [
+    { titleW: 75, bodyW1: 95, bodyW2: 60, atoms: 3 },
+    { titleW: 60, bodyW1: 90, bodyW2: 72, atoms: 2 },
+    { titleW: 82, bodyW1: 88, bodyW2: 45, atoms: 4 },
+  ];
+
   return (
-    <ul className="space-y-2">
-      {[0, 1, 2].map((i) => (
+    <ul className="space-y-2" aria-label="Loading threads" aria-busy="true">
+      {cards.map((c, i) => (
         <li
           key={i}
-          className="h-24 animate-pulse-slow rounded-lg border border-border bg-bg-elevated"
-        />
+          className="animate-pulse-slow overflow-hidden rounded-lg border border-border bg-bg-elevated"
+          style={{
+            borderLeft: `3px solid ${accentColor}80`,
+            animationDelay: `${i * 120}ms`,
+          }}
+        >
+          <div className="p-4">
+            {/* Realm chip placeholder */}
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              <span
+                className="h-3.5 w-14 rounded"
+                style={{ background: `${accentColor}25` }}
+              />
+              <span className="h-3.5 w-20 rounded bg-bg" />
+            </div>
+
+            {/* Title placeholder */}
+            <div
+              className="h-5 rounded bg-text-muted/15"
+              style={{ width: `${c.titleW}%` }}
+            />
+
+            {/* Body preview — 2 lines */}
+            <div className="mt-2 space-y-1.5">
+              <div
+                className="h-3 rounded bg-text-muted/10"
+                style={{ width: `${c.bodyW1}%` }}
+              />
+              <div
+                className="h-3 rounded bg-text-muted/10"
+                style={{ width: `${c.bodyW2}%` }}
+              />
+            </div>
+
+            {/* Atom chips placeholder */}
+            <div className="mt-3 flex flex-wrap gap-1">
+              {Array.from({ length: c.atoms }).map((_, j) => (
+                <span
+                  key={j}
+                  className="h-4 rounded bg-bg/60"
+                  style={{
+                    width: `${50 + ((j * 17) % 40)}px`,
+                    border: '1px solid rgba(255,255,255,0.04)',
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Meta row placeholder */}
+            <div className="mt-3 flex items-center gap-3">
+              <span className="h-3 w-14 rounded bg-text-muted/10" />
+              <span className="h-3 w-10 rounded bg-text-muted/10" />
+              <span className="h-3 w-20 rounded bg-text-muted/10" />
+            </div>
+          </div>
+        </li>
       ))}
     </ul>
   );
