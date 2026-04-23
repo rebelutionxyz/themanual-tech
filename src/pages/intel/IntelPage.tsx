@@ -312,6 +312,7 @@ export function IntelPage() {
         selectedL3={selectedL3}
         sortBy={sortBy}
         timeWindowHours={activeWindow}
+        savedMode={activeView === 'saved'}
       />
     </div>
   );

@@ -229,6 +229,26 @@ export async function listThreads(
 }
 
 /**
+ * Fetch multiple threads by ID, preserving the order of the provided IDs.
+ * Used by the Saved view and anywhere else that needs specific threads.
+ */
+export async function listThreadsByIds(threadIds: string[]): Promise<ForumThread[]> {
+  if (!supabase || threadIds.length === 0) return [];
+  const { data } = await supabase
+    .from('forum_threads')
+    .select('*')
+    .in('id', threadIds);
+  if (!data) return [];
+
+  const enriched = await enrichWithAuthors(data);
+  // Preserve caller's order
+  const order = new Map(threadIds.map((id, i) => [id, i]));
+  return enriched.sort(
+    (a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999),
+  );
+}
+
+/**
  * Get a single thread with author + atom links enriched.
  */
 export async function getThread(threadId: string): Promise<ForumThread | null> {

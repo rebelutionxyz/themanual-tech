@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MessageSquare, Lock, Clock } from 'lucide-react';
-import { listThreads, relativeTime, type ForumThread } from '@/lib/intel';
+import { MessageSquare, Lock, Clock, Bookmark, BookmarkCheck } from 'lucide-react';
+import { listThreads, listThreadsByIds, relativeTime, type ForumThread } from '@/lib/intel';
+import { listSavedThreadIds, toggleSave, isSavedBatch } from '@/lib/reactions';
 import { useManualData } from '@/lib/useManualData';
 import { useIntelStore } from '@/stores/useIntelStore';
+import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { KETTLE_COLORS, FRONT_COLORS, REALM_COLORS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -16,6 +18,8 @@ interface ThreadListProps {
   selectedL3?: string | null;
   sortBy?: 'hot' | 'new' | 'top';
   timeWindowHours?: number;
+  /** When true, list only threads this Bee has saved. Ignores realm filters. */
+  savedMode?: boolean;
 }
 
 export function ThreadList({
@@ -25,8 +29,38 @@ export function ThreadList({
   selectedL3 = null,
   sortBy = 'hot',
   timeWindowHours = 0,
+  savedMode = false,
 }: ThreadListProps) {
   const { atoms } = useManualData();
+  const { bee } = useAuth();
+
+  // Track which threads the current Bee has saved. Batch-fetched when threads
+  // load. Optimistic toggle on click.
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+
+  async function handleToggleSave(threadId: string) {
+    if (!bee?.id) return;
+    const currentlySaved = savedIds.has(threadId);
+    // Optimistic
+    setSavedIds((prev) => {
+      const next = new Set(prev);
+      if (currentlySaved) next.delete(threadId);
+      else next.add(threadId);
+      return next;
+    });
+    try {
+      await toggleSave('intel', threadId, bee.id);
+    } catch (err) {
+      // Rollback
+      console.warn('toggleSave failed:', err);
+      setSavedIds((prev) => {
+        const next = new Set(prev);
+        if (currentlySaved) next.add(threadId);
+        else next.delete(threadId);
+        return next;
+      });
+    }
+  }
   const [threads, setThreads] = useState<ForumThread[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,22 +102,34 @@ export function ThreadList({
     setError(null);
     setThreadAtomLinks(new Map());
     setThreadCategoryLinks(new Map());
+    setSavedIds(new Set());
 
-    listThreads(
-      {
-        realm: selectedRealm,
-        front: selectedFront,
-        l2: selectedL2,
-        sortBy,
-        timeWindowHours,
-      },
-      atomIdsInRealm,
-    )
+    // Saved mode: get Bee's saved thread IDs, then fetch those threads
+    // via the shared helper which handles mapping + author enrichment.
+    const threadPromise: Promise<ForumThread[]> = savedMode
+      ? bee?.id
+        ? (async () => {
+            const ids = await listSavedThreadIds(bee.id);
+            return listThreadsByIds(ids);
+          })()
+        : Promise.resolve([] as ForumThread[])
+      : listThreads(
+          {
+            realm: selectedRealm,
+            front: selectedFront,
+            l2: selectedL2,
+            sortBy,
+            timeWindowHours,
+          },
+          atomIdsInRealm,
+        );
+
+    threadPromise
       .then(async (result) => {
         if (cancelled) return;
         setThreads(result);
 
-        // Fetch atom + category links for these threads (best effort — silent if fails)
+        // Fetch atom + category links + saved state for these threads (best effort)
         if (result.length > 0 && supabase) {
           const ids = result.map((t) => t.id);
           try {
@@ -122,6 +168,19 @@ export function ThreadList({
           } catch {
             // non-fatal (table may not exist pre-migration)
           }
+          // Batch-fetch which of these threads the current Bee has saved.
+          // In savedMode all are saved by definition; skip the call.
+          if (!savedMode && bee?.id) {
+            try {
+              const saved = await isSavedBatch(ids, bee.id);
+              if (!cancelled) setSavedIds(saved);
+            } catch {
+              // non-fatal (entity_saves table may not be migrated yet)
+            }
+          } else if (savedMode) {
+            // All visible threads are saved in savedMode
+            setSavedIds(new Set(ids));
+          }
         }
       })
       .catch((err) => {
@@ -134,7 +193,7 @@ export function ThreadList({
     return () => {
       cancelled = true;
     };
-  }, [selectedRealm, selectedFront, selectedL2, sortBy, timeWindowHours, atomIdsInRealm]);
+  }, [selectedRealm, selectedFront, selectedL2, sortBy, timeWindowHours, atomIdsInRealm, savedMode, bee?.id]);
 
   if (error) {
     return (
@@ -154,6 +213,8 @@ export function ThreadList({
         front={selectedFront}
         l2={selectedL2}
         l3={selectedL3}
+        savedMode={savedMode}
+        signedIn={Boolean(bee?.id)}
       />
     );
 
@@ -166,6 +227,9 @@ export function ThreadList({
           atomIds={threadAtomLinks.get(t.id) ?? []}
           categoryPaths={threadCategoryLinks.get(t.id) ?? []}
           atomById={atomById}
+          saved={savedIds.has(t.id)}
+          canSave={Boolean(bee?.id)}
+          onToggleSave={() => handleToggleSave(t.id)}
         />
       ))}
     </ul>
@@ -187,11 +251,17 @@ function ThreadCard({
   atomIds,
   categoryPaths,
   atomById,
+  saved,
+  canSave,
+  onToggleSave,
 }: {
   thread: ForumThread;
   atomIds: string[];
   categoryPaths: string[];
   atomById: Map<string, ReturnType<Map<string, unknown>['get']>>;
+  saved: boolean;
+  canSave: boolean;
+  onToggleSave: () => void;
 }) {
   const { setRealm, setFront, setL2, setL3 } = useIntelStore();
 
@@ -388,9 +458,32 @@ function ThreadCard({
               </div>
             )}
           </div>
-          {thread.isLocked && (
-            <Lock size={14} className="mt-1 flex-shrink-0 text-text-muted" />
-          )}
+          {/* Top-right actions: lock indicator + bookmark button */}
+          <div className="flex flex-shrink-0 items-start gap-2">
+            {thread.isLocked && (
+              <Lock size={14} className="mt-1 text-text-muted" />
+            )}
+            {canSave && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onToggleSave();
+                }}
+                className={cn(
+                  'rounded-md p-1.5 transition-colors',
+                  saved
+                    ? 'text-honey hover:bg-honey/10'
+                    : 'text-text-muted hover:bg-bg hover:text-text-silver',
+                )}
+                title={saved ? 'Remove from Saved' : 'Save for later'}
+                aria-label={saved ? 'Remove from Saved' : 'Save for later'}
+              >
+                {saved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-text-muted">
@@ -445,12 +538,89 @@ function EmptyThreads({
   front,
   l2,
   l3,
+  savedMode = false,
+  signedIn = true,
 }: {
   realm: string | null;
   front: Front | null;
   l2: string | null;
   l3: string | null;
+  savedMode?: boolean;
+  signedIn?: boolean;
 }) {
+  // Saved-mode empty state — different messaging, honey-gold theming
+  if (savedMode) {
+    const signedOut = !signedIn;
+    const headline = signedOut ? 'Sign in to see your Saved threads' : 'Nothing saved yet';
+    const subtext = signedOut
+      ? 'Your bookmarks are tied to your Bee account. Sign in to start saving threads.'
+      : 'Click the 🔖 bookmark icon on any thread card to save it here for later.';
+    return (
+      <div
+        className="rounded-lg border-2 border-dashed p-8 text-center"
+        style={{
+          borderColor: '#FAD15E40',
+          background: '#FAD15E08',
+        }}
+      >
+        <div
+          className="mx-auto mb-4 h-2 w-12 rounded-full"
+          style={{ background: '#FAD15E', opacity: 0.6 }}
+        />
+        <div
+          className="mb-3 inline-block rounded px-2 py-0.5 font-mono uppercase tracking-widest"
+          style={{
+            fontSize: '10px',
+            color: '#FAD15E',
+            background: '#FAD15E15',
+          }}
+          data-size="meta"
+        >
+          SAVED
+        </div>
+        <p
+          className="mb-2 font-display text-text-silver-bright"
+          style={{ fontSize: '17px', fontWeight: 500 }}
+        >
+          {headline}
+        </p>
+        <p
+          className="mx-auto max-w-md text-text-dim"
+          style={{ fontSize: '13px', lineHeight: '1.5' }}
+        >
+          {subtext}
+        </p>
+        {signedOut ? (
+          <Link
+            to="/login"
+            className="mt-5 inline-flex items-center gap-1.5 rounded-md border-2 px-4 py-1.5 transition-colors"
+            style={{
+              borderColor: '#FAD15E60',
+              color: '#FAD15E',
+              fontSize: '12px',
+              fontWeight: 600,
+            }}
+          >
+            Sign in
+          </Link>
+        ) : (
+          <Link
+            to="/intel"
+            className="mt-5 inline-flex items-center gap-1.5 rounded-md border-2 px-4 py-1.5 transition-colors"
+            style={{
+              borderColor: '#6B94C860',
+              color: '#6B94C8',
+              fontSize: '12px',
+              fontWeight: 600,
+            }}
+          >
+            Browse INTEL
+          </Link>
+        )}
+      </div>
+    );
+  }
+
   // Build the "where" phrase for the empty message
   const location =
     [realm, front, l2, l3].filter(Boolean).join(' · ') || 'INTEL';
