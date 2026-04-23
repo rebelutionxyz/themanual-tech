@@ -39,7 +39,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'home', label: 'Home', icon: Home, group: 'primary' },
   { id: 'hot', label: 'Hot', icon: Flame, group: 'primary' },
-  { id: 'new', label: 'New', icon: Clock, group: 'primary' },
+  { id: 'new', label: 'Breaking', icon: Clock, group: 'primary' },
   { id: 'create', label: 'Thread', icon: Plus, group: 'primary', isAction: true },
   { id: 'mythreads', label: 'My Threads', icon: MessageSquare, group: 'personal' },
   { id: 'following', label: 'Following', icon: Users, group: 'personal' },
@@ -110,6 +110,30 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
     return () => document.removeEventListener('keydown', onKey);
   }, [pinned]);
 
+  // Click-outside to close on mobile (when sidebar is pinned expanded)
+  useEffect(() => {
+    if (!pinned) return;
+    // Only on mobile
+    if (window.innerWidth >= 768) return;
+    const onDocClick = (e: MouseEvent | TouchEvent) => {
+      const aside = asideRef.current;
+      if (!aside) return;
+      const target = e.target as Node;
+      if (aside.contains(target)) return; // click inside — ignore
+      setPinned(false);
+    };
+    // Delay registration to avoid catching the very click/touch that pinned it
+    const t = setTimeout(() => {
+      document.addEventListener('mousedown', onDocClick);
+      document.addEventListener('touchstart', onDocClick, { passive: true });
+    }, 0);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('touchstart', onDocClick);
+    };
+  }, [pinned]);
+
   function handleSelect(view: IntelView) {
     onSelectView(view);
     // On touch (no hover), auto-collapse after selection
@@ -122,15 +146,25 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
   const personalItems = NAV_ITEMS.filter((n) => n.group === 'personal');
 
   return (
-    <aside
-      ref={asideRef}
-      onMouseEnter={() => !pinned && setHovered(true)}
-      onMouseLeave={() => !pinned && setHovered(false)}
-      className={cn(
-        'relative z-20 flex h-full flex-col border-r border-border bg-bg-elevated/60 transition-[width] duration-200 ease-out',
-        expanded ? 'w-44' : 'w-12',
+    <>
+      {/* Mobile overlay — only when pinned open (tap anywhere dims/closes) */}
+      {pinned && (
+        <div
+          className="fixed inset-0 z-10 bg-black/40 backdrop-blur-sm md:hidden"
+          onClick={() => setPinned(false)}
+          aria-hidden="true"
+        />
       )}
-    >
+
+      <aside
+        ref={asideRef}
+        onMouseEnter={() => !pinned && setHovered(true)}
+        onMouseLeave={() => !pinned && setHovered(false)}
+        className={cn(
+          'relative z-20 flex h-full flex-col border-r border-border bg-bg-elevated transition-[width] duration-200 ease-out',
+          expanded ? 'w-44' : 'w-12',
+        )}
+      >
       {/* Toggle */}
       <button
         type="button"
@@ -185,6 +219,7 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
         />
       </div>
     </aside>
+    </>
   );
 }
 

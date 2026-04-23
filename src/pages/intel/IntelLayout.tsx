@@ -101,7 +101,7 @@ export function IntelLayout() {
           className="min-w-0 flex-1 overflow-y-auto"
           style={{
             background:
-              'linear-gradient(180deg, rgba(107, 148, 200, 0.04) 0%, rgba(107, 148, 200, 0.01) 40%, transparent 100%)',
+              'linear-gradient(180deg, rgba(107, 148, 200, 0.12) 0%, rgba(107, 148, 200, 0.08) 50%, rgba(107, 148, 200, 0.06) 100%)',
           }}
         >
           <Outlet />

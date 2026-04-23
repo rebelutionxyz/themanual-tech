@@ -50,6 +50,8 @@ export interface ThreadListFilter {
   /** Only threads linked to this specific atom */
   atomId?: string | null;
   sortBy?: 'hot' | 'new' | 'top';
+  /** Time window in hours for sortBy='hot' or 'new'. 0 = all-time. */
+  timeWindowHours?: number;
   limit?: number;
 }
 
@@ -129,6 +131,19 @@ export async function listThreads(
         ? { col: 'created_at', ascending: false }
         : { col: 'last_activity_at', ascending: false };
 
+  // Compute time-window cutoff (if applicable). 0 = all-time, skip filter.
+  const windowHours = filter.timeWindowHours;
+  const applyWindow = typeof windowHours === 'number' && windowHours > 0;
+  const cutoffIso = applyWindow
+    ? new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString()
+    : null;
+  // Which column to filter by window on:
+  //  - 'new' (Breaking): filter by created_at (threads born in window)
+  //  - 'hot': filter by last_activity_at (threads active in window)
+  //  - 'top': we could filter either way; default to last_activity_at
+  const windowCol: 'created_at' | 'last_activity_at' =
+    filter.sortBy === 'new' ? 'created_at' : 'last_activity_at';
+
   // Specific atom filter — narrow to threads linked to this atom
   if (filter.atomId) {
     const { data: links } = await supabase
@@ -138,22 +153,26 @@ export async function listThreads(
       .eq('atom_id', filter.atomId);
     if (!links?.length) return [];
     const ids = links.map((l) => l.source_id);
-    const { data: threads } = await supabase
+    let q = supabase
       .from('forum_threads')
       .select('*')
       .in('id', ids)
       .order(order.col, { ascending: order.ascending })
       .limit(limit);
+    if (cutoffIso) q = q.gte(windowCol, cutoffIso);
+    const { data: threads } = await q;
     return enrichWithAuthors(threads ?? []);
   }
 
   // No realm filter — all threads
   if (!filter.realm) {
-    const { data } = await supabase
+    let q = supabase
       .from('forum_threads')
       .select('*')
       .order(order.col, { ascending: order.ascending })
       .limit(limit);
+    if (cutoffIso) q = q.gte(windowCol, cutoffIso);
+    const { data } = await q;
     return enrichWithAuthors(data ?? []);
   }
 
@@ -175,7 +194,6 @@ export async function listThreads(
 
   // Query 2 — via atom links (only if atomIdsInRealm provided; otherwise skip)
   if (atomIdsInRealm && atomIdsInRealm.length > 0) {
-    // Supabase caps .in() at ~1000 elements; batch if needed.
     const BATCH = 500;
     for (let i = 0; i < atomIdsInRealm.length; i += BATCH) {
       const chunk = atomIdsInRealm.slice(i, i + BATCH);
@@ -191,12 +209,14 @@ export async function listThreads(
   const allIds = Array.from(new Set([...directIds, ...linkedIds]));
   if (allIds.length === 0) return [];
 
-  const { data: threads } = await supabase
+  let qFinal = supabase
     .from('forum_threads')
     .select('*')
     .in('id', allIds)
     .order(order.col, { ascending: order.ascending })
     .limit(limit);
+  if (cutoffIso) qFinal = qFinal.gte(windowCol, cutoffIso);
+  const { data: threads } = await qFinal;
   return enrichWithAuthors(threads ?? []);
 }
 

@@ -60,12 +60,20 @@ export interface InlineComposerProps {
 
   /** Subheader / description under the main header */
   subheader?: string;
+
+  /** When true, renders as a collapsed single-line prompt until clicked.
+   *  When false, renders fully expanded immediately (used for replies). */
+  startCollapsed?: boolean;
+
+  /** Placeholder text for collapsed prompt */
+  placeholderCollapsed?: string;
 }
 
 const INTEL_BLUE = '#6B94C8';
 
 /**
- * Always-expanded composer. Renders as a prominent bordered card.
+ * Composer card. Can render collapsed (single-line prompt → click to expand) or
+ * fully expanded (used for reply mode where Reply button is the trigger).
  * Title (threads only) + body + opt-in atom tagging via [Add atoms] toggle.
  */
 export function InlineComposer({
@@ -84,6 +92,8 @@ export function InlineComposer({
   accentColor = INTEL_BLUE,
   header,
   subheader,
+  startCollapsed = false,
+  placeholderCollapsed,
 }: InlineComposerProps) {
   const navigate = useNavigate();
 
@@ -95,8 +105,16 @@ export function InlineComposer({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Expansion state — if startCollapsed, begin collapsed; otherwise fully expanded.
+  // Drafts with content auto-expand on mount so Bees see their WIP.
+  const [expanded, setExpanded] = useState(!startCollapsed);
+
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+
+  const placeholderCollapsedFinal =
+    placeholderCollapsed ??
+    (mode === 'thread' ? 'Start a thread. Earn BLiNG!' : 'Reply to this thread...');
 
   const placeholderBodyFinal =
     placeholderBody ??
@@ -112,10 +130,17 @@ export function InlineComposer({
         if (parsed.title) setTitle(parsed.title);
         if (parsed.body) setBody(parsed.body);
         if (parsed.atomIds) setAtomIds(parsed.atomIds);
+        // If draft has content, auto-expand to show it
+        const hasContent =
+          (parsed.title && parsed.title.trim()) ||
+          (parsed.body && parsed.body.trim()) ||
+          (Array.isArray(parsed.atomIds) && parsed.atomIds.length > 0);
+        if (hasContent) setExpanded(true);
       } catch {
         // ignore corrupt draft
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
 
   // Autosave draft
@@ -162,6 +187,7 @@ export function InlineComposer({
         setBody('');
         setAtomIds([]);
         setAdvancedOpen(false);
+        if (startCollapsed) setExpanded(false);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to post');
@@ -196,6 +222,7 @@ export function InlineComposer({
       }
     }
     setAdvancedOpen(false);
+    if (startCollapsed) setExpanded(false);
     if (onCancel) onCancel();
   }
 
@@ -215,14 +242,49 @@ export function InlineComposer({
     );
   }
 
+  // Collapsed state — prominent single-line prompt
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setExpanded(true);
+          setTimeout(() => {
+            if (mode === 'thread') titleRef.current?.focus();
+            else bodyRef.current?.focus();
+          }, 50);
+        }}
+        className="group flex w-full items-center gap-2 rounded-lg border-2 bg-bg-elevated px-4 py-3 text-left transition-all hover:bg-panel-2 hover:shadow-lg"
+        style={{
+          borderColor: `${accentColor}60`,
+          boxShadow: `0 0 0 1px ${accentColor}15, 0 2px 8px rgba(0,0,0,0.25)`,
+        }}
+      >
+        <Send size={14} style={{ color: accentColor }} />
+        <span
+          className="flex-1 font-display tracking-wide"
+          style={{ fontSize: '14px', color: accentColor, fontWeight: 500 }}
+        >
+          {placeholderCollapsedFinal}
+        </span>
+        <span
+          className="font-mono text-text-muted"
+          style={{ fontSize: '11px' }}
+          data-size="meta"
+        >
+          Click to compose →
+        </span>
+      </button>
+    );
+  }
+
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-lg border-2 p-4 shadow-lg transition-colors"
+      className="rounded-lg border-2 bg-bg-elevated p-4 shadow-lg transition-colors"
       style={{
         borderColor: `${accentColor}60`,
-        background: `linear-gradient(135deg, ${accentColor}0A 0%, rgba(15, 18, 23, 0.4) 100%)`,
-        boxShadow: `0 0 0 1px ${accentColor}15, 0 4px 12px rgba(0,0,0,0.2)`,
+        boxShadow: `0 0 0 1px ${accentColor}15, 0 4px 12px rgba(0,0,0,0.3)`,
       }}
     >
       {/* Header */}

@@ -3,6 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import { ThreadList } from '@/components/intel/ThreadList';
 import { L3Refinement } from '@/components/intel/L3Refinement';
 import { InlineComposer } from '@/components/intel/InlineComposer';
+import { TimeWindowBar } from '@/components/intel/TimeWindowBar';
 import { useIntelStore } from '@/stores/useIntelStore';
 import { useAuth } from '@/lib/auth';
 import { createThread } from '@/lib/intel';
@@ -25,14 +26,22 @@ export function IntelPage() {
     selectedL2,
     selectedL3,
     activeView,
+    hotWindow,
+    breakingWindow,
     setRealm,
     setFront,
     setL2,
     setL3,
+    setHotWindow,
+    setBreakingWindow,
   } = useIntelStore();
 
   const sortBy: 'hot' | 'new' | 'top' =
     activeView === 'new' ? 'new' : 'hot';
+
+  // Active time window depends on view. Home/following/saved/etc. use 0 (all-time).
+  const activeWindow =
+    activeView === 'hot' ? hotWindow : activeView === 'new' ? breakingWindow : 0;
 
   // Build breadcrumb segments based on what's selected
   const crumbs: BreadcrumbSegment[] = [];
@@ -98,7 +107,8 @@ export function IntelPage() {
             style={{ fontSize: '11px', color: INTEL_COLOR, opacity: 0.7 }}
             data-size="meta"
           >
-            INTEL {activeView === 'new' && '· New'}
+            INTEL {activeView === 'new' && '· Breaking'}
+            {activeView === 'hot' && '· Hot'}
             {activeView === 'mythreads' && '· My threads'}
             {activeView === 'following' && '· Following'}
             {activeView === 'saved' && '· Saved'}
@@ -165,13 +175,50 @@ export function IntelPage() {
         </div>
       </div>
 
-      {/* Inline composer (replaces "+ Thread" button) */}
+      {/* Time window picker — only for Hot and Breaking views */}
+      {(activeView === 'hot' || activeView === 'new') && (
+        <TimeWindowBar
+          value={activeView === 'hot' ? hotWindow : breakingWindow}
+          onChange={(h) => {
+            if (activeView === 'hot') setHotWindow(h);
+            else setBreakingWindow(h);
+          }}
+          label={activeView === 'hot' ? 'Hot in' : 'Breaking in'}
+        />
+      )}
+
+      {/* L3 refinement row + optional tree drill */}
+      <L3Refinement
+        selectedRealm={selectedRealm}
+        selectedFront={selectedFront}
+        selectedL2={selectedL2}
+        selectedL3={selectedL3}
+        onSelectL3={setL3}
+        onSelectPath={(path) => {
+          // Parse "Realm / L2 / L3 / L4 / ..." — update store based on depth
+          const parts = path.split(' / ').map((s) => s.trim());
+          if (parts.length >= 2) {
+            const second = parts[1];
+            const FRONTS = ['UNITE & RULE', 'INVESTIGATE', 'THE NEW WORLD ORDER', 'PROSECUTE', 'THE DEEP STATE'];
+            if (FRONTS.includes(second)) {
+              if (parts.length >= 3) setL3(parts[2]);
+              else setL3(null);
+            } else {
+              if (parts.length >= 3) setL3(parts[2]);
+              else setL3(null);
+            }
+          }
+        }}
+      />
+
+      {/* Inline composer — collapsed by default, click to expand */}
       <div className="mb-4">
         <InlineComposer
           mode="thread"
           enabled={!!bee}
           disabledMessage="Sign in to start a thread"
           draftKey="intel-thread-new"
+          startCollapsed={true}
           allowExpand={true}
           expandUrl="/intel/new"
           header="Start a thread. Earn BLiNG!"
@@ -179,6 +226,11 @@ export function IntelPage() {
             selectedRealm
               ? `Posting in ${selectedRealm}${selectedFront ? ` · ${selectedFront}` : ''}${selectedL2 ? ` · ${selectedL2}` : ''}`
               : 'Posting to INTEL'
+          }
+          placeholderCollapsed={
+            selectedRealm
+              ? `Start a thread in ${selectedRealm}${selectedFront ? ` · ${selectedFront}` : ''}. Earn BLiNG!`
+              : 'Start a thread. Earn BLiNG!'
           }
           placeholderTitle="What's on your mind?"
           inheritedContext={{
@@ -210,34 +262,6 @@ export function IntelPage() {
         />
       </div>
 
-      {/* L3 refinement row + optional tree drill */}
-      <L3Refinement
-        selectedRealm={selectedRealm}
-        selectedFront={selectedFront}
-        selectedL2={selectedL2}
-        selectedL3={selectedL3}
-        onSelectL3={setL3}
-        onSelectPath={(path) => {
-          // Parse "Realm / L2 / L3 / L4 / ..." — update store based on depth
-          const parts = path.split(' / ').map((s) => s.trim());
-          // Skip root (parts[0] is already selectedRealm)
-          if (parts.length >= 2) {
-            const second = parts[1];
-            // If second part is a Front, set Front; else set L2
-            const FRONTS = ['UNITE & RULE', 'INVESTIGATE', 'THE NEW WORLD ORDER', 'PROSECUTE', 'THE DEEP STATE'];
-            if (FRONTS.includes(second)) {
-              // Path is Realm / Front / L3 / ...
-              if (parts.length >= 3) setL3(parts[2]);
-              else setL3(null);
-            } else {
-              // Path is Realm / L2 / L3 / ...
-              if (parts.length >= 3) setL3(parts[2]);
-              else setL3(null);
-            }
-          }
-        }}
-      />
-
       {/* Thread list */}
       <ThreadList
         selectedRealm={selectedRealm}
@@ -245,6 +269,7 @@ export function IntelPage() {
         selectedL2={selectedL2}
         selectedL3={selectedL3}
         sortBy={sortBy}
+        timeWindowHours={activeWindow}
       />
     </div>
   );

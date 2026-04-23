@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp, Network } from 'lucide-react';
 import { useManualData } from '@/lib/useManualData';
 import { FRONT_ORDER } from '@/lib/constants';
@@ -35,6 +35,11 @@ export function L3Refinement({
   const { atoms, tree } = useManualData();
   const [treeOpen, setTreeOpen] = useState(false);
 
+  // Auto-close the tree if L3 gets deselected (no L3 = no drill context)
+  useEffect(() => {
+    if (!selectedL3 && treeOpen) setTreeOpen(false);
+  }, [selectedL3, treeOpen]);
+
   const l3Options = useMemo(() => {
     const hasL2Context = selectedRealm && selectedL2;
     const hasFrontContext = selectedRealm && selectedFront && !selectedL2;
@@ -52,36 +57,47 @@ export function L3Refinement({
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [atoms, selectedRealm, selectedFront, selectedL2]);
 
-  // Build the tree scope: narrow to the current branch
+  // Build the tree scope: scope to the SELECTED L3's branch only.
+  // The tree answers "what's under the L3 you picked?"
   const treeRoot = useMemo(() => {
-    if (!tree || !selectedRealm) return null;
+    if (!tree || !selectedRealm || !selectedL3) return null;
     const realmNode = tree.children.find((c) => c.name === selectedRealm);
     if (!realmNode) return null;
 
+    // Walk down to find the L3 node. L3 sits under either Front/L2 or realm directly.
+    // Strategy: find any node in the realm subtree whose name === selectedL3 AND whose
+    // parent chain matches the front/L2 context.
+    function findL3(node: import('@/types/manual').TreeNode): import('@/types/manual').TreeNode | null {
+      // match by name at depth >= 2
+      if (node.name === selectedL3 && node.depth >= 2) return node;
+      for (const child of node.children) {
+        const found = findL3(child);
+        if (found) return found;
+      }
+      return null;
+    }
+
+    // If a Front or L2 is selected, narrow search to that branch first for accuracy
+    let searchRoot: import('@/types/manual').TreeNode = realmNode;
     if (selectedFront) {
-      // Find the Front branch under the realm
-      // In the data, Fronts are typically at depth 2 (Power / FRONT_NAME)
       const frontNode =
         realmNode.children.find((c) => c.name === selectedFront) ||
         findNodeByPath(realmNode, `${selectedRealm} / ${selectedFront}`);
-      return frontNode ?? null;
-    }
-
-    if (selectedL2) {
-      // Find the L2 branch under realm
+      if (frontNode) searchRoot = frontNode;
+    } else if (selectedL2) {
       const l2Node = realmNode.children.find((c) => c.name === selectedL2);
-      return l2Node ?? null;
+      if (l2Node) searchRoot = l2Node;
     }
 
-    return realmNode;
-  }, [tree, selectedRealm, selectedFront, selectedL2]);
+    return findL3(searchRoot);
+  }, [tree, selectedRealm, selectedFront, selectedL2, selectedL3]);
 
   if (l3Options.length === 0) return null;
 
   return (
     <div className="mb-4 space-y-2">
       {/* Flat L3 scroll bar */}
-      <div className="rounded-lg border border-border bg-bg-elevated/40">
+      <div className="rounded-lg border border-border bg-bg-elevated">
         <ScrollRow>
           <button
             type="button"
@@ -115,22 +131,22 @@ export function L3Refinement({
         </ScrollRow>
       </div>
 
-      {/* Drill deeper toggle */}
-      {treeRoot && (
+      {/* Drill deeper — only when L3 is selected and has children to drill into */}
+      {treeRoot && treeRoot.children.length > 0 && (
         <div>
           <button
             type="button"
             onClick={() => setTreeOpen((o) => !o)}
-            className="flex items-center gap-1.5 rounded-md border border-border bg-bg-elevated/40 px-2.5 py-1 text-text-dim transition-colors hover:border-border-bright hover:text-text-silver"
+            className="flex items-center gap-1.5 rounded-md border border-border bg-bg-elevated px-2.5 py-1 text-text-dim transition-colors hover:border-border-bright hover:text-text-silver"
             style={{ fontSize: '11px' }}
           >
             <Network size={11} />
-            <span>Drill deeper</span>
+            <span>Drill deeper into {selectedL3}</span>
             {treeOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
           </button>
 
           {treeOpen && (
-            <div className="mt-2 rounded-lg border border-border bg-bg-elevated/40 p-2">
+            <div className="mt-2 rounded-lg border border-border bg-bg-elevated p-2">
               <TaxonomyTree
                 root={treeRoot}
                 mode="single-path"

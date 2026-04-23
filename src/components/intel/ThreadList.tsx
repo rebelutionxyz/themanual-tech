@@ -15,6 +15,7 @@ interface ThreadListProps {
   selectedL2: string | null;
   selectedL3?: string | null;
   sortBy?: 'hot' | 'new' | 'top';
+  timeWindowHours?: number;
 }
 
 export function ThreadList({
@@ -23,6 +24,7 @@ export function ThreadList({
   selectedL2,
   selectedL3 = null,
   sortBy = 'hot',
+  timeWindowHours = 0,
 }: ThreadListProps) {
   const { atoms } = useManualData();
   const [threads, setThreads] = useState<ForumThread[] | null>(null);
@@ -69,6 +71,7 @@ export function ThreadList({
         front: selectedFront,
         l2: selectedL2,
         sortBy,
+        timeWindowHours,
       },
       atomIdsInRealm,
     )
@@ -109,7 +112,7 @@ export function ThreadList({
     return () => {
       cancelled = true;
     };
-  }, [selectedRealm, selectedFront, selectedL2, sortBy, atomIdsInRealm]);
+  }, [selectedRealm, selectedFront, selectedL2, sortBy, timeWindowHours, atomIdsInRealm]);
 
   if (error) {
     return (
@@ -180,7 +183,7 @@ function ThreadCard({
     <li>
       <Link
         to={`/intel/t/${thread.id}`}
-        className="group block rounded-lg border border-border bg-bg-elevated/40 p-4 transition-colors hover:border-border-bright hover:bg-bg-elevated"
+        className="group block rounded-lg border border-border bg-bg-elevated p-4 transition-colors hover:border-border-bright hover:bg-panel-2"
       >
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
@@ -313,7 +316,7 @@ function ThreadListSkeleton() {
       {[0, 1, 2].map((i) => (
         <li
           key={i}
-          className="h-24 animate-pulse-slow rounded-lg border border-border bg-bg-elevated/40"
+          className="h-24 animate-pulse-slow rounded-lg border border-border bg-bg-elevated"
         />
       ))}
     </ul>
