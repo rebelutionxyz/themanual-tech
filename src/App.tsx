@@ -10,6 +10,7 @@ import { LoginPage } from '@/pages/LoginPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { SurfacePage } from '@/pages/SurfacePage';
 import { WavesPage } from '@/pages/WavesPage';
+import { BlingsPage } from '@/pages/BlingsPage';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
 
@@ -41,6 +42,9 @@ export default function App() {
 
             {/* Waves surface — Mini Waves V76 embedded via iframe */}
             <Route path="/waves" element={<WavesPage />} />
+
+            {/* BLiNG! surface — freedomblings.com embedded via iframe */}
+            <Route path="/bling" element={<BlingsPage />} />
 
             {/* All other surfaces use generic SurfacePage */}
             <Route path="/:slug" element={<SurfacePage />} />
