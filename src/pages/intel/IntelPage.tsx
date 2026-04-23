@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth';
 import { createThread } from '@/lib/intel';
 import { FRONT_COLORS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import type { Front } from '@/types/manual';
 
 const INTEL_COLOR = '#6B94C8';
 
@@ -246,18 +247,47 @@ export function IntelPage() {
         selectedL3={selectedL3}
         onSelectL3={setL3}
         onSelectPath={(path) => {
-          // Parse "Realm / L2 / L3 / L4 / ..." — update store based on depth
-          const parts = path.split(' / ').map((s) => s.trim());
+          // Parse "Realm / Something / L3 / ..." and update the store so the
+          // whole UI (breadcrumb, realm bar, flat L3 bar, composer context)
+          // reflects the drilled-to position.
+          //
+          // Path shapes we handle:
+          //   "Power"                              → realm only
+          //   "Power / Activism"                   → realm + L2
+          //   "Power / INVESTIGATE"                → realm + Front
+          //   "Power / Activism / Civic Education" → realm + L2 + L3
+          //   "Power / INVESTIGATE / 9/11"         → realm + Front + L3
+          //   "Body / Nutrition / Hydration"       → realm + L2 + L3
+          //   Anything deeper → keep L3 at parts[2], ignore deeper for filter
+          const parts = path.split(' / ').map((s) => s.trim()).filter(Boolean);
+          if (parts.length === 0) return;
+
+          const FRONTS = [
+            'UNITE & RULE',
+            'INVESTIGATE',
+            'THE NEW WORLD ORDER',
+            'PROSECUTE',
+            'THE DEEP STATE',
+          ];
+
+          // Always set the realm
+          setRealm(parts[0]);
+
+          // Clear deeper selections first, then reapply based on path depth
+          setFront(null);
+          setL2(null);
+          setL3(null);
+
           if (parts.length >= 2) {
             const second = parts[1];
-            const FRONTS = ['UNITE & RULE', 'INVESTIGATE', 'THE NEW WORLD ORDER', 'PROSECUTE', 'THE DEEP STATE'];
             if (FRONTS.includes(second)) {
-              if (parts.length >= 3) setL3(parts[2]);
-              else setL3(null);
+              setFront(second as Front);
             } else {
-              if (parts.length >= 3) setL3(parts[2]);
-              else setL3(null);
+              setL2(second);
             }
+          }
+          if (parts.length >= 3) {
+            setL3(parts[2]);
           }
         }}
       />

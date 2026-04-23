@@ -119,12 +119,14 @@ export function L3Refinement({
   // Don't render if no flat options AND no tree root (i.e., no realm/front/l2 context)
   if (l3Options.length === 0 && !treeRoot) return null;
 
-  // Drill Deeper should only appear if the tree actually shows something
-  // NEW beyond the flat bar — i.e., at least one of treeRoot's children has its
-  // own children. Otherwise the tree just duplicates what's already in the
-  // flat bar, which is noise.
+  // Drill Deeper should only appear when:
+  //  1. A realm is actually selected (not "All")
+  //  2. The tree actually shows something NEW beyond the flat bar — at least one
+  //     of treeRoot's children has its own children. Otherwise the tree just
+  //     duplicates what's already in the flat bar, which is noise.
   const hasDrillableContent = Boolean(
-    treeRoot &&
+    selectedRealm &&
+      treeRoot &&
       treeRoot.children.length > 0 &&
       treeRoot.children.some((c) => c.children.length > 0),
   );
