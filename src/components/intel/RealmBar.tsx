@@ -1,6 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { REALM_ORDER, FRONT_ORDER, FRONT_CLASS } from '@/lib/constants';
+import { ScrollRow, RowLabel } from '@/components/ui/ScrollRow';
 import { cn } from '@/lib/utils';
 import type { Front } from '@/types/manual';
 
@@ -16,100 +15,6 @@ interface RealmBarProps {
 
 const FRONT_SET = new Set<string>(FRONT_ORDER);
 
-/**
- * Reusable horizontally-scrolling row with left/right chevron arrows.
- * Used for every row in the sticky bar.
- */
-function ScrollRow({
-  className,
-  leading,
-  children,
-}: {
-  className?: string;
-  leading?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const update = () => {
-      setCanScrollLeft(el.scrollLeft > 4);
-      setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
-    };
-    update();
-    el.addEventListener('scroll', update, { passive: true });
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    const mo = new MutationObserver(update);
-    mo.observe(el, { childList: true, subtree: true });
-    return () => {
-      el.removeEventListener('scroll', update);
-      ro.disconnect();
-      mo.disconnect();
-    };
-  }, []);
-
-  const scroll = (dir: 'left' | 'right') => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const amt = el.clientWidth * 0.6;
-    el.scrollBy({ left: dir === 'left' ? -amt : amt, behavior: 'smooth' });
-  };
-
-  return (
-    <div className={cn('relative flex items-center', className)}>
-      {leading && <div className="flex-shrink-0 pl-3">{leading}</div>}
-
-      {canScrollLeft && (
-        <button
-          type="button"
-          onClick={() => scroll('left')}
-          aria-label="Scroll left"
-          className="absolute left-0 top-0 z-10 flex h-full items-center justify-center bg-gradient-to-r from-bg-elevated via-bg-elevated/90 to-transparent px-2 text-text-silver hover:text-text"
-          style={{ left: leading ? 64 : 0 }}
-        >
-          <ChevronLeft size={16} />
-        </button>
-      )}
-
-      <div
-        ref={scrollRef}
-        className="scrollbar-none flex flex-1 items-center gap-1 overflow-x-auto px-3 py-2"
-        style={{ scrollbarWidth: 'none' }}
-      >
-        {children}
-      </div>
-
-      {canScrollRight && (
-        <button
-          type="button"
-          onClick={() => scroll('right')}
-          aria-label="Scroll right"
-          className="absolute right-0 top-0 z-10 flex h-full items-center justify-center bg-gradient-to-l from-bg-elevated via-bg-elevated/90 to-transparent px-2 text-text-silver hover:text-text"
-        >
-          <ChevronRight size={16} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-function RowLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span
-      className="font-mono uppercase tracking-wider text-text-muted"
-      style={{ fontSize: '10.5px' }}
-      data-size="meta"
-    >
-      {children}
-    </span>
-  );
-}
-
 export function RealmBar({
   selectedRealm,
   selectedFront,
@@ -119,16 +24,12 @@ export function RealmBar({
   onSelectL2,
   realmSubs = {},
 }: RealmBarProps) {
-  const isPowerActive = selectedRealm === 'Power';
+  // L2s for current realm, stripped of any Front names
+  const subsForRealm = selectedRealm ? realmSubs[selectedRealm] ?? [] : [];
+  const l2Options = subsForRealm.filter((s) => !FRONT_SET.has(s));
 
-  // L2s for current realm, EXCLUDING any Front name (defensive double-filter)
-  const l2Options = (selectedRealm ? realmSubs[selectedRealm] ?? [] : []).filter(
-    (s) => !FRONT_SET.has(s),
-  );
-
-  const showL2Row = selectedRealm && l2Options.length > 0;
-  // Fronts get their OWN row, only on Power, shown BELOW the L2 row
-  const showFrontsRow = isPowerActive;
+  const hasRealm = selectedRealm !== null;
+  const isPower = selectedRealm === 'Power';
 
   return (
     <div className="sticky top-0 z-30 border-b border-border bg-bg-elevated/95 backdrop-blur-md">
@@ -158,8 +59,8 @@ export function RealmBar({
         ))}
       </ScrollRow>
 
-      {/* ROW 2 — L2s for current realm (no Fronts) */}
-      {showL2Row && (
+      {/* ROW 2 — L2 subs (shown for any selected realm, INCLUDING Power) */}
+      {hasRealm && l2Options.length > 0 && (
         <ScrollRow
           className="border-t border-border bg-bg/40"
           leading={<RowLabel>Subs</RowLabel>}
@@ -175,8 +76,8 @@ export function RealmBar({
         </ScrollRow>
       )}
 
-      {/* ROW 3 — Fronts (Power only, always shown below L2 row) */}
-      {showFrontsRow && (
+      {/* ROW 3 — Fronts (Power realm only) */}
+      {isPower && (
         <ScrollRow
           className="border-t border-border bg-bg/40"
           leading={<RowLabel>Fronts</RowLabel>}
@@ -185,9 +86,9 @@ export function RealmBar({
             <button
               key={front}
               type="button"
-              onClick={() => {
-                onSelectFront(selectedFront === front ? null : front);
-              }}
+              onClick={() =>
+                onSelectFront(selectedFront === front ? null : front)
+              }
               className={cn(
                 'flex-shrink-0 rounded-md border px-2.5 py-1 transition-colors',
                 'font-display tracking-wide',

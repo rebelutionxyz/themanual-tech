@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useManualData } from '@/lib/useManualData';
 import { FRONT_ORDER } from '@/lib/constants';
+import { ScrollRow, RowLabel } from '@/components/ui/ScrollRow';
 import { cn } from '@/lib/utils';
 import type { Front } from '@/types/manual';
 
@@ -16,11 +17,7 @@ interface L3RefinementProps {
 
 /**
  * Body-level refinement row. Only visible when a realm + L2 are selected.
- * Shows L3 sub-sub-categories for the selected L2.
- * Sits between page header and thread list, flush with content width.
- *
- * Note: filters out any L3 that matches a Front name — the Manual data has
- * some atoms where Front names leak into L3 positions (taxonomy cleanup TBD).
+ * Horizontally scrollable with chevron arrows matching realm/L2/Fronts pattern.
  */
 export function L3Refinement({
   selectedRealm,
@@ -32,18 +29,14 @@ export function L3Refinement({
   const { atoms } = useManualData();
 
   const l3Options = useMemo(() => {
-    if (!selectedRealm) return [] as string[];
-    // Need EITHER L2 OR Front to show L3s (otherwise scope is too broad)
-    if (!selectedL2 && !selectedFront) return [] as string[];
-
+    if (!selectedRealm || !selectedL2) return [] as string[];
     const set = new Set<string>();
     for (const a of atoms) {
       if (a.realm !== selectedRealm) continue;
       if (selectedFront && a.front !== selectedFront) continue;
-      if (selectedL2 && a.L2 !== selectedL2) continue;
+      if (a.L2 !== selectedL2) continue;
       if (!a.L3) continue;
-      // Filter out Front names that leak into L3 positions (data quirk)
-      if (FRONT_SET.has(a.L3)) continue;
+      if (FRONT_SET.has(a.L3)) continue; // strip Front names that leak into L3
       set.add(a.L3);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b));
@@ -52,20 +45,13 @@ export function L3Refinement({
   if (l3Options.length === 0) return null;
 
   return (
-    <div className="mb-4 rounded-lg border border-border bg-bg-elevated/40 px-3 py-2">
-      <div
-        className="mb-1.5 font-mono uppercase tracking-wider text-text-muted"
-        style={{ fontSize: '10.5px' }}
-        data-size="meta"
-      >
-        Refine: {selectedL2 ?? selectedFront}
-      </div>
-      <div className="flex flex-wrap gap-1">
+    <div className="mb-4 rounded-lg border border-border bg-bg-elevated/40">
+      <ScrollRow leading={<RowLabel>Refine: {selectedL2}</RowLabel>}>
         <button
           type="button"
           onClick={() => onSelectL3(null)}
           className={cn(
-            'rounded-md border px-2 py-0.5 transition-colors',
+            'flex-shrink-0 rounded-md border px-2 py-0.5 transition-colors',
             selectedL3 === null
               ? 'border-text-silver/40 bg-bg text-text'
               : 'border-transparent text-text-dim hover:border-border hover:text-text-silver',
@@ -80,7 +66,7 @@ export function L3Refinement({
             type="button"
             onClick={() => onSelectL3(selectedL3 === l3 ? null : l3)}
             className={cn(
-              'rounded-md border px-2 py-0.5 transition-colors',
+              'flex-shrink-0 rounded-md border px-2 py-0.5 transition-colors',
               selectedL3 === l3
                 ? 'border-text-silver/40 bg-bg text-text'
                 : 'border-transparent text-text-silver hover:border-border hover:bg-bg',
@@ -90,7 +76,7 @@ export function L3Refinement({
             {l3}
           </button>
         ))}
-      </div>
+      </ScrollRow>
     </div>
   );
 }

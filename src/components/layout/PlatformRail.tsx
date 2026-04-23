@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { X, ChevronRight } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { X, ChevronRight, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import {
   SURFACES,
   SURFACE_GROUPS,
@@ -11,34 +11,40 @@ import { cn } from '@/lib/utils';
 
 /**
  * Right-side platform rail.
- * - Icon rail (~56px wide, always visible on desktop)
- * - Hover an icon → peek popup (temporary)
- * - Click an icon → pin popup (persists until dismissed or another opened)
- * - Popup is color-coded with that surface's accent color
- * - Mobile: rail hidden, swipe-from-right reveals drawer with all surfaces
+ *
+ * Desktop:
+ * - Default: ~56px icon rail, always visible
+ * - Click top toggle → expands to ~180px with labels (like left sidebar)
+ * - Click any surface icon in expanded mode → navigate + auto-collapse
+ * - Hover an icon in collapsed mode → surface popup peeks
+ * - Click an icon in collapsed mode → surface popup pins
+ *
+ * Mobile:
+ * - Rail hidden
+ * - Swipe from right edge OR tap small tab → drawer slides in showing all surfaces
  */
 export function PlatformRail() {
   const location = useLocation();
+  const navigate = useNavigate();
   const activeSlug =
     location.pathname.length > 1 ? location.pathname.slice(1).split('/')[0] : null;
 
+  const [expanded, setExpanded] = useState(false);
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
   const [pinnedSlug, setPinnedSlug] = useState<string | null>(null);
-
-  // Mobile drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // Which popup to show: pinned takes priority, else hovered
-  const popupSlug = pinnedSlug ?? hoveredSlug;
+  const railRef = useRef<HTMLDivElement>(null);
+
+  // Popups only apply in COLLAPSED mode
+  const popupSlug = !expanded ? pinnedSlug ?? hoveredSlug : null;
   const popupSurface = popupSlug ? SURFACES.find((s) => s.slug === popupSlug) : null;
 
-  // Close pin when clicking outside
-  const railRef = useRef<HTMLDivElement>(null);
+  // Close popup pin when clicking outside
   useEffect(() => {
     if (!pinnedSlug) return;
     const onDown = (e: MouseEvent) => {
-      if (!railRef.current) return;
-      if (!railRef.current.contains(e.target as Node)) {
+      if (!railRef.current?.contains(e.target as Node)) {
         setPinnedSlug(null);
       }
     };
@@ -46,20 +52,18 @@ export function PlatformRail() {
     return () => document.removeEventListener('mousedown', onDown);
   }, [pinnedSlug]);
 
-  // ESC closes pinned popup
+  // ESC closes anything open
   useEffect(() => {
-    if (!pinnedSlug && !drawerOpen) return;
     const onEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setPinnedSlug(null);
-        setDrawerOpen(false);
-      }
+      if (e.key !== 'Escape') return;
+      if (pinnedSlug) setPinnedSlug(null);
+      if (drawerOpen) setDrawerOpen(false);
     };
     document.addEventListener('keydown', onEsc);
     return () => document.removeEventListener('keydown', onEsc);
   }, [pinnedSlug, drawerOpen]);
 
-  // Swipe-from-right gesture for mobile
+  // Swipe-from-right gesture (mobile)
   useEffect(() => {
     let touchStartX = 0;
     let touchStartY = 0;
@@ -71,14 +75,11 @@ export function PlatformRail() {
       if (e.changedTouches.length === 0) return;
       const endX = e.changedTouches[0].clientX;
       const endY = e.changedTouches[0].clientY;
-      const dx = touchStartX - endX; // positive = swipe left
+      const dx = touchStartX - endX;
       const dy = Math.abs(touchStartY - endY);
-
-      // Open drawer: swipe from right edge leftward, horizontal dominant
       if (!drawerOpen && touchStartX > window.innerWidth - 30 && dx > 40 && dy < 40) {
         setDrawerOpen(true);
       }
-      // Close drawer: swipe rightward when drawer is open
       if (drawerOpen && dx < -40 && dy < 40) {
         setDrawerOpen(false);
       }
@@ -91,70 +92,113 @@ export function PlatformRail() {
     };
   }, [drawerOpen]);
 
-  // Listen for external "open drawer" event from UtilityChrome button.
-  // Desktop: pin the currently-active surface's popup.
-  // Mobile: open the drawer.
+  // Listen for UtilityChrome's sidebar-opener event (mobile only)
   useEffect(() => {
     const onOpen = () => {
-      const isMobile = window.innerWidth < 768; // matches Tailwind md breakpoint
-      if (isMobile) {
-        setDrawerOpen(true);
-      } else {
-        // Pin the active surface's popup if on a surface, else first surface
-        const slugToPin = activeSlug ?? SURFACES[0]?.slug ?? null;
-        if (slugToPin) setPinnedSlug(slugToPin);
-      }
+      const isMobile = window.innerWidth < 768;
+      if (isMobile) setDrawerOpen(true);
     };
     window.addEventListener('open-surfaces-drawer', onOpen);
     return () => window.removeEventListener('open-surfaces-drawer', onOpen);
-  }, [activeSlug]);
+  }, []);
 
-  const handleIconClick = useCallback(
-    (slug: string) => {
+  function handleIconClick(slug: string) {
+    if (expanded) {
+      // Expanded mode: clicking navigates and auto-collapses
+      navigate(`/${slug}`);
+      setExpanded(false);
+      setPinnedSlug(null);
+    } else {
+      // Collapsed mode: clicking toggles pin popup
       setPinnedSlug((current) => (current === slug ? null : slug));
-    },
-    [],
-  );
+    }
+  }
 
   return (
     <>
-      {/* Desktop rail — always visible */}
+      {/* Desktop rail */}
       <div
         ref={railRef}
         className="relative z-40 hidden md:block"
-        onMouseLeave={() => {
-          if (!pinnedSlug) setHoveredSlug(null);
-        }}
+        onMouseLeave={() => !pinnedSlug && setHoveredSlug(null)}
       >
         <aside
-          className="flex h-full w-14 flex-col overflow-y-auto border-l border-border bg-bg-elevated/60"
+          className={cn(
+            'flex h-full flex-col overflow-y-auto border-l border-border bg-bg-elevated/60 transition-[width] duration-200 ease-out',
+            expanded ? 'w-48' : 'w-14',
+          )}
           aria-label="Platform surfaces"
         >
-          {SURFACE_GROUPS.map((group) => {
-            const surfaces = getSurfacesByGroup(group);
-            return (
-              <div key={group} className="py-2">
-                <div className="mx-auto mb-1 h-px w-6 bg-border" aria-hidden="true" />
-                <ul className="space-y-0.5 px-2">
-                  {surfaces.map((s) => (
-                    <li key={s.slug}>
-                      <RailIcon
-                        surface={s}
-                        active={activeSlug === s.slug}
-                        hovered={hoveredSlug === s.slug}
-                        pinned={pinnedSlug === s.slug}
-                        onHover={() => !pinnedSlug && setHoveredSlug(s.slug)}
-                        onClick={() => handleIconClick(s.slug)}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
+          {/* Expand/collapse toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setExpanded((e) => !e);
+              setPinnedSlug(null);
+              setHoveredSlug(null);
+            }}
+            aria-label={expanded ? 'Collapse surfaces' : 'Expand surfaces'}
+            className={cn(
+              'flex h-12 flex-shrink-0 items-center border-b border-border text-text-silver hover:bg-bg hover:text-text',
+              expanded ? 'justify-between px-3' : 'justify-center',
+            )}
+          >
+            {expanded && (
+              <span
+                className="font-mono uppercase tracking-widest text-text-muted"
+                style={{ fontSize: '11px' }}
+                data-size="meta"
+              >
+                Surfaces
+              </span>
+            )}
+            {expanded ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+          </button>
+
+          {/* Surface list grouped */}
+          <div className="flex-1">
+            {SURFACE_GROUPS.map((group) => {
+              const surfaces = getSurfacesByGroup(group);
+              return (
+                <div key={group} className="py-1.5">
+                  {expanded ? (
+                    <div
+                      className="px-3 pb-1 font-mono uppercase tracking-wider text-text-muted"
+                      style={{ fontSize: '10px' }}
+                      data-size="meta"
+                    >
+                      {group}
+                    </div>
+                  ) : (
+                    <div
+                      className="mx-auto mb-1 h-px w-6 bg-border"
+                      aria-hidden="true"
+                    />
+                  )}
+                  <ul className="space-y-0.5 px-2">
+                    {surfaces.map((s) => (
+                      <li key={s.slug}>
+                        <RailItem
+                          surface={s}
+                          active={activeSlug === s.slug}
+                          expanded={expanded}
+                          hovered={hoveredSlug === s.slug}
+                          pinned={pinnedSlug === s.slug}
+                          onHover={() =>
+                            !expanded && !pinnedSlug && setHoveredSlug(s.slug)
+                          }
+                          onClick={() => handleIconClick(s.slug)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
         </aside>
 
-        {/* Popup — slides out from LEFT of the rail (toward content) */}
+        {/* Popup (collapsed mode only) — slides out to LEFT of rail */}
         {popupSurface && (
           <SurfacePopup
             surface={popupSurface}
@@ -169,19 +213,32 @@ export function PlatformRail() {
         )}
       </div>
 
-      {/* Mobile drawer — hidden until swipe or utility chrome button */}
+      {/* Mobile drawer */}
       <MobileDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         activeSlug={activeSlug}
       />
+
+      {/* Mobile: small tab hint when drawer is closed */}
+      {!drawerOpen && (
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Open surfaces menu"
+          className="fixed right-0 top-1/2 z-30 flex h-12 w-4 -translate-y-1/2 items-center justify-center rounded-l-md border-y border-l border-border bg-bg-elevated text-text-muted hover:text-text md:hidden"
+        >
+          <ChevronRight size={12} className="rotate-180" />
+        </button>
+      )}
     </>
   );
 }
 
-function RailIcon({
+function RailItem({
   surface,
   active,
+  expanded,
   hovered,
   pinned,
   onHover,
@@ -189,6 +246,7 @@ function RailIcon({
 }: {
   surface: SurfaceDef;
   active: boolean;
+  expanded: boolean;
   hovered: boolean;
   pinned: boolean;
   onHover: () => void;
@@ -196,7 +254,42 @@ function RailIcon({
 }) {
   const Icon = surface.icon;
   const highlighted = active || hovered || pinned;
+  const isBling = surface.special === 'bling';
 
+  if (expanded) {
+    // Expanded = Link-like row with icon + name
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        onMouseEnter={onHover}
+        className={cn(
+          'group flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors',
+          active
+            ? 'bg-bg text-text'
+            : 'text-text-dim hover:bg-bg hover:text-text-silver',
+        )}
+        title={surface.function}
+      >
+        <Icon
+          size={16}
+          className="flex-shrink-0 transition-colors"
+          style={active ? { color: surface.color } : undefined}
+        />
+        <span
+          className={cn(
+            'flex-1 truncate font-medium tracking-wide',
+            isBling && 'bling',
+          )}
+          style={{ fontSize: '13px' }}
+        >
+          {surface.name}
+        </span>
+      </button>
+    );
+  }
+
+  // Collapsed = icon only
   return (
     <button
       type="button"
@@ -215,7 +308,6 @@ function RailIcon({
         className="flex-shrink-0 transition-colors"
         style={highlighted ? { color: surface.color } : undefined}
       />
-      {/* Active indicator — small dot on left edge */}
       {active && (
         <span
           className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r-full"
@@ -245,8 +337,8 @@ function SurfacePopup({
 
   return (
     <div
-      className="absolute right-14 top-0 z-50 w-64 animate-slide-in-right"
-      style={{ maxHeight: 'calc(100vh - 56px)' }}
+      className="absolute right-14 top-12 z-50 w-64 animate-slide-in-right"
+      style={{ maxHeight: 'calc(100vh - 56px - 48px)' }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
@@ -258,7 +350,6 @@ function SurfacePopup({
           backdropFilter: 'blur(12px)',
         }}
       >
-        {/* Header with surface color */}
         <div
           className="flex items-center gap-2.5 border-b px-3 py-2.5"
           style={{
@@ -278,10 +369,7 @@ function SurfacePopup({
           <div className="min-w-0 flex-1">
             <div
               className="font-display tracking-wide"
-              style={{
-                fontSize: '15px',
-                color: surface.color,
-              }}
+              style={{ fontSize: '15px', color: surface.color }}
             >
               <span className={cn(isBling && 'bling')}>{surface.name}</span>
             </div>
@@ -305,15 +393,11 @@ function SurfacePopup({
           )}
         </div>
 
-        {/* Body: primary action + quick links */}
         <div className="p-3">
           <Link
             to={`/${surface.slug}`}
             className="flex items-center justify-between rounded-md border px-3 py-2 transition-colors"
-            style={{
-              borderColor: surface.color + '30',
-              color: surface.color,
-            }}
+            style={{ borderColor: surface.color + '30', color: surface.color }}
           >
             <span className="font-display tracking-wide" style={{ fontSize: '13px' }}>
               Open {surface.name}
@@ -343,7 +427,6 @@ function SurfacePopup({
           </ul>
         </div>
 
-        {/* Footer */}
         <div
           className="border-t px-3 py-2"
           style={{ borderColor: surface.color + '20' }}
@@ -353,7 +436,7 @@ function SurfacePopup({
             style={{ fontSize: '10px' }}
             data-size="meta"
           >
-            {pinned ? 'Pinned · click icon or press Esc to close' : 'Hover · click to pin'}
+            {pinned ? 'Pinned · Esc to close' : 'Hover · click to pin'}
           </p>
         </div>
       </div>
@@ -373,14 +456,11 @@ function MobileDrawer({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 md:hidden" aria-modal="true">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
         aria-label="Close menu"
       />
-
-      {/* Drawer from right */}
       <aside className="absolute right-0 top-0 flex h-full w-[82vw] max-w-sm flex-col overflow-y-auto border-l border-border bg-bg shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
@@ -404,7 +484,6 @@ function MobileDrawer({
             <X size={18} />
           </button>
         </div>
-
         {SURFACE_GROUPS.map((group) => {
           const surfaces = getSurfacesByGroup(group);
           return (
@@ -431,9 +510,7 @@ function MobileDrawer({
                     >
                       <s.icon
                         size={18}
-                        style={
-                          activeSlug === s.slug ? { color: s.color } : undefined
-                        }
+                        style={activeSlug === s.slug ? { color: s.color } : undefined}
                       />
                       <span
                         className={cn(
@@ -457,7 +534,6 @@ function MobileDrawer({
   );
 }
 
-/** Quick actions shown per surface in the popup */
 function getQuickActions(surface: SurfaceDef): { label: string; to: string }[] {
   switch (surface.slug) {
     case 'intel':
