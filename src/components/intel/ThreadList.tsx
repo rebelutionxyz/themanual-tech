@@ -2,7 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MessageSquare, Lock, Clock, Bookmark, BookmarkCheck } from 'lucide-react';
 import { listThreads, listThreadsByIds, relativeTime, type ForumThread } from '@/lib/intel';
-import { listSavedThreadIds, toggleSave, isSavedBatch } from '@/lib/reactions';
+import {
+  listSavedThreadIds,
+  toggleSave,
+  isSavedBatch,
+  getReactionsBatch,
+  type ReactionSummary,
+} from '@/lib/reactions';
+import { ReactionBar } from '@/components/intel/ReactionBar';
 import { useManualData } from '@/lib/useManualData';
 import { useIntelStore } from '@/stores/useIntelStore';
 import { useAuth } from '@/lib/auth';
@@ -95,6 +102,8 @@ export function ThreadList({
   // Fetch atom + category links for all visible threads so we can show chips
   const [threadAtomLinks, setThreadAtomLinks] = useState<Map<string, string[]>>(new Map());
   const [threadCategoryLinks, setThreadCategoryLinks] = useState<Map<string, string[]>>(new Map());
+  // Batch-fetched reaction summaries (per thread id)
+  const [reactionSummaries, setReactionSummaries] = useState<Map<string, ReactionSummary>>(new Map());
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +112,7 @@ export function ThreadList({
     setThreadAtomLinks(new Map());
     setThreadCategoryLinks(new Map());
     setSavedIds(new Set());
+    setReactionSummaries(new Map());
 
     // Saved mode: get Bee's saved thread IDs, then fetch those threads
     // via the shared helper which handles mapping + author enrichment.
@@ -181,6 +191,14 @@ export function ThreadList({
             // All visible threads are saved in savedMode
             setSavedIds(new Set(ids));
           }
+
+          // Batch-fetch reaction summaries for all visible threads
+          try {
+            const reactions = await getReactionsBatch(ids, bee?.id ?? null);
+            if (!cancelled) setReactionSummaries(reactions);
+          } catch {
+            // non-fatal (entity_reactions table may not be migrated yet)
+          }
         }
       })
       .catch((err) => {
@@ -230,6 +248,7 @@ export function ThreadList({
           saved={savedIds.has(t.id)}
           canSave={Boolean(bee?.id)}
           onToggleSave={() => handleToggleSave(t.id)}
+          reactionSummary={reactionSummaries.get(t.id)}
         />
       ))}
     </ul>
@@ -254,6 +273,7 @@ function ThreadCard({
   saved,
   canSave,
   onToggleSave,
+  reactionSummary,
 }: {
   thread: ForumThread;
   atomIds: string[];
@@ -262,6 +282,7 @@ function ThreadCard({
   saved: boolean;
   canSave: boolean;
   onToggleSave: () => void;
+  reactionSummary?: ReactionSummary;
 }) {
   const { setRealm, setFront, setL2, setL3 } = useIntelStore();
 
@@ -485,6 +506,31 @@ function ThreadCard({
             )}
           </div>
         </div>
+
+        {/* Reactions row — compact mode, only visible when there are reactions.
+            Stops propagation so reaction clicks don't open the thread. */}
+        {reactionSummary &&
+          (reactionSummary.counts.honey > 0 ||
+            reactionSummary.counts.fire > 0 ||
+            reactionSummary.counts.thinking > 0 ||
+            reactionSummary.counts.warning > 0 ||
+            reactionSummary.counts.check > 0) && (
+            <div
+              className="mt-3"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+            >
+              <ReactionBar
+                sourceSurface="intel"
+                sourceId={thread.id}
+                sourceKind="thread"
+                initialSummary={reactionSummary}
+                compact
+              />
+            </div>
+          )}
 
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-text-muted">
           <MetaPill icon={<MessageSquare size={11} />}>
