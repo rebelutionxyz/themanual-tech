@@ -93,10 +93,10 @@ export function PlatformRail() {
     };
   }, [drawerOpen]);
 
-  // Listen for UtilityChrome's sidebar-opener event (tablet/mobile, below lg)
+  // Listen for UtilityChrome's sidebar-opener event (mobile only, <md 768px)
   useEffect(() => {
     const onOpen = () => {
-      if (window.innerWidth < 1024) {
+      if (window.innerWidth < 768) {
         setDrawerOpen(true);
       }
     };
@@ -123,7 +123,7 @@ export function PlatformRail() {
       {/* Desktop rail (≥1024px) */}
       <div
         ref={railRef}
-        className="relative z-40 hidden lg:block"
+        className="relative z-40 hidden md:block"
         onMouseEnter={() => !expanded && setHoverExpanded(true)}
         onMouseLeave={() => {
           if (!pinnedSlug) setHoveredSlug(null);
@@ -235,7 +235,7 @@ export function PlatformRail() {
           type="button"
           onClick={() => setDrawerOpen(true)}
           aria-label="Open surfaces menu"
-          className="fixed right-0 top-1/2 z-30 flex h-12 w-4 -translate-y-1/2 items-center justify-center rounded-l-md border-y border-l border-border bg-bg-elevated text-text-muted hover:text-text lg:hidden"
+          className="fixed right-0 top-1/2 z-30 flex h-12 w-4 -translate-y-1/2 items-center justify-center rounded-l-md border-y border-l border-border bg-bg-elevated text-text-muted hover:text-text md:hidden"
         >
           <ChevronRight size={12} className="rotate-180" />
         </button>
@@ -464,7 +464,7 @@ function MobileDrawer({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 lg:hidden" aria-modal="true">
+    <div className="fixed inset-0 z-50 md:hidden" aria-modal="true">
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}

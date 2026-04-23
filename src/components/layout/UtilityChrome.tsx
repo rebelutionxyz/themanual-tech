@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Search, Bell, MessageCircle, ShoppingCart, LayoutGrid, PanelLeftOpen } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Search, Bell, MessageCircle, ShoppingCart, LayoutGrid } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { SURFACES } from '@/lib/surfaces';
 import { SearchModal } from './SearchModal';
 import { cn } from '@/lib/utils';
 
@@ -23,21 +22,12 @@ import { cn } from '@/lib/utils';
  */
 export function UtilityChrome() {
   const { bee } = useAuth();
-  const location = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
 
   const notificationCount = 0;
   const messageCount = 0;
   const cartCount = 0;
   const blingBalance = bee ? 0 : null;
-
-  // Determine current surface (if on /surface-slug route)
-  const slug = location.pathname.length > 1 ? location.pathname.slice(1).split('/')[0] : null;
-  const currentSurface = slug ? SURFACES.find((s) => s.slug === slug) : null;
-  const currentSurfaceColor = currentSurface?.color ?? '#6B94C8';
-
-  // Only INTEL currently has an internal sidebar. Extend list as more surfaces get sidebars.
-  const surfaceHasInternalSidebar = slug === 'intel';
 
   // "/" keyboard shortcut to open search
   useEffect(() => {
@@ -60,35 +50,10 @@ export function UtilityChrome() {
     window.dispatchEvent(new CustomEvent('open-surfaces-drawer'));
   }
 
-  function openSurfaceSidebar() {
-    // For now, only INTEL. Future: emit per-surface event based on slug.
-    if (slug === 'intel') {
-      window.dispatchEvent(new CustomEvent('open-intel-sidebar'));
-    }
-  }
-
   return (
     <>
       <div className="flex items-center gap-1">
-        {/* 1. Left-sidebar opener (surface-colored, tablet/mobile only) */}
-        {surfaceHasInternalSidebar && (
-          <button
-            type="button"
-            onClick={openSurfaceSidebar}
-            aria-label={`Open ${currentSurface?.name} menu`}
-            title={`${currentSurface?.name} menu`}
-            className="mr-1 flex h-9 w-9 items-center justify-center rounded-md border transition-colors lg:hidden"
-            style={{
-              borderColor: currentSurfaceColor + '40',
-              background: currentSurfaceColor + '15',
-              color: currentSurfaceColor,
-            }}
-          >
-            <PanelLeftOpen size={16} />
-          </button>
-        )}
-
-        {/* 2. Search */}
+        {/* 1. Search */}
         <button
           type="button"
           onClick={() => setSearchOpen(true)}
@@ -149,13 +114,19 @@ export function UtilityChrome() {
           </Link>
         )}
 
-        {/* 7. Profile-avatar */}
+        {/* 7. Profile-avatar: avatar on right, handle reveals on hover */}
         {bee ? (
           <Link
             to="/profile"
-            className="ml-0.5 flex items-center gap-2 rounded-full border border-border-bright bg-bg-elevated py-0.5 pl-0.5 pr-3 transition-all hover:border-text-silver/50 hover:bg-panel-2"
+            className="group ml-0.5 flex items-center gap-0 rounded-full border border-border-bright bg-bg-elevated py-0.5 pl-1 pr-1 transition-all hover:gap-2 hover:border-text-silver/50 hover:bg-panel-2 hover:pl-3"
             title={`Profile · @${bee.handle}`}
           >
+            <span
+              className="max-w-0 overflow-hidden font-mono text-text-silver transition-[max-width] duration-200 ease-out group-hover:max-w-[120px]"
+              style={{ fontSize: '12.5px' }}
+            >
+              <span className="whitespace-nowrap">{bee.handle}</span>
+            </span>
             <span
               className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-honey/30 to-kettle-sourced/30 font-display font-semibold text-text"
               style={{ fontSize: '13px' }}
@@ -165,12 +136,6 @@ export function UtilityChrome() {
                 className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-bg-elevated bg-kettle-sourced"
                 aria-label="Online"
               />
-            </span>
-            <span
-              className="hidden font-mono text-text-silver md:inline"
-              style={{ fontSize: '12.5px' }}
-            >
-              {bee.handle}
             </span>
           </Link>
         ) : (
@@ -188,7 +153,7 @@ export function UtilityChrome() {
           onClick={openSurfacesRail}
           aria-label="Open surfaces menu"
           title="Surfaces"
-          className="ml-1 flex h-9 w-9 items-center justify-center rounded-md border border-honey/40 bg-honey/10 text-honey transition-colors hover:border-honey/70 hover:bg-honey/20 lg:hidden"
+          className="ml-1 flex h-9 w-9 items-center justify-center rounded-md border border-honey/40 bg-honey/10 text-honey transition-colors hover:border-honey/70 hover:bg-honey/20 md:hidden"
         >
           <LayoutGrid size={16} />
         </button>

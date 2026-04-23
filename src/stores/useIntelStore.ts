@@ -41,6 +41,7 @@ export const useIntelStore = create<IntelState>()((set) => ({
   setL2: (l2) =>
     set({
       selectedL2: l2,
+      selectedFront: null, // Front and L2 are sibling alternatives under a realm, mutex
       selectedL3: null,
     }),
   setL3: (l3) => set({ selectedL3: l3 }),

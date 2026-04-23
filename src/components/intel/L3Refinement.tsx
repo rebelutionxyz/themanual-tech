@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useManualData } from '@/lib/useManualData';
 import { FRONT_ORDER } from '@/lib/constants';
-import { ScrollRow, RowLabel } from '@/components/ui/ScrollRow';
+import { ScrollRow } from '@/components/ui/ScrollRow';
 import { cn } from '@/lib/utils';
 import type { Front } from '@/types/manual';
 
@@ -46,7 +46,7 @@ export function L3Refinement({
 
   return (
     <div className="mb-4 rounded-lg border border-border bg-bg-elevated/40">
-      <ScrollRow leading={<RowLabel>Refine: {selectedL2}</RowLabel>}>
+      <ScrollRow>
         <button
           type="button"
           onClick={() => onSelectL3(null)}
