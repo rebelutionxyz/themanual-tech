@@ -118,12 +118,16 @@ export function L3Refinement({
   // Don't render if no flat options AND no tree root (i.e., no realm/front/l2 context)
   if (l3Options.length === 0 && !treeRoot) return null;
 
-  // Drill Deeper appears whenever:
-  //  1. A realm is actually selected (not "All")
-  //  2. The scope node has any children to drill into
-  // Simple. No "smart" hiding based on grandchildren — user chooses what's useful.
+  // Drill Deeper ONLY appears when an L3 is selected AND that L3 has further
+  // children (L4+) to drill into. Before L3 selection, the sticky realm bar
+  // and flat L3 bar already cover all visible hierarchy — drilling would just
+  // duplicate what's on screen. Once at L3, the tree is the only place to
+  // see deeper structure, so it earns its place.
   const hasDrillableContent = Boolean(
-    selectedRealm && treeRoot && treeRoot.children.length > 0,
+    selectedRealm &&
+      selectedL3 &&
+      treeRoot &&
+      treeRoot.children.length > 0,
   );
 
   return (
