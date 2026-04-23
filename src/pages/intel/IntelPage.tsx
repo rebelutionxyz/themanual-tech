@@ -174,11 +174,13 @@ export function IntelPage() {
           draftKey="intel-thread-new"
           allowExpand={true}
           expandUrl="/intel/new"
-          placeholderCollapsed={
+          header="Start a thread. Earn BLiNG!"
+          subheader={
             selectedRealm
-              ? `Start a thread in ${selectedRealm}${selectedFront ? ` · ${selectedFront}` : ''}${selectedL2 ? ` · ${selectedL2}` : ''}...`
-              : 'Start a new thread...'
+              ? `Posting in ${selectedRealm}${selectedFront ? ` · ${selectedFront}` : ''}${selectedL2 ? ` · ${selectedL2}` : ''}`
+              : 'Posting to INTEL'
           }
+          placeholderTitle="What's on your mind?"
           inheritedContext={{
             realm: selectedRealm,
             front: selectedFront,
@@ -198,7 +200,6 @@ export function IntelPage() {
                 },
                 bee.id,
               );
-              // Navigate to new thread
               navigate(`/intel/t/${newId}`);
               return true;
             } catch (err) {

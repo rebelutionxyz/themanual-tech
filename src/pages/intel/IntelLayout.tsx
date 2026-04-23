@@ -97,7 +97,13 @@ export function IntelLayout() {
         />
 
         {/* Content */}
-        <main className="min-w-0 flex-1 overflow-y-auto">
+        <main
+          className="min-w-0 flex-1 overflow-y-auto"
+          style={{
+            background:
+              'linear-gradient(180deg, rgba(107, 148, 200, 0.04) 0%, rgba(107, 148, 200, 0.01) 40%, transparent 100%)',
+          }}
+        >
           <Outlet />
         </main>
       </div>

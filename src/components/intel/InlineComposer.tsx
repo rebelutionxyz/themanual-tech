@@ -17,7 +17,7 @@ export interface InlineComposerProps {
     atomIds: string[];
   }) => Promise<boolean>;
 
-  /** Draft key — used for local storage persistence. e.g. "intel-thread" or "intel-reply-<threadId>" */
+  /** Draft key — used for local storage persistence. */
   draftKey?: string;
 
   /** Parent context for replies — inherits realm, atoms shown on "inherited" line. */
@@ -27,9 +27,6 @@ export interface InlineComposerProps {
     l2?: string | null;
     atomIds?: string[];
   };
-
-  /** Placeholder text for collapsed state */
-  placeholderCollapsed?: string;
 
   /** Placeholder text for title input (thread mode only) */
   placeholderTitle?: string;
@@ -43,52 +40,52 @@ export interface InlineComposerProps {
   /** Text shown when not enabled */
   disabledMessage?: string;
 
-  /** Auto-focus the body on mount (used for inline replies that appear on click) */
+  /** Auto-focus the first input on mount (used for replies triggered by Reply button) */
   autoFocus?: boolean;
 
-  /** Controlled expanded state. If omitted, component manages its own. */
-  expanded?: boolean;
-  onExpandedChange?: (expanded: boolean) => void;
+  /** Called when user cancels (for reply mode — collapses back to "Reply" button) */
+  onCancel?: () => void;
 
   /** Show "Expand to full page" button. Thread mode only. */
   allowExpand?: boolean;
 
   /** URL to navigate to on expand. Thread context saved to sessionStorage. */
   expandUrl?: string;
+
+  /** Surface accent color (default INTEL blue) */
+  accentColor?: string;
+
+  /** Header text shown above the composer (e.g. "Start a thread. Earn BLiNG!") */
+  header?: string;
+
+  /** Subheader / description under the main header */
+  subheader?: string;
 }
 
+const INTEL_BLUE = '#6B94C8';
+
 /**
- * Inline composer — collapses to a single-line prompt, expands on focus
- * to a full composer with title (threads only), body, optional atoms,
- * and expand-to-full-page button.
- *
- * Draft autosaves to localStorage per draftKey.
- * Replies hide the title field and inherit parent atoms (expandable).
+ * Always-expanded composer. Renders as a prominent bordered card.
+ * Title (threads only) + body + opt-in atom tagging via [Add atoms] toggle.
  */
 export function InlineComposer({
   mode,
   onSubmit,
   draftKey,
   inheritedContext,
-  placeholderCollapsed,
   placeholderTitle = 'Title your thread...',
   placeholderBody,
   enabled = true,
   disabledMessage = 'Sign in to post',
   autoFocus = false,
-  expanded: controlledExpanded,
-  onExpandedChange,
+  onCancel,
   allowExpand = false,
   expandUrl,
+  accentColor = INTEL_BLUE,
+  header,
+  subheader,
 }: InlineComposerProps) {
   const navigate = useNavigate();
-
-  const [internalExpanded, setInternalExpanded] = useState(autoFocus);
-  const expanded = controlledExpanded ?? internalExpanded;
-  const setExpanded = (next: boolean) => {
-    if (onExpandedChange) onExpandedChange(next);
-    else setInternalExpanded(next);
-  };
 
   // Form state
   const [title, setTitle] = useState('');
@@ -101,16 +98,13 @@ export function InlineComposer({
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
-  const placeholderCollapsedFinal =
-    placeholderCollapsed ??
-    (mode === 'thread' ? 'Start a new thread...' : 'Reply to this thread...');
   const placeholderBodyFinal =
     placeholderBody ??
     (mode === 'thread' ? 'Share your thought...' : 'Your reply...');
 
-  // Restore draft from local storage when expanded
+  // Restore draft from local storage on mount
   useEffect(() => {
-    if (!expanded || !draftKey) return;
+    if (!draftKey) return;
     const saved = localStorage.getItem(`draft:${draftKey}`);
     if (saved) {
       try {
@@ -122,11 +116,11 @@ export function InlineComposer({
         // ignore corrupt draft
       }
     }
-  }, [expanded, draftKey]);
+  }, [draftKey]);
 
   // Autosave draft
   useEffect(() => {
-    if (!expanded || !draftKey) return;
+    if (!draftKey) return;
     const hasContent = title.trim() || body.trim() || atomIds.length > 0;
     if (!hasContent) {
       localStorage.removeItem(`draft:${draftKey}`);
@@ -135,17 +129,15 @@ export function InlineComposer({
     const snap = JSON.stringify({ title, body, atomIds });
     const t = setTimeout(() => localStorage.setItem(`draft:${draftKey}`, snap), 400);
     return () => clearTimeout(t);
-  }, [expanded, draftKey, title, body, atomIds]);
+  }, [draftKey, title, body, atomIds]);
 
-  // Auto-focus body when autoFocus is true
+  // Auto-focus the appropriate input
   useEffect(() => {
-    if (autoFocus && expanded) {
-      if (mode === 'thread') titleRef.current?.focus();
-      else bodyRef.current?.focus();
-    }
-  }, [autoFocus, expanded, mode]);
+    if (!autoFocus) return;
+    if (mode === 'thread') titleRef.current?.focus();
+    else bodyRef.current?.focus();
+  }, [autoFocus, mode]);
 
-  // Minimum body length; title required for threads
   const canSubmit = useMemo(() => {
     if (mode === 'thread') {
       return title.trim().length >= 2 && body.trim().length >= 2 && !submitting;
@@ -165,13 +157,11 @@ export function InlineComposer({
         atomIds,
       });
       if (ok) {
-        // Clear draft + state on success
         if (draftKey) localStorage.removeItem(`draft:${draftKey}`);
         setTitle('');
         setBody('');
         setAtomIds([]);
         setAdvancedOpen(false);
-        setExpanded(false);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to post');
@@ -182,7 +172,6 @@ export function InlineComposer({
 
   function handleExpandToFullPage() {
     if (!expandUrl) return;
-    // Preserve current draft in sessionStorage for the full-page composer to pick up
     const payload = {
       title,
       body,
@@ -196,7 +185,6 @@ export function InlineComposer({
   }
 
   function handleCancel() {
-    // If draft has content, confirm. Otherwise just collapse.
     const hasContent = title.trim() || body.trim() || atomIds.length > 0;
     if (hasContent) {
       const keep = window.confirm('Keep draft? OK = keep, Cancel = discard');
@@ -207,36 +195,59 @@ export function InlineComposer({
         setAtomIds([]);
       }
     }
-    setExpanded(false);
     setAdvancedOpen(false);
+    if (onCancel) onCancel();
   }
 
-  // Collapsed state
-  if (!expanded) {
+  // Disabled state (not signed in)
+  if (!enabled) {
     return (
-      <button
-        type="button"
-        onClick={() => enabled && setExpanded(true)}
-        disabled={!enabled}
-        className={cn(
-          'w-full rounded-lg border border-border bg-bg-elevated/40 px-4 py-2.5 text-left text-text-muted transition-colors',
-          enabled
-            ? 'hover:border-text-silver/40 hover:bg-bg-elevated hover:text-text-silver'
-            : 'cursor-not-allowed opacity-60',
-        )}
-        style={{ fontSize: '13px' }}
+      <div
+        className="rounded-lg border px-4 py-3 text-center text-text-muted"
+        style={{
+          fontSize: '13px',
+          borderColor: `${accentColor}30`,
+          background: `${accentColor}08`,
+        }}
       >
-        {enabled ? placeholderCollapsedFinal : disabledMessage}
-      </button>
+        {disabledMessage}
+      </div>
     );
   }
 
-  // Expanded state
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-lg border border-text-silver/30 bg-bg-elevated p-3"
+      className="rounded-lg border-2 p-4 shadow-lg transition-colors"
+      style={{
+        borderColor: `${accentColor}60`,
+        background: `linear-gradient(135deg, ${accentColor}0A 0%, rgba(15, 18, 23, 0.4) 100%)`,
+        boxShadow: `0 0 0 1px ${accentColor}15, 0 4px 12px rgba(0,0,0,0.2)`,
+      }}
     >
+      {/* Header */}
+      {(header || subheader) && (
+        <div className="mb-3">
+          {header && (
+            <h3
+              className="font-display tracking-wide"
+              style={{ fontSize: '16px', color: accentColor, fontWeight: 600 }}
+            >
+              {header}
+            </h3>
+          )}
+          {subheader && (
+            <p
+              className="mt-0.5 font-mono text-text-muted"
+              style={{ fontSize: '11px' }}
+              data-size="meta"
+            >
+              {subheader}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Title (threads only) */}
       {mode === 'thread' && (
         <input
@@ -245,8 +256,12 @@ export function InlineComposer({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder={placeholderTitle}
-          className="mb-2 w-full rounded-md border border-border bg-bg px-3 py-2 text-text placeholder:text-text-muted focus:border-text-silver/50 focus:outline-none focus:ring-1 focus:ring-text-silver/30"
-          style={{ fontSize: '15px', fontWeight: 500 }}
+          className="mb-2 w-full rounded-md border bg-bg px-3 py-2 text-text placeholder:text-text-muted focus:outline-none focus:ring-1"
+          style={{
+            fontSize: '15px',
+            fontWeight: 500,
+            borderColor: `${accentColor}40`,
+          }}
           maxLength={200}
           required
         />
@@ -258,10 +273,13 @@ export function InlineComposer({
         value={body}
         onChange={(e) => setBody(e.target.value)}
         placeholder={placeholderBodyFinal}
-        rows={mode === 'thread' ? 5 : 3}
-        autoFocus={autoFocus && mode === 'reply'}
-        className="w-full resize-y rounded-md border border-border bg-bg px-3 py-2 text-text placeholder:text-text-muted focus:border-text-silver/50 focus:outline-none focus:ring-1 focus:ring-text-silver/30"
-        style={{ fontSize: '14px', lineHeight: '1.5' }}
+        rows={mode === 'thread' ? 4 : 3}
+        className="w-full resize-y rounded-md border bg-bg px-3 py-2 text-text placeholder:text-text-muted focus:outline-none focus:ring-1"
+        style={{
+          fontSize: '14px',
+          lineHeight: '1.5',
+          borderColor: `${accentColor}40`,
+        }}
       />
 
       {/* Inherited context chip (replies) */}
@@ -275,12 +293,16 @@ export function InlineComposer({
           {inheritedContext.front && ` · ${inheritedContext.front}`}
           {inheritedContext.l2 && ` · ${inheritedContext.l2}`}
           {inheritedContext.atomIds && inheritedContext.atomIds.length > 0 && (
-            <span> · {inheritedContext.atomIds.length} atom{inheritedContext.atomIds.length === 1 ? '' : 's'}</span>
+            <span>
+              {' · '}
+              {inheritedContext.atomIds.length} atom
+              {inheritedContext.atomIds.length === 1 ? '' : 's'}
+            </span>
           )}
         </div>
       )}
 
-      {/* Advanced section (opt-in atom tagging, etc.) */}
+      {/* Advanced — opt-in atom tagging */}
       <div className="mt-2">
         <button
           type="button"
@@ -314,7 +336,7 @@ export function InlineComposer({
         )}
       </div>
 
-      {/* Error banner */}
+      {/* Error */}
       {error && (
         <p
           className="mt-2 text-kettle-unsourced"
@@ -343,25 +365,37 @@ export function InlineComposer({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="flex items-center gap-1 rounded-md px-3 py-1 text-text-silver hover:bg-bg"
-            style={{ fontSize: '12px' }}
-          >
-            <X size={11} />
-            Cancel
-          </button>
+          {onCancel && (
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="flex items-center gap-1 rounded-md px-3 py-1 text-text-silver hover:bg-bg"
+              style={{ fontSize: '12px' }}
+            >
+              <X size={11} />
+              Cancel
+            </button>
+          )}
           <button
             type="submit"
             disabled={!canSubmit}
             className={cn(
-              'flex items-center gap-1.5 rounded-md border px-3 py-1.5 transition-all',
+              'flex items-center gap-1.5 rounded-md border px-4 py-1.5 transition-all',
               canSubmit
-                ? 'border-text-silver/40 bg-bg-elevated text-text-silver-bright hover:border-text-silver/70 hover:bg-panel-2'
+                ? 'text-text shadow-sm'
                 : 'cursor-not-allowed border-border text-text-dim opacity-60',
             )}
-            style={{ fontSize: '12px' }}
+            style={{
+              fontSize: '13px',
+              fontWeight: 500,
+              ...(canSubmit
+                ? {
+                    borderColor: `${accentColor}80`,
+                    background: `${accentColor}20`,
+                    color: accentColor,
+                  }
+                : {}),
+            }}
           >
             {submitting ? (
               <Loader2 size={12} className="animate-spin" />

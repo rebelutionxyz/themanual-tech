@@ -325,10 +325,7 @@ export function ThreadPage() {
               mode="reply"
               enabled={true}
               autoFocus={true}
-              expanded={true}
-              onExpandedChange={(expanded) => {
-                if (!expanded) setReplyingTo(null);
-              }}
+              onCancel={() => setReplyingTo(null)}
               draftKey={`intel-reply-${thread.id}-root`}
               inheritedContext={{
                 realm: thread.primaryRealm,
@@ -336,6 +333,7 @@ export function ThreadPage() {
                 l2: thread.primaryL2,
                 atomIds: linkedAtoms.map((a) => a.id),
               }}
+              header="Reply. Earn BLiNG!"
               placeholderBody="Your reply..."
               onSubmit={async ({ body, atomIds }) => {
                 try {
@@ -485,12 +483,10 @@ function PostNode({
             mode="reply"
             enabled={true}
             autoFocus={true}
-            expanded={true}
-            onExpandedChange={(expanded) => {
-              if (!expanded) setReplyingTo(null);
-            }}
+            onCancel={() => setReplyingTo(null)}
             draftKey={`intel-reply-${threadId}-${post.id}`}
             inheritedContext={threadContext}
+            header="Reply. Earn BLiNG!"
             placeholderBody="Your reply..."
             onSubmit={async ({ body, atomIds }) => {
               try {
