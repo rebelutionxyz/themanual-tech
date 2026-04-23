@@ -1,32 +1,43 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Search, Bell, MessageCircle, ShoppingCart, LayoutGrid } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Search, Bell, MessageCircle, ShoppingCart, LayoutGrid, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { SURFACES } from '@/lib/surfaces';
 import { SearchModal } from './SearchModal';
 import { cn } from '@/lib/utils';
 
 /**
  * Utility chrome cluster shown in top-right of SiteHeader.
- * Final order (left to right):
- *   search · notif · msg · cart · BLiNG! pill · profile-avatar · sidebar-opener (mobile only)
  *
- * - Home icon removed (logo top-left + INTEL sidebar both handle home navigation)
- * - Search icon opens modal (consistent mobile + desktop)
- * - "/" keyboard shortcut opens search modal from anywhere
- * - Cart shown only when count > 0
- * - BLiNG! pill shown only when signed in
- * - Profile combines avatar + handle into one clickable pill
- * - Sidebar opener mobile-only (desktop has rail always visible)
+ * Final order (left to right):
+ *   left-sidebar-opener · search · notif · msg · cart · BLiNG! pill · profile · right-rail-opener
+ *
+ * Left-sidebar opener (surface-colored):
+ *   - Only shown when current surface has an internal sidebar (e.g., INTEL)
+ *   - Only visible below lg breakpoint (<1024px)
+ *   - Fires custom "open-intel-sidebar" (or surface-specific) event
+ *
+ * Right-rail opener (honey gold):
+ *   - Only visible below lg breakpoint (<1024px)
+ *   - Fires "open-surfaces-drawer" event
  */
 export function UtilityChrome() {
   const { bee } = useAuth();
+  const location = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
 
-  // Placeholder counts — wire later
   const notificationCount = 0;
   const messageCount = 0;
   const cartCount = 0;
   const blingBalance = bee ? 0 : null;
+
+  // Determine current surface (if on /surface-slug route)
+  const slug = location.pathname.length > 1 ? location.pathname.slice(1).split('/')[0] : null;
+  const currentSurface = slug ? SURFACES.find((s) => s.slug === slug) : null;
+  const currentSurfaceColor = currentSurface?.color ?? '#6B94C8';
+
+  // Only INTEL currently has an internal sidebar. Extend list as more surfaces get sidebars.
+  const surfaceHasInternalSidebar = slug === 'intel';
 
   // "/" keyboard shortcut to open search
   useEffect(() => {
@@ -45,14 +56,39 @@ export function UtilityChrome() {
     return () => document.removeEventListener('keydown', onKey);
   }, [searchOpen]);
 
-  function openSurfaces() {
+  function openSurfacesRail() {
     window.dispatchEvent(new CustomEvent('open-surfaces-drawer'));
+  }
+
+  function openSurfaceSidebar() {
+    // For now, only INTEL. Future: emit per-surface event based on slug.
+    if (slug === 'intel') {
+      window.dispatchEvent(new CustomEvent('open-intel-sidebar'));
+    }
   }
 
   return (
     <>
       <div className="flex items-center gap-1">
-        {/* 1. Search — opens modal */}
+        {/* 1. Left-sidebar opener (surface-colored, tablet/mobile only) */}
+        {surfaceHasInternalSidebar && (
+          <button
+            type="button"
+            onClick={openSurfaceSidebar}
+            aria-label={`Open ${currentSurface?.name} menu`}
+            title={`${currentSurface?.name} menu`}
+            className="mr-1 flex h-9 w-9 items-center justify-center rounded-md border transition-colors lg:hidden"
+            style={{
+              borderColor: currentSurfaceColor + '40',
+              background: currentSurfaceColor + '15',
+              color: currentSurfaceColor,
+            }}
+          >
+            <PanelLeftOpen size={16} />
+          </button>
+        )}
+
+        {/* 2. Search */}
         <button
           type="button"
           onClick={() => setSearchOpen(true)}
@@ -63,7 +99,7 @@ export function UtilityChrome() {
           <Search size={16} />
         </button>
 
-        {/* 2. Notifications */}
+        {/* 3. Notifications */}
         {bee && (
           <IconButton
             ariaLabel="Notifications"
@@ -75,7 +111,7 @@ export function UtilityChrome() {
           </IconButton>
         )}
 
-        {/* 3. Messages */}
+        {/* 4. Messages */}
         {bee && (
           <IconButton
             ariaLabel="Messages"
@@ -87,7 +123,7 @@ export function UtilityChrome() {
           </IconButton>
         )}
 
-        {/* 4. Cart (only when >0) */}
+        {/* 5. Cart (only when >0) */}
         {bee && cartCount > 0 && (
           <IconButton
             ariaLabel="Cart"
@@ -99,27 +135,21 @@ export function UtilityChrome() {
           </IconButton>
         )}
 
-        {/* 5. BLiNG! balance pill */}
+        {/* 6. BLiNG! balance pill */}
         {blingBalance !== null && (
           <Link
             to="/bling"
             className="ml-0.5 flex items-center gap-1.5 rounded-full border border-honey/40 bg-bg-elevated px-2.5 py-1 transition-colors hover:border-honey/70"
             title="BLiNG! balance"
           >
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ background: '#FAD15E' }}
-            />
-            <span
-              className="bling font-mono tracking-wide"
-              style={{ fontSize: '12px' }}
-            >
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#FAD15E' }} />
+            <span className="bling font-mono tracking-wide" style={{ fontSize: '12px' }}>
               {blingBalance.toLocaleString()}
             </span>
           </Link>
         )}
 
-        {/* 6. Profile-avatar */}
+        {/* 7. Profile-avatar */}
         {bee ? (
           <Link
             to="/profile"
@@ -152,19 +182,18 @@ export function UtilityChrome() {
           </Link>
         )}
 
-        {/* 7. Sidebar opener — MOBILE ONLY */}
+        {/* 8. Right-rail opener (honey gold, tablet/mobile only) */}
         <button
           type="button"
-          onClick={openSurfaces}
+          onClick={openSurfacesRail}
           aria-label="Open surfaces menu"
           title="Surfaces"
-          className="ml-1 flex h-9 w-9 items-center justify-center rounded-md border border-honey/40 bg-honey/10 text-honey transition-colors hover:border-honey/70 hover:bg-honey/20 md:hidden"
+          className="ml-1 flex h-9 w-9 items-center justify-center rounded-md border border-honey/40 bg-honey/10 text-honey transition-colors hover:border-honey/70 hover:bg-honey/20 lg:hidden"
         >
           <LayoutGrid size={16} />
         </button>
       </div>
 
-      {/* Search modal — rendered outside the chrome row */}
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   );

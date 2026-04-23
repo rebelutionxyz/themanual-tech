@@ -30,14 +30,15 @@ export function PlatformRail() {
     location.pathname.length > 1 ? location.pathname.slice(1).split('/')[0] : null;
 
   const [expanded, setExpanded] = useState(false);
+  const [hoverExpanded, setHoverExpanded] = useState(false);
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
   const [pinnedSlug, setPinnedSlug] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const railRef = useRef<HTMLDivElement>(null);
 
-  // Popups only apply in COLLAPSED mode
-  const popupSlug = !expanded ? pinnedSlug ?? hoveredSlug : null;
+  // Popups only apply in COLLAPSED mode (not expanded and not hover-expanded)
+  const popupSlug = !expanded && !hoverExpanded ? pinnedSlug ?? hoveredSlug : null;
   const popupSurface = popupSlug ? SURFACES.find((s) => s.slug === popupSlug) : null;
 
   // Close popup pin when clicking outside
@@ -92,40 +93,47 @@ export function PlatformRail() {
     };
   }, [drawerOpen]);
 
-  // Listen for UtilityChrome's sidebar-opener event (mobile only)
+  // Listen for UtilityChrome's sidebar-opener event (tablet/mobile, below lg)
   useEffect(() => {
     const onOpen = () => {
-      const isMobile = window.innerWidth < 768;
-      if (isMobile) setDrawerOpen(true);
+      if (window.innerWidth < 1024) {
+        setDrawerOpen(true);
+      }
     };
     window.addEventListener('open-surfaces-drawer', onOpen);
     return () => window.removeEventListener('open-surfaces-drawer', onOpen);
   }, []);
 
+  // Hover expands the rail (desktop only). Click toggle pins.
+  const expandedEffective = expanded || hoverExpanded;
+
   function handleIconClick(slug: string) {
-    if (expanded) {
-      // Expanded mode: clicking navigates and auto-collapses
+    if (expandedEffective) {
       navigate(`/${slug}`);
       setExpanded(false);
+      setHoverExpanded(false);
       setPinnedSlug(null);
     } else {
-      // Collapsed mode: clicking toggles pin popup
       setPinnedSlug((current) => (current === slug ? null : slug));
     }
   }
 
   return (
     <>
-      {/* Desktop rail */}
+      {/* Desktop rail (≥1024px) */}
       <div
         ref={railRef}
-        className="relative z-40 hidden md:block"
-        onMouseLeave={() => !pinnedSlug && setHoveredSlug(null)}
+        className="relative z-40 hidden lg:block"
+        onMouseEnter={() => !expanded && setHoverExpanded(true)}
+        onMouseLeave={() => {
+          if (!pinnedSlug) setHoveredSlug(null);
+          if (!expanded) setHoverExpanded(false);
+        }}
       >
         <aside
           className={cn(
             'flex h-full flex-col overflow-y-auto border-l border-border bg-bg-elevated/60 transition-[width] duration-200 ease-out',
-            expanded ? 'w-48' : 'w-14',
+            expandedEffective ? 'w-48' : 'w-14',
           )}
           aria-label="Platform surfaces"
         >
@@ -136,14 +144,15 @@ export function PlatformRail() {
               setExpanded((e) => !e);
               setPinnedSlug(null);
               setHoveredSlug(null);
+              setHoverExpanded(false);
             }}
-            aria-label={expanded ? 'Collapse surfaces' : 'Expand surfaces'}
+            aria-label={expanded ? 'Unpin surfaces' : 'Pin surfaces'}
             className={cn(
               'flex h-12 flex-shrink-0 items-center border-b border-border text-text-silver hover:bg-bg hover:text-text',
-              expanded ? 'justify-between px-3' : 'justify-center',
+              expandedEffective ? 'justify-between px-3' : 'justify-center',
             )}
           >
-            {expanded && (
+            {expandedEffective && (
               <span
                 className="font-mono uppercase tracking-widest text-text-muted"
                 style={{ fontSize: '11px' }}
@@ -152,7 +161,7 @@ export function PlatformRail() {
                 Surfaces
               </span>
             )}
-            {expanded ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+            {expandedEffective ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
           </button>
 
           {/* Surface list grouped */}
@@ -161,7 +170,7 @@ export function PlatformRail() {
               const surfaces = getSurfacesByGroup(group);
               return (
                 <div key={group} className="py-1.5">
-                  {expanded ? (
+                  {expandedEffective ? (
                     <div
                       className="px-3 pb-1 font-mono uppercase tracking-wider text-text-muted"
                       style={{ fontSize: '10px' }}
@@ -181,11 +190,11 @@ export function PlatformRail() {
                         <RailItem
                           surface={s}
                           active={activeSlug === s.slug}
-                          expanded={expanded}
+                          expanded={expandedEffective}
                           hovered={hoveredSlug === s.slug}
                           pinned={pinnedSlug === s.slug}
                           onHover={() =>
-                            !expanded && !pinnedSlug && setHoveredSlug(s.slug)
+                            !expandedEffective && !pinnedSlug && setHoveredSlug(s.slug)
                           }
                           onClick={() => handleIconClick(s.slug)}
                         />
@@ -226,7 +235,7 @@ export function PlatformRail() {
           type="button"
           onClick={() => setDrawerOpen(true)}
           aria-label="Open surfaces menu"
-          className="fixed right-0 top-1/2 z-30 flex h-12 w-4 -translate-y-1/2 items-center justify-center rounded-l-md border-y border-l border-border bg-bg-elevated text-text-muted hover:text-text md:hidden"
+          className="fixed right-0 top-1/2 z-30 flex h-12 w-4 -translate-y-1/2 items-center justify-center rounded-l-md border-y border-l border-border bg-bg-elevated text-text-muted hover:text-text lg:hidden"
         >
           <ChevronRight size={12} className="rotate-180" />
         </button>
@@ -455,7 +464,7 @@ function MobileDrawer({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 md:hidden" aria-modal="true">
+    <div className="fixed inset-0 z-50 lg:hidden" aria-modal="true">
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}

@@ -51,9 +51,15 @@ export function IntelLayout() {
       navigate(buildNewThreadUrl(selectedRealm, selectedFront, selectedL2));
       return;
     }
-    // If we're not on /intel root and the user picks a different view, go home
+    // If we're not on /intel root, navigate there
     if (window.location.pathname !== '/intel') {
       navigate('/intel');
+    }
+    // "Home" resets all realm/front/L2/L3 filters (fully unfiltered view)
+    if (view === 'home') {
+      setRealm(null);
+      setFront(null);
+      setL2(null);
     }
     setActiveView(view);
   }
