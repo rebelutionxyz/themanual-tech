@@ -39,7 +39,7 @@ export function NewThreadPage() {
     front: urlFront && FRONT_ORDER.includes(urlFront) ? urlFront : null,
     l2: urlL2,
   });
-  const [realmManuallyOverridden, setRealmManuallyOverridden] = useState(!!urlRealm);
+  const [realmManuallyOverridden, setRealmManuallyOverridden] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,16 +56,21 @@ export function NewThreadPage() {
     } as RealmSelection;
   }, [atomIds, atoms]);
 
-  // When atoms selected and user hasn't manually picked, auto-apply derivation
+  // When atoms selected and user hasn't explicitly clicked realm picker, auto-apply derivation.
+  // URL seeded values don't count as 'manual override' — atoms trump URL.
   useEffect(() => {
     if (derivedFromAtoms && !realmManuallyOverridden) {
       setRealmSel(derivedFromAtoms);
     }
-    // If all atoms removed and we were in derived mode, clear
+    // If all atoms removed and we were in auto mode, fall back to URL seed (or null)
     if (atomIds.length === 0 && !realmManuallyOverridden) {
-      setRealmSel({ realm: urlRealm, front: null, l2: null });
+      setRealmSel({
+        realm: urlRealm,
+        front: urlFront && FRONT_ORDER.includes(urlFront) ? urlFront : null,
+        l2: urlL2,
+      });
     }
-  }, [derivedFromAtoms, realmManuallyOverridden, atomIds.length, urlRealm]);
+  }, [derivedFromAtoms, realmManuallyOverridden, atomIds.length, urlRealm, urlFront, urlL2]);
 
   // Validation: must have atoms OR realm
   const hasRealm = !!realmSel.realm;

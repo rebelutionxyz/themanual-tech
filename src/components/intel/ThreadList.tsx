@@ -25,17 +25,23 @@ export function ThreadList({
   const [threads, setThreads] = useState<ForumThread[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Precompute atomIds-in-realm for the atom-link filter
+  // Precompute atomIds-in-realm for the atom-link filter.
+  // Cap at 500 to avoid Supabase .in() URL-length issues; we rank leaves/sourced.
   const atomIdsInRealm = useMemo(() => {
     if (!selectedRealm) return undefined;
-    return atoms
-      .filter((a) => {
-        if (a.realm !== selectedRealm) return false;
-        if (selectedFront && a.front !== selectedFront) return false;
-        if (selectedL2 && a.L2 !== selectedL2) return false;
-        return true;
-      })
-      .map((a) => a.id);
+    const matches = atoms.filter((a) => {
+      if (a.realm !== selectedRealm) return false;
+      if (selectedFront && a.front !== selectedFront) return false;
+      if (selectedL2 && a.L2 !== selectedL2) return false;
+      return true;
+    });
+    // Prefer leaves + sourced atoms when capping
+    matches.sort((a, b) => {
+      const aScore = (a.isLeaf ? 2 : 0) + (a.kettle === 'Sourced' ? 1 : 0);
+      const bScore = (b.isLeaf ? 2 : 0) + (b.kettle === 'Sourced' ? 1 : 0);
+      return bScore - aScore;
+    });
+    return matches.slice(0, 500).map((a) => a.id);
   }, [atoms, selectedRealm, selectedFront, selectedL2]);
 
   // Map atoms by id for quick lookup on cards
@@ -90,7 +96,10 @@ export function ThreadList({
         }
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message ?? 'Failed to load threads');
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load threads');
+          setThreads([]); // allow empty state to render instead of infinite skeleton
+        }
       });
 
     return () => {

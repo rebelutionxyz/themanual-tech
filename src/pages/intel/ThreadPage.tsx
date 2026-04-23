@@ -11,7 +11,7 @@ import {
   type ForumThread,
   type ForumPost,
 } from '@/lib/intel';
-import { KETTLE_COLORS } from '@/lib/constants';
+import { KETTLE_COLORS, FRONT_COLORS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 /**
@@ -115,6 +115,42 @@ export function ThreadPage() {
 
       {/* Thread header */}
       <article className="rounded-lg border border-border bg-bg-elevated/40 p-5 md:p-6">
+        {/* Realm / Front / L2 badges */}
+        {(thread.primaryRealm || thread.primaryFront || thread.primaryL2) && (
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            {thread.primaryRealm && (
+              <span
+                className="rounded-md border border-border bg-bg px-2 py-0.5 font-mono text-text-silver"
+                style={{ fontSize: '11px' }}
+                data-size="meta"
+              >
+                {thread.primaryRealm}
+              </span>
+            )}
+            {thread.primaryFront && (
+              <span
+                className="rounded-md border px-2 py-0.5 font-display"
+                style={{
+                  fontSize: '11px',
+                  color: FRONT_COLORS[thread.primaryFront],
+                  borderColor: FRONT_COLORS[thread.primaryFront] + '40',
+                }}
+              >
+                {thread.primaryFront}
+              </span>
+            )}
+            {thread.primaryL2 && (
+              <span
+                className="rounded-md border border-border bg-bg px-2 py-0.5 font-mono text-text-dim"
+                style={{ fontSize: '11px' }}
+                data-size="meta"
+              >
+                {thread.primaryL2}
+              </span>
+            )}
+          </div>
+        )}
+
         <h1 className="font-display text-3xl font-semibold leading-tight text-text-silver-bright">
           {thread.title}
         </h1>

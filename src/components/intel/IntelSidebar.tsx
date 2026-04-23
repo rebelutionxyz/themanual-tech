@@ -62,7 +62,7 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
     <aside
       className={cn(
         'flex h-full flex-col border-r border-border bg-bg-elevated/60 transition-[width] duration-200 ease-out',
-        expanded ? 'w-60' : 'w-14',
+        expanded ? 'w-44' : 'w-14',
       )}
     >
       {/* Toggle button at top */}
