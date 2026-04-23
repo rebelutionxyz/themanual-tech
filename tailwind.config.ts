@@ -61,12 +61,17 @@ export default {
       animation: {
         'honey-drop': 'honey-drop 0.6s ease-out',
         'pulse-slow': 'pulse 3s ease-in-out infinite',
+        'slide-in-right': 'slide-in-right 0.18s ease-out',
       },
       keyframes: {
         'honey-drop': {
           '0%': { transform: 'translateY(-8px) scale(0.9)', opacity: '0' },
           '50%': { transform: 'translateY(0) scale(1.05)', opacity: '1' },
           '100%': { transform: 'translateY(0) scale(1)', opacity: '1' },
+        },
+        'slide-in-right': {
+          '0%': { transform: 'translateX(8px)', opacity: '0' },
+          '100%': { transform: 'translateX(0)', opacity: '1' },
         },
       },
     },

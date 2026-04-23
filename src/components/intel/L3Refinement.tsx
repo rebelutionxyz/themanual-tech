@@ -1,7 +1,10 @@
 import { useMemo } from 'react';
 import { useManualData } from '@/lib/useManualData';
+import { FRONT_ORDER } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { Front } from '@/types/manual';
+
+const FRONT_SET = new Set<string>(FRONT_ORDER);
 
 interface L3RefinementProps {
   selectedRealm: string | null;
@@ -15,6 +18,9 @@ interface L3RefinementProps {
  * Body-level refinement row. Only visible when a realm + L2 are selected.
  * Shows L3 sub-sub-categories for the selected L2.
  * Sits between page header and thread list, flush with content width.
+ *
+ * Note: filters out any L3 that matches a Front name — the Manual data has
+ * some atoms where Front names leak into L3 positions (taxonomy cleanup TBD).
  */
 export function L3Refinement({
   selectedRealm,
@@ -33,6 +39,8 @@ export function L3Refinement({
       if (selectedFront && a.front !== selectedFront) continue;
       if (a.L2 !== selectedL2) continue;
       if (!a.L3) continue;
+      // Filter out Front names that leak into L3 positions (data quirk)
+      if (FRONT_SET.has(a.L3)) continue;
       set.add(a.L3);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b));

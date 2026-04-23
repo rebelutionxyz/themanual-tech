@@ -1,18 +1,16 @@
 import { Outlet } from 'react-router-dom';
-import { PlatformSidebar } from './PlatformSidebar';
+import { PlatformRail } from './PlatformRail';
 
 export function PlatformLayout() {
   return (
     <div className="flex h-[calc(100vh-56px)] overflow-hidden">
-      {/* Left: 19-surface sidebar */}
-      <aside className="hidden md:block">
-        <PlatformSidebar />
-      </aside>
-
       {/* Main surface area */}
       <main className="min-w-0 flex-1 overflow-hidden">
         <Outlet />
       </main>
+
+      {/* Right: 19-surface icon rail + hover/click popups + mobile drawer */}
+      <PlatformRail />
     </div>
   );
 }
