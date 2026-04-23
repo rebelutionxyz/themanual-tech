@@ -99,9 +99,10 @@ export function ThreadPage() {
     parentId: string | null,
     body: string,
     atomIds: string[] = [],
+    categoryPaths: string[] = [],
   ) {
     if (!bee || !threadId) return;
-    const newId = await createPost(threadId, body, bee.id, parentId, atomIds);
+    const newId = await createPost(threadId, body, bee.id, parentId, atomIds, categoryPaths);
     // Optimistic: refetch posts
     const p = await getPosts(threadId);
     setPosts(p);
@@ -335,9 +336,9 @@ export function ThreadPage() {
               }}
               header="Reply. Earn BLiNG!"
               placeholderBody="Your reply..."
-              onSubmit={async ({ body, atomIds }) => {
+              onSubmit={async ({ body, atomIds, categoryPaths }) => {
                 try {
-                  await handleReply(null, body, atomIds);
+                  await handleReply(null, body, atomIds, categoryPaths);
                   return true;
                 } catch {
                   return false;
@@ -402,7 +403,12 @@ interface PostNodeProps {
   depth: number;
   replyingTo: string | null;
   setReplyingTo: (id: string | null) => void;
-  onReply: (parentId: string | null, body: string, atomIds?: string[]) => Promise<void>;
+  onReply: (
+    parentId: string | null,
+    body: string,
+    atomIds?: string[],
+    categoryPaths?: string[],
+  ) => Promise<void>;
   canReply: boolean;
   threadId: string;
   threadContext: {
@@ -488,9 +494,9 @@ function PostNode({
             inheritedContext={threadContext}
             header="Reply. Earn BLiNG!"
             placeholderBody="Your reply..."
-            onSubmit={async ({ body, atomIds }) => {
+            onSubmit={async ({ body, atomIds, categoryPaths }) => {
               try {
-                await onReply(post.id, body, atomIds);
+                await onReply(post.id, body, atomIds, categoryPaths);
                 return true;
               } catch {
                 return false;

@@ -41,14 +41,13 @@ export function L3Refinement({
   }, [selectedL3, treeOpen]);
 
   const l3Options = useMemo(() => {
+    // Body L3 list only for L2 context now. Front sub-categories live in the sticky realm bar.
     const hasL2Context = selectedRealm && selectedL2;
-    const hasFrontContext = selectedRealm && selectedFront && !selectedL2;
-    if (!hasL2Context && !hasFrontContext) return [] as string[];
+    if (!hasL2Context) return [] as string[];
 
     const set = new Set<string>();
     for (const a of atoms) {
       if (a.realm !== selectedRealm) continue;
-      if (selectedFront && a.front !== selectedFront) continue;
       if (selectedL2 && a.L2 !== selectedL2) continue;
       if (!a.L3) continue;
       if (FRONT_SET.has(a.L3)) continue;

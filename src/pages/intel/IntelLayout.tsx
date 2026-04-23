@@ -24,10 +24,12 @@ export function IntelLayout() {
     selectedRealm,
     selectedFront,
     selectedL2,
+    selectedL3,
     activeView,
     setRealm,
     setFront,
     setL2,
+    setL3,
     setActiveView,
   } = useIntelStore();
 
@@ -44,6 +46,23 @@ export function IntelLayout() {
       result[realm] = Array.from(set).sort((a, b) => a.localeCompare(b));
     }
     return result;
+  }, [atoms, loaded]);
+
+  // Front sub-category (L3) options per Front, computed from atoms
+  // These are the sub-categories that appear below Fronts when one is selected
+  const frontL3s = useMemo(() => {
+    if (!loaded) return {};
+    const result: Record<string, Set<string>> = {};
+    for (const atom of atoms) {
+      if (!atom.front || !atom.L3) continue;
+      if (!result[atom.front]) result[atom.front] = new Set<string>();
+      result[atom.front].add(atom.L3);
+    }
+    const sorted: Record<string, string[]> = {};
+    for (const [front, set] of Object.entries(result)) {
+      sorted[front] = Array.from(set).sort((a, b) => a.localeCompare(b));
+    }
+    return sorted;
   }, [atoms, loaded]);
 
   function handleSidebarSelect(view: IntelView) {
@@ -75,6 +94,7 @@ export function IntelLayout() {
           selectedRealm={selectedRealm}
           selectedFront={selectedFront}
           selectedL2={selectedL2}
+          selectedL3={selectedL3}
           onSelectRealm={(r) => {
             setRealm(r);
             if (window.location.pathname !== '/intel') {
@@ -93,7 +113,14 @@ export function IntelLayout() {
               navigate('/intel');
             }
           }}
+          onSelectL3={(l3) => {
+            setL3(l3);
+            if (window.location.pathname !== '/intel') {
+              navigate('/intel');
+            }
+          }}
           realmSubs={realmSubs}
+          frontL3s={frontL3s}
         />
 
         {/* Content */}

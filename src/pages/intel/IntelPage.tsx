@@ -175,18 +175,6 @@ export function IntelPage() {
         </div>
       </div>
 
-      {/* Time window picker — only for Hot and Breaking views */}
-      {(activeView === 'hot' || activeView === 'new') && (
-        <TimeWindowBar
-          value={activeView === 'hot' ? hotWindow : breakingWindow}
-          onChange={(h) => {
-            if (activeView === 'hot') setHotWindow(h);
-            else setBreakingWindow(h);
-          }}
-          label={activeView === 'hot' ? 'Hot in' : 'Breaking in'}
-        />
-      )}
-
       {/* L3 refinement row + optional tree drill */}
       <L3Refinement
         selectedRealm={selectedRealm}
@@ -242,7 +230,7 @@ export function IntelPage() {
             front: selectedFront,
             l2: selectedL2,
           }}
-          onSubmit={async ({ title, body, atomIds, realm, front, l2 }) => {
+          onSubmit={async ({ title, body, atomIds, categoryPaths, realm, front, l2 }) => {
             if (!bee || !title) return false;
             try {
               const newId = await createThread(
@@ -253,6 +241,7 @@ export function IntelPage() {
                   primaryFront: front,
                   primaryL2: l2,
                   atomIds,
+                  categoryPaths,
                 },
                 bee.id,
               );
@@ -265,6 +254,18 @@ export function IntelPage() {
           }}
         />
       </div>
+
+      {/* Time window dropdown — above thread list, only for Hot/Breaking views */}
+      {(activeView === 'hot' || activeView === 'new') && (
+        <TimeWindowBar
+          value={activeView === 'hot' ? hotWindow : breakingWindow}
+          onChange={(h) => {
+            if (activeView === 'hot') setHotWindow(h);
+            else setBreakingWindow(h);
+          }}
+          mode={activeView === 'hot' ? 'hot' : 'breaking'}
+        />
+      )}
 
       {/* Thread list */}
       <ThreadList

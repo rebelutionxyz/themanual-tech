@@ -59,6 +59,7 @@ export interface CreateThreadInput {
   title: string;
   body: string;
   atomIds?: string[];
+  categoryPaths?: string[];
   primaryRealm?: string | null;
   primaryFront?: Front | null;
   primaryL2?: string | null;
@@ -302,6 +303,22 @@ export async function createThread(
     }
   }
 
+  // Category tags — additive L2+ branches for cross-discovery
+  if (input.categoryPaths && input.categoryPaths.length > 0) {
+    const catLinks = input.categoryPaths.map((path) => ({
+      source_surface: 'intel',
+      source_id: thread.id,
+      category_path: path,
+      created_by: authorBeeId,
+    }));
+    const { error: catErr } = await supabase
+      .from('entity_category_links')
+      .insert(catLinks);
+    if (catErr) {
+      console.warn('Category link insert failed (thread was created):', catErr.message);
+    }
+  }
+
   return String(thread.id);
 }
 
@@ -311,6 +328,7 @@ export async function createPost(
   authorBeeId: string,
   parentPostId: string | null = null,
   atomIds: string[] = [],
+  categoryPaths: string[] = [],
 ): Promise<string> {
   if (!supabase) throw new Error('Supabase not configured');
 
@@ -337,8 +355,19 @@ export async function createPost(
       source_id: postId,
       atom_id: atomId,
     }));
-    // Best-effort: silent if table missing or RLS denies
     await supabase.from('entity_atom_links').insert(links);
+  }
+
+  // Link categories to this reply (if any were provided)
+  if (categoryPaths.length > 0) {
+    const postId = String(data.id);
+    const catLinks = categoryPaths.map((path) => ({
+      source_surface: 'intel',
+      source_id: postId,
+      category_path: path,
+      created_by: authorBeeId,
+    }));
+    await supabase.from('entity_category_links').insert(catLinks);
   }
 
   // Reply count increment handled by DB trigger (see schema-v3-intel.sql)

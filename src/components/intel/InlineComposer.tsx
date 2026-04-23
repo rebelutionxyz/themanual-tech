@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo, type FormEvent } from 'react';
-import { Send, X, Loader2 } from 'lucide-react';
+import { Send, X, Loader2, Image, Video, FileText, MapPin, Link2, Tag, AtSign } from 'lucide-react';
 import { AtomPicker } from '@/components/intel/AtomPicker';
+import { CategoryPicker } from '@/components/intel/CategoryPicker';
 import { RealmPicker, type RealmSelection } from '@/components/intel/RealmPicker';
 import { useManualData } from '@/lib/useManualData';
 import { cn } from '@/lib/utils';
@@ -12,6 +13,7 @@ export interface InlineComposerPayload {
   title?: string;
   body: string;
   atomIds: string[];
+  categoryPaths: string[];
   realm: string | null;
   front: Front | null;
   l2: string | null;
@@ -81,6 +83,7 @@ export function InlineComposer({
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [atomIds, setAtomIds] = useState<string[]>([]);
+  const [categoryPaths, setCategoryPaths] = useState<string[]>([]);
   const [realmSel, setRealmSel] = useState<RealmSelection>({
     realm: inheritedContext?.realm ?? null,
     front: inheritedContext?.front ?? null,
@@ -146,6 +149,7 @@ export function InlineComposer({
         if (parsed.title) setTitle(parsed.title);
         if (parsed.body) setBody(parsed.body);
         if (parsed.atomIds) setAtomIds(parsed.atomIds);
+        if (parsed.categoryPaths) setCategoryPaths(parsed.categoryPaths);
         if (parsed.realm || parsed.front || parsed.l2) {
           setRealmSel({
             realm: parsed.realm ?? null,
@@ -169,7 +173,11 @@ export function InlineComposer({
   // Autosave draft
   useEffect(() => {
     if (!draftKey) return;
-    const hasContent = title.trim() || body.trim() || atomIds.length > 0;
+    const hasContent =
+      title.trim() ||
+      body.trim() ||
+      atomIds.length > 0 ||
+      categoryPaths.length > 0;
     if (!hasContent) {
       localStorage.removeItem(`draft:${draftKey}`);
       return;
@@ -178,6 +186,7 @@ export function InlineComposer({
       title,
       body,
       atomIds,
+      categoryPaths,
       realm: realmSel.realm,
       front: realmSel.front,
       l2: realmSel.l2,
@@ -190,6 +199,7 @@ export function InlineComposer({
     title,
     body,
     atomIds,
+    categoryPaths,
     realmSel.realm,
     realmSel.front,
     realmSel.l2,
@@ -221,6 +231,7 @@ export function InlineComposer({
         title: mode === 'thread' ? title.trim() : undefined,
         body: body.trim(),
         atomIds,
+        categoryPaths,
         realm: realmSel.realm,
         front: realmSel.front,
         l2: realmSel.l2,
@@ -230,6 +241,7 @@ export function InlineComposer({
         setTitle('');
         setBody('');
         setAtomIds([]);
+        setCategoryPaths([]);
         setRealmManuallyOverridden(false);
         setRealmSel({
           realm: inheritedContext?.realm ?? null,
@@ -246,7 +258,8 @@ export function InlineComposer({
   }
 
   function handleCancel() {
-    const hasContent = title.trim() || body.trim() || atomIds.length > 0;
+    const hasContent =
+      title.trim() || body.trim() || atomIds.length > 0 || categoryPaths.length > 0;
     if (hasContent) {
       const keep = window.confirm('Keep draft? OK = keep, Cancel = discard');
       if (!keep && draftKey) {
@@ -254,6 +267,7 @@ export function InlineComposer({
         setTitle('');
         setBody('');
         setAtomIds([]);
+        setCategoryPaths([]);
         setRealmManuallyOverridden(false);
         setRealmSel({
           realm: inheritedContext?.realm ?? null,
@@ -282,22 +296,33 @@ export function InlineComposer({
     );
   }
 
-  // Collapsed — two-line "pop" card
+  // Collapsed — two-line info + action icons + inactive Post
   if (!expanded) {
     const bodyLine =
       collapsedBodyLine ?? placeholderBodyFinal ?? 'Share your thought...';
 
+    const expand = () => {
+      setExpanded(true);
+      setTimeout(() => {
+        if (mode === 'thread') titleRef.current?.focus();
+        else bodyRef.current?.focus();
+      }, 50);
+    };
+
+    // Icon defs — all trigger expand for now (UI only, no backend wired yet)
+    const actionIcons: { id: string; icon: typeof Image; label: string; title: string }[] = [
+      { id: 'image', icon: Image, label: 'Image', title: 'Attach image (coming soon)' },
+      { id: 'video', icon: Video, label: 'Video', title: 'Attach video (coming soon)' },
+      { id: 'doc', icon: FileText, label: 'Doc', title: 'Attach document (coming soon)' },
+      { id: 'location', icon: MapPin, label: 'Location', title: 'Add location (coming soon)' },
+      { id: 'link', icon: Link2, label: 'Link', title: 'Preview link (coming soon)' },
+      { id: 'atoms', icon: Tag, label: 'Atoms', title: 'Tag atoms from the Manual' },
+      { id: 'mention', icon: AtSign, label: 'Mention', title: 'Mention a Bee (coming soon)' },
+    ];
+
     return (
-      <button
-        type="button"
-        onClick={() => {
-          setExpanded(true);
-          setTimeout(() => {
-            if (mode === 'thread') titleRef.current?.focus();
-            else bodyRef.current?.focus();
-          }, 50);
-        }}
-        className="group relative block w-full overflow-hidden rounded-lg border-2 bg-bg px-4 py-3 text-left transition-all hover:scale-[1.01] hover:shadow-xl"
+      <div
+        className="group relative overflow-hidden rounded-lg border-2 bg-bg transition-all hover:shadow-xl"
         style={{
           borderColor: `${accentColor}80`,
           boxShadow: `0 0 0 1px ${accentColor}25, 0 4px 14px rgba(0,0,0,0.35), 0 0 16px ${accentColor}20`,
@@ -311,30 +336,89 @@ export function InlineComposer({
           }}
         />
 
-        <div className="relative flex items-baseline gap-2">
-          <span
-            className="font-display tracking-wide"
-            style={{ fontSize: '14px', color: '#FAD15E', fontWeight: 600 }}
-          >
-            Earn BLiNG!
-          </span>
-          {collapsedContextLabel && (
-            <span
-              className="truncate font-mono uppercase tracking-widest"
-              style={{ fontSize: '10.5px', color: `${accentColor}C0` }}
-              data-size="meta"
-            >
-              {collapsedContextLabel}
-            </span>
-          )}
-        </div>
-        <div
-          className="relative mt-1 truncate"
-          style={{ fontSize: '13px', color: 'rgba(232, 236, 241, 0.55)' }}
+        {/* Clickable text area (top portion) */}
+        <button
+          type="button"
+          onClick={expand}
+          className="relative block w-full px-4 py-3 text-left"
         >
-          {bodyLine}
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span
+              className="font-display tracking-wide"
+              style={{ fontSize: '14px', color: '#FAD15E', fontWeight: 600 }}
+            >
+              Earn BLiNG!
+            </span>
+            {collapsedContextLabel && (
+              <span
+                className="truncate font-mono uppercase tracking-widest"
+                style={{ fontSize: '10.5px', color: `${accentColor}C0` }}
+                data-size="meta"
+              >
+                {collapsedContextLabel}
+              </span>
+            )}
+          </div>
+          <div
+            className="mt-1 truncate"
+            style={{ fontSize: '13px', color: 'rgba(232, 236, 241, 0.55)' }}
+          >
+            {bodyLine}
+          </div>
+        </button>
+
+        {/* Divider */}
+        <div
+          className="relative h-px"
+          style={{ background: `${accentColor}25` }}
+        />
+
+        {/* Action icon row + inactive Post button */}
+        <div className="relative flex items-center justify-between gap-2 px-3 py-2">
+          <div className="flex items-center gap-0.5 sm:gap-1">
+            {actionIcons.map((action) => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={action.id}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    expand();
+                  }}
+                  title={action.title}
+                  aria-label={action.label}
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-bg-elevated hover:text-text-silver"
+                >
+                  <Icon size={15} />
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Inactive Post button — clickable, expands composer */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              expand();
+            }}
+            title="Write to enable posting"
+            className="hidden items-center gap-1.5 rounded-md border px-3 py-1 transition-colors sm:flex"
+            style={{
+              fontSize: '12px',
+              borderColor: `${accentColor}30`,
+              color: `${accentColor}80`,
+              background: 'transparent',
+              opacity: 0.7,
+              cursor: 'pointer',
+            }}
+          >
+            <Send size={11} />
+            <span>Post</span>
+          </button>
         </div>
-      </button>
+      </div>
     );
   }
 
@@ -397,13 +481,53 @@ export function InlineComposer({
         onChange={(e) => setBody(e.target.value)}
         placeholder={placeholderBodyFinal}
         rows={mode === 'thread' ? 4 : 3}
-        className="mb-3 w-full resize-y rounded-md border bg-bg px-3 py-2 text-text placeholder:text-text-muted focus:outline-none focus:ring-1"
+        className="mb-2 w-full resize-y rounded-md border bg-bg px-3 py-2 text-text placeholder:text-text-muted focus:outline-none focus:ring-1"
         style={{
           fontSize: '14px',
           lineHeight: '1.5',
           borderColor: `${accentColor}40`,
         }}
       />
+
+      {/* Attachments row — placeholder icons, show coming-soon tooltips */}
+      <div className="mb-3">
+        <div
+          className="mb-1 font-mono uppercase tracking-wider text-text-muted"
+          style={{ fontSize: '11px' }}
+          data-size="meta"
+        >
+          Attach
+        </div>
+        <div className="flex flex-wrap items-center gap-1">
+          {[
+            { id: 'image', icon: Image, label: 'Image' },
+            { id: 'video', icon: Video, label: 'Video' },
+            { id: 'doc', icon: FileText, label: 'Doc' },
+            { id: 'location', icon: MapPin, label: 'Location' },
+            { id: 'link', icon: Link2, label: 'Link' },
+            { id: 'mention', icon: AtSign, label: 'Mention' },
+          ].map(({ id, icon: Icon, label }) => (
+            <button
+              key={id}
+              type="button"
+              disabled
+              title={`${label} — coming soon`}
+              className="flex items-center gap-1 rounded-md border border-border bg-bg/40 px-2 py-1 text-text-muted opacity-60"
+              style={{ fontSize: '11px', cursor: 'not-allowed' }}
+            >
+              <Icon size={12} />
+              <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
+          <span
+            className="ml-1 font-mono text-text-dim"
+            style={{ fontSize: '10.5px' }}
+            data-size="meta"
+          >
+            Coming soon
+          </span>
+        </div>
+      </div>
 
       {/* Inherited context line (reply mode, informational) */}
       {mode === 'reply' && inheritedContext?.realm && (
@@ -438,6 +562,15 @@ export function InlineComposer({
             l2: realmSel.l2,
           }}
           placeholder="Search atoms to tag..."
+        />
+      </div>
+
+      {/* Category picker — multi-select L2+ branches for additive discovery */}
+      <div className="mb-3">
+        <CategoryPicker
+          value={categoryPaths}
+          onChange={setCategoryPaths}
+          max={5}
         />
       </div>
 
