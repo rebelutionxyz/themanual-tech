@@ -219,8 +219,6 @@ export function IntelPage() {
           disabledMessage="Sign in to start a thread"
           draftKey="intel-thread-new"
           startCollapsed={true}
-          allowExpand={true}
-          expandUrl="/intel/new"
           header="Start a thread. Earn BLiNG!"
           subheader={
             selectedRealm

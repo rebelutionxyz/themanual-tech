@@ -242,7 +242,7 @@ export function InlineComposer({
     );
   }
 
-  // Collapsed state — prominent single-line prompt
+  // Collapsed state — thin input-style box
   if (!expanded) {
     return (
       <button
@@ -254,25 +254,17 @@ export function InlineComposer({
             else bodyRef.current?.focus();
           }, 50);
         }}
-        className="group flex w-full items-center gap-2 rounded-lg border-2 bg-bg-elevated px-4 py-3 text-left transition-all hover:bg-panel-2 hover:shadow-lg"
+        className="group flex w-full items-center rounded-md border bg-bg px-3 py-2 text-left transition-colors hover:bg-bg-elevated"
         style={{
           borderColor: `${accentColor}60`,
-          boxShadow: `0 0 0 1px ${accentColor}15, 0 2px 8px rgba(0,0,0,0.25)`,
+          boxShadow: `0 0 0 1px ${accentColor}18`,
         }}
       >
-        <Send size={14} style={{ color: accentColor }} />
         <span
-          className="flex-1 font-display tracking-wide"
-          style={{ fontSize: '14px', color: accentColor, fontWeight: 500 }}
+          className="flex-1 truncate"
+          style={{ fontSize: '13px', color: `${accentColor}C0` }}
         >
           {placeholderCollapsedFinal}
-        </span>
-        <span
-          className="font-mono text-text-muted"
-          style={{ fontSize: '11px' }}
-          data-size="meta"
-        >
-          Click to compose →
         </span>
       </button>
     );

@@ -57,46 +57,56 @@ export function L3Refinement({
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [atoms, selectedRealm, selectedFront, selectedL2]);
 
-  // Build the tree scope: scope to the SELECTED L3's branch only.
-  // The tree answers "what's under the L3 you picked?"
+  // Build the tree scope: scope to the deepest selected level.
+  //  - If L3 is selected → show L3 node (children are L4s)
+  //  - Else if L2 or Front is selected → show that node (children are L3s)
+  //  - Else → show realm node (children are L2s)
   const treeRoot = useMemo(() => {
-    if (!tree || !selectedRealm || !selectedL3) return null;
+    if (!tree || !selectedRealm) return null;
     const realmNode = tree.children.find((c) => c.name === selectedRealm);
     if (!realmNode) return null;
 
-    // Walk down to find the L3 node. L3 sits under either Front/L2 or realm directly.
-    // Strategy: find any node in the realm subtree whose name === selectedL3 AND whose
-    // parent chain matches the front/L2 context.
-    function findL3(node: import('@/types/manual').TreeNode): import('@/types/manual').TreeNode | null {
-      // match by name at depth >= 2
-      if (node.name === selectedL3 && node.depth >= 2) return node;
+    // Find node by name in a subtree (depth-first, first match wins)
+    function findByName(
+      node: import('@/types/manual').TreeNode,
+      name: string,
+    ): import('@/types/manual').TreeNode | null {
+      if (node.name === name) return node;
       for (const child of node.children) {
-        const found = findL3(child);
+        const found = findByName(child, name);
         if (found) return found;
       }
       return null;
     }
 
-    // If a Front or L2 is selected, narrow search to that branch first for accuracy
-    let searchRoot: import('@/types/manual').TreeNode = realmNode;
+    // Pick the starting scope based on Front / L2
+    let scope: import('@/types/manual').TreeNode = realmNode;
     if (selectedFront) {
       const frontNode =
         realmNode.children.find((c) => c.name === selectedFront) ||
         findNodeByPath(realmNode, `${selectedRealm} / ${selectedFront}`);
-      if (frontNode) searchRoot = frontNode;
+      if (frontNode) scope = frontNode;
     } else if (selectedL2) {
-      const l2Node = realmNode.children.find((c) => c.name === selectedL2);
-      if (l2Node) searchRoot = l2Node;
+      // L2 might be a direct child of the realm (most common) OR deeper
+      const direct = realmNode.children.find((c) => c.name === selectedL2);
+      scope = direct ?? findByName(realmNode, selectedL2) ?? realmNode;
     }
 
-    return findL3(searchRoot);
+    // If an L3 is selected, drill further within scope
+    if (selectedL3) {
+      const l3Node = findByName(scope, selectedL3);
+      if (l3Node) return l3Node;
+    }
+    return scope;
   }, [tree, selectedRealm, selectedFront, selectedL2, selectedL3]);
 
-  if (l3Options.length === 0) return null;
+  // Don't render if no flat options AND no tree root (i.e., no realm/front/l2 context)
+  if (l3Options.length === 0 && !treeRoot) return null;
 
   return (
     <div className="mb-4 space-y-2">
-      {/* Flat L3 scroll bar */}
+      {/* Flat L3 scroll bar — only if we have L3 options for the context */}
+      {l3Options.length > 0 && (
       <div className="rounded-lg border border-border bg-bg-elevated">
         <ScrollRow>
           <button
@@ -130,8 +140,9 @@ export function L3Refinement({
           ))}
         </ScrollRow>
       </div>
+      )}
 
-      {/* Drill deeper — only when L3 is selected and has children to drill into */}
+      {/* Drill deeper — only when tree root exists and has children to drill into */}
       {treeRoot && treeRoot.children.length > 0 && (
         <div>
           <button
@@ -141,7 +152,7 @@ export function L3Refinement({
             style={{ fontSize: '11px' }}
           >
             <Network size={11} />
-            <span>Drill deeper into {selectedL3}</span>
+            <span>Drill deeper into {treeRoot.name}</span>
             {treeOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
           </button>
 
