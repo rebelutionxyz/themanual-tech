@@ -32,12 +32,15 @@ export function L3Refinement({
   const { atoms } = useManualData();
 
   const l3Options = useMemo(() => {
-    if (!selectedRealm || !selectedL2) return [] as string[];
+    if (!selectedRealm) return [] as string[];
+    // Need EITHER L2 OR Front to show L3s (otherwise scope is too broad)
+    if (!selectedL2 && !selectedFront) return [] as string[];
+
     const set = new Set<string>();
     for (const a of atoms) {
       if (a.realm !== selectedRealm) continue;
       if (selectedFront && a.front !== selectedFront) continue;
-      if (a.L2 !== selectedL2) continue;
+      if (selectedL2 && a.L2 !== selectedL2) continue;
       if (!a.L3) continue;
       // Filter out Front names that leak into L3 positions (data quirk)
       if (FRONT_SET.has(a.L3)) continue;
@@ -55,7 +58,7 @@ export function L3Refinement({
         style={{ fontSize: '10.5px' }}
         data-size="meta"
       >
-        Refine: {selectedL2}
+        Refine: {selectedL2 ?? selectedFront}
       </div>
       <div className="flex flex-wrap gap-1">
         <button

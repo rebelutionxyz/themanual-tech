@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from '@/lib/auth';
 import { HomePage } from '@/pages/HomePage';
 import { ManualPage } from '@/pages/ManualPage';
+import { IntelLayout } from '@/pages/intel/IntelLayout';
 import { IntelPage } from '@/pages/intel/IntelPage';
 import { NewThreadPage } from '@/pages/intel/NewThreadPage';
 import { ThreadPage } from '@/pages/intel/ThreadPage';
@@ -24,14 +25,20 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/profile" element={<ProfilePage />} />
 
-          {/* INTEL sub-routes (NO platform sidebar wrap — composer/detail are focused views) */}
-          <Route path="/intel/new" element={<NewThreadPage />} />
-          <Route path="/intel/t/:threadId" element={<ThreadPage />} />
-
-          {/* Platform surfaces (flat URLs, sidebar-wrapped) */}
+          {/* Platform surfaces (right rail + utility chrome) */}
           <Route element={<PlatformLayout />}>
+            {/* Manual surface */}
             <Route path="/manual" element={<ManualPage />} />
-            <Route path="/intel" element={<IntelPage />} />
+
+            {/* INTEL surface + all sub-routes share the same IntelLayout
+                (sidebar + realm bar persist across thread list, composer, detail) */}
+            <Route path="/intel" element={<IntelLayout />}>
+              <Route index element={<IntelPage />} />
+              <Route path="new" element={<NewThreadPage />} />
+              <Route path="t/:threadId" element={<ThreadPage />} />
+            </Route>
+
+            {/* All other surfaces use generic SurfacePage */}
             <Route path="/:slug" element={<SurfacePage />} />
           </Route>
 

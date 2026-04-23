@@ -1,27 +1,35 @@
 import { Link } from 'react-router-dom';
-import { Home, Search, Bell, MessageCircle, ShoppingCart } from 'lucide-react';
+import { Home, Search, Bell, MessageCircle, ShoppingCart, LayoutGrid } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 
 /**
  * Utility chrome cluster shown in top-right of SiteHeader.
- * Order: home · search · BLiNG! balance · notifications · messages · cart · profile
+ * Final order (left to right):
+ *   home · search · notif · msg · cart · BLiNG! pill · profile-avatar · sidebar-opener
  *
- * Cart is only shown when it has items (count > 0).
- * BLiNG! pill shows balance; click navigates to /bling surface.
+ * - Cart shown only when count > 0
+ * - BLiNG! pill shown only when signed in
+ * - Profile combines avatar + handle into one clickable pill; goes to /profile
+ * - Sidebar-opener dispatches a custom event that PlatformRail listens for
+ *   (opens pinned popup on desktop; opens drawer on mobile)
  */
 export function UtilityChrome() {
   const { bee } = useAuth();
 
-  // TODO wire these to real data once surfaces exist
+  // Placeholder counts — wire these to real data later
   const notificationCount = 0;
   const messageCount = 0;
   const cartCount = 0;
   const blingBalance = bee ? 0 : null;
 
+  function openSurfaces() {
+    window.dispatchEvent(new CustomEvent('open-surfaces-drawer'));
+  }
+
   return (
     <div className="flex items-center gap-1">
-      {/* Home icon */}
+      {/* 1. Home */}
       <Link
         to="/"
         className="flex h-9 w-9 items-center justify-center rounded-md text-text-silver transition-colors hover:bg-bg-elevated hover:text-text"
@@ -31,25 +39,58 @@ export function UtilityChrome() {
         <Home size={16} />
       </Link>
 
-      {/* Search (opens search UI — placeholder for now) */}
+      {/* 2. Search */}
       <button
         type="button"
         className="flex h-9 w-9 items-center justify-center rounded-md text-text-silver transition-colors hover:bg-bg-elevated hover:text-text"
         aria-label="Search"
         title="Search"
-        onClick={() => {
-          // TODO: open site-wide search modal
-          console.log('search clicked');
-        }}
+        onClick={() => console.log('search clicked (placeholder)')}
       >
         <Search size={16} />
       </button>
 
-      {/* BLiNG! balance pill */}
+      {/* 3. Notifications */}
+      {bee && (
+        <IconButton
+          ariaLabel="Notifications"
+          title="Notifications"
+          badge={notificationCount}
+          onClick={() => console.log('notifications clicked')}
+        >
+          <Bell size={16} />
+        </IconButton>
+      )}
+
+      {/* 4. Messages */}
+      {bee && (
+        <IconButton
+          ariaLabel="Messages"
+          title="Messages"
+          badge={messageCount}
+          onClick={() => console.log('messages clicked')}
+        >
+          <MessageCircle size={16} />
+        </IconButton>
+      )}
+
+      {/* 5. Cart (only if >0) */}
+      {bee && cartCount > 0 && (
+        <IconButton
+          ariaLabel="Cart"
+          title="Cart"
+          badge={cartCount}
+          onClick={() => console.log('cart clicked')}
+        >
+          <ShoppingCart size={16} />
+        </IconButton>
+      )}
+
+      {/* 6. BLiNG! balance pill */}
       {blingBalance !== null && (
         <Link
           to="/bling"
-          className="flex items-center gap-1.5 rounded-full border border-honey/30 bg-bg-elevated px-2.5 py-1 transition-colors hover:border-honey/60"
+          className="ml-0.5 flex items-center gap-1.5 rounded-full border border-honey/40 bg-bg-elevated px-2.5 py-1 transition-colors hover:border-honey/70"
           title="BLiNG! balance"
         >
           <span
@@ -65,53 +106,28 @@ export function UtilityChrome() {
         </Link>
       )}
 
-      {/* Notifications */}
-      {bee && (
-        <IconButton
-          ariaLabel="Notifications"
-          title="Notifications"
-          badge={notificationCount}
-          onClick={() => console.log('notifications clicked')}
-        >
-          <Bell size={16} />
-        </IconButton>
-      )}
-
-      {/* Messages */}
-      {bee && (
-        <IconButton
-          ariaLabel="Messages"
-          title="Messages"
-          badge={messageCount}
-          onClick={() => console.log('messages clicked')}
-        >
-          <MessageCircle size={16} />
-        </IconButton>
-      )}
-
-      {/* Cart (only if has items) */}
-      {bee && cartCount > 0 && (
-        <IconButton
-          ariaLabel="Cart"
-          title="Cart"
-          badge={cartCount}
-          onClick={() => console.log('cart clicked')}
-        >
-          <ShoppingCart size={16} />
-        </IconButton>
-      )}
-
-      {/* Profile */}
+      {/* 7. Profile-avatar (bigger + brighter than before) */}
       {bee ? (
         <Link
           to="/profile"
-          className="flex items-center gap-2 rounded-full border border-border bg-bg-elevated px-2.5 py-1 text-sm transition-colors hover:border-border-bright hover:bg-panel-2"
+          className="ml-0.5 flex items-center gap-2 rounded-full border border-border-bright bg-bg-elevated py-0.5 pl-0.5 pr-3 transition-all hover:border-text-silver/50 hover:bg-panel-2"
           title={`Profile · @${bee.handle}`}
         >
-          <span className="h-1.5 w-1.5 rounded-full bg-kettle-sourced" />
+          {/* Avatar circle (larger, brighter) */}
+          <span
+            className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-honey/30 to-kettle-sourced/30 font-display font-semibold text-text"
+            style={{ fontSize: '13px' }}
+          >
+            {bee.handle.slice(0, 1).toUpperCase()}
+            {/* Presence dot */}
+            <span
+              className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-bg-elevated bg-kettle-sourced"
+              aria-label="Online"
+            />
+          </span>
           <span
             className="hidden font-mono text-text-silver md:inline"
-            style={{ fontSize: '12px' }}
+            style={{ fontSize: '12.5px' }}
           >
             {bee.handle}
           </span>
@@ -124,6 +140,17 @@ export function UtilityChrome() {
           Sign in
         </Link>
       )}
+
+      {/* 8. Sidebar opener — always visible now (desktop: pin active popup, mobile: open drawer) */}
+      <button
+        type="button"
+        onClick={openSurfaces}
+        aria-label="Open surfaces menu"
+        title="Surfaces"
+        className="ml-1 flex h-9 w-9 items-center justify-center rounded-md border border-honey/40 bg-honey/10 text-honey transition-colors hover:border-honey/70 hover:bg-honey/20"
+      >
+        <LayoutGrid size={16} />
+      </button>
     </div>
   );
 }

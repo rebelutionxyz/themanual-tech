@@ -91,6 +91,24 @@ export function PlatformRail() {
     };
   }, [drawerOpen]);
 
+  // Listen for external "open drawer" event from UtilityChrome button.
+  // Desktop: pin the currently-active surface's popup.
+  // Mobile: open the drawer.
+  useEffect(() => {
+    const onOpen = () => {
+      const isMobile = window.innerWidth < 768; // matches Tailwind md breakpoint
+      if (isMobile) {
+        setDrawerOpen(true);
+      } else {
+        // Pin the active surface's popup if on a surface, else first surface
+        const slugToPin = activeSlug ?? SURFACES[0]?.slug ?? null;
+        if (slugToPin) setPinnedSlug(slugToPin);
+      }
+    };
+    window.addEventListener('open-surfaces-drawer', onOpen);
+    return () => window.removeEventListener('open-surfaces-drawer', onOpen);
+  }, [activeSlug]);
+
   const handleIconClick = useCallback(
     (slug: string) => {
       setPinnedSlug((current) => (current === slug ? null : slug));
@@ -151,24 +169,12 @@ export function PlatformRail() {
         )}
       </div>
 
-      {/* Mobile drawer — hidden until swipe */}
+      {/* Mobile drawer — hidden until swipe or utility chrome button */}
       <MobileDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         activeSlug={activeSlug}
       />
-
-      {/* Mobile swipe hint tab */}
-      {!drawerOpen && (
-        <button
-          type="button"
-          onClick={() => setDrawerOpen(true)}
-          aria-label="Open surfaces menu"
-          className="fixed right-0 top-1/2 z-30 flex h-12 w-4 -translate-y-1/2 items-center justify-center rounded-l-md border-y border-l border-border bg-bg-elevated text-text-muted hover:text-text md:hidden"
-        >
-          <ChevronRight size={12} className="rotate-180" />
-        </button>
-      )}
     </>
   );
 }

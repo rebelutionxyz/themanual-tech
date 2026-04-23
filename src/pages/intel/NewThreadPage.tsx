@@ -1,42 +1,40 @@
 import { useState, useMemo, useEffect, type FormEvent } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, MessagesSquare, Send, Sparkles } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useManualData } from '@/lib/useManualData';
 import { createThread } from '@/lib/intel';
 import { AtomPicker } from '@/components/intel/AtomPicker';
 import { RealmPicker, type RealmSelection } from '@/components/intel/RealmPicker';
-import { FRONT_ORDER } from '@/lib/constants';
-import type { Front } from '@/types/manual';
+import { useIntelStore } from '@/stores/useIntelStore';
 import { cn } from '@/lib/utils';
 
 /**
  * Thread composer — /intel/new
- * Reads optional URL params: ?realm=Power&front=INVESTIGATE&l2=JFK
+ * Reads initial realm context from the IntelStore (set by the realm bar above).
  *
  * Model D flow:
  * - Title + Body required
- * - AtomPicker (prioritized by URL/realm context)
+ * - AtomPicker (prioritized by active realm context)
  * - RealmPicker (auto-fills from linked atoms, editable, required if no atoms)
  * - Submit validates: must have 1+ atoms OR realm selected
  */
 export function NewThreadPage() {
   const { bee, configured } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const { atoms } = useManualData();
 
-  // Read URL context
-  const urlRealm = searchParams.get('realm');
-  const urlFront = searchParams.get('front') as Front | null;
-  const urlL2 = searchParams.get('l2');
+  // Read current realm context from IntelStore (shared with IntelLayout)
+  const urlRealm = useIntelStore((s) => s.selectedRealm);
+  const urlFront = useIntelStore((s) => s.selectedFront);
+  const urlL2 = useIntelStore((s) => s.selectedL2);
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [atomIds, setAtomIds] = useState<string[]>([]);
   const [realmSel, setRealmSel] = useState<RealmSelection>({
     realm: urlRealm,
-    front: urlFront && FRONT_ORDER.includes(urlFront) ? urlFront : null,
+    front: urlFront,
     l2: urlL2,
   });
   const [realmManuallyOverridden, setRealmManuallyOverridden] = useState(false);
@@ -62,13 +60,9 @@ export function NewThreadPage() {
     if (derivedFromAtoms && !realmManuallyOverridden) {
       setRealmSel(derivedFromAtoms);
     }
-    // If all atoms removed and we were in auto mode, fall back to URL seed (or null)
+    // If all atoms removed and we were in auto mode, fall back to store seed (or null)
     if (atomIds.length === 0 && !realmManuallyOverridden) {
-      setRealmSel({
-        realm: urlRealm,
-        front: urlFront && FRONT_ORDER.includes(urlFront) ? urlFront : null,
-        l2: urlL2,
-      });
+      setRealmSel({ realm: urlRealm, front: urlFront, l2: urlL2 });
     }
   }, [derivedFromAtoms, realmManuallyOverridden, atomIds.length, urlRealm, urlFront, urlL2]);
 

@@ -1,109 +1,27 @@
-import { useMemo, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { MessagesSquare, Plus } from 'lucide-react';
-import { useManualData } from '@/lib/useManualData';
-import { RealmBar } from '@/components/intel/RealmBar';
-import { IntelSidebar, type IntelView } from '@/components/intel/IntelSidebar';
 import { ThreadList } from '@/components/intel/ThreadList';
 import { L3Refinement } from '@/components/intel/L3Refinement';
-import { REALM_ORDER } from '@/lib/constants';
-import type { Front } from '@/types/manual';
+import { useIntelStore } from '@/stores/useIntelStore';
+import { buildNewThreadUrl } from './IntelLayout';
 
+/**
+ * Thread list page. Sidebar + realm bar are provided by IntelLayout wrapper.
+ * This component only renders the content that changes: header, filters, list.
+ */
 export function IntelPage() {
-  const navigate = useNavigate();
-  const { atoms, loaded } = useManualData();
-
-  const [selectedRealm, setSelectedRealm] = useState<string | null>(null);
-  const [selectedFront, setSelectedFront] = useState<Front | null>(null);
-  const [selectedL2, setSelectedL2] = useState<string | null>(null);
-  const [selectedL3, setSelectedL3] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<IntelView>('home');
-
-  const realmSubs = useMemo(() => {
-    if (!loaded) return {};
-    const subs: Record<string, Set<string>> = {};
-    for (const realm of REALM_ORDER) subs[realm] = new Set<string>();
-    for (const atom of atoms) {
-      if (atom.L2 && subs[atom.realm]) subs[atom.realm].add(atom.L2);
-    }
-    const result: Record<string, string[]> = {};
-    for (const [realm, set] of Object.entries(subs)) {
-      result[realm] = Array.from(set).sort((a, b) => a.localeCompare(b));
-    }
-    return result;
-  }, [atoms, loaded]);
+  const {
+    selectedRealm,
+    selectedFront,
+    selectedL2,
+    selectedL3,
+    activeView,
+    setL3,
+  } = useIntelStore();
 
   const sortBy: 'hot' | 'new' | 'top' =
     activeView === 'new' ? 'new' : activeView === 'hot' ? 'hot' : 'hot';
 
-  function handleSidebarSelect(view: IntelView) {
-    if (view === 'create') {
-      navigate(buildNewThreadUrl(selectedRealm, selectedFront, selectedL2));
-      return;
-    }
-    setActiveView(view);
-  }
-
-  // Clear L3 when L2 changes
-  function changeL2(next: string | null) {
-    setSelectedL2(next);
-    setSelectedL3(null);
-  }
-
-  return (
-    <div className="flex h-full overflow-hidden">
-      <IntelSidebar activeView={activeView} onSelectView={handleSidebarSelect} />
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <RealmBar
-          selectedRealm={selectedRealm}
-          selectedFront={selectedFront}
-          selectedL2={selectedL2}
-          onSelectRealm={(r) => {
-            setSelectedRealm(r);
-            setSelectedFront(null);
-            changeL2(null);
-          }}
-          onSelectFront={(f) => {
-            setSelectedFront(f);
-            changeL2(null);
-          }}
-          onSelectL2={changeL2}
-          realmSubs={realmSubs}
-        />
-
-        <main className="flex-1 overflow-y-auto">
-          <IntelFeedContent
-            selectedRealm={selectedRealm}
-            selectedFront={selectedFront}
-            selectedL2={selectedL2}
-            selectedL3={selectedL3}
-            onSelectL3={setSelectedL3}
-            sortBy={sortBy}
-          />
-        </main>
-      </div>
-    </div>
-  );
-}
-
-interface IntelFeedContentProps {
-  selectedRealm: string | null;
-  selectedFront: Front | null;
-  selectedL2: string | null;
-  selectedL3: string | null;
-  onSelectL3: (l3: string | null) => void;
-  sortBy: 'hot' | 'new' | 'top';
-}
-
-function IntelFeedContent({
-  selectedRealm,
-  selectedFront,
-  selectedL2,
-  selectedL3,
-  onSelectL3,
-  sortBy,
-}: IntelFeedContentProps) {
   const contextLabel = selectedL3
     ? `${selectedRealm} · ${selectedL2} · ${selectedL3}`
     : selectedL2
@@ -155,7 +73,7 @@ function IntelFeedContent({
         selectedFront={selectedFront}
         selectedL2={selectedL2}
         selectedL3={selectedL3}
-        onSelectL3={onSelectL3}
+        onSelectL3={setL3}
       />
 
       {/* Thread list */}
@@ -168,18 +86,4 @@ function IntelFeedContent({
       />
     </div>
   );
-}
-
-/** Build /intel/new URL with optional realm context params */
-function buildNewThreadUrl(
-  realm: string | null,
-  front: Front | null,
-  l2: string | null,
-): string {
-  const params = new URLSearchParams();
-  if (realm) params.set('realm', realm);
-  if (front) params.set('front', front);
-  if (l2) params.set('l2', l2);
-  const qs = params.toString();
-  return qs ? `/intel/new?${qs}` : '/intel/new';
 }
