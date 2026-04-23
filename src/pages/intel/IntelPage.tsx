@@ -5,17 +5,10 @@ import { useManualData } from '@/lib/useManualData';
 import { RealmBar } from '@/components/intel/RealmBar';
 import { IntelSidebar, type IntelView } from '@/components/intel/IntelSidebar';
 import { ThreadList } from '@/components/intel/ThreadList';
+import { L3Refinement } from '@/components/intel/L3Refinement';
 import { REALM_ORDER } from '@/lib/constants';
 import type { Front } from '@/types/manual';
 
-/**
- * INTEL surface — where Bees interact with the Realms.
- *
- * Layout:
- *   [Left sidebar: retractable icons]
- *   [Realm bar top — 13 realms, drill-down to L2 / Fronts]
- *   [Content area: thread list, realm-filtered]
- */
 export function IntelPage() {
   const navigate = useNavigate();
   const { atoms, loaded } = useManualData();
@@ -23,9 +16,9 @@ export function IntelPage() {
   const [selectedRealm, setSelectedRealm] = useState<string | null>(null);
   const [selectedFront, setSelectedFront] = useState<Front | null>(null);
   const [selectedL2, setSelectedL2] = useState<string | null>(null);
+  const [selectedL3, setSelectedL3] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<IntelView>('home');
 
-  // Compute L2 sub-categories per realm from atoms
   const realmSubs = useMemo(() => {
     if (!loaded) return {};
     const subs: Record<string, Set<string>> = {};
@@ -40,7 +33,6 @@ export function IntelPage() {
     return result;
   }, [atoms, loaded]);
 
-  // Sidebar view → sort mapping
   const sortBy: 'hot' | 'new' | 'top' =
     activeView === 'new' ? 'new' : activeView === 'hot' ? 'hot' : 'hot';
 
@@ -52,6 +44,12 @@ export function IntelPage() {
     setActiveView(view);
   }
 
+  // Clear L3 when L2 changes
+  function changeL2(next: string | null) {
+    setSelectedL2(next);
+    setSelectedL3(null);
+  }
+
   return (
     <div className="flex h-full overflow-hidden">
       <IntelSidebar activeView={activeView} onSelectView={handleSidebarSelect} />
@@ -61,9 +59,16 @@ export function IntelPage() {
           selectedRealm={selectedRealm}
           selectedFront={selectedFront}
           selectedL2={selectedL2}
-          onSelectRealm={setSelectedRealm}
-          onSelectFront={setSelectedFront}
-          onSelectL2={setSelectedL2}
+          onSelectRealm={(r) => {
+            setSelectedRealm(r);
+            setSelectedFront(null);
+            changeL2(null);
+          }}
+          onSelectFront={(f) => {
+            setSelectedFront(f);
+            changeL2(null);
+          }}
+          onSelectL2={changeL2}
           realmSubs={realmSubs}
         />
 
@@ -72,6 +77,8 @@ export function IntelPage() {
             selectedRealm={selectedRealm}
             selectedFront={selectedFront}
             selectedL2={selectedL2}
+            selectedL3={selectedL3}
+            onSelectL3={setSelectedL3}
             sortBy={sortBy}
           />
         </main>
@@ -84,6 +91,8 @@ interface IntelFeedContentProps {
   selectedRealm: string | null;
   selectedFront: Front | null;
   selectedL2: string | null;
+  selectedL3: string | null;
+  onSelectL3: (l3: string | null) => void;
   sortBy: 'hot' | 'new' | 'top';
 }
 
@@ -91,13 +100,17 @@ function IntelFeedContent({
   selectedRealm,
   selectedFront,
   selectedL2,
+  selectedL3,
+  onSelectL3,
   sortBy,
 }: IntelFeedContentProps) {
-  const contextLabel = selectedFront
-    ? `${selectedRealm} · ${selectedFront}`
+  const contextLabel = selectedL3
+    ? `${selectedRealm} · ${selectedL2} · ${selectedL3}`
     : selectedL2
       ? `${selectedRealm} · ${selectedL2}`
-      : selectedRealm ?? 'All Realms';
+      : selectedFront
+        ? `${selectedRealm} · ${selectedFront}`
+        : selectedRealm ?? 'All Realms';
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">
@@ -125,7 +138,6 @@ function IntelFeedContent({
           </h1>
         </div>
 
-        {/* Quick new thread button — carries current realm/front/l2 context */}
         <Link
           to={buildNewThreadUrl(selectedRealm, selectedFront, selectedL2)}
           className="flex items-center gap-1.5 rounded-md border border-text-silver/30 bg-bg-elevated px-3 py-1.5 text-text-silver-bright transition-colors hover:border-text-silver/60 hover:bg-panel-2"
@@ -137,11 +149,21 @@ function IntelFeedContent({
         </Link>
       </div>
 
+      {/* L3 refinement row — only when L2 is selected */}
+      <L3Refinement
+        selectedRealm={selectedRealm}
+        selectedFront={selectedFront}
+        selectedL2={selectedL2}
+        selectedL3={selectedL3}
+        onSelectL3={onSelectL3}
+      />
+
       {/* Thread list */}
       <ThreadList
         selectedRealm={selectedRealm}
         selectedFront={selectedFront}
         selectedL2={selectedL2}
+        selectedL3={selectedL3}
         sortBy={sortBy}
       />
     </div>

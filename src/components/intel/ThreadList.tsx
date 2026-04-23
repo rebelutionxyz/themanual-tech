@@ -12,6 +12,7 @@ interface ThreadListProps {
   selectedRealm: string | null;
   selectedFront: Front | null;
   selectedL2: string | null;
+  selectedL3?: string | null;
   sortBy?: 'hot' | 'new' | 'top';
 }
 
@@ -19,6 +20,7 @@ export function ThreadList({
   selectedRealm,
   selectedFront,
   selectedL2,
+  selectedL3 = null,
   sortBy = 'hot',
 }: ThreadListProps) {
   const { atoms } = useManualData();
@@ -33,6 +35,7 @@ export function ThreadList({
       if (a.realm !== selectedRealm) return false;
       if (selectedFront && a.front !== selectedFront) return false;
       if (selectedL2 && a.L2 !== selectedL2) return false;
+      if (selectedL3 && a.L3 !== selectedL3) return false;
       return true;
     });
     // Prefer leaves + sourced atoms when capping
@@ -42,7 +45,7 @@ export function ThreadList({
       return bScore - aScore;
     });
     return matches.slice(0, 500).map((a) => a.id);
-  }, [atoms, selectedRealm, selectedFront, selectedL2]);
+  }, [atoms, selectedRealm, selectedFront, selectedL2, selectedL3]);
 
   // Map atoms by id for quick lookup on cards
   const atomById = useMemo(() => {

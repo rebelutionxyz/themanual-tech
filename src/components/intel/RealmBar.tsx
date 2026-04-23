@@ -18,13 +18,15 @@ const FRONT_SET = new Set<string>(FRONT_ORDER);
 
 /**
  * Reusable horizontally-scrolling row with left/right chevron arrows.
- * Used for the realm row, Power Fronts+L2 row, and plain L2 row.
+ * Used for every row in the sticky bar.
  */
 function ScrollRow({
   className,
+  leading,
   children,
 }: {
   className?: string;
+  leading?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -42,7 +44,6 @@ function ScrollRow({
     el.addEventListener('scroll', update, { passive: true });
     const ro = new ResizeObserver(update);
     ro.observe(el);
-    // Observe children changes (when subs array updates) for dynamic realm switches
     const mo = new MutationObserver(update);
     mo.observe(el, { childList: true, subtree: true });
     return () => {
@@ -61,12 +62,15 @@ function ScrollRow({
 
   return (
     <div className={cn('relative flex items-center', className)}>
+      {leading && <div className="flex-shrink-0 pl-3">{leading}</div>}
+
       {canScrollLeft && (
         <button
           type="button"
           onClick={() => scroll('left')}
           aria-label="Scroll left"
           className="absolute left-0 top-0 z-10 flex h-full items-center justify-center bg-gradient-to-r from-bg-elevated via-bg-elevated/90 to-transparent px-2 text-text-silver hover:text-text"
+          style={{ left: leading ? 64 : 0 }}
         >
           <ChevronLeft size={16} />
         </button>
@@ -94,6 +98,18 @@ function ScrollRow({
   );
 }
 
+function RowLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      className="font-mono uppercase tracking-wider text-text-muted"
+      style={{ fontSize: '10.5px' }}
+      data-size="meta"
+    >
+      {children}
+    </span>
+  );
+}
+
 export function RealmBar({
   selectedRealm,
   selectedFront,
@@ -104,15 +120,19 @@ export function RealmBar({
   realmSubs = {},
 }: RealmBarProps) {
   const isPowerActive = selectedRealm === 'Power';
-  const allSubs = selectedRealm ? realmSubs[selectedRealm] ?? [] : [];
-  const nonFrontSubs = allSubs.filter((s) => !FRONT_SET.has(s));
 
-  const showL2Row = selectedRealm && !isPowerActive && nonFrontSubs.length > 0;
-  const showPowerRow = isPowerActive;
+  // L2s for current realm, EXCLUDING any Front name (defensive double-filter)
+  const l2Options = (selectedRealm ? realmSubs[selectedRealm] ?? [] : []).filter(
+    (s) => !FRONT_SET.has(s),
+  );
+
+  const showL2Row = selectedRealm && l2Options.length > 0;
+  // Fronts get their OWN row, only on Power, shown BELOW the L2 row
+  const showFrontsRow = isPowerActive;
 
   return (
     <div className="sticky top-0 z-30 border-b border-border bg-bg-elevated/95 backdrop-blur-md">
-      {/* Primary realm row */}
+      {/* ROW 1 — 13 Realms */}
       <ScrollRow>
         <RealmChip
           label="All"
@@ -138,16 +158,35 @@ export function RealmBar({
         ))}
       </ScrollRow>
 
-      {/* POWER ROW: Fronts + L2s with divider (Option B) */}
-      {showPowerRow && (
-        <ScrollRow className="border-t border-border bg-bg/40">
+      {/* ROW 2 — L2s for current realm (no Fronts) */}
+      {showL2Row && (
+        <ScrollRow
+          className="border-t border-border bg-bg/40"
+          leading={<RowLabel>Subs</RowLabel>}
+        >
+          {l2Options.map((sub) => (
+            <L2Chip
+              key={sub}
+              label={sub}
+              active={selectedL2 === sub}
+              onClick={() => onSelectL2(selectedL2 === sub ? null : sub)}
+            />
+          ))}
+        </ScrollRow>
+      )}
+
+      {/* ROW 3 — Fronts (Power only, always shown below L2 row) */}
+      {showFrontsRow && (
+        <ScrollRow
+          className="border-t border-border bg-bg/40"
+          leading={<RowLabel>Fronts</RowLabel>}
+        >
           {FRONT_ORDER.map((front) => (
             <button
               key={front}
               type="button"
               onClick={() => {
                 onSelectFront(selectedFront === front ? null : front);
-                onSelectL2(null);
               }}
               className={cn(
                 'flex-shrink-0 rounded-md border px-2.5 py-1 transition-colors',
@@ -161,36 +200,6 @@ export function RealmBar({
             >
               {front}
             </button>
-          ))}
-
-          {nonFrontSubs.length > 0 && (
-            <div className="mx-2 h-5 w-px flex-shrink-0 bg-border" aria-hidden="true" />
-          )}
-
-          {nonFrontSubs.map((sub) => (
-            <L2Chip
-              key={sub}
-              label={sub}
-              active={selectedL2 === sub}
-              onClick={() => {
-                onSelectL2(selectedL2 === sub ? null : sub);
-                onSelectFront(null);
-              }}
-            />
-          ))}
-        </ScrollRow>
-      )}
-
-      {/* L2 row for non-Power realms */}
-      {showL2Row && (
-        <ScrollRow className="border-t border-border bg-bg/40">
-          {nonFrontSubs.map((sub) => (
-            <L2Chip
-              key={sub}
-              label={sub}
-              active={selectedL2 === sub}
-              onClick={() => onSelectL2(selectedL2 === sub ? null : sub)}
-            />
           ))}
         </ScrollRow>
       )}
