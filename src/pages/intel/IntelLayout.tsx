@@ -65,37 +65,36 @@ export function IntelLayout() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      {/* Top: realm bar spans FULL width (above sidebar) */}
-      <RealmBar
-        selectedRealm={selectedRealm}
-        selectedFront={selectedFront}
-        selectedL2={selectedL2}
-        onSelectRealm={(r) => {
-          setRealm(r);
-          if (window.location.pathname !== '/intel') {
-            navigate('/intel');
-          }
-        }}
-        onSelectFront={(f) => {
-          setFront(f);
-          if (window.location.pathname !== '/intel') {
-            navigate('/intel');
-          }
-        }}
-        onSelectL2={(l2) => {
-          setL2(l2);
-          if (window.location.pathname !== '/intel') {
-            navigate('/intel');
-          }
-        }}
-        realmSubs={realmSubs}
-      />
+    <div className="flex h-full overflow-hidden">
+      {/* Left: INTEL sidebar (full height, outside realm bar column) */}
+      <IntelSidebar activeView={activeView} onSelectView={handleSidebarSelect} />
 
-      {/* Row below realm bar: sidebar + content */}
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Left: INTEL sidebar */}
-        <IntelSidebar activeView={activeView} onSelectView={handleSidebarSelect} />
+      {/* Main column: realm bars on top, content below */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <RealmBar
+          selectedRealm={selectedRealm}
+          selectedFront={selectedFront}
+          selectedL2={selectedL2}
+          onSelectRealm={(r) => {
+            setRealm(r);
+            if (window.location.pathname !== '/intel') {
+              navigate('/intel');
+            }
+          }}
+          onSelectFront={(f) => {
+            setFront(f);
+            if (window.location.pathname !== '/intel') {
+              navigate('/intel');
+            }
+          }}
+          onSelectL2={(l2) => {
+            setL2(l2);
+            if (window.location.pathname !== '/intel') {
+              navigate('/intel');
+            }
+          }}
+          realmSubs={realmSubs}
+        />
 
         {/* Content */}
         <main className="min-w-0 flex-1 overflow-y-auto">

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Search, X, Plus, Check } from 'lucide-react';
+import { Search, X, Plus, Check, Network } from 'lucide-react';
 import { useManualData } from '@/lib/useManualData';
 import { KETTLE_COLORS } from '@/lib/constants';
+import { TaxonomyTree } from '@/components/manual/TaxonomyTree';
 import type { Atom, Front } from '@/types/manual';
 import { cn } from '@/lib/utils';
 
@@ -48,10 +49,11 @@ export function AtomPicker({
   realmContext,
   searchOnly = true,
 }: AtomPickerProps) {
-  const { atoms, loaded } = useManualData();
+  const { atoms, loaded, tree } = useManualData();
   const [query, setQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [treeMode, setTreeMode] = useState(false);
 
   const atomById = useMemo(() => {
     const m = new Map<string, Atom>();
@@ -147,17 +149,50 @@ export function AtomPicker({
   return (
     <div className="w-full">
       {label && (
-        <div
-          className="mb-1.5 font-mono uppercase tracking-wider text-text-muted"
-          style={{ fontSize: '11px' }}
-          data-size="meta"
-        >
-          {label}
-          {typeof max === 'number' && (
-            <span className="ml-2 text-text-dim">
-              ({value.length}/{max})
-            </span>
-          )}
+        <div className="mb-1.5 flex items-center justify-between">
+          <div
+            className="font-mono uppercase tracking-wider text-text-muted"
+            style={{ fontSize: '11px' }}
+            data-size="meta"
+          >
+            {label}
+            {typeof max === 'number' && (
+              <span className="ml-2 text-text-dim">
+                ({value.length}/{max})
+              </span>
+            )}
+          </div>
+          {/* Mode toggle: Search ↔ Tree */}
+          <div className="flex items-center gap-0.5 rounded-md border border-border bg-bg-elevated p-0.5">
+            <button
+              type="button"
+              onClick={() => setTreeMode(false)}
+              className={cn(
+                'flex items-center gap-1 rounded px-2 py-0.5 transition-colors',
+                !treeMode
+                  ? 'bg-bg text-text'
+                  : 'text-text-muted hover:text-text-silver',
+              )}
+              style={{ fontSize: '11px' }}
+            >
+              <Search size={10} />
+              Search
+            </button>
+            <button
+              type="button"
+              onClick={() => setTreeMode(true)}
+              className={cn(
+                'flex items-center gap-1 rounded px-2 py-0.5 transition-colors',
+                treeMode
+                  ? 'bg-bg text-text'
+                  : 'text-text-muted hover:text-text-silver',
+              )}
+              style={{ fontSize: '11px' }}
+            >
+              <Network size={10} />
+              Browse
+            </button>
+          </div>
         </div>
       )}
 
@@ -183,26 +218,29 @@ export function AtomPicker({
         </div>
       )}
 
-      {/* Search input */}
-      <div className="relative">
-        <Search
-          size={14}
-          className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted"
-        />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setShowSuggestions(true);
-          }}
-          onFocus={() => {
-            setFocused(true);
-            setShowSuggestions(true);
-          }}
-          onBlur={() => {
-            setFocused(false);
-            setTimeout(() => setShowSuggestions(false), 150);
+      {/* SEARCH MODE */}
+      {!treeMode && (
+        <>
+          {/* Search input */}
+          <div className="relative">
+            <Search
+              size={14}
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted"
+            />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => {
+                setFocused(true);
+                setShowSuggestions(true);
+              }}
+              onBlur={() => {
+                setFocused(false);
+                setTimeout(() => setShowSuggestions(false), 150);
           }}
           placeholder={atMax ? `Max ${max} atoms selected` : placeholder}
           disabled={atMax}
@@ -296,6 +334,32 @@ export function AtomPicker({
           <p className="text-text-muted" style={{ fontSize: '12px' }}>
             No atoms match "{query}"
           </p>
+        </div>
+      )}
+        </>
+      )}
+
+      {/* TREE MODE */}
+      {treeMode && tree && loaded && (
+        <div className="max-h-96 overflow-y-auto rounded-md border border-border bg-bg-elevated/40 p-2">
+          {/* Render each realm as a top-level expandable branch */}
+          {tree.children.map((realmNode) => (
+            <TaxonomyTree
+              key={realmNode.path}
+              root={realmNode}
+              mode="multi-atom"
+              selectedAtomIds={new Set(value)}
+              onToggleAtom={(atom) => {
+                if (value.includes(atom.id)) {
+                  removeAtom(atom.id);
+                } else if (!atMax) {
+                  addAtom(atom);
+                }
+              }}
+              compact={true}
+              maxDepth={0}
+            />
+          ))}
         </div>
       )}
     </div>

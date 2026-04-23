@@ -290,6 +290,7 @@ export async function createPost(
   body: string,
   authorBeeId: string,
   parentPostId: string | null = null,
+  atomIds: string[] = [],
 ): Promise<string> {
   if (!supabase) throw new Error('Supabase not configured');
 
@@ -307,6 +308,19 @@ export async function createPost(
   if (error || !data) {
     throw new Error(error?.message ?? 'Failed to create post');
   }
+
+  // Link atoms to this reply (if any were provided)
+  if (atomIds.length > 0) {
+    const postId = String(data.id);
+    const links = atomIds.map((atomId) => ({
+      source_type: 'forum_post',
+      source_id: postId,
+      atom_id: atomId,
+    }));
+    // Best-effort: silent if table missing or RLS denies
+    await supabase.from('entity_atom_links').insert(links);
+  }
+
   // Reply count increment handled by DB trigger (see schema-v3-intel.sql)
   return String(data.id);
 }

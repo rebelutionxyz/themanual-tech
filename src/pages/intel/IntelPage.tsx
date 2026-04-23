@@ -1,10 +1,12 @@
-import { Link } from 'react-router-dom';
-import { ChevronRight, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
 import { ThreadList } from '@/components/intel/ThreadList';
 import { L3Refinement } from '@/components/intel/L3Refinement';
+import { InlineComposer } from '@/components/intel/InlineComposer';
 import { useIntelStore } from '@/stores/useIntelStore';
+import { useAuth } from '@/lib/auth';
+import { createThread } from '@/lib/intel';
 import { FRONT_COLORS } from '@/lib/constants';
-import { buildNewThreadUrl } from './IntelLayout';
 import { cn } from '@/lib/utils';
 
 const INTEL_COLOR = '#6B94C8';
@@ -14,6 +16,9 @@ const INTEL_COLOR = '#6B94C8';
  * Renders a breadcrumb-style header (no redundant "Discussion" title).
  */
 export function IntelPage() {
+  const { bee } = useAuth();
+  const navigate = useNavigate();
+
   const {
     selectedRealm,
     selectedFront,
@@ -158,24 +163,78 @@ export function IntelPage() {
             ))}
           </div>
         </div>
-
-        <Link
-          to={buildNewThreadUrl(selectedRealm, selectedFront, selectedL2)}
-          className="flex flex-shrink-0 items-center gap-1.5 rounded-md border border-text-silver/30 bg-bg-elevated px-3 py-1.5 text-text-silver-bright transition-colors hover:border-text-silver/60 hover:bg-panel-2"
-          style={{ fontSize: '13px' }}
-        >
-          <Plus size={14} />
-          <span>Thread</span>
-        </Link>
       </div>
 
-      {/* L3 refinement row — only when L2 is selected */}
+      {/* Inline composer (replaces "+ Thread" button) */}
+      <div className="mb-4">
+        <InlineComposer
+          mode="thread"
+          enabled={!!bee}
+          disabledMessage="Sign in to start a thread"
+          draftKey="intel-thread-new"
+          allowExpand={true}
+          expandUrl="/intel/new"
+          placeholderCollapsed={
+            selectedRealm
+              ? `Start a thread in ${selectedRealm}${selectedFront ? ` · ${selectedFront}` : ''}${selectedL2 ? ` · ${selectedL2}` : ''}...`
+              : 'Start a new thread...'
+          }
+          inheritedContext={{
+            realm: selectedRealm,
+            front: selectedFront,
+            l2: selectedL2,
+          }}
+          onSubmit={async ({ title, body, atomIds }) => {
+            if (!bee || !title) return false;
+            try {
+              const newId = await createThread(
+                {
+                  title,
+                  body,
+                  primaryRealm: selectedRealm ?? null,
+                  primaryFront: selectedFront ?? null,
+                  primaryL2: selectedL2 ?? null,
+                  atomIds,
+                },
+                bee.id,
+              );
+              // Navigate to new thread
+              navigate(`/intel/t/${newId}`);
+              return true;
+            } catch (err) {
+              console.error(err);
+              return false;
+            }
+          }}
+        />
+      </div>
+
+      {/* L3 refinement row + optional tree drill */}
       <L3Refinement
         selectedRealm={selectedRealm}
         selectedFront={selectedFront}
         selectedL2={selectedL2}
         selectedL3={selectedL3}
         onSelectL3={setL3}
+        onSelectPath={(path) => {
+          // Parse "Realm / L2 / L3 / L4 / ..." — update store based on depth
+          const parts = path.split(' / ').map((s) => s.trim());
+          // Skip root (parts[0] is already selectedRealm)
+          if (parts.length >= 2) {
+            const second = parts[1];
+            // If second part is a Front, set Front; else set L2
+            const FRONTS = ['UNITE & RULE', 'INVESTIGATE', 'THE NEW WORLD ORDER', 'PROSECUTE', 'THE DEEP STATE'];
+            if (FRONTS.includes(second)) {
+              // Path is Realm / Front / L3 / ...
+              if (parts.length >= 3) setL3(parts[2]);
+              else setL3(null);
+            } else {
+              // Path is Realm / L2 / L3 / ...
+              if (parts.length >= 3) setL3(parts[2]);
+              else setL3(null);
+            }
+          }
+        }}
       />
 
       {/* Thread list */}

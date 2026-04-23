@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Search, Bell, MessageCircle, ShoppingCart, LayoutGrid, PanelLeftOpen } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Search, Bell, MessageCircle, ShoppingCart, LayoutGrid } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { SearchModal } from './SearchModal';
 import { cn } from '@/lib/utils';
@@ -22,17 +22,12 @@ import { cn } from '@/lib/utils';
  */
 export function UtilityChrome() {
   const { bee } = useAuth();
-  const location = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
 
   const notificationCount = 0;
   const messageCount = 0;
   const cartCount = 0;
   const blingBalance = bee ? 0 : null;
-
-  // Current surface slug (for left-surface-opener context)
-  const slug = location.pathname.length > 1 ? location.pathname.slice(1).split('/')[0] : null;
-  const surfaceHasInternalSidebar = slug === 'intel';
 
   // "/" keyboard shortcut to open search
   useEffect(() => {
@@ -55,33 +50,9 @@ export function UtilityChrome() {
     window.dispatchEvent(new CustomEvent('open-surfaces-drawer'));
   }
 
-  function openSurfaceSidebar() {
-    if (slug === 'intel') {
-      window.dispatchEvent(new CustomEvent('open-intel-sidebar'));
-    }
-  }
-
   return (
     <>
       <div className="flex items-center gap-1">
-        {/* 0. Left-surface opener (mobile only, shown when surface has internal sidebar) */}
-        {surfaceHasInternalSidebar && (
-          <button
-            type="button"
-            onClick={openSurfaceSidebar}
-            aria-label="Open INTEL menu"
-            title="INTEL menu"
-            className="mr-1 flex h-9 w-9 items-center justify-center rounded-md border transition-colors md:hidden"
-            style={{
-              borderColor: '#6B94C840',
-              background: '#6B94C815',
-              color: '#6B94C8',
-            }}
-          >
-            <PanelLeftOpen size={16} />
-          </button>
-        )}
-
         {/* 1. Search */}
         <button
           type="button"

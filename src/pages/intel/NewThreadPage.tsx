@@ -41,6 +41,31 @@ export function NewThreadPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Hydrate draft from sessionStorage (handed off by the InlineComposer "Expand" button)
+  useEffect(() => {
+    const raw = sessionStorage.getItem('composer-draft');
+    if (!raw) return;
+    try {
+      const draft = JSON.parse(raw);
+      if (draft.title) setTitle(draft.title);
+      if (draft.body) setBody(draft.body);
+      if (Array.isArray(draft.atomIds)) setAtomIds(draft.atomIds);
+      if (draft.realm || draft.front || draft.l2) {
+        setRealmSel({
+          realm: draft.realm ?? null,
+          front: draft.front ?? null,
+          l2: draft.l2 ?? null,
+        });
+        // If user manually set a realm in the inline composer, treat as manual override
+        setRealmManuallyOverridden(true);
+      }
+    } catch {
+      // ignore corrupt draft
+    }
+    // Clear session draft so refreshing the page doesn't re-hydrate stale state
+    sessionStorage.removeItem('composer-draft');
+  }, []);
+
   // Auto-derive realm from first linked atom unless manually overridden
   const derivedFromAtoms = useMemo(() => {
     if (atomIds.length === 0) return null;

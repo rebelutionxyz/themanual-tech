@@ -1,7 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { ChevronDown, ChevronUp, Network } from 'lucide-react';
 import { useManualData } from '@/lib/useManualData';
 import { FRONT_ORDER } from '@/lib/constants';
 import { ScrollRow } from '@/components/ui/ScrollRow';
+import { TaxonomyTree, findNodeByPath } from '@/components/manual/TaxonomyTree';
 import { cn } from '@/lib/utils';
 import type { Front } from '@/types/manual';
 
@@ -13,15 +15,14 @@ interface L3RefinementProps {
   selectedL2: string | null;
   selectedL3: string | null;
   onSelectL3: (l3: string | null) => void;
+  onSelectPath?: (path: string) => void;
 }
 
 /**
- * Body-level scroll bar for L3 refinement.
- * Shows when either:
- *   (a) an L2 is selected → shows L3s nested under that L2
- *   (b) a Front is selected (but no L2) → shows L3s directly under that Front
+ * L3 refinement row + optional tree drill.
  *
- * Filters out Front names that leak into L3 position (taxonomy cleanup TBD).
+ * Flat scroll bar (always shown when context has L3 options).
+ * Tree toggle opens an inline tree scoped to the current context below the scroll bar.
  */
 export function L3Refinement({
   selectedRealm,
@@ -29,11 +30,12 @@ export function L3Refinement({
   selectedL2,
   selectedL3,
   onSelectL3,
+  onSelectPath,
 }: L3RefinementProps) {
-  const { atoms } = useManualData();
+  const { atoms, tree } = useManualData();
+  const [treeOpen, setTreeOpen] = useState(false);
 
   const l3Options = useMemo(() => {
-    // Require either an L2 or a Front context
     const hasL2Context = selectedRealm && selectedL2;
     const hasFrontContext = selectedRealm && selectedFront && !selectedL2;
     if (!hasL2Context && !hasFrontContext) return [] as string[];
@@ -42,50 +44,107 @@ export function L3Refinement({
     for (const a of atoms) {
       if (a.realm !== selectedRealm) continue;
       if (selectedFront && a.front !== selectedFront) continue;
-      // If filtering under an L2, require L2 match
       if (selectedL2 && a.L2 !== selectedL2) continue;
       if (!a.L3) continue;
-      if (FRONT_SET.has(a.L3)) continue; // strip Front names that leak into L3
+      if (FRONT_SET.has(a.L3)) continue;
       set.add(a.L3);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [atoms, selectedRealm, selectedFront, selectedL2]);
 
+  // Build the tree scope: narrow to the current branch
+  const treeRoot = useMemo(() => {
+    if (!tree || !selectedRealm) return null;
+    const realmNode = tree.children.find((c) => c.name === selectedRealm);
+    if (!realmNode) return null;
+
+    if (selectedFront) {
+      // Find the Front branch under the realm
+      // In the data, Fronts are typically at depth 2 (Power / FRONT_NAME)
+      const frontNode =
+        realmNode.children.find((c) => c.name === selectedFront) ||
+        findNodeByPath(realmNode, `${selectedRealm} / ${selectedFront}`);
+      return frontNode ?? null;
+    }
+
+    if (selectedL2) {
+      // Find the L2 branch under realm
+      const l2Node = realmNode.children.find((c) => c.name === selectedL2);
+      return l2Node ?? null;
+    }
+
+    return realmNode;
+  }, [tree, selectedRealm, selectedFront, selectedL2]);
+
   if (l3Options.length === 0) return null;
 
   return (
-    <div className="mb-4 rounded-lg border border-border bg-bg-elevated/40">
-      <ScrollRow>
-        <button
-          type="button"
-          onClick={() => onSelectL3(null)}
-          className={cn(
-            'flex-shrink-0 rounded-md border px-2 py-0.5 transition-colors',
-            selectedL3 === null
-              ? 'border-text-silver/40 bg-bg text-text'
-              : 'border-transparent text-text-dim hover:border-border hover:text-text-silver',
-          )}
-          style={{ fontSize: '11px' }}
-        >
-          All
-        </button>
-        {l3Options.map((l3) => (
+    <div className="mb-4 space-y-2">
+      {/* Flat L3 scroll bar */}
+      <div className="rounded-lg border border-border bg-bg-elevated/40">
+        <ScrollRow>
           <button
-            key={l3}
             type="button"
-            onClick={() => onSelectL3(selectedL3 === l3 ? null : l3)}
+            onClick={() => onSelectL3(null)}
             className={cn(
-              'flex-shrink-0 rounded-md border px-2 py-0.5 transition-colors',
-              selectedL3 === l3
+              'flex-shrink-0 rounded-md border px-2.5 py-1 transition-colors',
+              selectedL3 === null
                 ? 'border-text-silver/40 bg-bg text-text'
-                : 'border-transparent text-text-silver hover:border-border hover:bg-bg',
+                : 'border-transparent text-text-dim hover:border-border hover:text-text-silver',
             )}
+            style={{ fontSize: '12px' }}
+          >
+            All
+          </button>
+          {l3Options.map((l3) => (
+            <button
+              key={l3}
+              type="button"
+              onClick={() => onSelectL3(selectedL3 === l3 ? null : l3)}
+              className={cn(
+                'flex-shrink-0 rounded-md border px-2.5 py-1 transition-colors',
+                selectedL3 === l3
+                  ? 'border-text-silver/40 bg-bg text-text'
+                  : 'border-transparent text-text-silver hover:border-border hover:bg-bg',
+              )}
+              style={{ fontSize: '12px' }}
+            >
+              {l3}
+            </button>
+          ))}
+        </ScrollRow>
+      </div>
+
+      {/* Drill deeper toggle */}
+      {treeRoot && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setTreeOpen((o) => !o)}
+            className="flex items-center gap-1.5 rounded-md border border-border bg-bg-elevated/40 px-2.5 py-1 text-text-dim transition-colors hover:border-border-bright hover:text-text-silver"
             style={{ fontSize: '11px' }}
           >
-            {l3}
+            <Network size={11} />
+            <span>Drill deeper</span>
+            {treeOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
           </button>
-        ))}
-      </ScrollRow>
+
+          {treeOpen && (
+            <div className="mt-2 rounded-lg border border-border bg-bg-elevated/40 p-2">
+              <TaxonomyTree
+                root={treeRoot}
+                mode="single-path"
+                selectedPath={undefined}
+                onSelectPath={(path) => {
+                  if (onSelectPath) onSelectPath(path);
+                }}
+                hideRoot={true}
+                compact={true}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

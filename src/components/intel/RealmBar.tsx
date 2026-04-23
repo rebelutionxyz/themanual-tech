@@ -153,7 +153,7 @@ function L2Chip({
           ? 'border-text-silver/40 bg-bg-elevated text-text'
           : 'border-transparent hover:border-border hover:bg-bg-elevated',
       )}
-      style={{ fontSize: '12px' }}
+      style={{ fontSize: '13px' }}
     >
       {label}
     </button>

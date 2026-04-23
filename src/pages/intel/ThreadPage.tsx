@@ -1,8 +1,11 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { useParams, Link, Navigate } from 'react-router-dom';
-import { ArrowLeft, MessagesSquare, Clock, Reply, Send } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useParams, Link, Navigate, useNavigate } from 'react-router-dom';
+import { ArrowLeft, MessagesSquare, Clock, Reply, Network, List } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useManualData } from '@/lib/useManualData';
+import { useIntelStore } from '@/stores/useIntelStore';
+import { TaxonomyTree } from '@/components/manual/TaxonomyTree';
+import { InlineComposer } from '@/components/intel/InlineComposer';
 import {
   getThread,
   getPosts,
@@ -13,6 +16,7 @@ import {
 } from '@/lib/intel';
 import { KETTLE_COLORS, FRONT_COLORS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import type { Front } from '@/types/manual';
 
 /**
  * Single thread view — /intel/t/:threadId
@@ -20,12 +24,15 @@ import { cn } from '@/lib/utils';
 export function ThreadPage() {
   const { threadId } = useParams<{ threadId: string }>();
   const { bee } = useAuth();
-  const { atoms } = useManualData();
+  const { atoms, tree } = useManualData();
+  const navigate = useNavigate();
+  const { setRealm, setFront, setL2, setL3 } = useIntelStore();
 
   const [thread, setThread] = useState<ForumThread | null | undefined>(undefined);
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [atomsView, setAtomsView] = useState<'chips' | 'tree'>('chips');
 
   useEffect(() => {
     if (!threadId) return;
@@ -88,9 +95,13 @@ export function ThreadPage() {
     }
   }
 
-  async function handleReply(parentId: string | null, body: string) {
+  async function handleReply(
+    parentId: string | null,
+    body: string,
+    atomIds: string[] = [],
+  ) {
     if (!bee || !threadId) return;
-    const newId = await createPost(threadId, body, bee.id, parentId);
+    const newId = await createPost(threadId, body, bee.id, parentId, atomIds);
     // Optimistic: refetch posts
     const p = await getPosts(threadId);
     setPosts(p);
@@ -193,28 +204,104 @@ export function ThreadPage() {
         {/* Linked atoms */}
         {linkedAtoms.length > 0 && (
           <div className="mt-5 border-t border-border pt-4">
-            <div
-              className="mb-2 font-mono uppercase tracking-wider text-text-muted"
-              style={{ fontSize: '11px' }}
-              data-size="meta"
-            >
-              Linked atoms
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {linkedAtoms.map((a) => (
-                <span
-                  key={a.id}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-bg px-2 py-1 text-text-silver"
-                  style={{ fontSize: '12px' }}
+            <div className="mb-2 flex items-center justify-between">
+              <div
+                className="font-mono uppercase tracking-wider text-text-muted"
+                style={{ fontSize: '11px' }}
+                data-size="meta"
+              >
+                Linked atoms ({linkedAtoms.length})
+              </div>
+              <div className="flex items-center gap-0.5 rounded-md border border-border bg-bg-elevated p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setAtomsView('chips')}
+                  className={cn(
+                    'flex items-center gap-1 rounded px-2 py-0.5 transition-colors',
+                    atomsView === 'chips'
+                      ? 'bg-bg text-text'
+                      : 'text-text-muted hover:text-text-silver',
+                  )}
+                  style={{ fontSize: '11px' }}
                 >
-                  <span
-                    className="h-1.5 w-1.5 rounded-full"
-                    style={{ background: KETTLE_COLORS[a.kettle] }}
-                  />
-                  {a.name}
-                </span>
-              ))}
+                  <List size={10} />
+                  Chips
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAtomsView('tree')}
+                  className={cn(
+                    'flex items-center gap-1 rounded px-2 py-0.5 transition-colors',
+                    atomsView === 'tree'
+                      ? 'bg-bg text-text'
+                      : 'text-text-muted hover:text-text-silver',
+                  )}
+                  style={{ fontSize: '11px' }}
+                >
+                  <Network size={10} />
+                  Tree
+                </button>
+              </div>
             </div>
+
+            {atomsView === 'chips' && (
+              <div className="flex flex-wrap gap-1.5">
+                {linkedAtoms.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => {
+                      // Navigate to /intel with this atom's context as filter
+                      setRealm(a.realm);
+                      if (a.front) setFront(a.front);
+                      if (a.L2) setL2(a.L2);
+                      if (a.L3) setL3(a.L3);
+                      navigate('/intel');
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-bg px-2 py-1 text-text-silver transition-colors hover:border-text-silver/50 hover:text-text"
+                    style={{ fontSize: '12px' }}
+                    title={a.path}
+                  >
+                    <span
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{ background: KETTLE_COLORS[a.kettle] }}
+                    />
+                    {a.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {atomsView === 'tree' && tree && (
+              <div className="rounded-md border border-border bg-bg-elevated/40 p-2">
+                {(() => {
+                  // Group linked atoms by realm, render each realm's branch
+                  const realmsWithAtoms = new Set(linkedAtoms.map((a) => a.realm));
+                  const linkedAtomIds = new Set(linkedAtoms.map((a) => a.id));
+                  return Array.from(realmsWithAtoms).map((realmName) => {
+                    const realmNode = tree.children.find((c) => c.name === realmName);
+                    if (!realmNode) return null;
+                    return (
+                      <TaxonomyTree
+                        key={realmName}
+                        root={realmNode}
+                        mode="multi-atom"
+                        selectedAtomIds={linkedAtomIds}
+                        onToggleAtom={(atom) => {
+                          // Click atom = navigate to its context
+                          setRealm(atom.realm);
+                          if (atom.front) setFront(atom.front);
+                          if (atom.L2) setL2(atom.L2);
+                          if (atom.L3) setL3(atom.L3);
+                          navigate('/intel');
+                        }}
+                        compact={true}
+                      />
+                    );
+                  });
+                })()}
+              </div>
+            )}
           </div>
         )}
 
@@ -233,10 +320,33 @@ export function ThreadPage() {
 
         {/* Root reply composer */}
         {replyingTo === 'root' && bee && (
-          <ReplyComposer
-            onSubmit={(body) => handleReply(null, body)}
-            onCancel={() => setReplyingTo(null)}
-          />
+          <div className="mt-3">
+            <InlineComposer
+              mode="reply"
+              enabled={true}
+              autoFocus={true}
+              expanded={true}
+              onExpandedChange={(expanded) => {
+                if (!expanded) setReplyingTo(null);
+              }}
+              draftKey={`intel-reply-${thread.id}-root`}
+              inheritedContext={{
+                realm: thread.primaryRealm,
+                front: thread.primaryFront,
+                l2: thread.primaryL2,
+                atomIds: linkedAtoms.map((a) => a.id),
+              }}
+              placeholderBody="Your reply..."
+              onSubmit={async ({ body, atomIds }) => {
+                try {
+                  await handleReply(null, body, atomIds);
+                  return true;
+                } catch {
+                  return false;
+                }
+              }}
+            />
+          </div>
         )}
       </article>
 
@@ -274,6 +384,13 @@ export function ThreadPage() {
             setReplyingTo={setReplyingTo}
             onReply={handleReply}
             canReply={!!bee && !thread.isLocked}
+            threadId={thread.id}
+            threadContext={{
+              realm: thread.primaryRealm,
+              front: thread.primaryFront,
+              l2: thread.primaryL2,
+              atomIds: linkedAtoms.map((a) => a.id),
+            }}
           />
         ))}
       </div>
@@ -287,8 +404,15 @@ interface PostNodeProps {
   depth: number;
   replyingTo: string | null;
   setReplyingTo: (id: string | null) => void;
-  onReply: (parentId: string | null, body: string) => Promise<void>;
+  onReply: (parentId: string | null, body: string, atomIds?: string[]) => Promise<void>;
   canReply: boolean;
+  threadId: string;
+  threadContext: {
+    realm?: string | null;
+    front?: Front | null;
+    l2?: string | null;
+    atomIds?: string[];
+  };
 }
 
 function PostNode({
@@ -299,6 +423,8 @@ function PostNode({
   setReplyingTo,
   onReply,
   canReply,
+  threadId,
+  threadContext,
 }: PostNodeProps) {
   const children = childMap.get(post.id) ?? [];
   const maxDepth = 4;
@@ -354,10 +480,28 @@ function PostNode({
 
       {/* Reply composer for this post */}
       {replyingTo === post.id && (
-        <ReplyComposer
-          onSubmit={async (body) => onReply(post.id, body)}
-          onCancel={() => setReplyingTo(null)}
-        />
+        <div className="mt-3">
+          <InlineComposer
+            mode="reply"
+            enabled={true}
+            autoFocus={true}
+            expanded={true}
+            onExpandedChange={(expanded) => {
+              if (!expanded) setReplyingTo(null);
+            }}
+            draftKey={`intel-reply-${threadId}-${post.id}`}
+            inheritedContext={threadContext}
+            placeholderBody="Your reply..."
+            onSubmit={async ({ body, atomIds }) => {
+              try {
+                await onReply(post.id, body, atomIds);
+                return true;
+              } catch {
+                return false;
+              }
+            }}
+          />
+        </div>
       )}
 
       {/* Nested replies */}
@@ -373,75 +517,13 @@ function PostNode({
               setReplyingTo={setReplyingTo}
               onReply={onReply}
               canReply={canReply}
+              threadId={threadId}
+              threadContext={threadContext}
             />
           ))}
         </div>
       )}
     </div>
-  );
-}
-
-function ReplyComposer({
-  onSubmit,
-  onCancel,
-}: {
-  onSubmit: (body: string) => void | Promise<void>;
-  onCancel: () => void;
-}) {
-  const [body, setBody] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!body.trim()) return;
-    setSubmitting(true);
-    try {
-      await onSubmit(body.trim());
-      setBody('');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <form
-      onSubmit={handleSubmit}
-      className="mt-3 rounded-lg border border-text-silver/30 bg-bg-elevated p-3"
-    >
-      <textarea
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder="Your reply..."
-        rows={3}
-        autoFocus
-        className="w-full resize-y rounded-md border border-border bg-bg px-3 py-2 text-text placeholder:text-text-muted focus:border-text-silver/50 focus:outline-none focus:ring-1 focus:ring-text-silver/30"
-        style={{ fontSize: '14px', lineHeight: '1.5' }}
-      />
-      <div className="mt-2 flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-md px-3 py-1 text-text-silver hover:bg-bg"
-          style={{ fontSize: '12px' }}
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={!body.trim() || submitting}
-          className={cn(
-            'flex items-center gap-1 rounded-md border px-3 py-1 transition-all',
-            body.trim() && !submitting
-              ? 'border-text-silver/40 bg-bg-elevated text-text-silver-bright hover:border-text-silver/70'
-              : 'cursor-not-allowed border-border text-text-dim opacity-60',
-          )}
-          style={{ fontSize: '12px' }}
-        >
-          <Send size={11} />
-          {submitting ? 'Posting...' : 'Post'}
-        </button>
-      </div>
-    </form>
   );
 }
 

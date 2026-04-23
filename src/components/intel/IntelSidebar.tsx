@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   PanelLeftClose,
   PanelLeftOpen,
@@ -10,7 +10,6 @@ import {
   Plus,
   Users,
   Settings,
-  X,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -50,37 +49,30 @@ const NAV_ITEMS: NavItem[] = [
 const INTEL_COLOR = '#6B94C8';
 
 /**
- * Left sidebar for INTEL.
+ * Left sidebar for INTEL. Always visible on all screen sizes.
  *
- * Desktop / tablet (≥768px): always visible as 48px icon rail.
- * Hover → peek expansion. Click toggle → pin.
- *
- * Mobile (<768px): hidden. Opens as drawer via:
- * - swipe-from-left-edge gesture, OR
- * - tap "open-intel-sidebar" event from utility chrome button
+ * Desktop: hover on rail → temporarily expand. Click top toggle → pin expanded.
+ * Mobile: tap top toggle → expand. Swipe right starting on the rail → expand.
+ *         Tap item to navigate (auto-collapse on touch devices).
  */
 export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
   const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const asideRef = useRef<HTMLElement>(null);
 
   const expanded = pinned || hovered;
 
-  // External open event (from UtilityChrome button on mobile)
+  // External open event (kept for compatibility if anything still fires it)
   useEffect(() => {
-    const onOpen = () => {
-      if (window.innerWidth < 768) {
-        setDrawerOpen(true);
-      } else {
-        setPinned(true);
-      }
-    };
+    const onOpen = () => setPinned(true);
     window.addEventListener('open-intel-sidebar', onOpen);
     return () => window.removeEventListener('open-intel-sidebar', onOpen);
   }, []);
 
-  // Swipe-from-left gesture (mobile only)
+  // Swipe-right-on-rail gesture (mobile) — starts on the sidebar element itself
   useEffect(() => {
+    const aside = asideRef.current;
+    if (!aside) return;
     let touchStartX = 0;
     let touchStartY = 0;
     const onStart = (e: TouchEvent) => {
@@ -89,179 +81,97 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
     };
     const onEnd = (e: TouchEvent) => {
       if (e.changedTouches.length === 0) return;
-      if (window.innerWidth >= 768) return; // only on mobile
       const endX = e.changedTouches[0].clientX;
       const endY = e.changedTouches[0].clientY;
       const dx = endX - touchStartX; // positive = swipe right
       const dy = Math.abs(touchStartY - endY);
-
-      // Open: swipe right from within 30px of left edge
-      if (!drawerOpen && touchStartX < 30 && dx > 40 && dy < 40) {
-        setDrawerOpen(true);
-      }
-      // Close: swipe left when drawer is open
-      if (drawerOpen && dx < -40 && dy < 40) {
-        setDrawerOpen(false);
+      // Swipe right to pin expanded; swipe left to collapse.
+      if (!pinned && dx > 30 && dy < 30) {
+        setPinned(true);
+      } else if (pinned && dx < -30 && dy < 30) {
+        setPinned(false);
       }
     };
-    document.addEventListener('touchstart', onStart, { passive: true });
-    document.addEventListener('touchend', onEnd, { passive: true });
+    aside.addEventListener('touchstart', onStart, { passive: true });
+    aside.addEventListener('touchend', onEnd, { passive: true });
     return () => {
-      document.removeEventListener('touchstart', onStart);
-      document.removeEventListener('touchend', onEnd);
+      aside.removeEventListener('touchstart', onStart);
+      aside.removeEventListener('touchend', onEnd);
     };
-  }, [drawerOpen]);
+  }, [pinned]);
 
-  // Esc closes drawer / unpins
+  // Esc unpins
   useEffect(() => {
+    if (!pinned) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (drawerOpen) setDrawerOpen(false);
-      if (pinned) setPinned(false);
+      if (e.key === 'Escape') setPinned(false);
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [drawerOpen, pinned]);
+  }, [pinned]);
 
   function handleSelect(view: IntelView) {
     onSelectView(view);
-    if (drawerOpen) setDrawerOpen(false);
+    // On touch (no hover), auto-collapse after selection
+    if (!window.matchMedia('(hover: hover)').matches) {
+      setPinned(false);
+    }
   }
 
   const primaryItems = NAV_ITEMS.filter((n) => n.group === 'primary');
   const personalItems = NAV_ITEMS.filter((n) => n.group === 'personal');
 
   return (
-    <>
-      {/* Desktop / tablet sidebar (≥768px): always visible */}
-      <aside
-        onMouseEnter={() => !pinned && setHovered(true)}
-        onMouseLeave={() => !pinned && setHovered(false)}
+    <aside
+      ref={asideRef}
+      onMouseEnter={() => !pinned && setHovered(true)}
+      onMouseLeave={() => !pinned && setHovered(false)}
+      className={cn(
+        'relative z-20 flex h-full flex-col border-r border-border bg-bg-elevated/60 transition-[width] duration-200 ease-out',
+        expanded ? 'w-44' : 'w-12',
+      )}
+    >
+      {/* Toggle */}
+      <button
+        type="button"
+        onClick={() => {
+          setPinned((p) => !p);
+          setHovered(false);
+        }}
+        aria-label={pinned ? 'Collapse INTEL menu' : 'Expand INTEL menu'}
         className={cn(
-          'relative z-20 hidden h-full flex-col border-r border-border bg-bg-elevated/60 transition-[width] duration-200 ease-out md:flex',
-          expanded ? 'w-44' : 'w-12',
+          'flex h-11 flex-shrink-0 items-center border-b border-border text-text-silver hover:bg-bg hover:text-text',
+          expanded ? 'justify-between px-3' : 'justify-center',
         )}
       >
-        {/* Toggle */}
-        <button
-          type="button"
-          onClick={() => {
-            setPinned((p) => !p);
-            setHovered(false);
-          }}
-          aria-label={pinned ? 'Unpin sidebar' : 'Pin sidebar'}
-          className={cn(
-            'flex h-11 flex-shrink-0 items-center border-b border-border text-text-silver hover:bg-bg hover:text-text',
-            expanded ? 'justify-between px-3' : 'justify-center',
-          )}
-        >
-          {expanded && (
-            <span
-              className="font-mono uppercase tracking-widest"
-              style={{ fontSize: '11px', color: INTEL_COLOR }}
-              data-size="meta"
-            >
-              INTEL
-            </span>
-          )}
-          {expanded ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
-        </button>
+        {expanded && (
+          <span
+            className="font-mono uppercase tracking-widest"
+            style={{ fontSize: '11px', color: INTEL_COLOR }}
+            data-size="meta"
+          >
+            INTEL
+          </span>
+        )}
+        {expanded ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+      </button>
 
-        <SidebarBody
-          activeView={activeView}
-          expanded={expanded}
-          primaryItems={primaryItems}
-          personalItems={personalItems}
-          onSelect={handleSelect}
-        />
-      </aside>
-
-      {/* Mobile drawer (<768px) */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-50 md:hidden" aria-modal="true">
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setDrawerOpen(false)}
-            aria-label="Close sidebar"
-          />
-          <aside className="absolute left-0 top-0 flex h-full w-60 flex-col border-r border-border bg-bg shadow-xl">
-            <div
-              className="flex items-center justify-between border-b border-border px-3 py-3"
-              style={{ borderBottomColor: INTEL_COLOR + '40' }}
-            >
-              <span
-                className="font-mono uppercase tracking-widest"
-                style={{ fontSize: '11px', color: INTEL_COLOR }}
-                data-size="meta"
-              >
-                INTEL
-              </span>
-              <button
-                type="button"
-                onClick={() => setDrawerOpen(false)}
-                aria-label="Close"
-                className="flex h-8 w-8 items-center justify-center rounded text-text-silver hover:bg-bg-elevated hover:text-text"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <SidebarBody
-              activeView={activeView}
-              expanded={true}
-              primaryItems={primaryItems}
-              personalItems={personalItems}
-              onSelect={handleSelect}
-            />
-          </aside>
-        </div>
-      )}
-
-      {/* Mobile: small left-edge tab hint when drawer is closed */}
-      {!drawerOpen && (
-        <button
-          type="button"
-          onClick={() => setDrawerOpen(true)}
-          aria-label="Open INTEL menu"
-          className="fixed left-0 top-1/2 z-30 flex h-12 w-4 -translate-y-1/2 items-center justify-center rounded-r-md border-y border-r border-border bg-bg-elevated text-text-muted hover:text-text md:hidden"
-          style={{ color: INTEL_COLOR }}
-        >
-          <PanelLeftOpen size={12} />
-        </button>
-      )}
-    </>
-  );
-}
-
-function SidebarBody({
-  activeView,
-  expanded,
-  primaryItems,
-  personalItems,
-  onSelect,
-}: {
-  activeView: IntelView;
-  expanded: boolean;
-  primaryItems: NavItem[];
-  personalItems: NavItem[];
-  onSelect: (view: IntelView) => void;
-}) {
-  return (
-    <>
       <nav className="flex-1 overflow-y-auto py-2">
         <SidebarGroup
           items={primaryItems}
           activeView={activeView}
           expanded={expanded}
-          onSelect={onSelect}
+          onSelect={handleSelect}
         />
         <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
         <SidebarGroup
           items={personalItems}
           activeView={activeView}
           expanded={expanded}
-          onSelect={onSelect}
+          onSelect={handleSelect}
         />
       </nav>
+
       <div className="mt-auto border-t border-border py-2">
         <SidebarItem
           id="settings"
@@ -274,7 +184,7 @@ function SidebarBody({
           }}
         />
       </div>
-    </>
+    </aside>
   );
 }
 
