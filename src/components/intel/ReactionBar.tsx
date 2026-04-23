@@ -22,11 +22,25 @@ interface ReactionBarProps {
   compact?: boolean;
 }
 
+// Per-reaction accent colors — mirrors the semantic intent. When a Bee clicks
+// a reaction, the button glows in that reaction's color, not generic honey.
+const REACTION_COLORS: Record<ReactionType, string> = {
+  honey: '#FAD15E',    // honey gold — appreciation
+  fire: '#E88938',     // orange — hot take
+  thinking: '#B8A8F0', // lavender — questioning
+  warning: '#C94C4C',  // crimson — flag
+  check: '#6FCF8F',    // green — verified
+};
+
 /**
  * 5-reaction bar for any source (thread or post).
  * 🍯 🔥 🤔 ⚠️ ✓
  *
  * Click toggles the Bee's reaction. Optimistic update + refetch on error.
+ *
+ * Compact mode (on cards): hides zero-count reactions entirely, larger emoji,
+ * per-reaction color glow when the Bee has reacted.
+ * Full mode (thread page): shows all 5 reactions always, bigger tap targets.
  */
 export function ReactionBar({
   sourceSurface,
@@ -107,31 +121,58 @@ export function ReactionBar({
         if (compact && count === 0 && !reacted) return null;
 
         const isPending = pending.has(r);
+        const accent = REACTION_COLORS[r];
         return (
           <button
             key={r}
             type="button"
-            onClick={() => handleToggle(r)}
+            onClick={(e) => {
+              // Stop propagation when used inside a card (compact mode) so
+              // clicking doesn't open the thread.
+              if (compact) {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+              handleToggle(r);
+            }}
             disabled={disabled}
             title={bee ? REACTION_HINTS[r] : `Sign in to react — ${REACTION_NAMES[r]}`}
             aria-label={REACTION_NAMES[r]}
             aria-pressed={reacted}
             className={cn(
-              'flex items-center gap-1 rounded-md border transition-all',
-              compact ? 'px-1.5 py-0.5' : 'px-2 py-1',
-              reacted
-                ? 'border-honey/40 bg-honey/10 text-honey'
-                : 'border-border bg-bg-elevated text-text-silver hover:border-text-silver/40 hover:bg-bg',
+              'inline-flex items-center rounded-md border transition-all',
+              // Bigger tap targets: min 24px height both modes, more padding full mode
+              compact
+                ? 'gap-1 px-2 py-1 min-h-[26px]'
+                : 'gap-1.5 px-2.5 py-1.5 min-h-[32px]',
+              !reacted &&
+                'border-border bg-bg-elevated text-text-silver hover:border-text-silver/40 hover:bg-bg',
               !bee && 'cursor-not-allowed opacity-50',
               isPending && 'opacity-60',
             )}
-            style={{ fontSize: compact ? '11px' : '12px' }}
+            style={
+              reacted
+                ? {
+                    borderColor: `${accent}60`,
+                    background: `${accent}18`,
+                    color: accent,
+                  }
+                : undefined
+            }
           >
-            <span style={{ fontSize: compact ? '12px' : '13px' }}>
+            <span
+              style={{ fontSize: compact ? '14px' : '16px', lineHeight: 1 }}
+            >
               {REACTION_LABELS[r]}
             </span>
             {count > 0 && (
-              <span className="font-mono tabular-nums" style={{ fontSize: compact ? '10.5px' : '11px' }}>
+              <span
+                className="font-mono tabular-nums"
+                style={{
+                  fontSize: compact ? '11px' : '12px',
+                  fontWeight: reacted ? 600 : 500,
+                }}
+              >
                 {count}
               </span>
             )}

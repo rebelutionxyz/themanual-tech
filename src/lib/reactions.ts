@@ -226,10 +226,38 @@ export async function toggleSave(
 }
 
 /**
- * List of thread source_ids the Bee has saved, newest first.
+ * List of thread source_ids the Bee has saved.
+ * @param sortMode 'newest' = by save date (default). 'active' = requires a
+ *                 join to forum_threads.last_activity_at so most-recently-replied
+ *                 saves surface first.
  */
-export async function listSavedThreadIds(beeId: string): Promise<string[]> {
+export async function listSavedThreadIds(
+  beeId: string,
+  sortMode: 'newest' | 'active' = 'newest',
+): Promise<string[]> {
   if (!supabase) return [];
+
+  if (sortMode === 'active') {
+    // Join via explicit select on the embedded forum_threads relation.
+    // Supabase PostgREST handles this via foreign-key inference if the
+    // entity_saves.source_id column has an FK to forum_threads.id.
+    // Fallback: if the join fails, we fetch saves + thread activity separately.
+    const { data: saves } = await supabase
+      .from('entity_saves')
+      .select('source_id')
+      .eq('bee_id', beeId);
+    if (!saves || saves.length === 0) return [];
+    const ids = saves.map((s) => String(s.source_id));
+    const { data: threads } = await supabase
+      .from('forum_threads')
+      .select('id, last_activity_at')
+      .in('id', ids)
+      .order('last_activity_at', { ascending: false });
+    if (!threads) return ids;
+    return threads.map((t) => String(t.id));
+  }
+
+  // Default: by save date, newest first
   const { data } = await supabase
     .from('entity_saves')
     .select('source_id, created_at')

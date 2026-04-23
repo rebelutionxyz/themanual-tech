@@ -229,17 +229,20 @@ export async function listThreads(
 }
 
 /**
- * Fetch thread IDs authored by a specific Bee, newest first.
- * Used by the My Threads view. Pair with listThreadsByIds to hydrate
- * with author + atom links.
+ * Fetch thread IDs authored by a specific Bee.
+ * @param sortMode 'newest' = by created_at (default). 'active' = by last_activity_at.
  */
-export async function listThreadIdsByAuthor(beeId: string): Promise<string[]> {
+export async function listThreadIdsByAuthor(
+  beeId: string,
+  sortMode: 'newest' | 'active' = 'newest',
+): Promise<string[]> {
   if (!supabase || !beeId) return [];
+  const orderCol = sortMode === 'active' ? 'last_activity_at' : 'created_at';
   const { data } = await supabase
     .from('forum_threads')
     .select('id')
     .eq('created_by', beeId)
-    .order('created_at', { ascending: false });
+    .order(orderCol, { ascending: false });
   return (data ?? []).map((r) => String(r.id));
 }
 

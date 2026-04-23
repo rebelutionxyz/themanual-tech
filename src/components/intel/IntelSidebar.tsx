@@ -384,15 +384,26 @@ function SidebarItem({
       )}
       style={active ? { color: INTEL_COLOR } : undefined}
     >
-      <Icon
-        size={16}
-        className={cn(
-          'flex-shrink-0',
-          isAction && 'text-honey',
-          !isAction && !active && 'text-text-muted group-hover:text-text-silver',
+      <span className="relative flex-shrink-0">
+        <Icon
+          size={16}
+          className={cn(
+            'flex-shrink-0',
+            isAction && 'text-honey',
+            !isAction && !active && 'text-text-muted group-hover:text-text-silver',
+          )}
+          style={active ? { color: INTEL_COLOR } : undefined}
+        />
+        {/* Collapsed-mode dot indicator — shows only when sidebar is collapsed
+            AND this item has a count > 0. Mirrors the color of the expanded badge. */}
+        {!expanded && badge && !comingSoon && (
+          <span
+            className="absolute -right-0.5 -top-0.5 block h-[6px] w-[6px] rounded-full ring-1 ring-bg-elevated"
+            style={{ background: badge.color }}
+            aria-hidden="true"
+          />
         )}
-        style={active ? { color: INTEL_COLOR } : undefined}
-      />
+      </span>
       {expanded && (
         <span
           className={cn('truncate tracking-wide', isAction && 'font-medium')}

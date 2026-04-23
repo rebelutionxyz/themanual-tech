@@ -45,6 +45,35 @@ export function ThreadList({
   const { atoms } = useManualData();
   const { bee } = useAuth();
 
+  // Personal-view sort mode (saved + mythreads). Each view remembers its own
+  // preference in localStorage. 'newest' = newest first. 'active' = most
+  // recently replied first.
+  const personalSortKey = savedMode
+    ? 'intel-sort-saved'
+    : myThreadsMode
+      ? 'intel-sort-mythreads'
+      : null;
+  const [personalSortMode, setPersonalSortModeState] = useState<'newest' | 'active'>(() => {
+    if (!personalSortKey) return 'newest';
+    try {
+      const stored = localStorage.getItem(personalSortKey);
+      if (stored === 'active') return 'active';
+    } catch {
+      // localStorage may throw in private browsing modes — fall through
+    }
+    return 'newest';
+  });
+  function setPersonalSortMode(next: 'newest' | 'active') {
+    setPersonalSortModeState(next);
+    if (personalSortKey) {
+      try {
+        localStorage.setItem(personalSortKey, next);
+      } catch {
+        // Non-fatal
+      }
+    }
+  }
+
   // Track which threads the current Bee has saved. Batch-fetched when threads
   // load. Optimistic toggle on click.
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
@@ -126,14 +155,14 @@ export function ThreadList({
       savedMode
         ? bee?.id
           ? (async () => {
-              const ids = await listSavedThreadIds(bee.id);
+              const ids = await listSavedThreadIds(bee.id, personalSortMode);
               return listThreadsByIds(ids);
             })()
           : Promise.resolve([] as ForumThread[])
         : myThreadsMode
           ? bee?.id
             ? (async () => {
-                const ids = await listThreadIdsByAuthor(bee.id);
+                const ids = await listThreadIdsByAuthor(bee.id, personalSortMode);
                 return listThreadsByIds(ids);
               })()
             : Promise.resolve([] as ForumThread[])
@@ -225,7 +254,7 @@ export function ThreadList({
     return () => {
       cancelled = true;
     };
-  }, [selectedRealm, selectedFront, selectedL2, sortBy, timeWindowHours, atomIdsInRealm, savedMode, myThreadsMode, bee?.id]);
+  }, [selectedRealm, selectedFront, selectedL2, sortBy, timeWindowHours, atomIdsInRealm, savedMode, myThreadsMode, personalSortMode, bee?.id]);
 
   if (error) {
     return (
@@ -259,22 +288,33 @@ export function ThreadList({
       />
     );
 
+  const showPersonalSortToggle = (savedMode || myThreadsMode) && threads.length > 0;
+
   return (
-    <ul className="space-y-2">
-      {threads.map((t) => (
-        <ThreadCard
-          key={t.id}
-          thread={t}
-          atomIds={threadAtomLinks.get(t.id) ?? []}
-          categoryPaths={threadCategoryLinks.get(t.id) ?? []}
-          atomById={atomById}
-          saved={savedIds.has(t.id)}
-          canSave={Boolean(bee?.id)}
-          onToggleSave={() => handleToggleSave(t.id)}
-          reactionSummary={reactionSummaries.get(t.id)}
+    <>
+      {showPersonalSortToggle && (
+        <PersonalSortToggle
+          mode={personalSortMode}
+          onChange={setPersonalSortMode}
+          accentColor={savedMode ? '#FAD15E' : BEE_COLOR}
         />
-      ))}
-    </ul>
+      )}
+      <ul className="space-y-2">
+        {threads.map((t) => (
+          <ThreadCard
+            key={t.id}
+            thread={t}
+            atomIds={threadAtomLinks.get(t.id) ?? []}
+            categoryPaths={threadCategoryLinks.get(t.id) ?? []}
+            atomById={atomById}
+            saved={savedIds.has(t.id)}
+            canSave={Boolean(bee?.id)}
+            onToggleSave={() => handleToggleSave(t.id)}
+            reactionSummary={reactionSummaries.get(t.id)}
+          />
+        ))}
+      </ul>
+    </>
   );
 }
 
@@ -531,21 +571,16 @@ function ThreadCard({
           </div>
         </div>
 
-        {/* Reactions row — compact mode, only visible when there are reactions.
-            Stops propagation so reaction clicks don't open the thread. */}
+        {/* Reactions row — compact mode. ReactionBar handles hiding zero-count
+            reactions and stopping propagation per-button, so we just render
+            it unconditionally and trust it to go invisible when empty. */}
         {reactionSummary &&
           (reactionSummary.counts.honey > 0 ||
             reactionSummary.counts.fire > 0 ||
             reactionSummary.counts.thinking > 0 ||
             reactionSummary.counts.warning > 0 ||
             reactionSummary.counts.check > 0) && (
-            <div
-              className="mt-3"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-            >
+            <div className="mt-3">
               <ReactionBar
                 sourceSurface="intel"
                 sourceId={thread.id}
@@ -574,6 +609,74 @@ function ThreadCard({
         </div>
       </Link>
     </li>
+  );
+}
+
+/**
+ * Sort toggle for Saved + My Threads views. Segmented 2-button control:
+ * Newest / Recently Active. Persists to localStorage via ThreadList parent.
+ * Accent color mirrors the view (honey for Saved, BEE_COLOR for My Threads).
+ */
+function PersonalSortToggle({
+  mode,
+  onChange,
+  accentColor,
+}: {
+  mode: 'newest' | 'active';
+  onChange: (next: 'newest' | 'active') => void;
+  accentColor: string;
+}) {
+  const options: { value: 'newest' | 'active'; label: string; hint: string }[] = [
+    { value: 'newest', label: 'Newest', hint: 'Most recently added' },
+    { value: 'active', label: 'Recently Active', hint: 'Most recent reply' },
+  ];
+
+  return (
+    <div className="mb-3 flex items-center gap-2">
+      <span
+        className="font-mono uppercase tracking-widest text-text-muted"
+        style={{ fontSize: '10px' }}
+        data-size="meta"
+      >
+        Sort
+      </span>
+      <div
+        className="inline-flex rounded-md border border-border bg-bg-elevated p-0.5"
+        role="radiogroup"
+        aria-label="Sort order"
+      >
+        {options.map((opt) => {
+          const active = mode === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onChange(opt.value)}
+              title={opt.hint}
+              className={cn(
+                'rounded-sm px-2.5 py-0.5 font-mono transition-all',
+                !active && 'text-text-dim hover:text-text-silver',
+              )}
+              style={{
+                fontSize: '11px',
+                ...(active
+                  ? {
+                      color: accentColor,
+                      background: `${accentColor}18`,
+                      fontWeight: 600,
+                    }
+                  : {}),
+              }}
+              data-size="meta"
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

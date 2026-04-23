@@ -120,8 +120,8 @@ export function IntelPage() {
             {activeView === 'saved' && '· Saved'}
           </div>
 
-          {/* Big breadcrumb */}
-          <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
+          {/* Big breadcrumb — responsive sizing: tight on mobile, bold on desktop */}
+          <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 sm:gap-x-1">
             <button
               type="button"
               onClick={() => {
@@ -136,27 +136,32 @@ export function IntelPage() {
                 selectedRealm
                   ? 'border-transparent text-text-muted hover:border-current hover:text-text-silver-bright hover:brightness-125'
                   : 'cursor-default border-transparent text-text-silver-bright',
+                // Responsive: 17px mobile, 22px desktop
+                'text-[17px] sm:text-[22px]',
               )}
-              style={{ fontSize: '22px' }}
               disabled={!selectedRealm}
             >
               Home
             </button>
 
             {crumbs.map((crumb, i) => (
-              <span key={`${crumb.label}-${i}`} className="flex items-baseline gap-x-1">
+              <span key={`${crumb.label}-${i}`} className="flex items-baseline gap-x-0.5 sm:gap-x-1">
                 <ChevronRight
-                  size={18}
-                  className="relative top-[3px] flex-shrink-0 text-text-muted"
+                  className="relative top-[2px] flex-shrink-0 text-text-muted sm:top-[3px] h-3.5 w-3.5 sm:h-[18px] sm:w-[18px]"
                 />
                 {crumb.clickable && crumb.onClick ? (
                   <button
                     type="button"
                     onClick={crumb.onClick}
                     title={`Back to ${crumb.label}`}
-                    className="font-display tracking-wide border-b border-dotted border-transparent transition-all hover:border-current hover:brightness-125"
+                    className={cn(
+                      'font-display tracking-wide border-b border-dotted border-transparent transition-all hover:border-current hover:brightness-125 break-words',
+                      // Parent crumb: 15px mobile, 22px desktop
+                      crumb.isDeepest
+                        ? 'text-[20px] sm:text-[26px]'
+                        : 'text-[15px] sm:text-[22px]',
+                    )}
                     style={{
-                      fontSize: crumb.isDeepest ? '26px' : '22px',
                       color: crumb.color ?? '#8A94A0',
                       fontWeight: crumb.isDeepest ? 600 : 400,
                     }}
@@ -165,9 +170,14 @@ export function IntelPage() {
                   </button>
                 ) : (
                   <span
-                    className="font-display tracking-wide"
+                    className={cn(
+                      'font-display tracking-wide break-words',
+                      // Deepest: 20px mobile, 26px desktop. Parent: 15px mobile, 22px desktop.
+                      crumb.isDeepest
+                        ? 'text-[20px] sm:text-[26px]'
+                        : 'text-[15px] sm:text-[22px]',
+                    )}
                     style={{
-                      fontSize: crumb.isDeepest ? '26px' : '22px',
                       color: crumb.isDeepest
                         ? crumb.color ?? '#E0E6EC'
                         : crumb.color ?? '#8A94A0',
