@@ -9,6 +9,7 @@ import { ThreadPage } from '@/pages/intel/ThreadPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { SurfacePage } from '@/pages/SurfacePage';
+import { WavesPage } from '@/pages/WavesPage';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
 
@@ -37,6 +38,9 @@ export default function App() {
               <Route path="new" element={<NewThreadPage />} />
               <Route path="t/:threadId" element={<ThreadPage />} />
             </Route>
+
+            {/* Waves surface — Mini Waves V76 embedded via iframe */}
+            <Route path="/waves" element={<WavesPage />} />
 
             {/* All other surfaces use generic SurfacePage */}
             <Route path="/:slug" element={<SurfacePage />} />

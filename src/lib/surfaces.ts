@@ -25,6 +25,8 @@ import {
   GraduationCap,
   Vote,
   Scale,
+  // Flow
+  Waves,
 } from 'lucide-react';
 
 export type SurfaceTier = 1 | 2;
@@ -270,6 +272,18 @@ export const SURFACES: SurfaceDef[] = [
     color: '#8A94A0',
     group: 'Services',
     tier: 2,
+  },
+  {
+    slug: 'waves',
+    name: 'WAVES',
+    function: 'Motion Flow',
+    description: 'Mini Waves. One Ocean at a time. Full 10-level hierarchy of motion.',
+    purpose:
+      'Orchestrate your life by motion. Vessels, Oceans, Waves, Tides, Flows — tasks tagged by what they feel like, not where they live.',
+    icon: Waves,
+    color: '#0EA5E9',
+    group: 'Services',
+    tier: 1,
   },
   {
     slug: 'edu',
