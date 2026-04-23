@@ -10,6 +10,8 @@ import {
   Plus,
   Users,
   Settings,
+  Sparkles,
+  Trophy,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -21,7 +23,9 @@ export type IntelView =
   | 'saved'
   | 'mythreads'
   | 'create'
-  | 'following';
+  | 'following'
+  | 'forme'
+  | 'prize';
 
 interface IntelSidebarProps {
   activeView: IntelView;
@@ -32,18 +36,24 @@ interface NavItem {
   id: IntelView;
   label: string;
   icon: LucideIcon;
-  group: 'primary' | 'personal';
+  group: 'primary' | 'personal' | 'future';
   isAction?: boolean;
+  /** Marks a future/not-yet-implemented item — dimmed, tooltip explains */
+  comingSoon?: boolean;
+  /** Optional subtitle/hint shown in tooltip */
+  comingSoonHint?: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { id: 'forme', label: 'For Me', icon: Sparkles, group: 'primary', comingSoon: true, comingSoonHint: 'Personalized feed — pick atoms, realms, and pillars to follow' },
   { id: 'home', label: 'Home', icon: Home, group: 'primary' },
   { id: 'hot', label: 'Hot', icon: Flame, group: 'primary' },
   { id: 'new', label: 'Breaking', icon: Clock, group: 'primary' },
   { id: 'create', label: 'Thread', icon: Plus, group: 'primary', isAction: true },
   { id: 'mythreads', label: 'My Threads', icon: MessageSquare, group: 'personal' },
-  { id: 'following', label: 'Following', icon: Users, group: 'personal' },
+  { id: 'following', label: 'Following', icon: Users, group: 'personal', comingSoon: true, comingSoonHint: 'Threads from Bees you follow' },
   { id: 'saved', label: 'Saved', icon: Bookmark, group: 'personal' },
+  { id: 'prize', label: 'Prize', icon: Trophy, group: 'future', comingSoon: true, comingSoonHint: 'blingster.xyz — post bets, match with BLiNG! escrow' },
 ];
 
 const INTEL_COLOR = '#6B94C8';
@@ -144,6 +154,7 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
 
   const primaryItems = NAV_ITEMS.filter((n) => n.group === 'primary');
   const personalItems = NAV_ITEMS.filter((n) => n.group === 'personal');
+  const futureItems = NAV_ITEMS.filter((n) => n.group === 'future');
 
   return (
     <>
@@ -204,6 +215,17 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
           expanded={expanded}
           onSelect={handleSelect}
         />
+        {futureItems.length > 0 && (
+          <>
+            <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
+            <SidebarGroup
+              items={futureItems}
+              activeView={activeView}
+              expanded={expanded}
+              onSelect={handleSelect}
+            />
+          </>
+        )}
       </nav>
 
       <div className="mt-auto border-t border-border py-2">
@@ -245,6 +267,8 @@ function SidebarGroup({
             active={activeView === item.id}
             expanded={expanded}
             isAction={item.isAction}
+            comingSoon={item.comingSoon}
+            comingSoonHint={item.comingSoonHint}
             onClick={() => onSelect(item.id)}
           />
         </li>
@@ -259,6 +283,8 @@ function SidebarItem({
   active,
   expanded,
   isAction,
+  comingSoon,
+  comingSoonHint,
   onClick,
 }: {
   id: string;
@@ -267,19 +293,30 @@ function SidebarItem({
   active: boolean;
   expanded: boolean;
   isAction?: boolean;
+  comingSoon?: boolean;
+  comingSoonHint?: string;
   onClick: () => void;
 }) {
+  const tooltip = comingSoon
+    ? comingSoonHint
+      ? `${label} — ${comingSoonHint}`
+      : `${label} — coming soon`
+    : expanded
+      ? undefined
+      : label;
+
   return (
     <button
       type="button"
       onClick={onClick}
-      title={expanded ? undefined : label}
+      title={tooltip}
       className={cn(
         'group flex w-full items-center rounded-md transition-colors',
         expanded ? 'gap-2.5 px-2 py-2' : 'justify-center py-2',
         active && 'bg-bg text-text',
         !active && 'text-text-dim hover:bg-bg hover:text-text-silver',
         isAction && !active && 'text-text-silver',
+        comingSoon && 'opacity-60',
       )}
       style={active ? { color: INTEL_COLOR } : undefined}
     >
@@ -298,6 +335,15 @@ function SidebarItem({
           style={{ fontSize: '13px' }}
         >
           {label}
+        </span>
+      )}
+      {expanded && comingSoon && (
+        <span
+          className="ml-auto flex-shrink-0 rounded border border-honey/30 px-1 py-0.5 font-mono uppercase tracking-wider text-honey/70"
+          style={{ fontSize: '8.5px' }}
+          data-size="meta"
+        >
+          Soon
         </span>
       )}
     </button>

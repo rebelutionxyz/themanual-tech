@@ -96,6 +96,11 @@ export function IntelPage() {
     }
   }
 
+  // Placeholder screens for coming-soon views
+  if (activeView === 'forme' || activeView === 'prize' || activeView === 'following') {
+    return <ComingSoonView view={activeView} />;
+  }
+
   return (
     <div className="safe-pad-x mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">
       {/* Breadcrumb header row */}
@@ -110,7 +115,6 @@ export function IntelPage() {
             INTEL {activeView === 'new' && '· Breaking'}
             {activeView === 'hot' && '· Hot'}
             {activeView === 'mythreads' && '· My threads'}
-            {activeView === 'following' && '· Following'}
             {activeView === 'saved' && '· Saved'}
           </div>
 
@@ -286,4 +290,98 @@ interface BreadcrumbSegment {
   clickable: boolean;
   isDeepest: boolean;
   onClick?: () => void;
+}
+
+function ComingSoonView({ view }: { view: 'forme' | 'prize' | 'following' }) {
+  const info = {
+    forme: {
+      title: 'For Me',
+      description:
+        'Your personalized INTEL feed. Pick the atoms, realms, and pillars you want to follow — your "For Me" view will be the union of everything you subscribe to.',
+      bullets: [
+        'Subscribe to atoms (9/11, JFK, Epstein, Fed, etc.)',
+        'Subscribe to realms or Fronts (Power · INVESTIGATE)',
+        'Subscribe to pillars (Rebelution, FreedomBLiNGs)',
+        'Follow specific Bees (coming with Following)',
+      ],
+      cta: 'Set up preferences',
+      note: 'No algorithm deciding what you see. You decide.',
+    },
+    prize: {
+      title: 'Prize',
+      description:
+        'Post bets with defined grounds. Another Bee matches your BLiNG! in escrow. Winner takes the pot when conditions resolve.',
+      bullets: [
+        'Bet on predictions (Fed decisions, election outcomes, market moves)',
+        'Bet on verifiable facts, sports outcomes, proposition trades',
+        'BLiNG! locked in escrow until resolution',
+        'Community or verifiable oracle decides outcome',
+      ],
+      cta: 'Learn more',
+      note: 'Lives at blingster.xyz · sovereign prediction market',
+    },
+    following: {
+      title: 'Following',
+      description:
+        'Threads from Bees you follow. Curate your own timeline by choosing whose voices you want to hear.',
+      bullets: [
+        'Follow any Bee from their profile',
+        'See only threads authored by Bees you follow',
+        'Combines with realm filters (follow a Bee, view their Power threads)',
+        'Unfollow anytime',
+      ],
+      cta: 'Browse Bees',
+      note: 'No one\'s voice is amplified automatically. You choose who you hear.',
+    },
+  }[view];
+
+  return (
+    <div className="safe-pad-x mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">
+      <div
+        className="rounded-lg border-2 bg-bg-elevated p-6 md:p-8 shadow-lg"
+        style={{
+          borderColor: '#6B94C880',
+          boxShadow: '0 0 0 1px #6B94C825, 0 4px 14px rgba(0,0,0,0.35), 0 0 16px #6B94C820',
+        }}
+      >
+        <div className="mb-2">
+          <span
+            className="font-mono uppercase tracking-widest text-honey/70"
+            style={{ fontSize: '10.5px' }}
+            data-size="meta"
+          >
+            Coming soon
+          </span>
+        </div>
+        <h1
+          className="mb-3 font-display tracking-wide"
+          style={{ fontSize: '28px', color: '#6B94C8', fontWeight: 600 }}
+        >
+          {info.title}
+        </h1>
+        <p className="mb-4 text-text-silver" style={{ fontSize: '14px', lineHeight: '1.6' }}>
+          {info.description}
+        </p>
+        <ul className="mb-5 space-y-1.5">
+          {info.bullets.map((b, i) => (
+            <li
+              key={i}
+              className="flex items-start gap-2 text-text-silver"
+              style={{ fontSize: '13px' }}
+            >
+              <span className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full" style={{ background: '#6B94C8' }} />
+              <span>{b}</span>
+            </li>
+          ))}
+        </ul>
+        <div
+          className="rounded-md border border-border bg-bg/60 p-3 font-mono text-text-dim"
+          style={{ fontSize: '11px' }}
+          data-size="meta"
+        >
+          {info.note}
+        </div>
+      </div>
+    </div>
+  );
 }

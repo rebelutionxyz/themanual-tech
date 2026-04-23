@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, type FormEvent } from 'react';
-import { Send, X, Loader2, Image, Video, FileText, MapPin, Link2, Tag, AtSign } from 'lucide-react';
+import { Send, X, Loader2, Image, Video, FileText, MapPin, Link2, Tag, AtSign, DollarSign, Gift, BarChart3, Trophy } from 'lucide-react';
 import { AtomPicker } from '@/components/intel/AtomPicker';
 import { CategoryPicker } from '@/components/intel/CategoryPicker';
 import { RealmPicker, type RealmSelection } from '@/components/intel/RealmPicker';
@@ -318,6 +318,10 @@ export function InlineComposer({
       { id: 'link', icon: Link2, label: 'Link', title: 'Preview link (coming soon)' },
       { id: 'atoms', icon: Tag, label: 'Atoms', title: 'Tag atoms from the Manual' },
       { id: 'mention', icon: AtSign, label: 'Mention', title: 'Mention a Bee (coming soon)' },
+      { id: 'sale', icon: DollarSign, label: 'Sale', title: 'Make this a Bazaar listing (coming soon)' },
+      { id: 'give', icon: Gift, label: 'Give', title: 'Start a Give campaign (coming soon)' },
+      { id: 'poll', icon: BarChart3, label: 'Poll', title: 'Add a poll (coming soon)' },
+      { id: 'prize', icon: Trophy, label: 'Prize', title: 'Post a bet with BLiNG! escrow (coming soon)' },
     ];
 
     return (
@@ -506,6 +510,10 @@ export function InlineComposer({
             { id: 'location', icon: MapPin, label: 'Location' },
             { id: 'link', icon: Link2, label: 'Link' },
             { id: 'mention', icon: AtSign, label: 'Mention' },
+            { id: 'sale', icon: DollarSign, label: 'Sale' },
+            { id: 'give', icon: Gift, label: 'Give' },
+            { id: 'poll', icon: BarChart3, label: 'Poll' },
+            { id: 'prize', icon: Trophy, label: 'Prize' },
           ].map(({ id, icon: Icon, label }) => (
             <button
               key={id}
