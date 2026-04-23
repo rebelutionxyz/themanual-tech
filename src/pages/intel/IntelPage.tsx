@@ -179,31 +179,10 @@ export function IntelPage() {
         </div>
       </div>
 
-      {/* L3 refinement row + optional tree drill */}
-      <L3Refinement
-        selectedRealm={selectedRealm}
-        selectedFront={selectedFront}
-        selectedL2={selectedL2}
-        selectedL3={selectedL3}
-        onSelectL3={setL3}
-        onSelectPath={(path) => {
-          // Parse "Realm / L2 / L3 / L4 / ..." — update store based on depth
-          const parts = path.split(' / ').map((s) => s.trim());
-          if (parts.length >= 2) {
-            const second = parts[1];
-            const FRONTS = ['UNITE & RULE', 'INVESTIGATE', 'THE NEW WORLD ORDER', 'PROSECUTE', 'THE DEEP STATE'];
-            if (FRONTS.includes(second)) {
-              if (parts.length >= 3) setL3(parts[2]);
-              else setL3(null);
-            } else {
-              if (parts.length >= 3) setL3(parts[2]);
-              else setL3(null);
-            }
-          }
-        }}
-      />
-
-      {/* Inline composer — collapsed by default, click to expand. 2/3 width on ≥sm. */}
+      {/* Inline composer — collapsed by default, click to expand. 2/3 width on ≥sm.
+          Positioned first in the body (right under breadcrumb) — posting is the
+          primary action on INTEL. Filtering/browsing tools (L3Refinement, time
+          window) live below, closer to the results they affect. */}
       <div className="mb-4 sm:mx-auto sm:w-2/3">
         <InlineComposer
           mode="thread"
@@ -258,6 +237,30 @@ export function IntelPage() {
           }}
         />
       </div>
+
+      {/* L3 refinement row + optional tree drill — below composer, closer to results */}
+      <L3Refinement
+        selectedRealm={selectedRealm}
+        selectedFront={selectedFront}
+        selectedL2={selectedL2}
+        selectedL3={selectedL3}
+        onSelectL3={setL3}
+        onSelectPath={(path) => {
+          // Parse "Realm / L2 / L3 / L4 / ..." — update store based on depth
+          const parts = path.split(' / ').map((s) => s.trim());
+          if (parts.length >= 2) {
+            const second = parts[1];
+            const FRONTS = ['UNITE & RULE', 'INVESTIGATE', 'THE NEW WORLD ORDER', 'PROSECUTE', 'THE DEEP STATE'];
+            if (FRONTS.includes(second)) {
+              if (parts.length >= 3) setL3(parts[2]);
+              else setL3(null);
+            } else {
+              if (parts.length >= 3) setL3(parts[2]);
+              else setL3(null);
+            }
+          }
+        }}
+      />
 
       {/* Time window dropdown — above thread list, only for Hot/Breaking views */}
       {(activeView === 'hot' || activeView === 'new') && (

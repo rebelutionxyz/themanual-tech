@@ -7,14 +7,12 @@ interface RealmBarProps {
   selectedRealm: string | null;
   selectedFront: Front | null;
   selectedL2: string | null;
-  selectedL3: string | null;
   onSelectRealm: (realm: string | null) => void;
   onSelectFront: (front: Front | null) => void;
   onSelectL2: (l2: string | null) => void;
-  onSelectL3: (l3: string | null) => void;
+  /** Reset L3 selection when parent context changes */
+  onResetL3?: () => void;
   realmSubs?: Record<string, string[]>;
-  /** L3 sub-categories for each Front (derived from atom data) */
-  frontL3s?: Record<string, string[]>;
 }
 
 const FRONT_SET = new Set<string>(FRONT_ORDER);
@@ -23,22 +21,15 @@ export function RealmBar({
   selectedRealm,
   selectedFront,
   selectedL2,
-  selectedL3,
   onSelectRealm,
   onSelectFront,
   onSelectL2,
-  onSelectL3,
+  onResetL3,
   realmSubs = {},
-  frontL3s = {},
 }: RealmBarProps) {
   // L2s for current realm, stripped of any Front names (defensive)
   const subsForRealm = selectedRealm ? realmSubs[selectedRealm] ?? [] : [];
   const l2Options = subsForRealm.filter((s) => !FRONT_SET.has(s));
-
-  // L3 sub-categories of the selected Front (for Row 4)
-  const frontSubs = selectedFront
-    ? (frontL3s[selectedFront] ?? []).filter((s) => !FRONT_SET.has(s))
-    : [];
 
   const hasRealm = selectedRealm !== null;
   const isPower = selectedRealm === 'Power';
@@ -55,7 +46,7 @@ export function RealmBar({
             onSelectRealm(null);
             onSelectFront(null);
             onSelectL2(null);
-            onSelectL3(null);
+            onResetL3?.();
           }}
         />
         <div className="h-5 w-px flex-shrink-0 bg-border" aria-hidden="true" />
@@ -68,7 +59,7 @@ export function RealmBar({
               onSelectRealm(selectedRealm === realm ? null : realm);
               onSelectFront(null);
               onSelectL2(null);
-              onSelectL3(null);
+              onResetL3?.();
             }}
           />
         ))}
@@ -87,7 +78,7 @@ export function RealmBar({
               active={selectedL2 === sub}
               onClick={() => {
                 onSelectL2(selectedL2 === sub ? null : sub);
-                onSelectL3(null);
+                onResetL3?.();
               }}
             />
           ))}
@@ -106,7 +97,7 @@ export function RealmBar({
               type="button"
               onClick={() => {
                 onSelectFront(selectedFront === front ? null : front);
-                onSelectL3(null);
+                onResetL3?.();
               }}
               className={cn(
                 'flex-shrink-0 rounded-md border px-2.5 py-1 transition-colors',
@@ -119,48 +110,6 @@ export function RealmBar({
               style={{ fontSize: '13px' }}
             >
               {front}
-            </button>
-          ))}
-        </ScrollRow>
-      )}
-
-      {/* ROW 4 — Front sub-categories (L3s under selected Front) */}
-      {isPower && selectedFront && frontSubs.length > 0 && (
-        <ScrollRow
-          className="border-t border-border bg-bg/60"
-          leading={
-            <RowLabel>
-              {selectedFront} subs
-            </RowLabel>
-          }
-        >
-          <button
-            type="button"
-            onClick={() => onSelectL3(null)}
-            className={cn(
-              'flex-shrink-0 rounded-md border px-2.5 py-1 transition-colors',
-              selectedL3 === null
-                ? 'border-text-silver/40 bg-bg text-text'
-                : 'border-transparent text-text-dim hover:border-border hover:text-text-silver',
-            )}
-            style={{ fontSize: '12px' }}
-          >
-            All
-          </button>
-          {frontSubs.map((sub) => (
-            <button
-              key={sub}
-              type="button"
-              onClick={() => onSelectL3(selectedL3 === sub ? null : sub)}
-              className={cn(
-                'flex-shrink-0 rounded-md border px-2.5 py-1 transition-colors',
-                selectedL3 === sub
-                  ? 'border-text-silver/40 bg-bg text-text'
-                  : 'border-transparent text-text-silver hover:border-border hover:bg-bg',
-              )}
-              style={{ fontSize: '12px' }}
-            >
-              {sub}
             </button>
           ))}
         </ScrollRow>
