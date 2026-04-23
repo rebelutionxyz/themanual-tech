@@ -194,15 +194,22 @@ export async function listThreads(
   (direct ?? []).forEach((r) => directIds.add(String(r.id)));
 
   // Query 2 — via atom links (only if atomIdsInRealm provided; otherwise skip)
+  // BATCH must stay small: each atom ID is ~80 chars average. PostgREST rejects
+  // URLs beyond ~16KB total. 50 IDs × 80 chars ≈ 4KB — safely under limits.
   if (atomIdsInRealm && atomIdsInRealm.length > 0) {
-    const BATCH = 500;
+    const BATCH = 50;
     for (let i = 0; i < atomIdsInRealm.length; i += BATCH) {
       const chunk = atomIdsInRealm.slice(i, i + BATCH);
-      const { data: links } = await supabase
+      const { data: links, error: linkErr } = await supabase
         .from('entity_atom_links')
         .select('source_id')
         .eq('source_surface', 'intel')
         .in('atom_id', chunk);
+      if (linkErr) {
+        // Log but keep going — partial results better than no thread list
+        console.warn('atom link batch failed', linkErr.message);
+        continue;
+      }
       (links ?? []).forEach((l) => linkedIds.add(String(l.source_id)));
     }
   }

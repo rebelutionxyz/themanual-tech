@@ -31,7 +31,9 @@ export function ThreadList({
   const [error, setError] = useState<string | null>(null);
 
   // Precompute atomIds-in-realm for the atom-link filter.
-  // Cap at 500 to avoid Supabase .in() URL-length issues; we rank leaves/sourced.
+  // Cap at 200: each atom ID is ~80 chars; with BATCH=50 in listThreads we
+  // make up to 4 requests per thread fetch. Higher caps cause wasted batches
+  // + URL-length 400s.
   const atomIdsInRealm = useMemo(() => {
     if (!selectedRealm) return undefined;
     const matches = atoms.filter((a) => {
@@ -47,7 +49,7 @@ export function ThreadList({
       const bScore = (b.isLeaf ? 2 : 0) + (b.kettle === 'Sourced' ? 1 : 0);
       return bScore - aScore;
     });
-    return matches.slice(0, 500).map((a) => a.id);
+    return matches.slice(0, 200).map((a) => a.id);
   }, [atoms, selectedRealm, selectedFront, selectedL2, selectedL3]);
 
   // Map atoms by id for quick lookup on cards

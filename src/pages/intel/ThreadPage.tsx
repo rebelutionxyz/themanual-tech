@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, Navigate, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MessagesSquare, Clock, Reply, Network, List } from 'lucide-react';
+import { ReactionBar } from '@/components/intel/ReactionBar';
+import { SaveButton } from '@/components/intel/SaveButton';
+import { ShareButton } from '@/components/intel/ShareButton';
 import { useAuth } from '@/lib/auth';
 import { useManualData } from '@/lib/useManualData';
 import { useIntelStore } from '@/stores/useIntelStore';
@@ -306,12 +309,29 @@ export function ThreadPage() {
           </div>
         )}
 
+        {/* Action bar — reactions, save, share */}
+        <div className="mt-5 flex flex-wrap items-center gap-2">
+          <ReactionBar
+            sourceSurface="intel"
+            sourceId={thread.id}
+            sourceKind="thread"
+          />
+          <div className="ml-auto flex items-center gap-1.5">
+            <SaveButton sourceSurface="intel" sourceId={thread.id} />
+            <ShareButton
+              sourceSurface="intel"
+              sourceId={thread.id}
+              url={`/intel/t/${thread.id}`}
+            />
+          </div>
+        </div>
+
         {/* Reply trigger */}
         {bee && !replyingTo && !thread.isLocked && (
           <button
             type="button"
             onClick={() => setReplyingTo('root')}
-            className="mt-5 inline-flex items-center gap-1.5 rounded-md border border-text-silver/30 bg-bg-elevated px-3 py-1.5 text-text-silver-bright hover:border-text-silver/60 hover:bg-panel-2"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-text-silver/30 bg-bg-elevated px-3 py-1.5 text-text-silver-bright hover:border-text-silver/60 hover:bg-panel-2"
             style={{ fontSize: '12px' }}
           >
             <Reply size={12} />
@@ -469,17 +489,25 @@ function PostNode({
         </div>
 
         {/* Actions */}
-        {canReply && replyingTo !== post.id && (
-          <button
-            type="button"
-            onClick={() => setReplyingTo(post.id)}
-            className="mt-3 inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-text-silver hover:border-border-bright hover:bg-bg"
-            style={{ fontSize: '11px' }}
-          >
-            <Reply size={11} />
-            Reply
-          </button>
-        )}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <ReactionBar
+            sourceSurface="intel"
+            sourceId={post.id}
+            sourceKind="post"
+            compact={true}
+          />
+          {canReply && replyingTo !== post.id && (
+            <button
+              type="button"
+              onClick={() => setReplyingTo(post.id)}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-bg-elevated px-2 py-0.5 text-text-silver hover:border-border-bright hover:bg-bg"
+              style={{ fontSize: '11px' }}
+            >
+              <Reply size={11} />
+              Reply
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Reply composer for this post */}
