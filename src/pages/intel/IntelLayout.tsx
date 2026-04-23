@@ -65,41 +65,41 @@ export function IntelLayout() {
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Left: INTEL internal sidebar (persists across all /intel/* routes) */}
-      <IntelSidebar activeView={activeView} onSelectView={handleSidebarSelect} />
+    <div className="flex h-full flex-col overflow-hidden">
+      {/* Top: realm bar spans FULL width (above sidebar) */}
+      <RealmBar
+        selectedRealm={selectedRealm}
+        selectedFront={selectedFront}
+        selectedL2={selectedL2}
+        onSelectRealm={(r) => {
+          setRealm(r);
+          // When realm changes while viewing thread/composer, navigate back to /intel
+          if (window.location.pathname !== '/intel') {
+            navigate('/intel');
+          }
+        }}
+        onSelectFront={(f) => {
+          setFront(f);
+          if (window.location.pathname !== '/intel') {
+            navigate('/intel');
+          }
+        }}
+        onSelectL2={(l2) => {
+          setL2(l2);
+          if (window.location.pathname !== '/intel') {
+            navigate('/intel');
+          }
+        }}
+        realmSubs={realmSubs}
+      />
 
-      {/* Main column */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Top: realm bar (persists across all /intel/* routes) */}
-        <RealmBar
-          selectedRealm={selectedRealm}
-          selectedFront={selectedFront}
-          selectedL2={selectedL2}
-          onSelectRealm={(r) => {
-            setRealm(r);
-            // When realm changes while viewing thread/composer, navigate back to /intel
-            if (window.location.pathname !== '/intel') {
-              navigate('/intel');
-            }
-          }}
-          onSelectFront={(f) => {
-            setFront(f);
-            if (window.location.pathname !== '/intel') {
-              navigate('/intel');
-            }
-          }}
-          onSelectL2={(l2) => {
-            setL2(l2);
-            if (window.location.pathname !== '/intel') {
-              navigate('/intel');
-            }
-          }}
-          realmSubs={realmSubs}
-        />
+      {/* Row below realm bar: sidebar + content */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* Left: INTEL sidebar */}
+        <IntelSidebar activeView={activeView} onSelectView={handleSidebarSelect} />
 
-        {/* Content: child route renders here */}
-        <main className="flex-1 overflow-y-auto">
+        {/* Content */}
+        <main className="min-w-0 flex-1 overflow-y-auto">
           <Outlet />
         </main>
       </div>
