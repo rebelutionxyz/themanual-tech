@@ -12,13 +12,17 @@ export interface ForumThread {
   createdBy: string;
   parentSurface: string | null;
   parentId: string | null;
+  /** Auto-derived or manually set realm this thread primarily lives in */
+  primaryRealm: string | null;
+  /** Optional specific Front under Power */
+  primaryFront: Front | null;
+  /** Optional L2 subcategory */
+  primaryL2: string | null;
   replyCount: number;
   lastActivityAt: string;
   isLocked: boolean;
   createdAt: string;
-  // Optional Bee author info (joined)
   authorHandle?: string;
-  // Optional: first N atom links (joined)
   atomLinks?: { atomId: string; linkType: string }[];
 }
 
@@ -36,9 +40,14 @@ export interface ForumPost {
 }
 
 export interface ThreadListFilter {
+  /**
+   * When set, only include threads whose primary_realm == this realm
+   * OR whose linked atoms' realms include this realm.
+   */
   realm?: string | null;
   front?: Front | null;
   l2?: string | null;
+  /** Only threads linked to this specific atom */
   atomId?: string | null;
   sortBy?: 'hot' | 'new' | 'top';
   limit?: number;
@@ -48,6 +57,9 @@ export interface CreateThreadInput {
   title: string;
   body: string;
   atomIds?: string[];
+  primaryRealm?: string | null;
+  primaryFront?: Front | null;
+  primaryL2?: string | null;
   parentSurface?: string | null;
   parentId?: string | null;
 }
@@ -64,6 +76,9 @@ function mapThread(row: Record<string, unknown>): ForumThread {
     createdBy: String(row.created_by ?? ''),
     parentSurface: (row.parent_surface as string) ?? null,
     parentId: (row.parent_id as string) ?? null,
+    primaryRealm: (row.primary_realm as string) ?? null,
+    primaryFront: (row.primary_front as Front) ?? null,
+    primaryL2: (row.primary_l2 as string) ?? null,
     replyCount: Number(row.reply_count ?? 0),
     lastActivityAt: String(row.last_activity_at ?? ''),
     isLocked: Boolean(row.is_locked),
@@ -93,36 +108,20 @@ function mapPost(row: Record<string, unknown>): ForumPost {
 
 /**
  * List threads with optional filters.
- * If an atomId is given, only threads with that atom linked are returned.
+ *
+ * Realm filtering applies Model D:
+ * - Match threads where primary_realm = filter.realm
+ * - OR threads linked to atoms whose realm = filter.realm
+ *
+ * To do this efficiently we ship atomIds-by-realm from the client.
  */
-export async function listThreads(filter: ThreadListFilter = {}): Promise<ForumThread[]> {
+export async function listThreads(
+  filter: ThreadListFilter = {},
+  atomIdsInRealm?: string[],
+): Promise<ForumThread[]> {
   if (!supabase) return [];
   const limit = filter.limit ?? 30;
 
-  // Build base query — join with bees for handle
-  // Note: Supabase doesn't support JOIN in select() shorthand cleanly, so we
-  // fetch threads, then author handles in a second pass.
-
-  // If filtering by atom, we need to join entity_atom_links first.
-  if (filter.atomId) {
-    const { data: links, error } = await supabase
-      .from('entity_atom_links')
-      .select('source_id')
-      .eq('source_surface', 'intel')
-      .eq('atom_id', filter.atomId);
-    if (error || !links?.length) return [];
-    const ids = links.map((l) => l.source_id);
-    const { data: threads, error: err2 } = await supabase
-      .from('forum_threads')
-      .select('*')
-      .in('id', ids)
-      .order('last_activity_at', { ascending: false })
-      .limit(limit);
-    if (err2 || !threads) return [];
-    return await enrichWithAuthors(threads);
-  }
-
-  // Standard list, optionally ordered
   const order =
     filter.sortBy === 'top'
       ? { col: 'reply_count', ascending: false }
@@ -130,31 +129,93 @@ export async function listThreads(filter: ThreadListFilter = {}): Promise<ForumT
         ? { col: 'created_at', ascending: false }
         : { col: 'last_activity_at', ascending: false };
 
-  const { data, error } = await supabase
+  // Specific atom filter — narrow to threads linked to this atom
+  if (filter.atomId) {
+    const { data: links } = await supabase
+      .from('entity_atom_links')
+      .select('source_id')
+      .eq('source_surface', 'intel')
+      .eq('atom_id', filter.atomId);
+    if (!links?.length) return [];
+    const ids = links.map((l) => l.source_id);
+    const { data: threads } = await supabase
+      .from('forum_threads')
+      .select('*')
+      .in('id', ids)
+      .order(order.col, { ascending: order.ascending })
+      .limit(limit);
+    return enrichWithAuthors(threads ?? []);
+  }
+
+  // No realm filter — all threads
+  if (!filter.realm) {
+    const { data } = await supabase
+      .from('forum_threads')
+      .select('*')
+      .order(order.col, { ascending: order.ascending })
+      .limit(limit);
+    return enrichWithAuthors(data ?? []);
+  }
+
+  // Realm filter: two sources
+  // 1. Threads with primary_realm = realm
+  // 2. Threads linked to atoms in that realm (via entity_atom_links)
+  const directIds = new Set<string>();
+  const linkedIds = new Set<string>();
+
+  // Query 1 — direct primary_realm match (also filter by front/l2 if set)
+  let q = supabase
+    .from('forum_threads')
+    .select('id')
+    .eq('primary_realm', filter.realm);
+  if (filter.front) q = q.eq('primary_front', filter.front);
+  if (filter.l2) q = q.eq('primary_l2', filter.l2);
+  const { data: direct } = await q;
+  (direct ?? []).forEach((r) => directIds.add(String(r.id)));
+
+  // Query 2 — via atom links (only if atomIdsInRealm provided; otherwise skip)
+  if (atomIdsInRealm && atomIdsInRealm.length > 0) {
+    // Supabase caps .in() at ~1000 elements; batch if needed.
+    const BATCH = 500;
+    for (let i = 0; i < atomIdsInRealm.length; i += BATCH) {
+      const chunk = atomIdsInRealm.slice(i, i + BATCH);
+      const { data: links } = await supabase
+        .from('entity_atom_links')
+        .select('source_id')
+        .eq('source_surface', 'intel')
+        .in('atom_id', chunk);
+      (links ?? []).forEach((l) => linkedIds.add(String(l.source_id)));
+    }
+  }
+
+  const allIds = Array.from(new Set([...directIds, ...linkedIds]));
+  if (allIds.length === 0) return [];
+
+  const { data: threads } = await supabase
     .from('forum_threads')
     .select('*')
+    .in('id', allIds)
     .order(order.col, { ascending: order.ascending })
     .limit(limit);
-  if (error || !data) return [];
-  return await enrichWithAuthors(data);
+  return enrichWithAuthors(threads ?? []);
 }
 
 /**
- * Get a single thread by id, enriched with author + atom links.
+ * Get a single thread with author + atom links enriched.
  */
 export async function getThread(threadId: string): Promise<ForumThread | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('forum_threads')
     .select('*')
     .eq('id', threadId)
     .maybeSingle();
-  if (error || !data) return null;
+  if (!data) return null;
+
   const enriched = await enrichWithAuthors([data]);
   const thread = enriched[0];
   if (!thread) return null;
 
-  // Fetch atom links
   const { data: links } = await supabase
     .from('entity_atom_links')
     .select('atom_id, link_type')
@@ -167,28 +228,21 @@ export async function getThread(threadId: string): Promise<ForumThread | null> {
   return thread;
 }
 
-/**
- * Get all posts for a thread, ordered chronologically.
- */
+/** Get all posts for a thread */
 export async function getPosts(threadId: string): Promise<ForumPost[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('forum_posts')
     .select('*')
     .eq('thread_id', threadId)
     .order('created_at', { ascending: true });
-  if (error || !data) return [];
-  return await enrichPostsWithAuthors(data);
+  return enrichPostsWithAuthors(data ?? []);
 }
 
 // ═════════════════════════════════════════════════════════════════════
 // Mutations
 // ═════════════════════════════════════════════════════════════════════
 
-/**
- * Create a new forum thread.
- * Returns the new thread's id on success, throws on failure.
- */
 export async function createThread(
   input: CreateThreadInput,
   authorBeeId: string,
@@ -201,6 +255,9 @@ export async function createThread(
       title: input.title.trim(),
       body: input.body,
       created_by: authorBeeId,
+      primary_realm: input.primaryRealm ?? null,
+      primary_front: input.primaryFront ?? null,
+      primary_l2: input.primaryL2 ?? null,
       parent_surface: input.parentSurface ?? null,
       parent_id: input.parentId ?? null,
     })
@@ -211,7 +268,6 @@ export async function createThread(
     throw new Error(error?.message ?? 'Failed to create thread');
   }
 
-  // Attach atom links (if any)
   if (input.atomIds && input.atomIds.length > 0) {
     const links = input.atomIds.map((atomId) => ({
       source_surface: 'intel',
@@ -229,9 +285,6 @@ export async function createThread(
   return String(thread.id);
 }
 
-/**
- * Reply to a thread (or to another post for nested replies).
- */
 export async function createPost(
   threadId: string,
   body: string,
@@ -254,15 +307,7 @@ export async function createPost(
   if (error || !data) {
     throw new Error(error?.message ?? 'Failed to create post');
   }
-
-  // Bump thread reply_count + last_activity_at
-  // (Best-effort — if this fails the post still exists)
-  try {
-    await supabase.rpc('increment_thread_reply_count', { p_thread_id: threadId });
-  } catch {
-    // Non-fatal; future migration will ensure this RPC exists
-  }
-
+  // Reply count increment handled by DB trigger (see schema-v3-intel.sql)
   return String(data.id);
 }
 
@@ -270,11 +315,9 @@ export async function createPost(
 // Author enrichment helpers
 // ═════════════════════════════════════════════════════════════════════
 
-async function enrichWithAuthors(
-  rows: Record<string, unknown>[],
-): Promise<ForumThread[]> {
+async function enrichWithAuthors(rows: Record<string, unknown>[]): Promise<ForumThread[]> {
   const threads = rows.map(mapThread);
-  if (!supabase) return threads;
+  if (!supabase || threads.length === 0) return threads;
 
   const beeIds = Array.from(new Set(threads.map((t) => t.createdBy).filter(Boolean)));
   if (beeIds.length === 0) return threads;
@@ -291,11 +334,9 @@ async function enrichWithAuthors(
   }));
 }
 
-async function enrichPostsWithAuthors(
-  rows: Record<string, unknown>[],
-): Promise<ForumPost[]> {
+async function enrichPostsWithAuthors(rows: Record<string, unknown>[]): Promise<ForumPost[]> {
   const posts = rows.map(mapPost);
-  if (!supabase) return posts;
+  if (!supabase || posts.length === 0) return posts;
 
   const beeIds = Array.from(new Set(posts.map((p) => p.beeId).filter(Boolean)));
   if (beeIds.length === 0) return posts;
@@ -328,5 +369,5 @@ export function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-/** Unused import guard — keeps Front/Kettle types in scope for future enrichment */
+/** Keeps Front/KettleState types in scope for future use */
 export type _ForceImports = Front | KettleState;

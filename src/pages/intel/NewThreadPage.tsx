@@ -1,34 +1,104 @@
-import { useState, type FormEvent } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, MessagesSquare, Send } from 'lucide-react';
+import { useState, useMemo, useEffect, type FormEvent } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, MessagesSquare, Send, Sparkles } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { useManualData } from '@/lib/useManualData';
 import { createThread } from '@/lib/intel';
 import { AtomPicker } from '@/components/intel/AtomPicker';
+import { RealmPicker, type RealmSelection } from '@/components/intel/RealmPicker';
+import { FRONT_ORDER } from '@/lib/constants';
+import type { Front } from '@/types/manual';
 import { cn } from '@/lib/utils';
 
 /**
  * Thread composer — /intel/new
+ * Reads optional URL params: ?realm=Power&front=INVESTIGATE&l2=JFK
+ *
+ * Model D flow:
+ * - Title + Body required
+ * - AtomPicker (prioritized by URL/realm context)
+ * - RealmPicker (auto-fills from linked atoms, editable, required if no atoms)
+ * - Submit validates: must have 1+ atoms OR realm selected
  */
 export function NewThreadPage() {
   const { bee, configured } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { atoms } = useManualData();
+
+  // Read URL context
+  const urlRealm = searchParams.get('realm');
+  const urlFront = searchParams.get('front') as Front | null;
+  const urlL2 = searchParams.get('l2');
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [atomIds, setAtomIds] = useState<string[]>([]);
+  const [realmSel, setRealmSel] = useState<RealmSelection>({
+    realm: urlRealm,
+    front: urlFront && FRONT_ORDER.includes(urlFront) ? urlFront : null,
+    l2: urlL2,
+  });
+  const [realmManuallyOverridden, setRealmManuallyOverridden] = useState(!!urlRealm);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = title.trim().length >= 2 && body.trim().length >= 1 && !submitting && !!bee;
+  // Auto-derive realm from first linked atom unless manually overridden
+  const derivedFromAtoms = useMemo(() => {
+    if (atomIds.length === 0) return null;
+    const first = atoms.find((a) => a.id === atomIds[0]);
+    if (!first) return null;
+    return {
+      realm: first.realm,
+      front: first.front ?? null,
+      // Don't auto-set L2 — too specific, feels overreach
+      l2: null,
+    } as RealmSelection;
+  }, [atomIds, atoms]);
+
+  // When atoms selected and user hasn't manually picked, auto-apply derivation
+  useEffect(() => {
+    if (derivedFromAtoms && !realmManuallyOverridden) {
+      setRealmSel(derivedFromAtoms);
+    }
+    // If all atoms removed and we were in derived mode, clear
+    if (atomIds.length === 0 && !realmManuallyOverridden) {
+      setRealmSel({ realm: urlRealm, front: null, l2: null });
+    }
+  }, [derivedFromAtoms, realmManuallyOverridden, atomIds.length, urlRealm]);
+
+  // Validation: must have atoms OR realm
+  const hasRealm = !!realmSel.realm;
+  const hasAtoms = atomIds.length > 0;
+  const categorizationOk = hasRealm || hasAtoms;
+  const canSubmit =
+    title.trim().length >= 2 &&
+    body.trim().length >= 1 &&
+    categorizationOk &&
+    !submitting &&
+    !!bee;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!canSubmit || !bee) return;
+
+    // If atoms are linked but no realm manually set, use derived
+    const finalRealm = realmSel.realm ?? derivedFromAtoms?.realm ?? null;
+    const finalFront = realmSel.front ?? derivedFromAtoms?.front ?? null;
+    const finalL2 = realmSel.l2 ?? null;
+
     setSubmitting(true);
     setError(null);
     try {
       const id = await createThread(
-        { title: title.trim(), body: body, atomIds },
+        {
+          title: title.trim(),
+          body,
+          atomIds,
+          primaryRealm: finalRealm,
+          primaryFront: finalFront,
+          primaryL2: finalL2,
+        },
         bee.id,
       );
       navigate(`/intel/t/${id}`);
@@ -38,7 +108,7 @@ export function NewThreadPage() {
     }
   }
 
-  // Not logged in? Prompt to sign in.
+  // Not logged in
   if (!bee) {
     return (
       <div className="mx-auto max-w-2xl px-6 py-12">
@@ -70,6 +140,9 @@ export function NewThreadPage() {
     );
   }
 
+  const usingDerived =
+    !realmManuallyOverridden && derivedFromAtoms && hasAtoms;
+
   return (
     <div className="mx-auto max-w-2xl px-6 py-8 md:px-10 md:py-12">
       {/* Header */}
@@ -96,6 +169,25 @@ export function NewThreadPage() {
         <MessagesSquare size={20} style={{ color: '#6B94C8' }} />
       </div>
 
+      {/* Context banner if URL had filter */}
+      {urlRealm && !realmManuallyOverridden && (
+        <div className="mb-5 rounded-md border border-border bg-bg-elevated/60 p-3">
+          <div
+            className="mb-1 flex items-center gap-1.5 font-mono uppercase tracking-wider text-text-muted"
+            style={{ fontSize: '11px' }}
+            data-size="meta"
+          >
+            <Sparkles size={11} />
+            Creating in
+          </div>
+          <div className="text-text-silver" style={{ fontSize: '13px' }}>
+            {urlRealm}
+            {urlFront && ` · ${urlFront}`}
+            {urlL2 && ` · ${urlL2}`}
+          </div>
+        </div>
+      )}
+
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Title */}
@@ -107,6 +199,7 @@ export function NewThreadPage() {
               data-size="meta"
             >
               Title
+              <span className="ml-1 text-kettle-unsourced">*</span>
             </span>
             <input
               type="text"
@@ -137,11 +230,12 @@ export function NewThreadPage() {
               data-size="meta"
             >
               Body
+              <span className="ml-1 text-kettle-unsourced">*</span>
             </span>
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              placeholder="Make your case. Cite sources if you have them. Link atoms below."
+              placeholder="Make your case. Cite sources. Link atoms below."
               rows={8}
               className="w-full resize-y rounded-md border border-border bg-bg px-3 py-2 text-text placeholder:text-text-muted focus:border-text-silver/50 focus:outline-none focus:ring-1 focus:ring-text-silver/30"
               style={{ fontSize: '14px', lineHeight: '1.6' }}
@@ -155,11 +249,34 @@ export function NewThreadPage() {
           value={atomIds}
           onChange={setAtomIds}
           label="Linked atoms"
-          placeholder="Link this thread to Manual atoms (optional but encouraged)"
           max={10}
+          searchOnly={true}
+          realmContext={{
+            realm: realmSel.realm ?? urlRealm,
+            front: realmSel.front ?? urlFront,
+            l2: realmSel.l2 ?? urlL2,
+          }}
         />
 
-        {/* Error */}
+        {/* Realm picker */}
+        <RealmPicker
+          value={realmSel}
+          onChange={(next) => {
+            setRealmSel(next);
+            setRealmManuallyOverridden(true);
+          }}
+          label="Realm"
+          autoDerived={!!usingDerived}
+          derivedHint={
+            usingDerived
+              ? `Auto-derived from linked atom "${atoms.find((a) => a.id === atomIds[0])?.name ?? ''}". You can override.`
+              : undefined
+          }
+          required={!hasAtoms}
+          error={!categorizationOk && title.length > 0 ? 'Link atoms or pick a realm' : undefined}
+        />
+
+        {/* Global error */}
         {error && (
           <div className="rounded-md border border-kettle-unsourced/30 bg-kettle-unsourced/10 p-3">
             <p className="text-kettle-unsourced" style={{ fontSize: '12px' }}>

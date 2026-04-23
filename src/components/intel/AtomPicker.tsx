@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Search, X, Plus, Check } from 'lucide-react';
 import { useManualData } from '@/lib/useManualData';
 import { KETTLE_COLORS } from '@/lib/constants';
-import type { Atom } from '@/types/manual';
+import type { Atom, Front } from '@/types/manual';
 import { cn } from '@/lib/utils';
 
 interface AtomPickerProps {
@@ -16,37 +16,42 @@ interface AtomPickerProps {
   placeholder?: string;
   /** Label shown above picker */
   label?: string;
-  /** Hide unselected suggestions until user types */
-  searchOnly?: boolean;
-  /** Bind to a specific realm (pre-filter) */
-  realmFilter?: string | null;
   /** Error message to display */
   error?: string;
+  /**
+   * Context to prioritize atoms from a specific realm/front/l2.
+   * These don't restrict selection — they just rank them higher when user types.
+   */
+  realmContext?: {
+    realm?: string | null;
+    front?: Front | null;
+    l2?: string | null;
+  };
+  /** Hide suggestions panel until user starts typing */
+  searchOnly?: boolean;
 }
 
 /**
  * Universal atom picker — used in every composer UI where Bees link to the Manual.
  *
- * Shows:
- * - Chips for currently-selected atoms (removable)
- * - Search input with live filtering
- * - Suggestion list under search (top 20 matches)
- *
- * Uses atoms.json loaded in memory (no network calls).
+ * V2 improvements:
+ * - searchOnly mode: no suggestions until user types
+ * - realmContext: when supplied, atoms in that scope rank higher
  */
 export function AtomPicker({
   value,
   onChange,
   max,
-  placeholder = 'Search atoms...',
+  placeholder = 'Search atoms (e.g. "jfk" or "fed")...',
   label,
-  searchOnly = false,
-  realmFilter,
   error,
+  realmContext,
+  searchOnly = true,
 }: AtomPickerProps) {
   const { atoms, loaded } = useManualData();
   const [query, setQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [focused, setFocused] = useState(false);
 
   const atomById = useMemo(() => {
     const m = new Map<string, Atom>();
@@ -59,45 +64,67 @@ export function AtomPicker({
     [value, atomById],
   );
 
-  // Search logic — name + path match, optionally pre-filtered by realm
+  /** Score an atom against the query + context */
+  function scoreAtom(atom: Atom, q: string): number {
+    const nameLower = atom.name.toLowerCase();
+    let score = 0;
+
+    // Query match
+    if (q) {
+      if (nameLower === q) score += 1000;
+      else if (nameLower.startsWith(q)) score += 600;
+      else if (nameLower.includes(q)) score += 300;
+      if (atom.path.toLowerCase().includes(q)) score += 100;
+      if (atom.themeTags.some((t) => t.toLowerCase().includes(q))) score += 50;
+    }
+
+    // Context boost
+    if (realmContext?.realm && atom.realm === realmContext.realm) score += 40;
+    if (realmContext?.front && atom.front === realmContext.front) score += 30;
+    if (realmContext?.l2 && atom.L2 === realmContext.l2) score += 20;
+
+    // Leaf atoms preferred (actual content vs. structural categories)
+    if (atom.isLeaf) score += 5;
+
+    // Sourced > unsourced
+    if (atom.kettle === 'Sourced') score += 3;
+
+    return score;
+  }
+
   const suggestions = useMemo(() => {
     if (!loaded) return [];
-    if (searchOnly && !query.trim()) return [];
 
     const q = query.trim().toLowerCase();
+
+    // searchOnly mode: no suggestions without query
+    if (searchOnly && !q) return [];
+
     let pool = atoms;
-    if (realmFilter) pool = pool.filter((a) => a.realm === realmFilter);
+    // If we have context but no query, narrow to context first (don't show ALL atoms)
+    if (!q && realmContext?.realm) {
+      pool = pool.filter((a) => a.realm === realmContext.realm);
+      if (realmContext.front) pool = pool.filter((a) => a.front === realmContext.front);
+      if (realmContext.l2) pool = pool.filter((a) => a.L2 === realmContext.l2);
+    }
 
     if (!q) {
-      // No query — return curated defaults (leaves only, sourced kettle state preferred)
+      // Context-only view — show top leaves in that scope
       return pool
         .filter((a) => a.isLeaf)
-        .sort((a, b) => {
-          // Sourced atoms first
-          if (a.kettle === 'Sourced' && b.kettle !== 'Sourced') return -1;
-          if (b.kettle === 'Sourced' && a.kettle !== 'Sourced') return 1;
-          return a.name.localeCompare(b.name);
-        })
+        .sort((a, b) => scoreAtom(b, '') - scoreAtom(a, ''))
         .slice(0, 20);
     }
 
-    // Query present — score + filter
-    return pool
-      .map((a) => {
-        const nameLower = a.name.toLowerCase();
-        let score = 0;
-        if (nameLower === q) score += 100;
-        else if (nameLower.startsWith(q)) score += 60;
-        else if (nameLower.includes(q)) score += 30;
-        if (a.path.toLowerCase().includes(q)) score += 10;
-        if (a.themeTags.some((t) => t.toLowerCase().includes(q))) score += 5;
-        return { atom: a, score };
-      })
+    // Query-driven scoring
+    return atoms
+      .map((a) => ({ atom: a, score: scoreAtom(a, q) }))
       .filter((r) => r.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, 20)
       .map((r) => r.atom);
-  }, [atoms, loaded, query, realmFilter, searchOnly]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [atoms, loaded, query, searchOnly, realmContext?.realm, realmContext?.front, realmContext?.l2]);
 
   const atMax = typeof max === 'number' && value.length >= max;
 
@@ -111,6 +138,11 @@ export function AtomPicker({
   function removeAtom(atomId: string) {
     onChange(value.filter((id) => id !== atomId));
   }
+
+  const hasContextHint =
+    !searchOnly === false && // searchOnly is true by default
+    realmContext?.realm &&
+    !query.trim();
 
   return (
     <div className="w-full">
@@ -164,8 +196,14 @@ export function AtomPicker({
             setQuery(e.target.value);
             setShowSuggestions(true);
           }}
-          onFocus={() => setShowSuggestions(true)}
-          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+          onFocus={() => {
+            setFocused(true);
+            setShowSuggestions(true);
+          }}
+          onBlur={() => {
+            setFocused(false);
+            setTimeout(() => setShowSuggestions(false), 150);
+          }}
           placeholder={atMax ? `Max ${max} atoms selected` : placeholder}
           disabled={atMax}
           className={cn(
@@ -178,6 +216,32 @@ export function AtomPicker({
           )}
         />
       </div>
+
+      {/* Context hint */}
+      {hasContextHint && (
+        <p
+          className="mt-1 font-mono text-text-dim"
+          style={{ fontSize: '11px' }}
+          data-size="meta"
+        >
+          Showing atoms from{' '}
+          <span className="text-text-silver">
+            {realmContext!.realm}
+            {realmContext!.front && ` · ${realmContext!.front}`}
+            {realmContext!.l2 && ` · ${realmContext!.l2}`}
+          </span>
+          . Type to search all atoms.
+        </p>
+      )}
+
+      {/* Empty state when searchOnly and no query */}
+      {searchOnly && !query.trim() && focused && suggestions.length === 0 && !atMax && (
+        <div className="mt-1 rounded-md border border-border bg-bg-elevated px-3 py-2">
+          <p className="text-text-muted" style={{ fontSize: '12px' }}>
+            Type to search 5,997 Manual atoms
+          </p>
+        </div>
+      )}
 
       {error && (
         <p className="mt-1 text-kettle-unsourced" style={{ fontSize: '11px' }} data-size="meta">
@@ -212,10 +276,7 @@ export function AtomPicker({
                   <div className="truncate text-text-silver" style={{ fontSize: '13px' }}>
                     {atom.name}
                   </div>
-                  <div
-                    className="path-mono truncate"
-                    style={{ fontSize: '10.5px' }}
-                  >
+                  <div className="path-mono truncate" style={{ fontSize: '10.5px' }}>
                     {atom.path}
                   </div>
                 </div>
@@ -230,7 +291,7 @@ export function AtomPicker({
         </div>
       )}
 
-      {showSuggestions && suggestions.length === 0 && query.trim() && (
+      {showSuggestions && query.trim() && suggestions.length === 0 && (
         <div className="mt-1 rounded-md border border-border bg-bg-elevated px-3 py-2">
           <p className="text-text-muted" style={{ fontSize: '12px' }}>
             No atoms match "{query}"

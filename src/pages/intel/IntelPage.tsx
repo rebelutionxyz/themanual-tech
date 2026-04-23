@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { MessagesSquare, Plus } from 'lucide-react';
 import { useManualData } from '@/lib/useManualData';
 import { RealmBar } from '@/components/intel/RealmBar';
@@ -46,7 +46,7 @@ export function IntelPage() {
 
   function handleSidebarSelect(view: IntelView) {
     if (view === 'create') {
-      navigate('/intel/new');
+      navigate(buildNewThreadUrl(selectedRealm, selectedFront, selectedL2));
       return;
     }
     setActiveView(view);
@@ -125,16 +125,16 @@ function IntelFeedContent({
           </h1>
         </div>
 
-        {/* Quick new thread button */}
-        <a
-          href="/intel/new"
+        {/* Quick new thread button — carries current realm/front/l2 context */}
+        <Link
+          to={buildNewThreadUrl(selectedRealm, selectedFront, selectedL2)}
           className="flex items-center gap-1.5 rounded-md border border-text-silver/30 bg-bg-elevated px-3 py-1.5 text-text-silver-bright transition-colors hover:border-text-silver/60 hover:bg-panel-2"
           style={{ fontSize: '13px' }}
         >
           <Plus size={14} />
           <span className="hidden md:inline">New Thread</span>
           <span className="md:hidden">New</span>
-        </a>
+        </Link>
       </div>
 
       {/* Thread list */}
@@ -146,4 +146,18 @@ function IntelFeedContent({
       />
     </div>
   );
+}
+
+/** Build /intel/new URL with optional realm context params */
+function buildNewThreadUrl(
+  realm: string | null,
+  front: Front | null,
+  l2: string | null,
+): string {
+  const params = new URLSearchParams();
+  if (realm) params.set('realm', realm);
+  if (front) params.set('front', front);
+  if (l2) params.set('l2', l2);
+  const qs = params.toString();
+  return qs ? `/intel/new?${qs}` : '/intel/new';
 }
