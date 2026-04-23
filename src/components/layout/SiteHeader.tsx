@@ -8,7 +8,7 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-bg/95 backdrop-blur-md">
-      <div className="flex h-14 items-center gap-3 px-4 md:px-6">
+      <div className="safe-pad-x flex h-14 items-center gap-3 px-4 md:px-6">
         {/* Logo + wordmark (clickable, goes home) */}
         <Link
           to="/"

@@ -24,7 +24,7 @@ export function RealmBar({
   onSelectL2,
   realmSubs = {},
 }: RealmBarProps) {
-  // L2s for current realm, stripped of any Front names
+  // L2s for current realm, stripped of any Front names (defensive)
   const subsForRealm = selectedRealm ? realmSubs[selectedRealm] ?? [] : [];
   const l2Options = subsForRealm.filter((s) => !FRONT_SET.has(s));
 
@@ -33,6 +33,7 @@ export function RealmBar({
 
   return (
     <div className="sticky top-0 z-30 border-b border-border bg-bg-elevated/95 backdrop-blur-md">
+      <div className="safe-pad-x">
       {/* ROW 1 — 13 Realms */}
       <ScrollRow>
         <RealmChip
@@ -59,7 +60,7 @@ export function RealmBar({
         ))}
       </ScrollRow>
 
-      {/* ROW 2 — L2 subs (shown for any selected realm, INCLUDING Power) */}
+      {/* ROW 2 — L2 subs for selected realm (excluding Fronts) */}
       {hasRealm && l2Options.length > 0 && (
         <ScrollRow
           className="border-t border-border bg-bg/40"
@@ -76,7 +77,7 @@ export function RealmBar({
         </ScrollRow>
       )}
 
-      {/* ROW 3 — Fronts (Power realm only) */}
+      {/* ROW 3 — Fronts (Power only) */}
       {isPower && (
         <ScrollRow
           className="border-t border-border bg-bg/40"
@@ -86,9 +87,7 @@ export function RealmBar({
             <button
               key={front}
               type="button"
-              onClick={() =>
-                onSelectFront(selectedFront === front ? null : front)
-              }
+              onClick={() => onSelectFront(selectedFront === front ? null : front)}
               className={cn(
                 'flex-shrink-0 rounded-md border px-2.5 py-1 transition-colors',
                 'font-display tracking-wide',
@@ -104,6 +103,7 @@ export function RealmBar({
           ))}
         </ScrollRow>
       )}
+      </div>
     </div>
   );
 }

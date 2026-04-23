@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { MessageSquare, Lock, Clock } from 'lucide-react';
 import { listThreads, relativeTime, type ForumThread } from '@/lib/intel';
 import { useManualData } from '@/lib/useManualData';
+import { useIntelStore } from '@/stores/useIntelStore';
 import { supabase } from '@/lib/supabase';
 import { KETTLE_COLORS, FRONT_COLORS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -137,6 +138,16 @@ export function ThreadList({
   );
 }
 
+type AtomShape = {
+  id: string;
+  name: string;
+  kettle: string;
+  realm: string;
+  front?: Front;
+  L2?: string;
+  L3?: string;
+};
+
 function ThreadCard({
   thread,
   atomIds,
@@ -146,10 +157,24 @@ function ThreadCard({
   atomIds: string[];
   atomById: Map<string, ReturnType<Map<string, unknown>['get']>>;
 }) {
+  const { setRealm, setFront, setL2, setL3 } = useIntelStore();
+
   const linkedAtoms = atomIds
-    .map((id) => atomById.get(id) as { id: string; name: string; kettle: string } | undefined)
-    .filter((a): a is { id: string; name: string; kettle: string } => !!a)
+    .map((id) => atomById.get(id) as AtomShape | undefined)
+    .filter((a): a is AtomShape => !!a)
     .slice(0, 4);
+
+  function handleAtomClick(e: React.MouseEvent, atom: AtomShape) {
+    // Prevent the outer thread Link from navigating
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Set the realm bar filters to this atom's context
+    setRealm(atom.realm);
+    if (atom.front) setFront(atom.front);
+    if (atom.L2) setL2(atom.L2);
+    if (atom.L3) setL3(atom.L3);
+  }
 
   return (
     <li>
@@ -210,14 +235,17 @@ function ThreadCard({
               </p>
             )}
 
-            {/* Linked atoms on card */}
+            {/* Linked atoms on card (clickable → filter by atom's context) */}
             {linkedAtoms.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">
                 {linkedAtoms.map((a) => (
-                  <span
+                  <button
+                    type="button"
                     key={a.id}
-                    className="inline-flex items-center gap-1 rounded bg-bg/60 px-1.5 py-0.5 text-text-silver"
+                    onClick={(e) => handleAtomClick(e, a)}
+                    className="inline-flex items-center gap-1 rounded border border-transparent bg-bg/60 px-1.5 py-0.5 text-text-silver transition-colors hover:border-text-silver/30 hover:bg-bg-elevated hover:text-text"
                     style={{ fontSize: '10.5px' }}
+                    title={`Filter by ${a.realm}${a.L2 ? ` · ${a.L2}` : ''}${a.L3 ? ` · ${a.L3}` : ''}`}
                   >
                     <span
                       className="h-1 w-1 rounded-full"
@@ -227,7 +255,7 @@ function ThreadCard({
                       }}
                     />
                     {a.name}
-                  </span>
+                  </button>
                 ))}
                 {atomIds.length > 4 && (
                   <span

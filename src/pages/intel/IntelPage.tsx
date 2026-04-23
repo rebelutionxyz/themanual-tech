@@ -57,6 +57,7 @@ export function IntelPage() {
         isDeepest: !selectedL2 && !selectedL3,
         onClick: () => {
           setL2(null);
+          setL3(null);
         },
       });
     }
@@ -82,7 +83,7 @@ export function IntelPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">
+    <div className="safe-pad-x mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">
       {/* Breadcrumb header row */}
       <div className="mb-6 flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">

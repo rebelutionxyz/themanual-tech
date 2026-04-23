@@ -73,7 +73,6 @@ export function IntelLayout() {
         selectedL2={selectedL2}
         onSelectRealm={(r) => {
           setRealm(r);
-          // When realm changes while viewing thread/composer, navigate back to /intel
           if (window.location.pathname !== '/intel') {
             navigate('/intel');
           }

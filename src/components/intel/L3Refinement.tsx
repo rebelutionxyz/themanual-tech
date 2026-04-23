@@ -16,8 +16,12 @@ interface L3RefinementProps {
 }
 
 /**
- * Body-level refinement row. Only visible when a realm + L2 are selected.
- * Horizontally scrollable with chevron arrows matching realm/L2/Fronts pattern.
+ * Body-level scroll bar for L3 refinement.
+ * Shows when either:
+ *   (a) an L2 is selected → shows L3s nested under that L2
+ *   (b) a Front is selected (but no L2) → shows L3s directly under that Front
+ *
+ * Filters out Front names that leak into L3 position (taxonomy cleanup TBD).
  */
 export function L3Refinement({
   selectedRealm,
@@ -29,12 +33,17 @@ export function L3Refinement({
   const { atoms } = useManualData();
 
   const l3Options = useMemo(() => {
-    if (!selectedRealm || !selectedL2) return [] as string[];
+    // Require either an L2 or a Front context
+    const hasL2Context = selectedRealm && selectedL2;
+    const hasFrontContext = selectedRealm && selectedFront && !selectedL2;
+    if (!hasL2Context && !hasFrontContext) return [] as string[];
+
     const set = new Set<string>();
     for (const a of atoms) {
       if (a.realm !== selectedRealm) continue;
       if (selectedFront && a.front !== selectedFront) continue;
-      if (a.L2 !== selectedL2) continue;
+      // If filtering under an L2, require L2 match
+      if (selectedL2 && a.L2 !== selectedL2) continue;
       if (!a.L3) continue;
       if (FRONT_SET.has(a.L3)) continue; // strip Front names that leak into L3
       set.add(a.L3);

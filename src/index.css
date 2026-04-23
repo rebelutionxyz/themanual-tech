@@ -161,4 +161,13 @@
   .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
+
+  /* Safe-area padding for tablet landscape (camera cutouts, home indicator, notch).
+     Only applies on tablet+ — mobile doesn't need this since portrait is the norm. */
+  @media (min-width: 768px) {
+    .safe-pad-x {
+      padding-left: env(safe-area-inset-left, 0);
+      padding-right: env(safe-area-inset-right, 0);
+    }
+  }
 }
