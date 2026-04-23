@@ -158,11 +158,9 @@ export function InlineComposer({
           });
           if (parsed.realmManuallyOverridden) setRealmManuallyOverridden(true);
         }
-        const hasContent =
-          (parsed.title && parsed.title.trim()) ||
-          (parsed.body && parsed.body.trim()) ||
-          (Array.isArray(parsed.atomIds) && parsed.atomIds.length > 0);
-        if (hasContent) setExpanded(true);
+        // Note: do NOT auto-expand on draft presence. Composer respects
+        // startCollapsed prop — user clicks to expand. Draft content still
+        // loads into the form, it just doesn't force the composer open.
       } catch {
         // ignore
       }

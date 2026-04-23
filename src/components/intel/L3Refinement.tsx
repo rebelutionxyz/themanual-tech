@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Network } from 'lucide-react';
 import { useManualData } from '@/lib/useManualData';
 import { FRONT_ORDER } from '@/lib/constants';
@@ -35,10 +35,9 @@ export function L3Refinement({
   const { atoms, tree } = useManualData();
   const [treeOpen, setTreeOpen] = useState(false);
 
-  // Auto-close the tree if L3 gets deselected (no L3 = no drill context)
-  useEffect(() => {
-    if (!selectedL3 && treeOpen) setTreeOpen(false);
-  }, [selectedL3, treeOpen]);
+  // User controls open/close via the Drill Deeper button. No auto-close
+  // based on selection state — that caused "flash" behavior where the tree
+  // would open and immediately close.
 
   const l3Options = useMemo(() => {
     // Flat L3 list for either L2 OR Front context (no double-counting — they're exclusive)
@@ -119,16 +118,12 @@ export function L3Refinement({
   // Don't render if no flat options AND no tree root (i.e., no realm/front/l2 context)
   if (l3Options.length === 0 && !treeRoot) return null;
 
-  // Drill Deeper should only appear when:
+  // Drill Deeper appears whenever:
   //  1. A realm is actually selected (not "All")
-  //  2. The tree actually shows something NEW beyond the flat bar — at least one
-  //     of treeRoot's children has its own children. Otherwise the tree just
-  //     duplicates what's already in the flat bar, which is noise.
+  //  2. The scope node has any children to drill into
+  // Simple. No "smart" hiding based on grandchildren — user chooses what's useful.
   const hasDrillableContent = Boolean(
-    selectedRealm &&
-      treeRoot &&
-      treeRoot.children.length > 0 &&
-      treeRoot.children.some((c) => c.children.length > 0),
+    selectedRealm && treeRoot && treeRoot.children.length > 0,
   );
 
   return (
