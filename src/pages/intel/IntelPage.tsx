@@ -61,6 +61,7 @@ export function IntelPage() {
       onClick: () => {
         setFront(null);
         setL2(null);
+        setL3(null);
       },
     });
 
@@ -129,11 +130,12 @@ export function IntelPage() {
                 setL2(null);
                 setL3(null);
               }}
+              title="Back to all INTEL"
               className={cn(
-                'font-display tracking-wide transition-colors hover:text-text',
+                'font-display tracking-wide border-b border-dotted transition-all',
                 selectedRealm
-                  ? 'text-text-muted hover:text-text-silver'
-                  : 'cursor-default text-text-silver-bright',
+                  ? 'border-transparent text-text-muted hover:border-current hover:text-text-silver-bright hover:brightness-125'
+                  : 'cursor-default border-transparent text-text-silver-bright',
               )}
               style={{ fontSize: '22px' }}
               disabled={!selectedRealm}
@@ -151,10 +153,11 @@ export function IntelPage() {
                   <button
                     type="button"
                     onClick={crumb.onClick}
-                    className="font-display tracking-wide text-text-silver transition-colors hover:text-text"
+                    title={`Back to ${crumb.label}`}
+                    className="font-display tracking-wide border-b border-dotted border-transparent transition-all hover:border-current hover:brightness-125"
                     style={{
                       fontSize: crumb.isDeepest ? '26px' : '22px',
-                      color: crumb.color,
+                      color: crumb.color ?? '#8A94A0',
                       fontWeight: crumb.isDeepest ? 600 : 400,
                     }}
                   >
