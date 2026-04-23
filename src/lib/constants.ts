@@ -44,6 +44,24 @@ export const FRONT_COLORS: Record<Front, string> = {
   'THE DEEP STATE': '#C94C4C',
 };
 
+// Realm colors — used for card accents, realm chips, breadcrumb highlights.
+// Chosen to evoke each realm's essence while staying harmonious as a palette.
+export const REALM_COLORS: Record<Realm, string> = {
+  Body: '#E88AB8',    // rose — vitality, physical
+  Mind: '#B8A8F0',    // lavender — thought, cognition
+  Spirit: '#F0C878',  // gold — soul, transcendence
+  Nature: '#6FCF8F',  // green — earth, living systems
+  Home: '#D4A574',    // warm tan — hearth, shelter
+  Craft: '#E8A868',   // terracotta — making, skill
+  Play: '#F78FB3',    // coral — joy, games
+  Gear: '#8A94A0',    // gunmetal — tools, equipment
+  Work: '#7AA8D4',    // steel blue — labor, production
+  Money: '#FAD15E',   // honey — currency, exchange
+  Tech: '#4FC3E8',    // cyan — digital, systems
+  World: '#9AC97A',   // sage — global, geography
+  Power: '#C94C4C',   // crimson — authority, sovereignty
+};
+
 export const KETTLE_STATES: KettleState[] = [
   'Sourced',
   'Accepted',

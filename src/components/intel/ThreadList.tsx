@@ -5,7 +5,7 @@ import { listThreads, relativeTime, type ForumThread } from '@/lib/intel';
 import { useManualData } from '@/lib/useManualData';
 import { useIntelStore } from '@/stores/useIntelStore';
 import { supabase } from '@/lib/supabase';
-import { KETTLE_COLORS, FRONT_COLORS } from '@/lib/constants';
+import { KETTLE_COLORS, FRONT_COLORS, REALM_COLORS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { Front } from '@/types/manual';
 
@@ -58,14 +58,16 @@ export function ThreadList({
     return m;
   }, [atoms]);
 
-  // Fetch atom links for all visible threads so we can show chips
+  // Fetch atom + category links for all visible threads so we can show chips
   const [threadAtomLinks, setThreadAtomLinks] = useState<Map<string, string[]>>(new Map());
+  const [threadCategoryLinks, setThreadCategoryLinks] = useState<Map<string, string[]>>(new Map());
 
   useEffect(() => {
     let cancelled = false;
     setThreads(null);
     setError(null);
     setThreadAtomLinks(new Map());
+    setThreadCategoryLinks(new Map());
 
     listThreads(
       {
@@ -81,10 +83,10 @@ export function ThreadList({
         if (cancelled) return;
         setThreads(result);
 
-        // Fetch atom links for these threads (best effort — silent if fails)
+        // Fetch atom + category links for these threads (best effort — silent if fails)
         if (result.length > 0 && supabase) {
+          const ids = result.map((t) => t.id);
           try {
-            const ids = result.map((t) => t.id);
             const { data } = await supabase
               .from('entity_atom_links')
               .select('source_id, atom_id')
@@ -101,6 +103,24 @@ export function ThreadList({
             setThreadAtomLinks(map);
           } catch {
             // non-fatal
+          }
+          try {
+            const { data: catData } = await supabase
+              .from('entity_category_links')
+              .select('source_id, category_path')
+              .eq('source_surface', 'intel')
+              .in('source_id', ids);
+            if (cancelled || !catData) return;
+            const catMap = new Map<string, string[]>();
+            for (const link of catData) {
+              const sid = String(link.source_id);
+              const arr = catMap.get(sid) ?? [];
+              arr.push(String(link.category_path));
+              catMap.set(sid, arr);
+            }
+            setThreadCategoryLinks(catMap);
+          } catch {
+            // non-fatal (table may not exist pre-migration)
           }
         }
       })
@@ -127,7 +147,15 @@ export function ThreadList({
   }
 
   if (threads === null) return <ThreadListSkeleton />;
-  if (threads.length === 0) return <EmptyThreads />;
+  if (threads.length === 0)
+    return (
+      <EmptyThreads
+        realm={selectedRealm}
+        front={selectedFront}
+        l2={selectedL2}
+        l3={selectedL3}
+      />
+    );
 
   return (
     <ul className="space-y-2">
@@ -136,6 +164,7 @@ export function ThreadList({
           key={t.id}
           thread={t}
           atomIds={threadAtomLinks.get(t.id) ?? []}
+          categoryPaths={threadCategoryLinks.get(t.id) ?? []}
           atomById={atomById}
         />
       ))}
@@ -156,10 +185,12 @@ type AtomShape = {
 function ThreadCard({
   thread,
   atomIds,
+  categoryPaths,
   atomById,
 }: {
   thread: ForumThread;
   atomIds: string[];
+  categoryPaths: string[];
   atomById: Map<string, ReturnType<Map<string, unknown>['get']>>;
 }) {
   const { setRealm, setFront, setL2, setL3 } = useIntelStore();
@@ -169,32 +200,84 @@ function ThreadCard({
     .filter((a): a is AtomShape => !!a)
     .slice(0, 4);
 
+  // Accent color: Front takes precedence (more specific), else realm
+  const accentColor =
+    thread.primaryFront && FRONT_COLORS[thread.primaryFront]
+      ? FRONT_COLORS[thread.primaryFront]
+      : thread.primaryRealm &&
+          REALM_COLORS[thread.primaryRealm as keyof typeof REALM_COLORS]
+        ? REALM_COLORS[thread.primaryRealm as keyof typeof REALM_COLORS]
+        : '#6B94C8'; // default to INTEL blue
+
+  // Show up to 3 category chips (excluding ones that would duplicate primary)
+  const primarySet = new Set(
+    [thread.primaryRealm, thread.primaryFront, thread.primaryL2]
+      .filter(Boolean)
+      .map((s) => String(s)),
+  );
+  const categoryChips = categoryPaths
+    .filter((path) => {
+      const leaf = path.split(' / ').pop() ?? path;
+      return !primarySet.has(leaf);
+    })
+    .slice(0, 3);
+
   function handleAtomClick(e: React.MouseEvent, atom: AtomShape) {
-    // Prevent the outer thread Link from navigating
     e.preventDefault();
     e.stopPropagation();
-
-    // Set the realm bar filters to this atom's context
     setRealm(atom.realm);
     if (atom.front) setFront(atom.front);
     if (atom.L2) setL2(atom.L2);
     if (atom.L3) setL3(atom.L3);
   }
 
+  function handleCategoryClick(e: React.MouseEvent, path: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    // Parse the category path to set realm/front/L2/L3 filters
+    const parts = path.split(' / ').map((s) => s.trim()).filter(Boolean);
+    if (parts.length === 0) return;
+    const FRONTS = [
+      'UNITE & RULE',
+      'INVESTIGATE',
+      'THE NEW WORLD ORDER',
+      'PROSECUTE',
+      'THE DEEP STATE',
+    ];
+    setRealm(parts[0]);
+    setFront(null);
+    setL2(null);
+    setL3(null);
+    if (parts.length >= 2) {
+      if (FRONTS.includes(parts[1])) {
+        setFront(parts[1] as Front);
+      } else {
+        setL2(parts[1]);
+      }
+    }
+    if (parts.length >= 3) setL3(parts[2]);
+  }
+
   return (
     <li>
       <Link
         to={`/intel/t/${thread.id}`}
-        className="group block rounded-lg border border-border bg-bg-elevated p-4 transition-colors hover:border-border-bright hover:bg-panel-2"
+        className="group block overflow-hidden rounded-lg border border-border bg-bg-elevated transition-all hover:border-border-bright hover:bg-panel-2"
+        style={{ borderLeft: `3px solid ${accentColor}80` }}
       >
+        <div className="p-4">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            {/* Primary realm badge */}
+            {/* Primary realm/front/L2 breadcrumb badges */}
             {thread.primaryRealm && (
               <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                 <span
-                  className="rounded bg-bg px-1.5 py-0.5 font-mono text-text-silver"
-                  style={{ fontSize: '10px' }}
+                  className="rounded px-1.5 py-0.5 font-mono"
+                  style={{
+                    fontSize: '10px',
+                    color: accentColor,
+                    background: `${accentColor}15`,
+                  }}
                   data-size="meta"
                 >
                   {thread.primaryRealm}
@@ -273,6 +356,37 @@ function ThreadCard({
                 )}
               </div>
             )}
+
+            {/* Category tags (from schema v5 multi-category system) */}
+            {categoryChips.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {categoryChips.map((path) => {
+                  const leaf = path.split(' / ').pop() ?? path;
+                  return (
+                    <button
+                      type="button"
+                      key={path}
+                      onClick={(e) => handleCategoryClick(e, path)}
+                      className="inline-flex items-center gap-1 rounded border border-border/50 bg-bg/40 px-1.5 py-0.5 text-text-dim transition-colors hover:border-border hover:bg-bg hover:text-text-silver"
+                      style={{ fontSize: '10px' }}
+                      title={`Filter by ${path}`}
+                    >
+                      <span className="text-text-muted">#</span>
+                      {leaf}
+                    </button>
+                  );
+                })}
+                {categoryPaths.length > categoryChips.length && (
+                  <span
+                    className="font-mono text-text-muted"
+                    style={{ fontSize: '10px' }}
+                    data-size="meta"
+                  >
+                    +{categoryPaths.length - categoryChips.length}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           {thread.isLocked && (
             <Lock size={14} className="mt-1 flex-shrink-0 text-text-muted" />
@@ -293,6 +407,7 @@ function ThreadCard({
               @{thread.authorHandle}
             </span>
           )}
+        </div>
         </div>
       </Link>
     </li>
@@ -325,30 +440,117 @@ function ThreadListSkeleton() {
   );
 }
 
-function EmptyThreads() {
+function EmptyThreads({
+  realm,
+  front,
+  l2,
+  l3,
+}: {
+  realm: string | null;
+  front: Front | null;
+  l2: string | null;
+  l3: string | null;
+}) {
+  // Build the "where" phrase for the empty message
+  const location =
+    [realm, front, l2, l3].filter(Boolean).join(' · ') || 'INTEL';
+
+  // Accent color matches the context
+  const accentColor = front
+    ? FRONT_COLORS[front]
+    : realm && REALM_COLORS[realm as keyof typeof REALM_COLORS]
+      ? REALM_COLORS[realm as keyof typeof REALM_COLORS]
+      : '#6B94C8'; // INTEL blue default
+
+  // Messaging adapts to depth
+  const isSpecific = Boolean(l2 || l3 || front);
+  const headline = isSpecific
+    ? `No threads in ${location} yet`
+    : realm
+      ? `No threads in ${realm} yet`
+      : 'The feed is quiet';
+
+  const subtext = isSpecific
+    ? 'Be the first Bee to post here. Earn BLiNG! for sparking the conversation.'
+    : realm
+      ? 'Start the discussion for this realm. Your thread sets the tone.'
+      : 'Pick a realm from the top, or start something from scratch. Every thread begins with one Bee.';
+
   return (
-    <div className="rounded-lg border border-dashed border-border p-10 text-center">
+    <div
+      className="rounded-lg border-2 border-dashed p-8 text-center"
+      style={{
+        borderColor: `${accentColor}40`,
+        background: `${accentColor}08`,
+      }}
+    >
+      {/* Accent dot */}
       <div
-        className="mx-auto mb-3 h-1.5 w-12 rounded-full"
-        style={{ background: '#6B94C8', opacity: 0.4 }}
+        className="mx-auto mb-4 h-2 w-12 rounded-full"
+        style={{ background: accentColor, opacity: 0.6 }}
       />
-      <p className="text-text-silver" style={{ fontSize: '14px' }}>
-        No threads yet
-      </p>
+
+      {/* Location chip */}
+      {realm && (
+        <div
+          className="mb-3 inline-block rounded px-2 py-0.5 font-mono uppercase tracking-widest"
+          style={{
+            fontSize: '10px',
+            color: accentColor,
+            background: `${accentColor}15`,
+          }}
+          data-size="meta"
+        >
+          {location}
+        </div>
+      )}
+
       <p
-        className="mt-2 font-mono text-text-muted"
-        style={{ fontSize: '11px' }}
-        data-size="meta"
+        className="mb-2 font-display text-text-silver-bright"
+        style={{ fontSize: '17px', fontWeight: 500 }}
       >
-        Be the first Bee to start a discussion
+        {headline}
       </p>
+
+      <p
+        className="mx-auto max-w-md text-text-dim"
+        style={{ fontSize: '13px', lineHeight: '1.5' }}
+      >
+        {subtext}
+      </p>
+
+      {/* Primary CTA — matches context */}
       <Link
         to="/intel/new"
-        className="mt-4 inline-block rounded-md border border-text-silver/30 bg-bg-elevated px-4 py-1.5 text-text-silver-bright transition-colors hover:border-text-silver/60 hover:bg-panel-2"
-        style={{ fontSize: '12px' }}
+        className="mt-5 inline-flex items-center gap-1.5 rounded-md border-2 px-4 py-1.5 transition-colors"
+        style={{
+          borderColor: `${accentColor}60`,
+          color: accentColor,
+          fontSize: '12px',
+          fontWeight: 600,
+        }}
       >
-        New Thread
+        <span style={{ color: '#FAD15E' }}>✦</span>
+        Start a thread
+        <span
+          className="font-mono"
+          style={{ fontSize: '10px', opacity: 0.7 }}
+          data-size="meta"
+        >
+          Earn BLiNG!
+        </span>
       </Link>
+
+      {/* Secondary hint when realm selected */}
+      {realm && (
+        <p
+          className="mt-4 font-mono text-text-muted"
+          style={{ fontSize: '10.5px' }}
+          data-size="meta"
+        >
+          Or pick "All" at the top to see every INTEL thread
+        </p>
+      )}
     </div>
   );
 }
