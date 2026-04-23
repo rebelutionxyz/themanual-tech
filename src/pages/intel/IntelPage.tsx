@@ -211,8 +211,8 @@ export function IntelPage() {
         }}
       />
 
-      {/* Inline composer — collapsed by default, click to expand */}
-      <div className="mb-4">
+      {/* Inline composer — collapsed by default, click to expand. 2/3 width on ≥sm. */}
+      <div className="mb-4 sm:mx-auto sm:w-2/3">
         <InlineComposer
           mode="thread"
           enabled={!!bee}
@@ -225,6 +225,12 @@ export function IntelPage() {
               ? `Posting in ${selectedRealm}${selectedFront ? ` · ${selectedFront}` : ''}${selectedL2 ? ` · ${selectedL2}` : ''}`
               : 'Posting to INTEL'
           }
+          collapsedContextLabel={
+            selectedRealm
+              ? `Post to INTEL / ${selectedRealm}${selectedFront ? ` / ${selectedFront}` : ''}${selectedL2 ? ` / ${selectedL2}` : ''}`
+              : 'Post to INTEL'
+          }
+          collapsedBodyLine="Share your thought..."
           placeholderCollapsed={
             selectedRealm
               ? `Start a thread in ${selectedRealm}${selectedFront ? ` · ${selectedFront}` : ''}. Earn BLiNG!`
@@ -236,16 +242,16 @@ export function IntelPage() {
             front: selectedFront,
             l2: selectedL2,
           }}
-          onSubmit={async ({ title, body, atomIds }) => {
+          onSubmit={async ({ title, body, atomIds, realm, front, l2 }) => {
             if (!bee || !title) return false;
             try {
               const newId = await createThread(
                 {
                   title,
                   body,
-                  primaryRealm: selectedRealm ?? null,
-                  primaryFront: selectedFront ?? null,
-                  primaryL2: selectedL2 ?? null,
+                  primaryRealm: realm,
+                  primaryFront: front,
+                  primaryL2: l2,
                   atomIds,
                 },
                 bee.id,

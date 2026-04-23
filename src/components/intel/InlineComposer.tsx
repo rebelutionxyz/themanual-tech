@@ -1,26 +1,29 @@
 import { useState, useRef, useEffect, useMemo, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Send, X, Maximize2, Tag, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Send, X, Loader2 } from 'lucide-react';
 import { AtomPicker } from '@/components/intel/AtomPicker';
+import { RealmPicker, type RealmSelection } from '@/components/intel/RealmPicker';
+import { useManualData } from '@/lib/useManualData';
 import { cn } from '@/lib/utils';
 import type { Front } from '@/types/manual';
 
 export type ComposerMode = 'thread' | 'reply';
 
+export interface InlineComposerPayload {
+  title?: string;
+  body: string;
+  atomIds: string[];
+  realm: string | null;
+  front: Front | null;
+  l2: string | null;
+}
+
 export interface InlineComposerProps {
   mode: ComposerMode;
-
-  /** Called on submit with the gathered content. Return true on success. */
-  onSubmit: (payload: {
-    title?: string;
-    body: string;
-    atomIds: string[];
-  }) => Promise<boolean>;
-
-  /** Draft key — used for local storage persistence. */
+  onSubmit: (payload: InlineComposerPayload) => Promise<boolean>;
   draftKey?: string;
 
-  /** Parent context for replies — inherits realm, atoms shown on "inherited" line. */
+  /** Initial/inherited realm context. Used as default for realm picker.
+   *  In reply mode, also shown as "inherited" line. */
   inheritedContext?: {
     realm?: string | null;
     front?: Front | null;
@@ -28,54 +31,32 @@ export interface InlineComposerProps {
     atomIds?: string[];
   };
 
-  /** Placeholder text for title input (thread mode only) */
   placeholderTitle?: string;
-
-  /** Placeholder text for body textarea */
   placeholderBody?: string;
-
-  /** Whether the Bee can post (needs sign-in) */
   enabled?: boolean;
-
-  /** Text shown when not enabled */
   disabledMessage?: string;
-
-  /** Auto-focus the first input on mount (used for replies triggered by Reply button) */
   autoFocus?: boolean;
-
-  /** Called when user cancels (for reply mode — collapses back to "Reply" button) */
   onCancel?: () => void;
 
-  /** Show "Expand to full page" button. Thread mode only. */
-  allowExpand?: boolean;
-
-  /** URL to navigate to on expand. Thread context saved to sessionStorage. */
-  expandUrl?: string;
-
-  /** Surface accent color (default INTEL blue) */
   accentColor?: string;
-
-  /** Header text shown above the composer (e.g. "Start a thread. Earn BLiNG!") */
   header?: string;
-
-  /** Subheader / description under the main header */
   subheader?: string;
 
-  /** When true, renders as a collapsed single-line prompt until clicked.
-   *  When false, renders fully expanded immediately (used for replies). */
+  /** When true, starts as a thin collapsed input button. */
   startCollapsed?: boolean;
-
-  /** Placeholder text for collapsed prompt */
   placeholderCollapsed?: string;
+
+  /** Context label shown under the "Earn BLiNG!" line on collapsed state
+   *  (e.g., "Post to INTEL / Power / INVESTIGATE") */
+  collapsedContextLabel?: string;
+
+  /** Short placeholder shown on collapsed state as the "body preview" line
+   *  (e.g., "Share your thought..."). Defaults to placeholderBody. */
+  collapsedBodyLine?: string;
 }
 
 const INTEL_BLUE = '#6B94C8';
 
-/**
- * Composer card. Can render collapsed (single-line prompt → click to expand) or
- * fully expanded (used for reply mode where Reply button is the trigger).
- * Title (threads only) + body + opt-in atom tagging via [Add atoms] toggle.
- */
 export function InlineComposer({
   mode,
   onSubmit,
@@ -87,40 +68,75 @@ export function InlineComposer({
   disabledMessage = 'Sign in to post',
   autoFocus = false,
   onCancel,
-  allowExpand = false,
-  expandUrl,
   accentColor = INTEL_BLUE,
   header,
   subheader,
   startCollapsed = false,
-  placeholderCollapsed,
+  collapsedContextLabel,
+  collapsedBodyLine,
 }: InlineComposerProps) {
-  const navigate = useNavigate();
+  const { atoms } = useManualData();
 
   // Form state
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [atomIds, setAtomIds] = useState<string[]>([]);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [realmSel, setRealmSel] = useState<RealmSelection>({
+    realm: inheritedContext?.realm ?? null,
+    front: inheritedContext?.front ?? null,
+    l2: inheritedContext?.l2 ?? null,
+  });
+  const [realmManuallyOverridden, setRealmManuallyOverridden] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Expansion state — if startCollapsed, begin collapsed; otherwise fully expanded.
-  // Drafts with content auto-expand on mount so Bees see their WIP.
   const [expanded, setExpanded] = useState(!startCollapsed);
 
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
-  const placeholderCollapsedFinal =
-    placeholderCollapsed ??
-    (mode === 'thread' ? 'Start a thread. Earn BLiNG!' : 'Reply to this thread...');
-
   const placeholderBodyFinal =
     placeholderBody ??
     (mode === 'thread' ? 'Share your thought...' : 'Your reply...');
 
-  // Restore draft from local storage on mount
+  // Auto-derive realm from first linked atom (unless user manually overrode)
+  const derivedFromAtoms = useMemo(() => {
+    if (atomIds.length === 0) return null;
+    const first = atoms.find((a) => a.id === atomIds[0]);
+    if (!first) return null;
+    return {
+      realm: first.realm,
+      front: first.front ?? null,
+      l2: null,
+    } as RealmSelection;
+  }, [atomIds, atoms]);
+
+  useEffect(() => {
+    if (realmManuallyOverridden) return;
+    if (!derivedFromAtoms) return;
+    setRealmSel(derivedFromAtoms);
+  }, [derivedFromAtoms, realmManuallyOverridden]);
+
+  // Keep realmSel in sync with inheritedContext changes (e.g., filter bar changes)
+  // but only if not manually overridden and no atoms picked yet
+  useEffect(() => {
+    if (realmManuallyOverridden) return;
+    if (atomIds.length > 0) return;
+    setRealmSel({
+      realm: inheritedContext?.realm ?? null,
+      front: inheritedContext?.front ?? null,
+      l2: inheritedContext?.l2 ?? null,
+    });
+  }, [
+    inheritedContext?.realm,
+    inheritedContext?.front,
+    inheritedContext?.l2,
+    realmManuallyOverridden,
+    atomIds.length,
+  ]);
+
+  // Restore draft from local storage
   useEffect(() => {
     if (!draftKey) return;
     const saved = localStorage.getItem(`draft:${draftKey}`);
@@ -130,14 +146,21 @@ export function InlineComposer({
         if (parsed.title) setTitle(parsed.title);
         if (parsed.body) setBody(parsed.body);
         if (parsed.atomIds) setAtomIds(parsed.atomIds);
-        // If draft has content, auto-expand to show it
+        if (parsed.realm || parsed.front || parsed.l2) {
+          setRealmSel({
+            realm: parsed.realm ?? null,
+            front: parsed.front ?? null,
+            l2: parsed.l2 ?? null,
+          });
+          if (parsed.realmManuallyOverridden) setRealmManuallyOverridden(true);
+        }
         const hasContent =
           (parsed.title && parsed.title.trim()) ||
           (parsed.body && parsed.body.trim()) ||
           (Array.isArray(parsed.atomIds) && parsed.atomIds.length > 0);
         if (hasContent) setExpanded(true);
       } catch {
-        // ignore corrupt draft
+        // ignore
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -151,23 +174,41 @@ export function InlineComposer({
       localStorage.removeItem(`draft:${draftKey}`);
       return;
     }
-    const snap = JSON.stringify({ title, body, atomIds });
+    const snap = JSON.stringify({
+      title,
+      body,
+      atomIds,
+      realm: realmSel.realm,
+      front: realmSel.front,
+      l2: realmSel.l2,
+      realmManuallyOverridden,
+    });
     const t = setTimeout(() => localStorage.setItem(`draft:${draftKey}`, snap), 400);
     return () => clearTimeout(t);
-  }, [draftKey, title, body, atomIds]);
+  }, [
+    draftKey,
+    title,
+    body,
+    atomIds,
+    realmSel.realm,
+    realmSel.front,
+    realmSel.l2,
+    realmManuallyOverridden,
+  ]);
 
-  // Auto-focus the appropriate input
+  // Auto-focus
   useEffect(() => {
-    if (!autoFocus) return;
+    if (!autoFocus || !expanded) return;
     if (mode === 'thread') titleRef.current?.focus();
     else bodyRef.current?.focus();
-  }, [autoFocus, mode]);
+  }, [autoFocus, expanded, mode]);
 
   const canSubmit = useMemo(() => {
+    if (submitting) return false;
     if (mode === 'thread') {
-      return title.trim().length >= 2 && body.trim().length >= 2 && !submitting;
+      return title.trim().length >= 2 && body.trim().length >= 2;
     }
-    return body.trim().length >= 2 && !submitting;
+    return body.trim().length >= 2;
   }, [mode, title, body, submitting]);
 
   async function handleSubmit(e?: FormEvent) {
@@ -180,13 +221,21 @@ export function InlineComposer({
         title: mode === 'thread' ? title.trim() : undefined,
         body: body.trim(),
         atomIds,
+        realm: realmSel.realm,
+        front: realmSel.front,
+        l2: realmSel.l2,
       });
       if (ok) {
         if (draftKey) localStorage.removeItem(`draft:${draftKey}`);
         setTitle('');
         setBody('');
         setAtomIds([]);
-        setAdvancedOpen(false);
+        setRealmManuallyOverridden(false);
+        setRealmSel({
+          realm: inheritedContext?.realm ?? null,
+          front: inheritedContext?.front ?? null,
+          l2: inheritedContext?.l2 ?? null,
+        });
         if (startCollapsed) setExpanded(false);
       }
     } catch (err) {
@@ -194,20 +243,6 @@ export function InlineComposer({
     } finally {
       setSubmitting(false);
     }
-  }
-
-  function handleExpandToFullPage() {
-    if (!expandUrl) return;
-    const payload = {
-      title,
-      body,
-      atomIds,
-      realm: inheritedContext?.realm ?? null,
-      front: inheritedContext?.front ?? null,
-      l2: inheritedContext?.l2 ?? null,
-    };
-    sessionStorage.setItem('composer-draft', JSON.stringify(payload));
-    navigate(expandUrl);
   }
 
   function handleCancel() {
@@ -219,22 +254,27 @@ export function InlineComposer({
         setTitle('');
         setBody('');
         setAtomIds([]);
+        setRealmManuallyOverridden(false);
+        setRealmSel({
+          realm: inheritedContext?.realm ?? null,
+          front: inheritedContext?.front ?? null,
+          l2: inheritedContext?.l2 ?? null,
+        });
       }
     }
-    setAdvancedOpen(false);
     if (startCollapsed) setExpanded(false);
     if (onCancel) onCancel();
   }
 
-  // Disabled state (not signed in)
+  // Disabled
   if (!enabled) {
     return (
       <div
-        className="rounded-lg border px-4 py-3 text-center text-text-muted"
+        className="rounded-md border px-4 py-3 text-center text-text-muted"
         style={{
           fontSize: '13px',
           borderColor: `${accentColor}30`,
-          background: `${accentColor}08`,
+          background: 'rgba(15, 18, 23, 0.6)',
         }}
       >
         {disabledMessage}
@@ -242,8 +282,11 @@ export function InlineComposer({
     );
   }
 
-  // Collapsed state — thin input-style box
+  // Collapsed — two-line "pop" card
   if (!expanded) {
+    const bodyLine =
+      collapsedBodyLine ?? placeholderBodyFinal ?? 'Share your thought...';
+
     return (
       <button
         type="button"
@@ -254,29 +297,55 @@ export function InlineComposer({
             else bodyRef.current?.focus();
           }, 50);
         }}
-        className="group flex w-full items-center rounded-md border bg-bg px-3 py-2 text-left transition-colors hover:bg-bg-elevated"
+        className="group relative block w-full overflow-hidden rounded-lg border-2 bg-bg px-4 py-3 text-left transition-all hover:scale-[1.01] hover:shadow-xl"
         style={{
-          borderColor: `${accentColor}60`,
-          boxShadow: `0 0 0 1px ${accentColor}18`,
+          borderColor: `${accentColor}80`,
+          boxShadow: `0 0 0 1px ${accentColor}25, 0 4px 14px rgba(0,0,0,0.35), 0 0 16px ${accentColor}20`,
         }}
       >
-        <span
-          className="flex-1 truncate"
-          style={{ fontSize: '13px', color: `${accentColor}C0` }}
+        {/* Subtle inner gradient glow */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-60"
+          style={{
+            background: `radial-gradient(ellipse at 10% 0%, ${accentColor}15 0%, transparent 60%)`,
+          }}
+        />
+
+        <div className="relative flex items-baseline gap-2">
+          <span
+            className="font-display tracking-wide"
+            style={{ fontSize: '14px', color: '#FAD15E', fontWeight: 600 }}
+          >
+            Earn BLiNG!
+          </span>
+          {collapsedContextLabel && (
+            <span
+              className="truncate font-mono uppercase tracking-widest"
+              style={{ fontSize: '10.5px', color: `${accentColor}C0` }}
+              data-size="meta"
+            >
+              {collapsedContextLabel}
+            </span>
+          )}
+        </div>
+        <div
+          className="relative mt-1 truncate"
+          style={{ fontSize: '13px', color: 'rgba(232, 236, 241, 0.55)' }}
         >
-          {placeholderCollapsedFinal}
-        </span>
+          {bodyLine}
+        </div>
       </button>
     );
   }
 
+  // Expanded — everything visible
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-lg border-2 bg-bg-elevated p-4 shadow-lg transition-colors"
+      className="rounded-lg border-2 bg-bg-elevated p-4 shadow-lg"
       style={{
         borderColor: `${accentColor}60`,
-        boxShadow: `0 0 0 1px ${accentColor}15, 0 4px 12px rgba(0,0,0,0.3)`,
+        boxShadow: `0 0 0 1px ${accentColor}15, 0 4px 12px rgba(0,0,0,0.2)`,
       }}
     >
       {/* Header */}
@@ -310,7 +379,7 @@ export function InlineComposer({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder={placeholderTitle}
-          className="mb-2 w-full rounded-md border bg-bg px-3 py-2 text-text placeholder:text-text-muted focus:outline-none focus:ring-1"
+          className="mb-3 w-full rounded-md border bg-bg px-3 py-2 text-text placeholder:text-text-muted focus:outline-none focus:ring-1"
           style={{
             fontSize: '15px',
             fontWeight: 500,
@@ -328,7 +397,7 @@ export function InlineComposer({
         onChange={(e) => setBody(e.target.value)}
         placeholder={placeholderBodyFinal}
         rows={mode === 'thread' ? 4 : 3}
-        className="w-full resize-y rounded-md border bg-bg px-3 py-2 text-text placeholder:text-text-muted focus:outline-none focus:ring-1"
+        className="mb-3 w-full resize-y rounded-md border bg-bg px-3 py-2 text-text placeholder:text-text-muted focus:outline-none focus:ring-1"
         style={{
           fontSize: '14px',
           lineHeight: '1.5',
@@ -336,14 +405,14 @@ export function InlineComposer({
         }}
       />
 
-      {/* Inherited context chip (replies) */}
+      {/* Inherited context line (reply mode, informational) */}
       {mode === 'reply' && inheritedContext?.realm && (
         <div
-          className="mt-2 font-mono text-text-muted"
+          className="mb-3 font-mono text-text-muted"
           style={{ fontSize: '11px' }}
           data-size="meta"
         >
-          Inherits: {inheritedContext.realm}
+          Parent thread: {inheritedContext.realm}
           {inheritedContext.front && ` · ${inheritedContext.front}`}
           {inheritedContext.l2 && ` · ${inheritedContext.l2}`}
           {inheritedContext.atomIds && inheritedContext.atomIds.length > 0 && (
@@ -356,44 +425,46 @@ export function InlineComposer({
         </div>
       )}
 
-      {/* Advanced — opt-in atom tagging */}
-      <div className="mt-2">
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen((o) => !o)}
-          className="flex items-center gap-1 rounded-md px-2 py-0.5 text-text-muted hover:bg-bg hover:text-text-silver"
-          style={{ fontSize: '11px' }}
-        >
-          <Tag size={11} />
-          <span>
-            {atomIds.length > 0
-              ? `${atomIds.length} atom${atomIds.length === 1 ? '' : 's'} added`
-              : 'Add atoms'}
-          </span>
-          {advancedOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-        </button>
+      {/* Atom picker — always visible */}
+      <div className="mb-3">
+        <AtomPicker
+          value={atomIds}
+          onChange={setAtomIds}
+          label="Atoms"
+          max={10}
+          realmContext={{
+            realm: realmSel.realm,
+            front: realmSel.front,
+            l2: realmSel.l2,
+          }}
+          placeholder="Search atoms to tag..."
+        />
+      </div>
 
-        {advancedOpen && (
-          <div className="mt-2 rounded-md border border-border bg-bg/60 p-2">
-            <AtomPicker
-              value={atomIds}
-              onChange={setAtomIds}
-              max={10}
-              realmContext={{
-                realm: inheritedContext?.realm,
-                front: inheritedContext?.front,
-                l2: inheritedContext?.l2,
-              }}
-              placeholder="Search atoms to tag..."
-            />
-          </div>
-        )}
+      {/* Realm picker — always visible, editable, defaults from context */}
+      <div className="mb-3">
+        <RealmPicker
+          value={realmSel}
+          onChange={(next) => {
+            setRealmSel(next);
+            setRealmManuallyOverridden(true);
+          }}
+          label="Realm"
+          autoDerived={!realmManuallyOverridden && atomIds.length > 0}
+          derivedHint={
+            !realmManuallyOverridden && atomIds.length > 0
+              ? 'Auto-derived from first atom'
+              : !realmManuallyOverridden && inheritedContext?.realm
+                ? 'From current filter'
+                : undefined
+          }
+        />
       </div>
 
       {/* Error */}
       {error && (
         <p
-          className="mt-2 text-kettle-unsourced"
+          className="mb-2 text-kettle-unsourced"
           style={{ fontSize: '11px' }}
           data-size="meta"
         >
@@ -402,63 +473,40 @@ export function InlineComposer({
       )}
 
       {/* Action row */}
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1">
-          {allowExpand && mode === 'thread' && expandUrl && (
-            <button
-              type="button"
-              onClick={handleExpandToFullPage}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-text-muted hover:bg-bg hover:text-text-silver"
-              style={{ fontSize: '11px' }}
-              title="Open in full-page composer"
-            >
-              <Maximize2 size={11} />
-              Expand
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {onCancel && (
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="flex items-center gap-1 rounded-md px-3 py-1 text-text-silver hover:bg-bg"
-              style={{ fontSize: '12px' }}
-            >
-              <X size={11} />
-              Cancel
-            </button>
-          )}
+      <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
+        {(onCancel || startCollapsed) && (
           <button
-            type="submit"
-            disabled={!canSubmit}
-            className={cn(
-              'flex items-center gap-1.5 rounded-md border px-4 py-1.5 transition-all',
-              canSubmit
-                ? 'text-text shadow-sm'
-                : 'cursor-not-allowed border-border text-text-dim opacity-60',
-            )}
-            style={{
-              fontSize: '13px',
-              fontWeight: 500,
-              ...(canSubmit
-                ? {
-                    borderColor: `${accentColor}80`,
-                    background: `${accentColor}20`,
-                    color: accentColor,
-                  }
-                : {}),
-            }}
+            type="button"
+            onClick={handleCancel}
+            className="flex items-center gap-1 rounded-md px-3 py-1.5 text-text-silver hover:bg-bg"
+            style={{ fontSize: '12px' }}
           >
-            {submitting ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : (
-              <Send size={12} />
-            )}
-            <span>{submitting ? 'Posting...' : 'Post'}</span>
+            <X size={11} />
+            Cancel
           </button>
-        </div>
+        )}
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className={cn(
+            'flex items-center gap-1.5 rounded-md border px-4 py-1.5 transition-all',
+            canSubmit ? 'shadow-sm' : 'cursor-not-allowed border-border text-text-dim opacity-60',
+          )}
+          style={{
+            fontSize: '13px',
+            fontWeight: 500,
+            ...(canSubmit
+              ? {
+                  borderColor: `${accentColor}80`,
+                  background: `${accentColor}20`,
+                  color: accentColor,
+                }
+              : {}),
+          }}
+        >
+          {submitting ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+          <span>{submitting ? 'Posting...' : 'Post'}</span>
+        </button>
       </div>
     </form>
   );

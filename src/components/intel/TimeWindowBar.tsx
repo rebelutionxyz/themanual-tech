@@ -40,7 +40,7 @@ export function TimeWindowBar({
   accentColor = INTEL_BLUE,
 }: TimeWindowBarProps) {
   return (
-    <div className="mb-4 rounded-lg border border-border bg-bg-elevated/40">
+    <div className="mb-4 rounded-lg border border-border bg-bg-elevated">
       <ScrollRow
         leading={
           label ? (

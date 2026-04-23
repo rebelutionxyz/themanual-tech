@@ -341,7 +341,7 @@ export function AtomPicker({
 
       {/* TREE MODE */}
       {treeMode && tree && loaded && (
-        <div className="max-h-96 overflow-y-auto rounded-md border border-border bg-bg-elevated/40 p-2">
+        <div className="max-h-96 overflow-y-auto rounded-md border border-border bg-bg-elevated p-2">
           {/* Render each realm as a top-level expandable branch */}
           {tree.children.map((realmNode) => (
             <TaxonomyTree

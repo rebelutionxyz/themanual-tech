@@ -148,7 +148,7 @@ export function NewThreadPage() {
             Sign in to start a thread
           </h1>
         </div>
-        <div className="mt-6 rounded-lg border border-border bg-bg-elevated/40 p-6">
+        <div className="mt-6 rounded-lg border border-border bg-bg-elevated p-6">
           <p className="text-text-silver" style={{ fontSize: '14px' }}>
             Anyone can read INTEL. To start a thread, you need to be a Bee.
           </p>
@@ -195,7 +195,7 @@ export function NewThreadPage() {
 
       {/* Context banner if URL had filter */}
       {urlRealm && !realmManuallyOverridden && (
-        <div className="mb-5 rounded-md border border-border bg-bg-elevated/60 p-3">
+        <div className="mb-5 rounded-md border border-border bg-bg-elevated p-3">
           <div
             className="mb-1 flex items-center gap-1.5 font-mono uppercase tracking-wider text-text-muted"
             style={{ fontSize: '11px' }}

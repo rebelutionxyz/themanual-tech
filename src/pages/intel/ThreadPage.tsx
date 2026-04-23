@@ -125,7 +125,7 @@ export function ThreadPage() {
       </Link>
 
       {/* Thread header */}
-      <article className="rounded-lg border border-border bg-bg-elevated/40 p-5 md:p-6">
+      <article className="rounded-lg border border-border bg-bg-elevated p-5 md:p-6">
         {/* Realm / Front / L2 badges */}
         {(thread.primaryRealm || thread.primaryFront || thread.primaryL2) && (
           <div className="mb-3 flex flex-wrap items-center gap-1.5">
@@ -273,7 +273,7 @@ export function ThreadPage() {
             )}
 
             {atomsView === 'tree' && tree && (
-              <div className="rounded-md border border-border bg-bg-elevated/40 p-2">
+              <div className="rounded-md border border-border bg-bg-elevated p-2">
                 {(() => {
                   // Group linked atoms by realm, render each realm's branch
                   const realmsWithAtoms = new Set(linkedAtoms.map((a) => a.realm));
@@ -361,7 +361,7 @@ export function ThreadPage() {
         )}
 
         {topLevelPosts.length === 0 && !bee && (
-          <div className="rounded-lg border border-border bg-bg-elevated/40 p-4 text-center">
+          <div className="rounded-lg border border-border bg-bg-elevated p-4 text-center">
             <p className="text-text-silver" style={{ fontSize: '13px' }}>
               No replies yet.{' '}
               <Link to="/login" className="text-text-silver-bright underline">
@@ -433,7 +433,7 @@ function PostNode({
       id={`post-${post.id}`}
       className={cn(indent && 'ml-4 border-l border-border pl-4 md:ml-6 md:pl-5')}
     >
-      <div className="rounded-lg border border-border bg-bg-elevated/40 p-4">
+      <div className="rounded-lg border border-border bg-bg-elevated p-4">
         {/* Author + time */}
         <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-text-muted">
           {post.authorHandle && (
@@ -526,10 +526,10 @@ function PostNode({
 function ThreadLoadingSkeleton() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 md:px-8 md:py-10">
-      <div className="h-40 animate-pulse-slow rounded-lg border border-border bg-bg-elevated/40" />
+      <div className="h-40 animate-pulse-slow rounded-lg border border-border bg-bg-elevated" />
       <div className="mt-4 space-y-3">
-        <div className="h-24 animate-pulse-slow rounded-lg border border-border bg-bg-elevated/40" />
-        <div className="h-24 animate-pulse-slow rounded-lg border border-border bg-bg-elevated/40" />
+        <div className="h-24 animate-pulse-slow rounded-lg border border-border bg-bg-elevated" />
+        <div className="h-24 animate-pulse-slow rounded-lg border border-border bg-bg-elevated" />
       </div>
     </div>
   );
