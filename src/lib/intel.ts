@@ -229,6 +229,34 @@ export async function listThreads(
 }
 
 /**
+ * Fetch thread IDs authored by a specific Bee, newest first.
+ * Used by the My Threads view. Pair with listThreadsByIds to hydrate
+ * with author + atom links.
+ */
+export async function listThreadIdsByAuthor(beeId: string): Promise<string[]> {
+  if (!supabase || !beeId) return [];
+  const { data } = await supabase
+    .from('forum_threads')
+    .select('id')
+    .eq('created_by', beeId)
+    .order('created_at', { ascending: false });
+  return (data ?? []).map((r) => String(r.id));
+}
+
+/**
+ * Count of threads authored by a specific Bee. Used for sidebar badge.
+ * Uses head+count — no row payload transferred.
+ */
+export async function countThreadsByAuthor(beeId: string): Promise<number> {
+  if (!supabase || !beeId) return 0;
+  const { count } = await supabase
+    .from('forum_threads')
+    .select('*', { count: 'exact', head: true })
+    .eq('created_by', beeId);
+  return count ?? 0;
+}
+
+/**
  * Fetch multiple threads by ID, preserving the order of the provided IDs.
  * Used by the Saved view and anywhere else that needs specific threads.
  */
@@ -359,6 +387,16 @@ export async function createPost(
 ): Promise<string> {
   if (!supabase) throw new Error('Supabase not configured');
 
+  // Snapshot reply_count BEFORE insert so we can detect trigger failure.
+  // If the trigger fires correctly, the stored count will be +1 after insert.
+  // If it silently fails (e.g., trigger not installed), we fall back to RPC.
+  const { data: pre } = await supabase
+    .from('forum_threads')
+    .select('reply_count')
+    .eq('id', threadId)
+    .maybeSingle();
+  const preCount = Number(pre?.reply_count ?? 0);
+
   const { data, error } = await supabase
     .from('forum_posts')
     .insert({
@@ -374,9 +412,10 @@ export async function createPost(
     throw new Error(error?.message ?? 'Failed to create post');
   }
 
+  const postId = String(data.id);
+
   // Link atoms to this reply (if any were provided)
   if (atomIds.length > 0) {
-    const postId = String(data.id);
     const links = atomIds.map((atomId) => ({
       source_type: 'forum_post',
       source_id: postId,
@@ -387,7 +426,6 @@ export async function createPost(
 
   // Link categories to this reply (if any were provided)
   if (categoryPaths.length > 0) {
-    const postId = String(data.id);
     const catLinks = categoryPaths.map((path) => ({
       source_surface: 'intel',
       source_id: postId,
@@ -397,8 +435,30 @@ export async function createPost(
     await supabase.from('entity_category_links').insert(catLinks);
   }
 
-  // Reply count increment handled by DB trigger (see schema-v3-intel.sql)
-  return String(data.id);
+  // Reply count increment SHOULD be handled by the on_forum_post_insert
+  // trigger (see schema-v3-intel.sql + schema-v7-reply-count-fix.sql).
+  // Verify by re-reading the count — if trigger silently failed, fall back
+  // to the RPC. This is a safety net, not the primary mechanism.
+  try {
+    const { data: post } = await supabase
+      .from('forum_threads')
+      .select('reply_count')
+      .eq('id', threadId)
+      .maybeSingle();
+    const postCount = Number(post?.reply_count ?? 0);
+    if (postCount <= preCount) {
+      // Trigger didn't fire. Fall back to RPC.
+      console.warn(
+        `[intel] reply_count trigger appears broken (pre=${preCount}, post=${postCount}). Falling back to RPC.`,
+      );
+      await supabase.rpc('increment_thread_reply_count', { p_thread_id: threadId });
+    }
+  } catch (verifyErr) {
+    // Non-fatal: verification itself failed. Post is saved, count may drift.
+    console.warn('[intel] reply_count verification failed:', verifyErr);
+  }
+
+  return postId;
 }
 
 // ═════════════════════════════════════════════════════════════════════

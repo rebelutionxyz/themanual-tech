@@ -36,6 +36,7 @@ export default function App() {
                 (sidebar + realm bar persist across thread list, composer, detail) */}
             <Route path="/intel" element={<IntelLayout />}>
               <Route index element={<IntelPage />} />
+              <Route path="mine" element={<IntelPage />} />
               <Route path="new" element={<NewThreadPage />} />
               <Route path="t/:threadId" element={<ThreadPage />} />
             </Route>

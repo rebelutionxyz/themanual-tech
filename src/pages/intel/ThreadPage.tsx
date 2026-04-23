@@ -17,7 +17,7 @@ import {
   type ForumThread,
   type ForumPost,
 } from '@/lib/intel';
-import { KETTLE_COLORS, FRONT_COLORS } from '@/lib/constants';
+import { KETTLE_COLORS, FRONT_COLORS, REALM_COLORS, BEE_COLOR } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { Front } from '@/types/manual';
 
@@ -106,9 +106,11 @@ export function ThreadPage() {
   ) {
     if (!bee || !threadId) return;
     const newId = await createPost(threadId, body, bee.id, parentId, atomIds, categoryPaths);
-    // Optimistic: refetch posts
-    const p = await getPosts(threadId);
+    // Refetch both posts and thread — thread pulls the fresh reply_count
+    // (bumped by DB trigger or client-side RPC fallback in createPost)
+    const [p, t] = await Promise.all([getPosts(threadId), getThread(threadId)]);
     setPosts(p);
+    if (t) setThread(t);
     setReplyingTo(null);
     // Auto-scroll to new post
     setTimeout(() => {
@@ -118,50 +120,126 @@ export function ThreadPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 md:px-8 md:py-10">
-      {/* Breadcrumb */}
-      <Link
-        to="/intel"
-        className="mb-4 inline-flex items-center gap-1.5 text-text-silver hover:text-text"
+      {/* Realm-aware back link. If thread has a primaryRealm, clicking restores
+          that realm filter on /intel so the user lands back in their
+          browsing context. Otherwise → generic Back to INTEL. */}
+      <button
+        type="button"
+        onClick={() => {
+          if (thread.primaryRealm) {
+            setRealm(thread.primaryRealm);
+            setFront(thread.primaryFront ?? null);
+            setL2(thread.primaryL2 ?? null);
+            setL3(null);
+          } else {
+            setRealm(null);
+            setFront(null);
+            setL2(null);
+            setL3(null);
+          }
+          navigate('/intel');
+        }}
+        className="mb-4 inline-flex items-center gap-1.5 text-text-silver hover:text-text-silver-bright transition-colors"
         style={{ fontSize: '12px' }}
       >
         <ArrowLeft size={14} />
-        <span>Back to INTEL</span>
-      </Link>
+        <span>
+          Back to{' '}
+          {thread.primaryFront ? (
+            <span style={{ color: FRONT_COLORS[thread.primaryFront] }}>
+              {thread.primaryFront}
+            </span>
+          ) : thread.primaryRealm ? (
+            <span
+              style={{
+                color:
+                  REALM_COLORS[thread.primaryRealm as keyof typeof REALM_COLORS] ??
+                  '#E0E6EC',
+              }}
+            >
+              {thread.primaryRealm}
+            </span>
+          ) : (
+            'INTEL'
+          )}
+        </span>
+      </button>
 
       {/* Thread header */}
       <article className="rounded-lg border border-border bg-bg-elevated p-5 md:p-6">
-        {/* Realm / Front / L2 badges */}
+        {/* Realm / Front / L2 badges — clickable to filter INTEL by that facet */}
         {(thread.primaryRealm || thread.primaryFront || thread.primaryL2) && (
           <div className="mb-3 flex flex-wrap items-center gap-1.5">
             {thread.primaryRealm && (
-              <span
-                className="rounded-md border border-border bg-bg px-2 py-0.5 font-mono text-text-silver"
-                style={{ fontSize: '11px' }}
+              <button
+                type="button"
+                onClick={() => {
+                  setRealm(thread.primaryRealm);
+                  setFront(null);
+                  setL2(null);
+                  setL3(null);
+                  navigate('/intel');
+                }}
+                className="rounded-md border px-2 py-0.5 font-mono transition-colors hover:brightness-125"
+                style={{
+                  fontSize: '11px',
+                  color:
+                    REALM_COLORS[thread.primaryRealm as keyof typeof REALM_COLORS] ??
+                    '#E0E6EC',
+                  borderColor: `${
+                    REALM_COLORS[thread.primaryRealm as keyof typeof REALM_COLORS] ??
+                    '#8A94A0'
+                  }40`,
+                  background: `${
+                    REALM_COLORS[thread.primaryRealm as keyof typeof REALM_COLORS] ??
+                    '#8A94A0'
+                  }0D`,
+                }}
                 data-size="meta"
+                title={`Filter INTEL by ${thread.primaryRealm}`}
               >
                 {thread.primaryRealm}
-              </span>
+              </button>
             )}
             {thread.primaryFront && (
-              <span
-                className="rounded-md border px-2 py-0.5 font-display"
+              <button
+                type="button"
+                onClick={() => {
+                  if (thread.primaryRealm) setRealm(thread.primaryRealm);
+                  setFront(thread.primaryFront);
+                  setL2(null);
+                  setL3(null);
+                  navigate('/intel');
+                }}
+                className="rounded-md border px-2 py-0.5 font-display transition-colors hover:brightness-125"
                 style={{
                   fontSize: '11px',
                   color: FRONT_COLORS[thread.primaryFront],
                   borderColor: FRONT_COLORS[thread.primaryFront] + '40',
+                  background: FRONT_COLORS[thread.primaryFront] + '0D',
                 }}
+                title={`Filter INTEL by ${thread.primaryFront}`}
               >
                 {thread.primaryFront}
-              </span>
+              </button>
             )}
             {thread.primaryL2 && (
-              <span
-                className="rounded-md border border-border bg-bg px-2 py-0.5 font-mono text-text-dim"
+              <button
+                type="button"
+                onClick={() => {
+                  if (thread.primaryRealm) setRealm(thread.primaryRealm);
+                  if (thread.primaryFront) setFront(thread.primaryFront);
+                  setL2(thread.primaryL2);
+                  setL3(null);
+                  navigate('/intel');
+                }}
+                className="rounded-md border border-border bg-bg px-2 py-0.5 font-mono text-text-dim transition-colors hover:border-text-silver/40 hover:text-text-silver"
                 style={{ fontSize: '11px' }}
                 data-size="meta"
+                title={`Filter INTEL by ${thread.primaryL2}`}
               >
                 {thread.primaryL2}
-              </span>
+              </button>
             )}
           </div>
         )}
@@ -170,15 +248,25 @@ export function ThreadPage() {
           {thread.title}
         </h1>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-text-muted">
+        <div className="mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-text-muted">
           {thread.authorHandle && (
-            <span
-              className="font-mono text-text-silver"
-              style={{ fontSize: '12px' }}
-              data-size="meta"
-            >
-              @{thread.authorHandle}
-            </span>
+            <>
+              <span
+                className="inline-flex items-center gap-1.5 font-mono"
+                style={{ fontSize: '12px', color: BEE_COLOR }}
+                data-size="meta"
+              >
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ background: BEE_COLOR }}
+                  aria-hidden="true"
+                />
+                @{thread.authorHandle}
+              </span>
+              <span className="text-text-muted/40" aria-hidden="true">
+                ·
+              </span>
+            </>
           )}
           <span
             className="inline-flex items-center gap-1 font-mono"
@@ -187,6 +275,9 @@ export function ThreadPage() {
           >
             <Clock size={11} />
             {relativeTime(thread.createdAt)}
+          </span>
+          <span className="text-text-muted/40" aria-hidden="true">
+            ·
           </span>
           <span
             className="inline-flex items-center gap-1 font-mono"
@@ -463,13 +554,23 @@ function PostNode({
         {/* Author + time */}
         <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-text-muted">
           {post.authorHandle && (
-            <span
-              className="font-mono text-text-silver"
-              style={{ fontSize: '12px' }}
-              data-size="meta"
-            >
-              @{post.authorHandle}
-            </span>
+            <>
+              <span
+                className="inline-flex items-center gap-1.5 font-mono"
+                style={{ fontSize: '12px', color: BEE_COLOR }}
+                data-size="meta"
+              >
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ background: BEE_COLOR }}
+                  aria-hidden="true"
+                />
+                @{post.authorHandle}
+              </span>
+              <span className="text-text-muted/40" aria-hidden="true">
+                ·
+              </span>
+            </>
           )}
           <span
             className="font-mono"

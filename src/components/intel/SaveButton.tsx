@@ -48,6 +48,8 @@ export function SaveButton({
     setPending(true);
     try {
       await toggleSave(sourceSurface, sourceId, bee.id);
+      // Notify sidebar to refresh Saved badge count
+      window.dispatchEvent(new CustomEvent('intel-counts-refresh'));
       if (onChange) onChange(next);
     } catch (err) {
       console.error('Save toggle failed:', err);

@@ -15,6 +15,10 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth';
+import { countSavedThreads } from '@/lib/reactions';
+import { countThreadsByAuthor } from '@/lib/intel';
+import { BEE_COLOR } from '@/lib/constants';
 
 export type IntelView =
   | 'home'
@@ -69,6 +73,44 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
   const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
   const asideRef = useRef<HTMLElement>(null);
+  const { bee } = useAuth();
+
+  // Personal badge counts — fetched when signed in, refreshed on
+  // intel-counts-refresh event (fired by ThreadList on save/unsave + IntelPage
+  // on thread create). Silent when 0 (per UX spec B).
+  const [savedCount, setSavedCount] = useState(0);
+  const [myThreadsCount, setMyThreadsCount] = useState(0);
+
+  useEffect(() => {
+    if (!bee?.id) {
+      setSavedCount(0);
+      setMyThreadsCount(0);
+      return;
+    }
+    let cancelled = false;
+    async function refreshCounts() {
+      if (!bee?.id) return;
+      try {
+        const [saved, authored] = await Promise.all([
+          countSavedThreads(bee.id),
+          countThreadsByAuthor(bee.id),
+        ]);
+        if (!cancelled) {
+          setSavedCount(saved);
+          setMyThreadsCount(authored);
+        }
+      } catch {
+        // Non-fatal — tables may not be migrated yet. Leave counts at 0.
+      }
+    }
+    refreshCounts();
+    const onRefresh = () => refreshCounts();
+    window.addEventListener('intel-counts-refresh', onRefresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('intel-counts-refresh', onRefresh);
+    };
+  }, [bee?.id]);
 
   const expanded = pinned || hovered;
 
@@ -156,6 +198,15 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
   const personalItems = NAV_ITEMS.filter((n) => n.group === 'personal');
   const futureItems = NAV_ITEMS.filter((n) => n.group === 'future');
 
+  // Per-view badge counts + colors. Silent when 0 (item.id omitted from map).
+  const badgeMap: Partial<Record<IntelView, { count: number; color: string }>> = {};
+  if (myThreadsCount > 0) {
+    badgeMap.mythreads = { count: myThreadsCount, color: BEE_COLOR };
+  }
+  if (savedCount > 0) {
+    badgeMap.saved = { count: savedCount, color: '#FAD15E' };
+  }
+
   return (
     <>
       {/* Mobile overlay — only when pinned open (tap anywhere dims/closes) */}
@@ -207,6 +258,7 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
           activeView={activeView}
           expanded={expanded}
           onSelect={handleSelect}
+          badgeMap={badgeMap}
         />
         <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
         <SidebarGroup
@@ -214,6 +266,7 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
           activeView={activeView}
           expanded={expanded}
           onSelect={handleSelect}
+          badgeMap={badgeMap}
         />
         {futureItems.length > 0 && (
           <>
@@ -223,6 +276,7 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
               activeView={activeView}
               expanded={expanded}
               onSelect={handleSelect}
+              badgeMap={badgeMap}
             />
           </>
         )}
@@ -250,11 +304,13 @@ function SidebarGroup({
   activeView,
   expanded,
   onSelect,
+  badgeMap,
 }: {
   items: NavItem[];
   activeView: IntelView;
   expanded: boolean;
   onSelect: (view: IntelView) => void;
+  badgeMap: Partial<Record<IntelView, { count: number; color: string }>>;
 }) {
   return (
     <ul className="space-y-0.5 px-1.5">
@@ -269,6 +325,7 @@ function SidebarGroup({
             isAction={item.isAction}
             comingSoon={item.comingSoon}
             comingSoonHint={item.comingSoonHint}
+            badge={badgeMap[item.id]}
             onClick={() => onSelect(item.id)}
           />
         </li>
@@ -285,6 +342,7 @@ function SidebarItem({
   isAction,
   comingSoon,
   comingSoonHint,
+  badge,
   onClick,
 }: {
   id: string;
@@ -295,6 +353,7 @@ function SidebarItem({
   isAction?: boolean;
   comingSoon?: boolean;
   comingSoonHint?: string;
+  badge?: { count: number; color: string };
   onClick: () => void;
 }) {
   const tooltip = comingSoon
@@ -303,7 +362,12 @@ function SidebarItem({
       : `${label} — coming soon`
     : expanded
       ? undefined
-      : label;
+      : badge
+        ? `${label} (${badge.count})`
+        : label;
+
+  // Format badge count compactly: 99+ cap for UI space
+  const badgeText = badge ? (badge.count > 99 ? '99+' : String(badge.count)) : '';
 
   return (
     <button
@@ -344,6 +408,23 @@ function SidebarItem({
           data-size="meta"
         >
           Soon
+        </span>
+      )}
+      {expanded && badge && !comingSoon && (
+        <span
+          className="ml-auto flex-shrink-0 rounded px-1.5 py-0.5 font-mono tabular-nums"
+          style={{
+            fontSize: '10px',
+            color: badge.color,
+            background: `${badge.color}18`,
+            border: `1px solid ${badge.color}35`,
+            fontWeight: 600,
+            letterSpacing: '0.02em',
+          }}
+          data-size="meta"
+          aria-label={`${badge.count} items`}
+        >
+          {badgeText}
         </span>
       )}
     </button>

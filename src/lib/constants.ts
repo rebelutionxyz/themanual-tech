@@ -62,6 +62,17 @@ export const REALM_COLORS: Record<Realm, string> = {
   Power: '#C94C4C',   // crimson — authority, sovereignty
 };
 
+/**
+ * BEE_COLOR — soft amber, honey family.
+ * Used for user-authored content (My Threads), profile identity, and any
+ * "this is you / yours" affordance. Distinct from BLiNG! honey (#FAD15E)
+ * and Saved gold — lives in the same warm family without competing.
+ *
+ * v1: single fixed color for all Bees. Future: per-Bee chosen color
+ * stored in bees.accent_color with this as the default.
+ */
+export const BEE_COLOR = '#E8B86E';
+
 export const KETTLE_STATES: KettleState[] = [
   'Sourced',
   'Accepted',

@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useManualData } from '@/lib/useManualData';
 import { RealmBar } from '@/components/intel/RealmBar';
 import { IntelSidebar, type IntelView } from '@/components/intel/IntelSidebar';
@@ -10,14 +10,31 @@ import type { Front } from '@/types/manual';
 /**
  * Shared layout for all INTEL routes.
  * Keeps left INTEL sidebar + top realm bar visible across:
- *   /intel          → thread list
+ *   /intel          → thread list (activeView drives sort/mode)
+ *   /intel/mine     → my threads (author = current Bee)
+ *   /intel/saved    → saved threads (reserved — state-only today, URL planned)
  *   /intel/new      → composer
  *   /intel/t/:id    → thread detail
  *
  * Child routes render inside the <Outlet />.
+ *
+ * URL ↔ activeView sync: dedicated sub-routes (like /intel/mine) set the
+ * corresponding activeView + clear realm filters on entry. This makes views
+ * shareable, bookmarkable, and refresh-safe. Future views (saved, following,
+ * forme) should follow the same pattern — see VIEW_ROUTE_MAP below.
  */
+
+// Map sub-routes → view identity. Extend here when adding new top-level INTEL views.
+const VIEW_ROUTE_MAP: Record<string, IntelView> = {
+  '/intel/mine': 'mythreads',
+};
+
+// Views that should show "unfiltered across all realms" (wipe realm/front/L2/L3 on entry).
+const UNFILTERED_VIEWS: IntelView[] = ['mythreads', 'saved', 'home'];
+
 export function IntelLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { atoms, loaded } = useManualData();
 
   const {
@@ -31,6 +48,25 @@ export function IntelLayout() {
     setL3,
     setActiveView,
   } = useIntelStore();
+
+  // URL → activeView sync. When the user navigates to /intel/mine directly
+  // (deep link, refresh, shared URL), promote that route's view into store
+  // state and clear realm filters so the view presents cleanly.
+  useEffect(() => {
+    const view = VIEW_ROUTE_MAP[location.pathname];
+    if (view && view !== activeView) {
+      setActiveView(view);
+      if (UNFILTERED_VIEWS.includes(view)) {
+        setRealm(null);
+        setFront(null);
+        setL2(null);
+        setL3(null);
+      }
+    }
+    // Intentionally exclude activeView from deps — we only want to react to
+    // route changes, not state-driven activeView changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   // L2 options per realm, computed from atoms
   const realmSubs = useMemo(() => {
@@ -52,8 +88,16 @@ export function IntelLayout() {
       navigate(buildNewThreadUrl(selectedRealm, selectedFront, selectedL2));
       return;
     }
-    // If we're not on /intel root, navigate there
-    if (window.location.pathname !== '/intel') {
+
+    // Route-backed views: navigate to their dedicated URL. useEffect above
+    // picks up the path change and syncs activeView + clears filters.
+    if (view === 'mythreads') {
+      navigate('/intel/mine');
+      return;
+    }
+
+    // Non-route views: ensure we're on /intel root, then set state directly.
+    if (location.pathname !== '/intel') {
       navigate('/intel');
     }
     // "Home" resets all realm/front/L2/L3 filters (fully unfiltered view)
@@ -61,6 +105,14 @@ export function IntelLayout() {
       setRealm(null);
       setFront(null);
       setL2(null);
+      setL3(null);
+    }
+    // Saved view: clear filters too (best practice — "show me mine everywhere")
+    if (view === 'saved') {
+      setRealm(null);
+      setFront(null);
+      setL2(null);
+      setL3(null);
     }
     setActiveView(view);
   }
@@ -78,20 +130,25 @@ export function IntelLayout() {
           selectedL2={selectedL2}
           onSelectRealm={(r) => {
             setRealm(r);
-            if (window.location.pathname !== '/intel') {
+            // When user picks a realm from /intel/mine (or any sub-route),
+            // return to the main /intel root so realm filter applies.
+            if (location.pathname !== '/intel') {
               navigate('/intel');
+              setActiveView('hot');
             }
           }}
           onSelectFront={(f) => {
             setFront(f);
-            if (window.location.pathname !== '/intel') {
+            if (location.pathname !== '/intel') {
               navigate('/intel');
+              setActiveView('hot');
             }
           }}
           onSelectL2={(l2) => {
             setL2(l2);
-            if (window.location.pathname !== '/intel') {
+            if (location.pathname !== '/intel') {
               navigate('/intel');
+              setActiveView('hot');
             }
           }}
           onResetL3={() => setL3(null)}

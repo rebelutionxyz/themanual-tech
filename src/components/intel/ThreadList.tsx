@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MessageSquare, Lock, Clock, Bookmark, BookmarkCheck } from 'lucide-react';
-import { listThreads, listThreadsByIds, relativeTime, type ForumThread } from '@/lib/intel';
+import { MessageSquare, Lock, Clock, Bookmark, BookmarkCheck, Share2, Check } from 'lucide-react';
+import { listThreads, listThreadsByIds, listThreadIdsByAuthor, relativeTime, type ForumThread } from '@/lib/intel';
 import {
   listSavedThreadIds,
   toggleSave,
   isSavedBatch,
   getReactionsBatch,
+  createShareLink,
   type ReactionSummary,
 } from '@/lib/reactions';
 import { ReactionBar } from '@/components/intel/ReactionBar';
@@ -14,7 +15,7 @@ import { useManualData } from '@/lib/useManualData';
 import { useIntelStore } from '@/stores/useIntelStore';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { KETTLE_COLORS, FRONT_COLORS, REALM_COLORS } from '@/lib/constants';
+import { KETTLE_COLORS, FRONT_COLORS, REALM_COLORS, BEE_COLOR } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { Front } from '@/types/manual';
 
@@ -27,6 +28,8 @@ interface ThreadListProps {
   timeWindowHours?: number;
   /** When true, list only threads this Bee has saved. Ignores realm filters. */
   savedMode?: boolean;
+  /** When true, list only threads authored by this Bee, newest first. Ignores realm filters. */
+  myThreadsMode?: boolean;
 }
 
 export function ThreadList({
@@ -37,6 +40,7 @@ export function ThreadList({
   sortBy = 'hot',
   timeWindowHours = 0,
   savedMode = false,
+  myThreadsMode = false,
 }: ThreadListProps) {
   const { atoms } = useManualData();
   const { bee } = useAuth();
@@ -57,6 +61,8 @@ export function ThreadList({
     });
     try {
       await toggleSave('intel', threadId, bee.id);
+      // Notify sidebar to refresh Saved badge count
+      window.dispatchEvent(new CustomEvent('intel-counts-refresh'));
     } catch (err) {
       // Rollback
       console.warn('toggleSave failed:', err);
@@ -114,25 +120,33 @@ export function ThreadList({
     setSavedIds(new Set());
     setReactionSummaries(new Map());
 
-    // Saved mode: get Bee's saved thread IDs, then fetch those threads
-    // via the shared helper which handles mapping + author enrichment.
-    const threadPromise: Promise<ForumThread[]> = savedMode
-      ? bee?.id
-        ? (async () => {
-            const ids = await listSavedThreadIds(bee.id);
-            return listThreadsByIds(ids);
-          })()
-        : Promise.resolve([] as ForumThread[])
-      : listThreads(
-          {
-            realm: selectedRealm,
-            front: selectedFront,
-            l2: selectedL2,
-            sortBy,
-            timeWindowHours,
-          },
-          atomIdsInRealm,
-        );
+    // Mode dispatch: savedMode → Bee's bookmarks; myThreadsMode → Bee's authored;
+    // otherwise → standard filtered listing.
+    const threadPromise: Promise<ForumThread[]> =
+      savedMode
+        ? bee?.id
+          ? (async () => {
+              const ids = await listSavedThreadIds(bee.id);
+              return listThreadsByIds(ids);
+            })()
+          : Promise.resolve([] as ForumThread[])
+        : myThreadsMode
+          ? bee?.id
+            ? (async () => {
+                const ids = await listThreadIdsByAuthor(bee.id);
+                return listThreadsByIds(ids);
+              })()
+            : Promise.resolve([] as ForumThread[])
+          : listThreads(
+              {
+                realm: selectedRealm,
+                front: selectedFront,
+                l2: selectedL2,
+                sortBy,
+                timeWindowHours,
+              },
+              atomIdsInRealm,
+            );
 
     threadPromise
       .then(async (result) => {
@@ -211,7 +225,7 @@ export function ThreadList({
     return () => {
       cancelled = true;
     };
-  }, [selectedRealm, selectedFront, selectedL2, sortBy, timeWindowHours, atomIdsInRealm, savedMode, bee?.id]);
+  }, [selectedRealm, selectedFront, selectedL2, sortBy, timeWindowHours, atomIdsInRealm, savedMode, myThreadsMode, bee?.id]);
 
   if (error) {
     return (
@@ -229,6 +243,7 @@ export function ThreadList({
         realm={selectedRealm}
         front={selectedFront}
         savedMode={savedMode}
+        myThreadsMode={myThreadsMode}
       />
     );
   if (threads.length === 0)
@@ -239,6 +254,7 @@ export function ThreadList({
         l2={selectedL2}
         l3={selectedL3}
         savedMode={savedMode}
+        myThreadsMode={myThreadsMode}
         signedIn={Boolean(bee?.id)}
       />
     );
@@ -486,11 +502,12 @@ function ThreadCard({
               </div>
             )}
           </div>
-          {/* Top-right actions: lock indicator + bookmark button */}
-          <div className="flex flex-shrink-0 items-start gap-2">
+          {/* Top-right actions: lock indicator + share + bookmark */}
+          <div className="flex flex-shrink-0 items-start gap-0.5">
             {thread.isLocked && (
-              <Lock size={14} className="mt-1 text-text-muted" />
+              <Lock size={14} className="mt-1.5 mr-1 text-text-muted" />
             )}
+            <CardShareButton threadId={thread.id} />
             {canSave && (
               <button
                 type="button"
@@ -560,6 +577,86 @@ function ThreadCard({
   );
 }
 
+/**
+ * Small icon-only share button for thread cards. Mirrors the bookmark icon's
+ * visual weight. Stops propagation so the click doesn't open the thread.
+ * Shows a Check icon for 2s after successful copy/share.
+ */
+function CardShareButton({ threadId }: { threadId: string }) {
+  const { bee } = useAuth();
+  const [copied, setCopied] = useState(false);
+  const [pending, setPending] = useState(false);
+
+  async function handleShare(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (pending) return;
+    setPending(true);
+    try {
+      const absoluteUrl = `${window.location.origin}/intel/t/${threadId}`;
+      const shareUrl = bee
+        ? await createShareLink('intel', threadId, bee.id, absoluteUrl)
+        : absoluteUrl;
+
+      // navigator.share on mobile, clipboard elsewhere
+      if (navigator.share) {
+        try {
+          await navigator.share({ url: shareUrl });
+          setCopied(true);
+        } catch {
+          await copyToClipboardFallback(shareUrl);
+          setCopied(true);
+        }
+      } else {
+        await copyToClipboardFallback(shareUrl);
+        setCopied(true);
+      }
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.warn('Card share failed:', err);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleShare}
+      disabled={pending}
+      className={cn(
+        'rounded-md p-1.5 transition-colors',
+        copied
+          ? 'text-kettle-sourced hover:bg-kettle-sourced/10'
+          : 'text-text-muted hover:bg-bg hover:text-text-silver',
+        pending && 'opacity-60',
+      )}
+      title={copied ? 'Link copied' : bee ? 'Share with affiliate tracking' : 'Copy share link'}
+      aria-label={copied ? 'Link copied' : 'Share thread'}
+    >
+      {copied ? <Check size={15} /> : <Share2 size={15} />}
+    </button>
+  );
+}
+
+async function copyToClipboardFallback(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+  } finally {
+    document.body.removeChild(ta);
+  }
+}
+
 function MetaPill({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <span
@@ -577,20 +674,25 @@ function ThreadListSkeleton({
   realm,
   front,
   savedMode = false,
+  myThreadsMode = false,
 }: {
   realm: string | null;
   front: Front | null;
   savedMode?: boolean;
+  myThreadsMode?: boolean;
 }) {
   // Match ThreadCard accent-color logic for visual continuity between
-  // skeleton → real cards. Saved mode uses honey gold.
+  // skeleton → real cards. Saved mode uses honey gold. My Threads uses
+  // soft amber (Bee color) — your output, earned, honey-family.
   const accentColor = savedMode
     ? '#FAD15E'
-    : front && FRONT_COLORS[front]
-      ? FRONT_COLORS[front]
-      : realm && REALM_COLORS[realm as keyof typeof REALM_COLORS]
-        ? REALM_COLORS[realm as keyof typeof REALM_COLORS]
-        : '#6B94C8'; // INTEL blue default
+    : myThreadsMode
+      ? BEE_COLOR
+      : front && FRONT_COLORS[front]
+        ? FRONT_COLORS[front]
+        : realm && REALM_COLORS[realm as keyof typeof REALM_COLORS]
+          ? REALM_COLORS[realm as keyof typeof REALM_COLORS]
+          : '#6B94C8'; // INTEL blue default
 
   // Randomized widths to feel like real content rather than uniform bars
   const cards = [
@@ -671,6 +773,7 @@ function EmptyThreads({
   l2,
   l3,
   savedMode = false,
+  myThreadsMode = false,
   signedIn = true,
 }: {
   realm: string | null;
@@ -678,8 +781,96 @@ function EmptyThreads({
   l2: string | null;
   l3: string | null;
   savedMode?: boolean;
+  myThreadsMode?: boolean;
   signedIn?: boolean;
 }) {
+  // My Threads empty state — soft amber (Bee color). Your output earns honey.
+  // Frame as invitation, not absence: "your first thread is waiting."
+  if (myThreadsMode) {
+    const signedOut = !signedIn;
+    const headline = signedOut ? 'Sign in to see your threads' : 'Your first thread is waiting';
+    const subtext = signedOut
+      ? 'Threads you author are tied to your Bee account. Sign in to start posting and earning BLiNG!.'
+      : 'Start a thread from any realm. Every thread you post earns Drops — productive action, rewarded.';
+    return (
+      <div
+        className="rounded-lg border-2 border-dashed p-8 text-center"
+        style={{
+          borderColor: `${BEE_COLOR}40`,
+          background: `${BEE_COLOR}08`,
+        }}
+      >
+        {/* Hex honeycomb cell, subtle — nod to Bee identity */}
+        <div className="mx-auto mb-4 flex items-center justify-center">
+          <svg width="36" height="40" viewBox="0 0 36 40" xmlns="http://www.w3.org/2000/svg">
+            <polygon
+              points="18,2 34,11 34,29 18,38 2,29 2,11"
+              fill="none"
+              stroke={BEE_COLOR}
+              strokeWidth="1.5"
+              opacity="0.7"
+            />
+            <polygon
+              points="18,10 26,14.5 26,23.5 18,28 10,23.5 10,14.5"
+              fill={BEE_COLOR}
+              opacity="0.25"
+            />
+          </svg>
+        </div>
+        <div
+          className="mb-3 inline-block rounded px-2 py-0.5 font-mono uppercase tracking-widest"
+          style={{
+            fontSize: '10px',
+            color: BEE_COLOR,
+            background: `${BEE_COLOR}15`,
+          }}
+          data-size="meta"
+        >
+          MY THREADS
+        </div>
+        <p
+          className="mb-2 font-display text-text-silver-bright"
+          style={{ fontSize: '17px', fontWeight: 500 }}
+        >
+          {headline}
+        </p>
+        <p
+          className="mx-auto max-w-md text-text-dim"
+          style={{ fontSize: '13px', lineHeight: '1.5' }}
+        >
+          {subtext}
+        </p>
+        {signedOut ? (
+          <Link
+            to="/login"
+            className="mt-5 inline-flex items-center gap-1.5 rounded-md border-2 px-4 py-1.5 transition-colors hover:brightness-110"
+            style={{
+              borderColor: `${BEE_COLOR}70`,
+              color: BEE_COLOR,
+              fontSize: '12px',
+              fontWeight: 600,
+            }}
+          >
+            Sign in
+          </Link>
+        ) : (
+          <Link
+            to="/intel"
+            className="mt-5 inline-flex items-center gap-1.5 rounded-md border-2 px-4 py-1.5 transition-colors hover:brightness-110"
+            style={{
+              borderColor: `${BEE_COLOR}70`,
+              color: BEE_COLOR,
+              fontSize: '12px',
+              fontWeight: 600,
+            }}
+          >
+            Start a thread
+          </Link>
+        )}
+      </div>
+    );
+  }
+
   // Saved-mode empty state — different messaging, honey-gold theming
   if (savedMode) {
     const signedOut = !signedIn;

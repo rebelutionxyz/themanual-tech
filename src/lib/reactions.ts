@@ -239,6 +239,19 @@ export async function listSavedThreadIds(beeId: string): Promise<string[]> {
   return data.map((r) => String(r.source_id));
 }
 
+/**
+ * Count of threads the Bee has saved. Used for sidebar badge.
+ * Uses head+count for efficiency — no row payload transferred.
+ */
+export async function countSavedThreads(beeId: string): Promise<number> {
+  if (!supabase || !beeId) return 0;
+  const { count } = await supabase
+    .from('entity_saves')
+    .select('*', { count: 'exact', head: true })
+    .eq('bee_id', beeId);
+  return count ?? 0;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // SHARES — Generate shareable URL with attribution token
 // (Per Universal Post Architecture: Fibonacci weights applied at resolution)

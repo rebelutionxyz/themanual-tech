@@ -232,6 +232,8 @@ export function IntelPage() {
                 },
                 bee.id,
               );
+              // Notify sidebar to refresh My Threads badge count
+              window.dispatchEvent(new CustomEvent('intel-counts-refresh'));
               navigate(`/intel/t/${newId}`);
               return true;
             } catch (err) {
@@ -316,6 +318,7 @@ export function IntelPage() {
         sortBy={sortBy}
         timeWindowHours={activeWindow}
         savedMode={activeView === 'saved'}
+        myThreadsMode={activeView === 'mythreads'}
       />
     </div>
   );
