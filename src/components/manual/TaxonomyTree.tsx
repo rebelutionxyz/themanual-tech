@@ -1,7 +1,7 @@
 import { useState, memo, useCallback } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { Atom, TreeNode } from '@/types/manual';
-import { FRONT_CLASS, KETTLE_COLORS } from '@/lib/constants';
+import { KETTLE_COLORS } from '@/lib/constants';
 import { cn, formatCount } from '@/lib/utils';
 
 export type TreeSelectMode = 'single-path' | 'multi-atom';
@@ -11,7 +11,7 @@ export interface TaxonomyTreeProps {
   root: TreeNode;
   /** Single-path mode: used for filter (pick one branch). Multi-atom: used for composer (pick many atoms). */
   mode: TreeSelectMode;
-  /** Selected path (single-path mode) — e.g. "Power / INVESTIGATE / 9/11" */
+  /** Selected path (single-path mode) — e.g. "Justice / Government / Accountability" */
   selectedPath?: string;
   /** Selected atom IDs (multi-atom mode) */
   selectedAtomIds?: Set<string>;
@@ -151,8 +151,6 @@ const TreeBranch = memo(function TreeBranch({
 }: TreeBranchProps) {
   const isExpanded = expanded.has(node.path);
   const hasChildren = node.children.length > 0 || node.atoms.length > 0;
-  const isFrontNode = node.front !== undefined && node.depth === 2;
-  const frontClass = isFrontNode && node.front ? FRONT_CLASS[node.front] : undefined;
   const reachedDepthLimit = maxDepth > 0 && depth >= maxDepth;
 
   const isSelectedInPath = mode === 'single-path' && selectedPath === node.path;
@@ -193,11 +191,9 @@ const TreeBranch = memo(function TreeBranch({
         <span
           className={cn(
             'truncate',
-            isFrontNode && 'font-display tracking-wide',
-            isFrontNode && frontClass,
-            !isFrontNode && depth === 0 && 'font-medium text-text',
-            !isFrontNode && depth === 1 && 'text-text-silver',
-            !isFrontNode && depth >= 2 && 'text-text-dim',
+            depth === 0 && 'font-medium text-text',
+            depth === 1 && 'text-text-silver',
+            depth >= 2 && 'text-text-dim',
             isSelectedInPath && 'text-text',
           )}
           style={{ fontSize }}

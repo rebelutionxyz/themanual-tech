@@ -7,30 +7,26 @@ import { TimeWindowBar } from '@/components/intel/TimeWindowBar';
 import { useIntelStore } from '@/stores/useIntelStore';
 import { useAuth } from '@/lib/auth';
 import { createThread } from '@/lib/intel';
-import { FRONT_COLORS } from '@/lib/constants';
+import { REALM_NAMES, REALM_ID_BY_NAME } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import type { Front } from '@/types/manual';
 
 const INTEL_COLOR = '#6B94C8';
 
 /**
  * Thread list page. Sidebar + realm bar provided by IntelLayout.
- * Renders a breadcrumb-style header (no redundant "Discussion" title).
  */
 export function IntelPage() {
   const { bee } = useAuth();
   const navigate = useNavigate();
 
   const {
-    selectedRealm,
-    selectedFront,
+    selectedRealmId,
     selectedL2,
     selectedL3,
     activeView,
     hotWindow,
     breakingWindow,
-    setRealm,
-    setFront,
+    setRealmId,
     setL2,
     setL3,
     setHotWindow,
@@ -40,14 +36,14 @@ export function IntelPage() {
   const sortBy: 'hot' | 'new' | 'top' =
     activeView === 'new' ? 'new' : 'hot';
 
-  // Active time window depends on view. Home/following/saved/etc. use 0 (all-time).
   const activeWindow =
     activeView === 'hot' ? hotWindow : activeView === 'new' ? breakingWindow : 0;
 
-  // Build breadcrumb segments based on what's selected
+  const realmName = selectedRealmId ? REALM_NAMES[selectedRealmId] : null;
+
   const crumbs: BreadcrumbSegment[] = [];
 
-  if (!selectedRealm) {
+  if (!selectedRealmId) {
     crumbs.push({
       label: 'All Realms',
       clickable: false,
@@ -55,28 +51,14 @@ export function IntelPage() {
     });
   } else {
     crumbs.push({
-      label: selectedRealm,
-      clickable: !!(selectedFront || selectedL2 || selectedL3),
-      isDeepest: !selectedFront && !selectedL2 && !selectedL3,
+      label: realmName ?? selectedRealmId,
+      clickable: !!(selectedL2 || selectedL3),
+      isDeepest: !selectedL2 && !selectedL3,
       onClick: () => {
-        setFront(null);
         setL2(null);
         setL3(null);
       },
     });
-
-    if (selectedFront) {
-      crumbs.push({
-        label: selectedFront,
-        color: FRONT_COLORS[selectedFront],
-        clickable: !!(selectedL2 || selectedL3),
-        isDeepest: !selectedL2 && !selectedL3,
-        onClick: () => {
-          setL2(null);
-          setL3(null);
-        },
-      });
-    }
 
     if (selectedL2) {
       crumbs.push({
@@ -98,17 +80,18 @@ export function IntelPage() {
     }
   }
 
-  // Placeholder screens for coming-soon views
   if (activeView === 'forme' || activeView === 'prize' || activeView === 'following') {
     return <ComingSoonView view={activeView} />;
   }
 
+  const subjectLabel = realmName
+    ? `${realmName}${selectedL2 ? ` · ${selectedL2}` : ''}`
+    : null;
+
   return (
     <div className="safe-pad-x mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">
-      {/* Breadcrumb header row */}
       <div className="mb-6 flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          {/* Small surface meta */}
           <div
             className="mb-1 font-mono uppercase tracking-widest"
             style={{ fontSize: '11px', color: INTEL_COLOR, opacity: 0.7 }}
@@ -120,26 +103,23 @@ export function IntelPage() {
             {activeView === 'saved' && '· Saved'}
           </div>
 
-          {/* Big breadcrumb — responsive sizing: tight on mobile, bold on desktop */}
           <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 sm:gap-x-1">
             <button
               type="button"
               onClick={() => {
-                setRealm(null);
-                setFront(null);
+                setRealmId(null);
                 setL2(null);
                 setL3(null);
               }}
               title="Back to all INTEL"
               className={cn(
                 'font-display tracking-wide border-b border-dotted transition-all',
-                selectedRealm
+                selectedRealmId
                   ? 'border-transparent text-text-muted hover:border-current hover:text-text-silver-bright hover:brightness-125'
                   : 'cursor-default border-transparent text-text-silver-bright',
-                // Responsive: 17px mobile, 22px desktop
                 'text-[17px] sm:text-[22px]',
               )}
-              disabled={!selectedRealm}
+              disabled={!selectedRealmId}
             >
               Home
             </button>
@@ -156,7 +136,6 @@ export function IntelPage() {
                     title={`Back to ${crumb.label}`}
                     className={cn(
                       'font-display tracking-wide border-b border-dotted border-transparent transition-all hover:border-current hover:brightness-125 break-words',
-                      // Parent crumb: 15px mobile, 22px desktop
                       crumb.isDeepest
                         ? 'text-[20px] sm:text-[26px]'
                         : 'text-[15px] sm:text-[22px]',
@@ -172,7 +151,6 @@ export function IntelPage() {
                   <span
                     className={cn(
                       'font-display tracking-wide break-words',
-                      // Deepest: 20px mobile, 26px desktop. Parent: 15px mobile, 22px desktop.
                       crumb.isDeepest
                         ? 'text-[20px] sm:text-[26px]'
                         : 'text-[15px] sm:text-[22px]',
@@ -193,10 +171,6 @@ export function IntelPage() {
         </div>
       </div>
 
-      {/* Inline composer — collapsed by default, click to expand. 2/3 width on ≥sm.
-          Positioned first in the body (right under breadcrumb) — posting is the
-          primary action on INTEL. Filtering/browsing tools (L3Refinement, time
-          window) live below, closer to the results they affect. */}
       <div className="mb-4 sm:mx-auto sm:w-2/3">
         <InlineComposer
           mode="thread"
@@ -206,43 +180,38 @@ export function IntelPage() {
           startCollapsed={true}
           header="Start a thread. Earn BLiNG!"
           subheader={
-            selectedRealm
-              ? `Posting in ${selectedRealm}${selectedFront ? ` · ${selectedFront}` : ''}${selectedL2 ? ` · ${selectedL2}` : ''}`
-              : 'Posting to INTEL'
+            subjectLabel ? `Posting in ${subjectLabel}` : 'Posting to INTEL'
           }
           collapsedContextLabel={
-            selectedRealm
-              ? `Post to INTEL / ${selectedRealm}${selectedFront ? ` / ${selectedFront}` : ''}${selectedL2 ? ` / ${selectedL2}` : ''}`
+            subjectLabel
+              ? `Post to INTEL / ${subjectLabel.replace(' · ', ' / ')}`
               : 'Post to INTEL'
           }
           collapsedBodyLine="Share your thought..."
           placeholderCollapsed={
-            selectedRealm
-              ? `Start a thread in ${selectedRealm}${selectedFront ? ` · ${selectedFront}` : ''}. Earn BLiNG!`
+            subjectLabel
+              ? `Start a thread in ${subjectLabel}. Earn BLiNG!`
               : 'Start a thread. Earn BLiNG!'
           }
           placeholderTitle="What's on your mind?"
           inheritedContext={{
-            realm: selectedRealm,
-            front: selectedFront,
+            realmId: selectedRealmId,
             l2: selectedL2,
           }}
-          onSubmit={async ({ title, body, atomIds, categoryPaths, realm, front, l2 }) => {
+          onSubmit={async ({ title, body, atomIds, categoryPaths, realmId, l2 }) => {
             if (!bee || !title) return false;
             try {
               const newId = await createThread(
                 {
                   title,
                   body,
-                  primaryRealm: realm,
-                  primaryFront: front,
+                  primaryRealm: realmId,
                   primaryL2: l2,
                   atomIds,
                   categoryPaths,
                 },
                 bee.id,
               );
-              // Notify sidebar to refresh My Threads badge count
               window.dispatchEvent(new CustomEvent('intel-counts-refresh'));
               navigate(`/intel/t/${newId}`);
               return true;
@@ -254,60 +223,27 @@ export function IntelPage() {
         />
       </div>
 
-      {/* L3 refinement row + optional tree drill — below composer, closer to results */}
       <L3Refinement
-        selectedRealm={selectedRealm}
-        selectedFront={selectedFront}
+        selectedRealmId={selectedRealmId}
         selectedL2={selectedL2}
         selectedL3={selectedL3}
         onSelectL3={setL3}
         onSelectPath={(path) => {
-          // Parse "Realm / Something / L3 / ..." and update the store so the
-          // whole UI (breadcrumb, realm bar, flat L3 bar, composer context)
-          // reflects the drilled-to position.
-          //
-          // Path shapes we handle:
-          //   "Power"                              → realm only
-          //   "Power / Activism"                   → realm + L2
-          //   "Power / INVESTIGATE"                → realm + Front
-          //   "Power / Activism / Civic Education" → realm + L2 + L3
-          //   "Power / INVESTIGATE / 9/11"         → realm + Front + L3
-          //   "Body / Nutrition / Hydration"       → realm + L2 + L3
-          //   Anything deeper → keep L3 at parts[2], ignore deeper for filter
           const parts = path.split(' / ').map((s) => s.trim()).filter(Boolean);
           if (parts.length === 0) return;
 
-          const FRONTS = [
-            'UNITE & RULE',
-            'INVESTIGATE',
-            'THE NEW WORLD ORDER',
-            'PROSECUTE',
-            'THE DEEP STATE',
-          ];
+          const realmId = REALM_ID_BY_NAME[parts[0]];
+          if (!realmId) return;
 
-          // Always set the realm
-          setRealm(parts[0]);
-
-          // Clear deeper selections first, then reapply based on path depth
-          setFront(null);
+          setRealmId(realmId);
           setL2(null);
           setL3(null);
 
-          if (parts.length >= 2) {
-            const second = parts[1];
-            if (FRONTS.includes(second)) {
-              setFront(second as Front);
-            } else {
-              setL2(second);
-            }
-          }
-          if (parts.length >= 3) {
-            setL3(parts[2]);
-          }
+          if (parts.length >= 2) setL2(parts[1]);
+          if (parts.length >= 3) setL3(parts[2]);
         }}
       />
 
-      {/* Time window dropdown — above thread list, only for Hot/Breaking views */}
       {(activeView === 'hot' || activeView === 'new') && (
         <TimeWindowBar
           value={activeView === 'hot' ? hotWindow : breakingWindow}
@@ -319,10 +255,8 @@ export function IntelPage() {
         />
       )}
 
-      {/* Thread list */}
       <ThreadList
-        selectedRealm={selectedRealm}
-        selectedFront={selectedFront}
+        selectedRealmId={selectedRealmId}
         selectedL2={selectedL2}
         selectedL3={selectedL3}
         sortBy={sortBy}
@@ -350,7 +284,7 @@ function ComingSoonView({ view }: { view: 'forme' | 'prize' | 'following' }) {
         'Your personalized INTEL feed. Pick the atoms, realms, and pillars you want to follow — your "For Me" view will be the union of everything you subscribe to.',
       bullets: [
         'Subscribe to atoms (9/11, JFK, Epstein, Fed, etc.)',
-        'Subscribe to realms or Fronts (Power · INVESTIGATE)',
+        'Subscribe to realms (Justice, Tech, Religion, etc.)',
         'Subscribe to pillars (Rebelution, FreedomBLiNGs)',
         'Follow specific Bees (coming with Following)',
       ],
@@ -377,7 +311,7 @@ function ComingSoonView({ view }: { view: 'forme' | 'prize' | 'following' }) {
       bullets: [
         'Follow any Bee from their profile',
         'See only threads authored by Bees you follow',
-        'Combines with realm filters (follow a Bee, view their Power threads)',
+        'Combines with realm filters (follow a Bee, view their Justice threads)',
         'Unfollow anytime',
       ],
       cta: 'Browse Bees',

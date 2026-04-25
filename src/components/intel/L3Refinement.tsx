@@ -1,17 +1,13 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Network } from 'lucide-react';
 import { useManualData } from '@/lib/useManualData';
-import { FRONT_ORDER } from '@/lib/constants';
 import { ScrollRow } from '@/components/ui/ScrollRow';
 import { TaxonomyTree, findNodeByPath } from '@/components/manual/TaxonomyTree';
 import { cn } from '@/lib/utils';
-import type { Front } from '@/types/manual';
-
-const FRONT_SET = new Set<string>(FRONT_ORDER);
+import type { RealmId, TreeNode } from '@/types/manual';
 
 interface L3RefinementProps {
-  selectedRealm: string | null;
-  selectedFront: Front | null;
+  selectedRealmId: RealmId | null;
   selectedL2: string | null;
   selectedL3: string | null;
   onSelectL3: (l3: string | null) => void;
@@ -21,12 +17,11 @@ interface L3RefinementProps {
 /**
  * L3 refinement row + optional tree drill.
  *
- * Flat scroll bar (always shown when context has L3 options).
- * Tree toggle opens an inline tree scoped to the current context below the scroll bar.
+ * Shown when realm + L2 are selected — flat list of L3 options under that L2.
+ * Tree toggle opens an inline tree scoped to the current context below the bar.
  */
 export function L3Refinement({
-  selectedRealm,
-  selectedFront,
+  selectedRealmId,
   selectedL2,
   selectedL3,
   onSelectL3,
@@ -35,62 +30,31 @@ export function L3Refinement({
   const { atoms, tree } = useManualData();
   const [treeOpen, setTreeOpen] = useState(false);
 
-  // User controls open/close via the Drill Deeper button. No auto-close
-  // based on selection state — that caused "flash" behavior where the tree
-  // would open and immediately close.
-
   const l3Options = useMemo(() => {
-    // Flat L3 list for either L2 OR Front context (no double-counting — they're exclusive)
-    const hasL2Context = selectedRealm && selectedL2;
-    const hasFrontContext = selectedRealm && selectedFront && !selectedL2;
-    if (!hasL2Context && !hasFrontContext) return [] as string[];
-
+    if (!selectedRealmId || !selectedL2) return [] as string[];
     const set = new Set<string>();
     for (const a of atoms) {
-      if (a.realm !== selectedRealm) continue;
-      if (selectedFront && a.front !== selectedFront) continue;
-      if (selectedL2 && a.L2 !== selectedL2) continue;
-      if (!a.L3) continue;
-      if (FRONT_SET.has(a.L3)) continue;
-      set.add(a.L3);
+      if (a.realmId !== selectedRealmId) continue;
+      if (a.pathParts[1] !== selectedL2) continue;
+      const l3 = a.pathParts[2];
+      if (l3) set.add(l3);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [atoms, selectedRealm, selectedFront, selectedL2]);
+  }, [atoms, selectedRealmId, selectedL2]);
 
-  // Build the tree scope: scope to the deepest selected level.
-  //  - If L3 is selected → show L3 node (children are L4s)
-  //  - Else if Front or L2 is selected → show that node (children are L3s)
-  //  - Else if only realm is selected → show realm (children are L2s + Fronts)
-  //  - Else (no realm) → null (no scope)
-  //
-  // We use path-based lookup instead of name-based to avoid ambiguity
-  // (e.g., "Tools" appears in many L2s — name alone isn't unique).
-  const treeRoot = useMemo(() => {
-    if (!tree || !selectedRealm) return null;
-    const realmNode = tree.children.find((c) => c.name === selectedRealm);
+  const treeRoot = useMemo<TreeNode | null>(() => {
+    if (!tree || !selectedRealmId) return null;
+    const realmNode = tree.children.find((c) => c.realmId === selectedRealmId);
     if (!realmNode) return null;
 
-    // Build the deepest unambiguous path from selected context
-    let scopePath = selectedRealm;
-    if (selectedFront) {
-      scopePath = `${selectedRealm} / ${selectedFront}`;
-    } else if (selectedL2) {
-      scopePath = `${selectedRealm} / ${selectedL2}`;
-    }
-    if (selectedL3) {
-      scopePath = `${scopePath} / ${selectedL3}`;
-    }
+    let scopePath = realmNode.path;
+    if (selectedL2) scopePath = `${scopePath} / ${selectedL2}`;
+    if (selectedL3) scopePath = `${scopePath} / ${selectedL3}`;
 
-    // Try exact path lookup (most reliable)
     const exact = findNodeByPath(tree, scopePath);
     if (exact) return exact;
 
-    // Fallback: if path lookup fails (rare — L3 under Front might nest differently),
-    // walk down from realm using best-effort name matching
-    function findByName(
-      node: import('@/types/manual').TreeNode,
-      name: string,
-    ): import('@/types/manual').TreeNode | null {
+    function findByName(node: TreeNode, name: string): TreeNode | null {
       if (node.name === name) return node;
       for (const child of node.children) {
         const found = findByName(child, name);
@@ -99,32 +63,22 @@ export function L3Refinement({
       return null;
     }
 
-    let scope: import('@/types/manual').TreeNode = realmNode;
-    if (selectedFront) {
-      const frontNode = realmNode.children.find((c) => c.name === selectedFront);
-      if (frontNode) scope = frontNode;
-    } else if (selectedL2) {
+    let scope: TreeNode = realmNode;
+    if (selectedL2) {
       const direct = realmNode.children.find((c) => c.name === selectedL2);
       scope = direct ?? findByName(realmNode, selectedL2) ?? realmNode;
     }
-
     if (selectedL3) {
       const l3Node = findByName(scope, selectedL3);
       if (l3Node) return l3Node;
     }
     return scope;
-  }, [tree, selectedRealm, selectedFront, selectedL2, selectedL3]);
+  }, [tree, selectedRealmId, selectedL2, selectedL3]);
 
-  // Don't render if no flat options AND no tree root (i.e., no realm/front/l2 context)
   if (l3Options.length === 0 && !treeRoot) return null;
 
-  // Drill Deeper ONLY appears when an L3 is selected AND that L3 has further
-  // children (L4+) to drill into. Before L3 selection, the sticky realm bar
-  // and flat L3 bar already cover all visible hierarchy — drilling would just
-  // duplicate what's on screen. Once at L3, the tree is the only place to
-  // see deeper structure, so it earns its place.
   const hasDrillableContent = Boolean(
-    selectedRealm &&
+    selectedRealmId &&
       selectedL3 &&
       treeRoot &&
       treeRoot.children.length > 0,
@@ -132,7 +86,6 @@ export function L3Refinement({
 
   return (
     <div className="mb-4 space-y-2">
-      {/* Flat L3 scroll bar — only if we have L3 options for the context */}
       {l3Options.length > 0 && (
       <div className="rounded-lg border border-border bg-bg-elevated">
         <ScrollRow>
@@ -169,7 +122,6 @@ export function L3Refinement({
       </div>
       )}
 
-      {/* Drill deeper — only when tree has content that goes deeper than the flat bar */}
       {hasDrillableContent && treeRoot && (
         <div>
           <button

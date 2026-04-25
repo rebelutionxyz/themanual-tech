@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { Atom, TreeNode } from '@/types/manual';
+import type { Atom, AtomType, KettleState, RealmId, TreeNode } from '@/types/manual';
 import { buildTree } from '@/lib/tree';
+import { supabase } from '@/lib/supabase';
 
 interface ManualData {
   atoms: Atom[];
@@ -12,22 +13,83 @@ interface ManualData {
 
 let cache: ManualData | null = null;
 
+const EMPTY_TREE: TreeNode = {
+  name: 'ROOT',
+  path: '',
+  depth: 0,
+  realmId: '',
+  atoms: [],
+  children: [],
+  atomCount: 0,
+};
+
+interface AtomRow {
+  id: string;
+  name: string;
+  path: string;
+  path_parts: string[];
+  realm_id: string;
+  realm_name: string;
+  depth: number;
+  type: string;
+  kettle: string;
+  is_leaf: boolean;
+  theme_tags: string[] | null;
+  realm_tags: string[] | null;
+  pillar_tags: string[] | null;
+  skin_tags: string[] | null;
+  geo: Record<string, unknown> | null;
+  note: string | null;
+  meta: Record<string, unknown> | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+function rowToAtom(r: AtomRow): Atom {
+  return {
+    id: r.id,
+    name: r.name,
+    path: r.path,
+    pathParts: r.path_parts,
+    realmId: r.realm_id as RealmId,
+    realmName: r.realm_name,
+    depth: r.depth,
+    type: r.type as AtomType,
+    kettle: r.kettle as KettleState,
+    isLeaf: r.is_leaf,
+    themeTags: r.theme_tags ?? [],
+    realmTags: r.realm_tags ?? [],
+    pillarTags: r.pillar_tags ?? [],
+    skinTags: r.skin_tags ?? [],
+    geo: r.geo,
+    note: r.note,
+    meta: r.meta ?? {},
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+function buildThemeIndex(atoms: Atom[]): Record<string, string[]> {
+  const idx: Record<string, string[]> = {};
+  for (const a of atoms) {
+    for (const tag of a.themeTags) {
+      (idx[tag] ??= []).push(a.id);
+    }
+  }
+  return idx;
+}
+
 /**
- * Loads atoms.json + theme_index.json once, caches globally.
+ * Loads atoms from Supabase once, caches globally.
+ *
+ * Supabase enforces a 1000-row default limit per request — we page through
+ * with .range() to pull all 4,860 atoms.
  */
 export function useManualData(): ManualData {
   const [state, setState] = useState<ManualData>(
     cache ?? {
       atoms: [],
-      tree: {
-        name: 'ROOT',
-        path: '',
-        depth: 0,
-        realm: '',
-        atoms: [],
-        children: [],
-        atomCount: 0,
-      },
+      tree: EMPTY_TREE,
       themeIndex: {},
       loaded: false,
       error: null,
@@ -40,14 +102,24 @@ export function useManualData(): ManualData {
 
     (async () => {
       try {
-        const [atomsRes, tagsRes] = await Promise.all([
-          fetch('/atoms.json'),
-          fetch('/theme_index.json'),
-        ]);
-        if (!atomsRes.ok) throw new Error(`atoms.json: ${atomsRes.status}`);
-        if (!tagsRes.ok) throw new Error(`theme_index.json: ${tagsRes.status}`);
-        const atoms: Atom[] = await atomsRes.json();
-        const themeIndex: Record<string, string[]> = await tagsRes.json();
+        if (!supabase) throw new Error('Supabase not configured');
+
+        const PAGE = 1000;
+        const all: AtomRow[] = [];
+        for (let from = 0; ; from += PAGE) {
+          const { data, error } = await supabase
+            .from('atoms')
+            .select('*')
+            .order('id')
+            .range(from, from + PAGE - 1);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          all.push(...(data as AtomRow[]));
+          if (data.length < PAGE) break;
+        }
+
+        const atoms = all.map(rowToAtom);
+        const themeIndex = buildThemeIndex(atoms);
         const tree = buildTree(atoms);
 
         const data: ManualData = {

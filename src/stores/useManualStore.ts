@@ -1,10 +1,10 @@
 import { create } from 'zustand';
-import type { AtomType, KettleState, ViewMode } from '@/types/manual';
+import type { AtomType, KettleState, RealmId, ViewMode } from '@/types/manual';
 
 interface ManualState {
   view: ViewMode;
   searchQuery: string;
-  selectedRealm: string | null;
+  selectedRealmId: RealmId | null;
   selectedKettle: KettleState | null;
   selectedType: AtomType | 'all';
   selectedTags: string[];
@@ -13,7 +13,7 @@ interface ManualState {
 
   setView: (view: ViewMode) => void;
   setSearchQuery: (q: string) => void;
-  setSelectedRealm: (r: string | null) => void;
+  setSelectedRealmId: (r: RealmId | null) => void;
   setSelectedKettle: (k: KettleState | null) => void;
   setSelectedType: (t: AtomType | 'all') => void;
   toggleTag: (tag: string) => void;
@@ -28,7 +28,7 @@ interface ManualState {
 export const useManualStore = create<ManualState>()((set) => ({
   view: 'outlook',
   searchQuery: '',
-  selectedRealm: null,
+  selectedRealmId: null,
   selectedKettle: null,
   selectedType: 'all',
   selectedTags: [],
@@ -37,7 +37,7 @@ export const useManualStore = create<ManualState>()((set) => ({
 
   setView: (view) => set({ view }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
-  setSelectedRealm: (selectedRealm) => set({ selectedRealm }),
+  setSelectedRealmId: (selectedRealmId) => set({ selectedRealmId }),
   setSelectedKettle: (selectedKettle) => set({ selectedKettle }),
   setSelectedType: (selectedType) => set({ selectedType }),
   toggleTag: (tag) =>
@@ -58,7 +58,6 @@ export const useManualStore = create<ManualState>()((set) => ({
   expandPath: (path) =>
     set((s) => {
       const next = new Set(s.expandedPaths);
-      // Expand this path and all ancestors
       const parts = path.split(' / ');
       for (let i = 1; i <= parts.length; i++) {
         next.add(parts.slice(0, i).join(' / '));
@@ -69,6 +68,7 @@ export const useManualStore = create<ManualState>()((set) => ({
   clearFilters: () =>
     set({
       searchQuery: '',
+      selectedRealmId: null,
       selectedKettle: null,
       selectedType: 'all',
       selectedTags: [],

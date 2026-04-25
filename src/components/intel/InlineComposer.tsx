@@ -5,7 +5,8 @@ import { CategoryPicker } from '@/components/intel/CategoryPicker';
 import { RealmPicker, type RealmSelection } from '@/components/intel/RealmPicker';
 import { useManualData } from '@/lib/useManualData';
 import { cn } from '@/lib/utils';
-import type { Front } from '@/types/manual';
+import { REALM_NAMES } from '@/lib/constants';
+import type { RealmId } from '@/types/manual';
 
 export type ComposerMode = 'thread' | 'reply';
 
@@ -14,8 +15,7 @@ export interface InlineComposerPayload {
   body: string;
   atomIds: string[];
   categoryPaths: string[];
-  realm: string | null;
-  front: Front | null;
+  realmId: RealmId | null;
   l2: string | null;
 }
 
@@ -27,8 +27,7 @@ export interface InlineComposerProps {
   /** Initial/inherited realm context. Used as default for realm picker.
    *  In reply mode, also shown as "inherited" line. */
   inheritedContext?: {
-    realm?: string | null;
-    front?: Front | null;
+    realmId?: RealmId | null;
     l2?: string | null;
     atomIds?: string[];
   };
@@ -49,7 +48,7 @@ export interface InlineComposerProps {
   placeholderCollapsed?: string;
 
   /** Context label shown under the "Earn BLiNG!" line on collapsed state
-   *  (e.g., "Post to INTEL / Power / INVESTIGATE") */
+   *  (e.g., "Post to INTEL / Justice / Government") */
   collapsedContextLabel?: string;
 
   /** Short placeholder shown on collapsed state as the "body preview" line
@@ -85,8 +84,7 @@ export function InlineComposer({
   const [atomIds, setAtomIds] = useState<string[]>([]);
   const [categoryPaths, setCategoryPaths] = useState<string[]>([]);
   const [realmSel, setRealmSel] = useState<RealmSelection>({
-    realm: inheritedContext?.realm ?? null,
-    front: inheritedContext?.front ?? null,
+    realmId: inheritedContext?.realmId ?? null,
     l2: inheritedContext?.l2 ?? null,
   });
   const [realmManuallyOverridden, setRealmManuallyOverridden] = useState(false);
@@ -109,8 +107,7 @@ export function InlineComposer({
     const first = atoms.find((a) => a.id === atomIds[0]);
     if (!first) return null;
     return {
-      realm: first.realm,
-      front: first.front ?? null,
+      realmId: first.realmId,
       l2: null,
     } as RealmSelection;
   }, [atomIds, atoms]);
@@ -127,13 +124,11 @@ export function InlineComposer({
     if (realmManuallyOverridden) return;
     if (atomIds.length > 0) return;
     setRealmSel({
-      realm: inheritedContext?.realm ?? null,
-      front: inheritedContext?.front ?? null,
+      realmId: inheritedContext?.realmId ?? null,
       l2: inheritedContext?.l2 ?? null,
     });
   }, [
-    inheritedContext?.realm,
-    inheritedContext?.front,
+    inheritedContext?.realmId,
     inheritedContext?.l2,
     realmManuallyOverridden,
     atomIds.length,
@@ -150,10 +145,9 @@ export function InlineComposer({
         if (parsed.body) setBody(parsed.body);
         if (parsed.atomIds) setAtomIds(parsed.atomIds);
         if (parsed.categoryPaths) setCategoryPaths(parsed.categoryPaths);
-        if (parsed.realm || parsed.front || parsed.l2) {
+        if (parsed.realmId || parsed.l2) {
           setRealmSel({
-            realm: parsed.realm ?? null,
-            front: parsed.front ?? null,
+            realmId: parsed.realmId ?? null,
             l2: parsed.l2 ?? null,
           });
           if (parsed.realmManuallyOverridden) setRealmManuallyOverridden(true);
@@ -185,8 +179,7 @@ export function InlineComposer({
       body,
       atomIds,
       categoryPaths,
-      realm: realmSel.realm,
-      front: realmSel.front,
+      realmId: realmSel.realmId,
       l2: realmSel.l2,
       realmManuallyOverridden,
     });
@@ -198,8 +191,7 @@ export function InlineComposer({
     body,
     atomIds,
     categoryPaths,
-    realmSel.realm,
-    realmSel.front,
+    realmSel.realmId,
     realmSel.l2,
     realmManuallyOverridden,
   ]);
@@ -230,8 +222,7 @@ export function InlineComposer({
         body: body.trim(),
         atomIds,
         categoryPaths,
-        realm: realmSel.realm,
-        front: realmSel.front,
+        realmId: realmSel.realmId,
         l2: realmSel.l2,
       });
       if (ok) {
@@ -242,8 +233,7 @@ export function InlineComposer({
         setCategoryPaths([]);
         setRealmManuallyOverridden(false);
         setRealmSel({
-          realm: inheritedContext?.realm ?? null,
-          front: inheritedContext?.front ?? null,
+          realmId: inheritedContext?.realmId ?? null,
           l2: inheritedContext?.l2 ?? null,
         });
         if (startCollapsed) setExpanded(false);
@@ -268,8 +258,7 @@ export function InlineComposer({
         setCategoryPaths([]);
         setRealmManuallyOverridden(false);
         setRealmSel({
-          realm: inheritedContext?.realm ?? null,
-          front: inheritedContext?.front ?? null,
+          realmId: inheritedContext?.realmId ?? null,
           l2: inheritedContext?.l2 ?? null,
         });
       }
@@ -536,14 +525,13 @@ export function InlineComposer({
       </div>
 
       {/* Inherited context line (reply mode, informational) */}
-      {mode === 'reply' && inheritedContext?.realm && (
+      {mode === 'reply' && inheritedContext?.realmId && (
         <div
           className="mb-3 font-mono text-text-muted"
           style={{ fontSize: '11px' }}
           data-size="meta"
         >
-          Parent thread: {inheritedContext.realm}
-          {inheritedContext.front && ` · ${inheritedContext.front}`}
+          Parent thread: {REALM_NAMES[inheritedContext.realmId]}
           {inheritedContext.l2 && ` · ${inheritedContext.l2}`}
           {inheritedContext.atomIds && inheritedContext.atomIds.length > 0 && (
             <span>
@@ -563,8 +551,7 @@ export function InlineComposer({
           label="Atoms"
           max={10}
           realmContext={{
-            realm: realmSel.realm,
-            front: realmSel.front,
+            realmId: realmSel.realmId,
             l2: realmSel.l2,
           }}
           placeholder="Search atoms to tag..."
@@ -593,7 +580,7 @@ export function InlineComposer({
           derivedHint={
             !realmManuallyOverridden && atomIds.length > 0
               ? 'Auto-derived from first atom'
-              : !realmManuallyOverridden && inheritedContext?.realm
+              : !realmManuallyOverridden && inheritedContext?.realmId
                 ? 'From current filter'
                 : undefined
           }

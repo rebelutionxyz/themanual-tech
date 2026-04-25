@@ -1,48 +1,52 @@
 import { useMemo } from 'react';
 import {
-  Heart,
-  Brain,
-  Sparkles,
-  Leaf,
-  Home,
+  Scale,
+  BookOpen,
   Hammer,
-  Gamepad2,
-  Wrench,
-  Briefcase,
-  Coins,
-  Cpu,
+  User,
   Globe2,
-  Crown,
+  HeartPulse,
+  Users,
+  Sigma,
+  FlaskConical,
+  Brain,
+  Cpu,
+  Hourglass,
+  Palette,
+  Sparkles,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import type { RealmId } from '@/types/manual';
 import { useManualStore } from '@/stores/useManualStore';
 import { useManualData } from '@/lib/useManualData';
-import { REALM_ORDER } from '@/lib/constants';
+import { REALM_ORDER, REALM_NAMES } from '@/lib/constants';
 import { cn, formatCount } from '@/lib/utils';
 
-const REALM_ICONS = {
-  Body: Heart,
-  Mind: Brain,
-  Spirit: Sparkles,
-  Nature: Leaf,
-  Home: Home,
-  Craft: Hammer,
-  Play: Gamepad2,
-  Gear: Wrench,
-  Work: Briefcase,
-  Money: Coins,
-  Tech: Cpu,
-  World: Globe2,
-  Power: Crown,
-} as const;
+const REALM_ICONS: Record<RealmId, LucideIcon> = {
+  justice: Scale,
+  reference: BookOpen,
+  human_activities: Hammer,
+  self: User,
+  geography: Globe2,
+  health: HeartPulse,
+  society: Users,
+  math: Sigma,
+  science: FlaskConical,
+  philosophy: Brain,
+  tech: Cpu,
+  history: Hourglass,
+  culture: Palette,
+  religion: Sparkles,
+};
 
 export function RealmSidebar() {
   const { atoms } = useManualData();
-  const selectedRealm = useManualStore((s) => s.selectedRealm);
-  const setSelectedRealm = useManualStore((s) => s.setSelectedRealm);
+  const selectedRealmId = useManualStore((s) => s.selectedRealmId);
+  const setSelectedRealmId = useManualStore((s) => s.setSelectedRealmId);
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = {};
-    for (const a of atoms) c[a.realm] = (c[a.realm] ?? 0) + 1;
+    const c: Partial<Record<RealmId, number>> = {};
+    for (const a of atoms) c[a.realmId] = (c[a.realmId] ?? 0) + 1;
     return c;
   }, [atoms]);
 
@@ -50,37 +54,38 @@ export function RealmSidebar() {
     <nav className="flex h-full flex-col items-center gap-1 overflow-y-auto border-r border-border bg-bg-elevated py-3">
       <button
         type="button"
-        onClick={() => setSelectedRealm(null)}
+        onClick={() => setSelectedRealmId(null)}
         className={cn(
           'group relative mb-1 flex h-10 w-10 items-center justify-center rounded-lg border transition-all',
-          selectedRealm === null
+          selectedRealmId === null
             ? 'border-text-silver/60 bg-text-silver/10 text-text'
             : 'border-transparent text-text-muted hover:border-border-bright hover:text-text-silver',
         )}
         aria-label="All realms"
-        title="All 13 realms"
+        title="All 14 realms"
       >
         <span className="font-display text-lg">∴</span>
       </button>
       <div className="mb-1 h-px w-6 bg-border" />
 
-      {REALM_ORDER.map((realm) => {
-        const Icon = REALM_ICONS[realm];
-        const isActive = selectedRealm === realm;
-        const count = counts[realm] ?? 0;
+      {REALM_ORDER.map((realmId) => {
+        const Icon = REALM_ICONS[realmId];
+        const name = REALM_NAMES[realmId];
+        const isActive = selectedRealmId === realmId;
+        const count = counts[realmId] ?? 0;
         return (
           <button
             type="button"
-            key={realm}
-            onClick={() => setSelectedRealm(isActive ? null : realm)}
+            key={realmId}
+            onClick={() => setSelectedRealmId(isActive ? null : realmId)}
             className={cn(
               'group relative flex h-10 w-10 items-center justify-center rounded-lg border transition-all',
               isActive
                 ? 'border-text-silver/60 bg-text-silver/10 text-text'
                 : 'border-transparent text-text-muted hover:border-border-bright hover:text-text-silver',
             )}
-            title={`${realm} · ${count} atoms`}
-            aria-label={realm}
+            title={`${name} · ${count} atoms`}
+            aria-label={name}
           >
             <Icon size={16} strokeWidth={1.75} />
             <span
@@ -88,7 +93,7 @@ export function RealmSidebar() {
               style={{ fontSize: '11px' }}
               data-size="meta"
             >
-              {realm} · {formatCount(count)}
+              {name} · {formatCount(count)}
             </span>
           </button>
         );

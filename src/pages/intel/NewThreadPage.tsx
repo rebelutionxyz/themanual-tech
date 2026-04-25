@@ -7,34 +7,26 @@ import { createThread } from '@/lib/intel';
 import { AtomPicker } from '@/components/intel/AtomPicker';
 import { RealmPicker, type RealmSelection } from '@/components/intel/RealmPicker';
 import { useIntelStore } from '@/stores/useIntelStore';
+import { REALM_NAMES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 /**
  * Thread composer — /intel/new
  * Reads initial realm context from the IntelStore (set by the realm bar above).
- *
- * Model D flow:
- * - Title + Body required
- * - AtomPicker (prioritized by active realm context)
- * - RealmPicker (auto-fills from linked atoms, editable, required if no atoms)
- * - Submit validates: must have 1+ atoms OR realm selected
  */
 export function NewThreadPage() {
   const { bee, configured } = useAuth();
   const navigate = useNavigate();
   const { atoms } = useManualData();
 
-  // Read current realm context from IntelStore (shared with IntelLayout)
-  const urlRealm = useIntelStore((s) => s.selectedRealm);
-  const urlFront = useIntelStore((s) => s.selectedFront);
+  const urlRealmId = useIntelStore((s) => s.selectedRealmId);
   const urlL2 = useIntelStore((s) => s.selectedL2);
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [atomIds, setAtomIds] = useState<string[]>([]);
   const [realmSel, setRealmSel] = useState<RealmSelection>({
-    realm: urlRealm,
-    front: urlFront,
+    realmId: urlRealmId,
     l2: urlL2,
   });
   const [realmManuallyOverridden, setRealmManuallyOverridden] = useState(false);
@@ -50,49 +42,39 @@ export function NewThreadPage() {
       if (draft.title) setTitle(draft.title);
       if (draft.body) setBody(draft.body);
       if (Array.isArray(draft.atomIds)) setAtomIds(draft.atomIds);
-      if (draft.realm || draft.front || draft.l2) {
+      if (draft.realmId || draft.l2) {
         setRealmSel({
-          realm: draft.realm ?? null,
-          front: draft.front ?? null,
+          realmId: draft.realmId ?? null,
           l2: draft.l2 ?? null,
         });
-        // If user manually set a realm in the inline composer, treat as manual override
         setRealmManuallyOverridden(true);
       }
     } catch {
       // ignore corrupt draft
     }
-    // Clear session draft so refreshing the page doesn't re-hydrate stale state
     sessionStorage.removeItem('composer-draft');
   }, []);
 
-  // Auto-derive realm from first linked atom unless manually overridden
   const derivedFromAtoms = useMemo(() => {
     if (atomIds.length === 0) return null;
     const first = atoms.find((a) => a.id === atomIds[0]);
     if (!first) return null;
     return {
-      realm: first.realm,
-      front: first.front ?? null,
-      // Don't auto-set L2 — too specific, feels overreach
+      realmId: first.realmId,
       l2: null,
     } as RealmSelection;
   }, [atomIds, atoms]);
 
-  // When atoms selected and user hasn't explicitly clicked realm picker, auto-apply derivation.
-  // URL seeded values don't count as 'manual override' — atoms trump URL.
   useEffect(() => {
     if (derivedFromAtoms && !realmManuallyOverridden) {
       setRealmSel(derivedFromAtoms);
     }
-    // If all atoms removed and we were in auto mode, fall back to store seed (or null)
     if (atomIds.length === 0 && !realmManuallyOverridden) {
-      setRealmSel({ realm: urlRealm, front: urlFront, l2: urlL2 });
+      setRealmSel({ realmId: urlRealmId, l2: urlL2 });
     }
-  }, [derivedFromAtoms, realmManuallyOverridden, atomIds.length, urlRealm, urlFront, urlL2]);
+  }, [derivedFromAtoms, realmManuallyOverridden, atomIds.length, urlRealmId, urlL2]);
 
-  // Validation: must have atoms OR realm
-  const hasRealm = !!realmSel.realm;
+  const hasRealm = !!realmSel.realmId;
   const hasAtoms = atomIds.length > 0;
   const categorizationOk = hasRealm || hasAtoms;
   const canSubmit =
@@ -106,9 +88,7 @@ export function NewThreadPage() {
     e.preventDefault();
     if (!canSubmit || !bee) return;
 
-    // If atoms are linked but no realm manually set, use derived
-    const finalRealm = realmSel.realm ?? derivedFromAtoms?.realm ?? null;
-    const finalFront = realmSel.front ?? derivedFromAtoms?.front ?? null;
+    const finalRealmId = realmSel.realmId ?? derivedFromAtoms?.realmId ?? null;
     const finalL2 = realmSel.l2 ?? null;
 
     setSubmitting(true);
@@ -119,8 +99,7 @@ export function NewThreadPage() {
           title: title.trim(),
           body,
           atomIds,
-          primaryRealm: finalRealm,
-          primaryFront: finalFront,
+          primaryRealm: finalRealmId,
           primaryL2: finalL2,
         },
         bee.id,
@@ -132,7 +111,6 @@ export function NewThreadPage() {
     }
   }
 
-  // Not logged in
   if (!bee) {
     return (
       <div className="mx-auto max-w-2xl px-6 py-12">
@@ -169,7 +147,6 @@ export function NewThreadPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8 md:px-10 md:py-12">
-      {/* Header */}
       <div className="mb-6 flex items-center gap-3">
         <Link
           to="/intel"
@@ -193,8 +170,7 @@ export function NewThreadPage() {
         <MessagesSquare size={20} style={{ color: '#6B94C8' }} />
       </div>
 
-      {/* Context banner if URL had filter */}
-      {urlRealm && !realmManuallyOverridden && (
+      {urlRealmId && !realmManuallyOverridden && (
         <div className="mb-5 rounded-md border border-border bg-bg-elevated p-3">
           <div
             className="mb-1 flex items-center gap-1.5 font-mono uppercase tracking-wider text-text-muted"
@@ -205,16 +181,13 @@ export function NewThreadPage() {
             Creating in
           </div>
           <div className="text-text-silver" style={{ fontSize: '13px' }}>
-            {urlRealm}
-            {urlFront && ` · ${urlFront}`}
+            {REALM_NAMES[urlRealmId]}
             {urlL2 && ` · ${urlL2}`}
           </div>
         </div>
       )}
 
-      {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Title */}
         <div>
           <label className="block">
             <span
@@ -245,7 +218,6 @@ export function NewThreadPage() {
           </div>
         </div>
 
-        {/* Body */}
         <div>
           <label className="block">
             <span
@@ -268,7 +240,6 @@ export function NewThreadPage() {
           </label>
         </div>
 
-        {/* Atom picker */}
         <AtomPicker
           value={atomIds}
           onChange={setAtomIds}
@@ -276,13 +247,11 @@ export function NewThreadPage() {
           max={10}
           searchOnly={true}
           realmContext={{
-            realm: realmSel.realm ?? urlRealm,
-            front: realmSel.front ?? urlFront,
+            realmId: realmSel.realmId ?? urlRealmId,
             l2: realmSel.l2 ?? urlL2,
           }}
         />
 
-        {/* Realm picker */}
         <RealmPicker
           value={realmSel}
           onChange={(next) => {
@@ -300,7 +269,6 @@ export function NewThreadPage() {
           error={!categorizationOk && title.length > 0 ? 'Link atoms or pick a realm' : undefined}
         />
 
-        {/* Global error */}
         {error && (
           <div className="rounded-md border border-kettle-unsourced/30 bg-kettle-unsourced/10 p-3">
             <p className="text-kettle-unsourced" style={{ fontSize: '12px' }}>
@@ -309,7 +277,6 @@ export function NewThreadPage() {
           </div>
         )}
 
-        {/* Actions */}
         <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
           <Link
             to="/intel"

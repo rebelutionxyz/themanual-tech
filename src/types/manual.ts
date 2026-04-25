@@ -63,12 +63,13 @@ export type RealmId =
   | 'culture'
   | 'religion';
 
-// Tree view node (computed in lib/tree.ts from atoms array)
+// Tree view node (computed in lib/tree.ts from atoms array).
+// realmId is '' on the synthetic ROOT only; every real node has a RealmId.
 export interface TreeNode {
   name: string;
   path: string;
   depth: number;
-  realmId: RealmId;
+  realmId: RealmId | '';
   atoms: Atom[];               // atoms whose exact path === this node's path
   children: TreeNode[];
   atomCount: number;           // total descendant atoms
@@ -80,3 +81,7 @@ export type ViewMode = 'outlook' | 'list' | 'graph';
 export interface FilterState {
   searchQuery: string;
   selectedRealmId: RealmId | null;
+  selectedKettle: KettleState | null;
+  selectedType: AtomType | 'all';
+  selectedTags: string[];
+}

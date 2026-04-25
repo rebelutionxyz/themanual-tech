@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Search, X, Plus, Check, Network, FolderTree } from 'lucide-react';
 import { useManualData } from '@/lib/useManualData';
-import { REALM_ORDER, FRONT_COLORS } from '@/lib/constants';
+import { REALM_ORDER } from '@/lib/constants';
 import { TaxonomyTree } from '@/components/manual/TaxonomyTree';
 import type { TreeNode } from '@/types/manual';
 import { cn } from '@/lib/utils';
 
 interface CategoryPickerProps {
-  /** Selected category paths (full paths like "Power / INVESTIGATE / 9/11") */
+  /** Selected category paths (full paths like "Justice / Government / Accountability") */
   value: string[];
   onChange: (paths: string[]) => void;
   max?: number;
@@ -20,11 +20,7 @@ interface CategoryPickerProps {
  * Multi-select picker for Manual categories (non-leaf branches).
  *
  * Categories = any non-leaf node (L2, L3, L4, L5). Gives posts additive
- * discoverability beyond the single primary realm/front/l2.
- *
- * Two modes:
- * - Search: type to find categories by name (ranked by path specificity)
- * - Browse: tree view, click branches to add
+ * discoverability beyond the single primary realm/L2.
  */
 export function CategoryPicker({
   value,
@@ -40,13 +36,11 @@ export function CategoryPicker({
   const [focused, setFocused] = useState(false);
   const [treeMode, setTreeMode] = useState(false);
 
-  // Flatten all non-leaf nodes into a list of searchable categories
   const allCategories = useMemo(() => {
     if (!loaded || !tree) return [] as { path: string; name: string; node: TreeNode }[];
     const results: { path: string; name: string; node: TreeNode }[] = [];
 
     function walk(node: TreeNode) {
-      // Depth 1+ (below ROOT) and has children → it's a category branch
       if (node.depth >= 1 && (node.children.length > 0 || node.depth <= 4)) {
         results.push({ path: node.path, name: node.name, node });
       }
@@ -56,7 +50,6 @@ export function CategoryPicker({
     return results;
   }, [tree, loaded]);
 
-  // Suggestion scoring
   const suggestions = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [] as typeof allCategories;
@@ -69,7 +62,6 @@ export function CategoryPicker({
         else if (nameLower.startsWith(q)) score += 600;
         else if (nameLower.includes(q)) score += 300;
         if (pathLower.includes(q)) score += 80;
-        // Prefer shallower categories (more general)
         score -= cat.node.depth * 5;
         return { ...cat, score };
       })
@@ -91,9 +83,8 @@ export function CategoryPicker({
     onChange(value.filter((p) => p !== path));
   }
 
-  // Resolve each selected path to its node for display (badge color if Front)
   const selectedChips = useMemo(() => {
-    if (!tree) return value.map((p) => ({ path: p, name: p.split(' / ').pop() ?? p, front: undefined as undefined | string }));
+    if (!tree) return value.map((p) => ({ path: p, name: p.split(' / ').pop() ?? p }));
     return value.map((path) => {
       const findNode = (n: TreeNode): TreeNode | null => {
         if (n.path === path) return n;
@@ -107,7 +98,6 @@ export function CategoryPicker({
       return {
         path,
         name: node?.name ?? path.split(' / ').pop() ?? path,
-        front: node?.front,
       };
     });
   }, [value, tree]);
@@ -167,12 +157,7 @@ export function CategoryPicker({
               title={chip.path}
             >
               <FolderTree size={11} className="flex-shrink-0 text-text-muted" />
-              <span
-                className="max-w-[200px] truncate"
-                style={chip.front ? { color: FRONT_COLORS[chip.front as keyof typeof FRONT_COLORS] } : undefined}
-              >
-                {chip.name}
-              </span>
+              <span className="max-w-[200px] truncate">{chip.name}</span>
               <X size={12} className="text-text-muted group-hover:text-text" />
             </button>
           ))}
@@ -253,12 +238,7 @@ export function CategoryPicker({
                     <div className="min-w-0 flex-1">
                       <div
                         className="truncate text-text-silver"
-                        style={{
-                          fontSize: '13px',
-                          ...(cat.node.front
-                            ? { color: FRONT_COLORS[cat.node.front] }
-                            : {}),
-                        }}
+                        style={{ fontSize: '13px' }}
                       >
                         {cat.name}
                       </div>
@@ -290,17 +270,17 @@ export function CategoryPicker({
       {/* BROWSE MODE */}
       {treeMode && tree && loaded && (
         <div className="max-h-96 overflow-y-auto rounded-md border border-border bg-bg-elevated p-2">
-          {REALM_ORDER.map((realmName) => {
-            const realmNode = tree.children.find((c) => c.name === realmName);
+          {REALM_ORDER.map((realmId) => {
+            const realmNode = tree.children.find((c) => c.realmId === realmId);
             if (!realmNode) return null;
             return (
               <TaxonomyTree
-                key={realmName}
+                key={realmId}
                 root={realmNode}
                 mode="single-path"
                 onSelectPath={(path, node) => {
-                  if (!node) return; // only add branches, not atoms
-                  if (node.children.length === 0) return; // skip leaves
+                  if (!node) return;
+                  if (node.children.length === 0) return;
                   if (value.includes(path)) removeCategory(path);
                   else if (!atMax) addCategory(path);
                 }}

@@ -71,6 +71,16 @@ export const REALM_COLORS: Record<RealmId, string> = {
 };
 
 /**
+ * REALM_ID_BY_NAME — reverse lookup from display name to RealmId slug.
+ *
+ * Used when parsing category paths (e.g. "Justice / Government / ...") back
+ * to a typed RealmId. Returns undefined for non-realm names.
+ */
+export const REALM_ID_BY_NAME: Record<string, RealmId> = Object.fromEntries(
+  REALM_ORDER.map((id) => [REALM_NAMES[id], id]),
+) as Record<string, RealmId>;
+
+/**
  * BEE_COLOR — soft amber, honey family.
  *
  * Used for user-authored content (My Threads), profile identity, and any

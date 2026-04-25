@@ -4,12 +4,11 @@ import { useManualStore } from '@/stores/useManualStore';
 import { useManualData } from '@/lib/useManualData';
 import { KettlePill } from '@/components/ui/KettlePill';
 import { cn, formatCount } from '@/lib/utils';
-import { FRONT_CLASS } from '@/lib/constants';
 
 export function ListView() {
   const { atoms } = useManualData();
   const searchQuery = useManualStore((s) => s.searchQuery);
-  const selectedRealm = useManualStore((s) => s.selectedRealm);
+  const selectedRealmId = useManualStore((s) => s.selectedRealmId);
   const selectedKettle = useManualStore((s) => s.selectedKettle);
   const selectedTags = useManualStore((s) => s.selectedTags);
   const selectAtom = useManualStore((s) => s.selectAtom);
@@ -18,7 +17,7 @@ export function ListView() {
     const q = searchQuery.toLowerCase();
     return atoms
       .filter((a) => {
-        if (selectedRealm && a.realm !== selectedRealm) return false;
+        if (selectedRealmId && a.realmId !== selectedRealmId) return false;
         if (selectedKettle && a.kettle !== selectedKettle) return false;
         if (
           selectedTags.length > 0 &&
@@ -35,8 +34,8 @@ export function ListView() {
         }
         return true;
       })
-      .slice(0, 500); // cap at 500 for perf; can paginate later
-  }, [atoms, searchQuery, selectedRealm, selectedKettle, selectedTags]);
+      .slice(0, 500);
+  }, [atoms, searchQuery, selectedRealmId, selectedKettle, selectedTags]);
 
   return (
     <div className="px-4 py-3 md:px-6 md:py-4">
@@ -93,12 +92,7 @@ function ListRow({
     >
       <div className="min-w-0">
         <div className="flex items-baseline gap-2">
-          <span
-            className={cn(
-              'truncate text-sm font-medium',
-              atom.front ? FRONT_CLASS[atom.front] : 'text-text',
-            )}
-          >
+          <span className="truncate text-sm font-medium text-text">
             {atom.name}
           </span>
         </div>

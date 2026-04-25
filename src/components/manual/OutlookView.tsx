@@ -2,8 +2,8 @@ import { memo, useCallback, useMemo } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { Atom, TreeNode } from '@/types/manual';
 import { useManualStore } from '@/stores/useManualStore';
-import { cn, formatCount, isFront, isRealm } from '@/lib/utils';
-import { FRONT_CLASS, KETTLE_COLORS } from '@/lib/constants';
+import { cn, formatCount } from '@/lib/utils';
+import { KETTLE_COLORS } from '@/lib/constants';
 
 interface OutlookViewProps {
   tree: TreeNode;
@@ -11,19 +11,17 @@ interface OutlookViewProps {
 
 export function OutlookView({ tree }: OutlookViewProps) {
   const searchQuery = useManualStore((s) => s.searchQuery);
-  const selectedRealm = useManualStore((s) => s.selectedRealm);
+  const selectedRealmId = useManualStore((s) => s.selectedRealmId);
   const selectedKettle = useManualStore((s) => s.selectedKettle);
   const selectedTags = useManualStore((s) => s.selectedTags);
 
-  // Roots to render: if realm filter, narrow to one realm
   const roots = useMemo(() => {
-    if (selectedRealm) {
-      return tree.children.filter((c) => c.name === selectedRealm);
+    if (selectedRealmId) {
+      return tree.children.filter((c) => c.realmId === selectedRealmId);
     }
     return tree.children;
-  }, [tree, selectedRealm]);
+  }, [tree, selectedRealmId]);
 
-  // Filter matcher — checks atom against active filters
   const matches = useCallback(
     (atom: Atom): boolean => {
       if (searchQuery) {
@@ -111,9 +109,6 @@ const TreeBranch = memo(function TreeBranch({ node, matches, depth }: TreeBranch
   const isExpanded = expandedPaths.has(node.path);
   const hasChildren = node.children.length > 0 || node.atoms.length > 0;
 
-  const isFrontNode = node.front !== undefined;
-  const frontClass = isFrontNode && node.front ? FRONT_CLASS[node.front] : undefined;
-
   return (
     <div className="my-0.5">
       <button
@@ -127,11 +122,9 @@ const TreeBranch = memo(function TreeBranch({ node, matches, depth }: TreeBranch
         <Caret expanded={isExpanded} hidden={!hasChildren} />
         <span
           className={cn(
-            isFrontNode && 'front-name',
-            isFrontNode && frontClass,
-            !isFrontNode && depth === 1 && 'text-[15px] font-medium text-text',
-            !isFrontNode && depth === 2 && 'text-sm text-text-silver',
-            !isFrontNode && depth >= 3 && 'text-sm text-text-dim',
+            depth === 1 && 'text-[15px] font-medium text-text',
+            depth === 2 && 'text-sm text-text-silver',
+            depth >= 3 && 'text-sm text-text-dim',
           )}
         >
           {node.name}
@@ -183,10 +176,7 @@ function AtomRow({ atom, visible }: AtomRowProps) {
       <span className="w-3 flex-shrink-0 text-center">
         <span
           className="inline-block h-1.5 w-1.5 rounded-full"
-          style={{
-            backgroundColor: KETTLE_COLORS[atom.kettle],
-            opacity: atom.kettle === 'Sourced' ? 1 : 0.6,
-          }}
+          style={{ backgroundColor: KETTLE_COLORS[atom.kettle] }}
         />
       </span>
       <span className="truncate text-sm text-text-silver group-hover:text-text">
@@ -217,7 +207,3 @@ function Caret({ expanded, hidden }: { expanded: boolean; hidden?: boolean }) {
     />
   );
 }
-
-// unused imports cleanup — keep isRealm/isFront utility available
-void isRealm;
-void isFront;

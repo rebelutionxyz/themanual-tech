@@ -5,8 +5,7 @@ import { getAtomById, getRelatedAtoms } from '@/lib/useManualData';
 import { getPathSegments } from '@/lib/tree';
 import { KettlePill } from '@/components/ui/KettlePill';
 import { TagChip } from '@/components/ui/TagChip';
-import { cn, isFront } from '@/lib/utils';
-import { FRONT_CLASS } from '@/lib/constants';
+import { cn } from '@/lib/utils';
 
 export function AtomDetailPanel() {
   const selectedAtomId = useManualStore((s) => s.selectedAtomId);
@@ -22,7 +21,7 @@ export function AtomDetailPanel() {
             Select an atom from the Manual to view its details
           </p>
           <p className="mt-2 font-mono text-text-muted" data-size="meta">
-            5,997 atoms · 13 realms · graph model
+            4,860 atoms · 14 realms · graph model
           </p>
         </div>
       </div>
@@ -66,12 +65,7 @@ export function AtomDetailPanel() {
 
         {/* Name + kettle */}
         <div className="mb-5 border-b border-border pb-5">
-          <h1
-            className={cn(
-              'font-display text-3xl font-semibold tracking-wide text-text',
-              atom.front && FRONT_CLASS[atom.front],
-            )}
-          >
+          <h1 className="font-display text-3xl font-semibold tracking-wide text-text">
             {atom.name}
           </h1>
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -168,7 +162,7 @@ function DetailHeader({ atom, onClose }: { atom: Atom; onClose: () => void }) {
         style={{ fontSize: '11px', letterSpacing: '0.1em' }}
         data-size="meta"
       >
-        {atom.realm}
+        {atom.realmName}
       </span>
       <button
         type="button"
@@ -220,15 +214,14 @@ function TagRow({ label, tags }: { label: string; tags: string[] }) {
 
 function RelatedAtomRow({ atom }: { atom: Atom }) {
   const selectAtom = useManualStore((s) => s.selectAtom);
+  const subPath = atom.pathParts[1];
   return (
     <button
       type="button"
       onClick={() => selectAtom(atom.id)}
       className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-bg-elevated"
     >
-      <span
-        className={cn(atom.front ? FRONT_CLASS[atom.front] : 'text-text-silver')}
-      >
+      <span className="text-text-silver">
         <span className="text-sm">{atom.name}</span>
       </span>
       <span
@@ -236,10 +229,9 @@ function RelatedAtomRow({ atom }: { atom: Atom }) {
         style={{ fontSize: '11px', maxWidth: '200px' }}
         data-size="meta"
       >
-        {atom.realm}
-        {atom.L2 && ` · ${atom.L2}`}
+        {atom.realmName}
+        {subPath && ` · ${subPath}`}
       </span>
-      {isFront(atom.name) || null}
     </button>
   );
 }

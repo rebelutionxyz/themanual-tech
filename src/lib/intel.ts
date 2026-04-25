@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Front, KettleState } from '@/types/manual';
+import type { RealmId } from '@/types/manual';
 
 // ═════════════════════════════════════════════════════════════════════
 // Types mirroring the forum_threads / forum_posts tables
@@ -12,10 +12,8 @@ export interface ForumThread {
   createdBy: string;
   parentSurface: string | null;
   parentId: string | null;
-  /** Auto-derived or manually set realm this thread primarily lives in */
-  primaryRealm: string | null;
-  /** Optional specific Front under Power */
-  primaryFront: Front | null;
+  /** Auto-derived or manually set realm this thread primarily lives in (RealmId slug) */
+  primaryRealm: RealmId | null;
   /** Optional L2 subcategory */
   primaryL2: string | null;
   replyCount: number;
@@ -41,11 +39,10 @@ export interface ForumPost {
 
 export interface ThreadListFilter {
   /**
-   * When set, only include threads whose primary_realm == this realm
-   * OR whose linked atoms' realms include this realm.
+   * When set, only include threads whose primary_realm == this realmId
+   * OR whose linked atoms' realmId == this realmId.
    */
-  realm?: string | null;
-  front?: Front | null;
+  realmId?: RealmId | null;
   l2?: string | null;
   /** Only threads linked to this specific atom */
   atomId?: string | null;
@@ -60,8 +57,7 @@ export interface CreateThreadInput {
   body: string;
   atomIds?: string[];
   categoryPaths?: string[];
-  primaryRealm?: string | null;
-  primaryFront?: Front | null;
+  primaryRealm?: RealmId | null;
   primaryL2?: string | null;
   parentSurface?: string | null;
   parentId?: string | null;
@@ -79,8 +75,7 @@ function mapThread(row: Record<string, unknown>): ForumThread {
     createdBy: String(row.created_by ?? ''),
     parentSurface: (row.parent_surface as string) ?? null,
     parentId: (row.parent_id as string) ?? null,
-    primaryRealm: (row.primary_realm as string) ?? null,
-    primaryFront: (row.primary_front as Front) ?? null,
+    primaryRealm: (row.primary_realm as RealmId) ?? null,
     primaryL2: (row.primary_l2 as string) ?? null,
     replyCount: Number(row.reply_count ?? 0),
     lastActivityAt: String(row.last_activity_at ?? ''),
@@ -166,7 +161,7 @@ export async function listThreads(
   }
 
   // No realm filter — all threads
-  if (!filter.realm) {
+  if (!filter.realmId) {
     let q = supabase
       .from('forum_threads')
       .select('*')
@@ -178,17 +173,16 @@ export async function listThreads(
   }
 
   // Realm filter: two sources
-  // 1. Threads with primary_realm = realm
+  // 1. Threads with primary_realm = realmId
   // 2. Threads linked to atoms in that realm (via entity_atom_links)
   const directIds = new Set<string>();
   const linkedIds = new Set<string>();
 
-  // Query 1 — direct primary_realm match (also filter by front/l2 if set)
+  // Query 1 — direct primary_realm match (also filter by l2 if set)
   let q = supabase
     .from('forum_threads')
     .select('id')
-    .eq('primary_realm', filter.realm);
-  if (filter.front) q = q.eq('primary_front', filter.front);
+    .eq('primary_realm', filter.realmId);
   if (filter.l2) q = q.eq('primary_l2', filter.l2);
   const { data: direct } = await q;
   (direct ?? []).forEach((r) => directIds.add(String(r.id)));
@@ -335,7 +329,6 @@ export async function createThread(
       body: input.body,
       created_by: authorBeeId,
       primary_realm: input.primaryRealm ?? null,
-      primary_front: input.primaryFront ?? null,
       primary_l2: input.primaryL2 ?? null,
       parent_surface: input.parentSurface ?? null,
       parent_id: input.parentId ?? null,
@@ -522,5 +515,3 @@ export function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-/** Keeps Front/KettleState types in scope for future use */
-export type _ForceImports = Front | KettleState;

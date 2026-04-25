@@ -17,9 +17,9 @@ import {
   type ForumThread,
   type ForumPost,
 } from '@/lib/intel';
-import { KETTLE_COLORS, FRONT_COLORS, REALM_COLORS, BEE_COLOR } from '@/lib/constants';
+import { KETTLE_COLORS, REALM_COLORS, REALM_NAMES, BEE_COLOR } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import type { Front } from '@/types/manual';
+import type { RealmId } from '@/types/manual';
 
 /**
  * Single thread view — /intel/t/:threadId
@@ -29,7 +29,7 @@ export function ThreadPage() {
   const { bee } = useAuth();
   const { atoms, tree } = useManualData();
   const navigate = useNavigate();
-  const { setRealm, setFront, setL2, setL3 } = useIntelStore();
+  const { setRealmId, setL2, setL3 } = useIntelStore();
 
   const [thread, setThread] = useState<ForumThread | null | undefined>(undefined);
   const [posts, setPosts] = useState<ForumPost[]>([]);
@@ -82,12 +82,10 @@ export function ThreadPage() {
     );
   }
 
-  // Build linked atom full info
   const linkedAtoms = (thread.atomLinks ?? [])
     .map((l) => atoms.find((a) => a.id === l.atomId))
     .filter((a): a is NonNullable<typeof a> => !!a);
 
-  // Build nested tree structure from flat posts array
   const topLevelPosts = posts.filter((p) => !p.parentPostId);
   const childMap = new Map<string, ForumPost[]>();
   for (const post of posts) {
@@ -98,6 +96,12 @@ export function ThreadPage() {
     }
   }
 
+  const primaryRealmId = thread.primaryRealm;
+  const primaryRealmName = primaryRealmId ? REALM_NAMES[primaryRealmId] : null;
+  const primaryRealmColor = primaryRealmId
+    ? REALM_COLORS[primaryRealmId] ?? '#E0E6EC'
+    : '#E0E6EC';
+
   async function handleReply(
     parentId: string | null,
     body: string,
@@ -106,13 +110,10 @@ export function ThreadPage() {
   ) {
     if (!bee || !threadId) return;
     const newId = await createPost(threadId, body, bee.id, parentId, atomIds, categoryPaths);
-    // Refetch both posts and thread — thread pulls the fresh reply_count
-    // (bumped by DB trigger or client-side RPC fallback in createPost)
     const [p, t] = await Promise.all([getPosts(threadId), getThread(threadId)]);
     setPosts(p);
     if (t) setThread(t);
     setReplyingTo(null);
-    // Auto-scroll to new post
     setTimeout(() => {
       document.getElementById(`post-${newId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
@@ -120,20 +121,15 @@ export function ThreadPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 md:px-8 md:py-10">
-      {/* Realm-aware back link. If thread has a primaryRealm, clicking restores
-          that realm filter on /intel so the user lands back in their
-          browsing context. Otherwise → generic Back to INTEL. */}
       <button
         type="button"
         onClick={() => {
-          if (thread.primaryRealm) {
-            setRealm(thread.primaryRealm);
-            setFront(thread.primaryFront ?? null);
+          if (primaryRealmId) {
+            setRealmId(primaryRealmId);
             setL2(thread.primaryL2 ?? null);
             setL3(null);
           } else {
-            setRealm(null);
-            setFront(null);
+            setRealmId(null);
             setL2(null);
             setL3(null);
           }
@@ -145,37 +141,22 @@ export function ThreadPage() {
         <ArrowLeft size={14} />
         <span>
           Back to{' '}
-          {thread.primaryFront ? (
-            <span style={{ color: FRONT_COLORS[thread.primaryFront] }}>
-              {thread.primaryFront}
-            </span>
-          ) : thread.primaryRealm ? (
-            <span
-              style={{
-                color:
-                  REALM_COLORS[thread.primaryRealm as keyof typeof REALM_COLORS] ??
-                  '#E0E6EC',
-              }}
-            >
-              {thread.primaryRealm}
-            </span>
+          {primaryRealmName ? (
+            <span style={{ color: primaryRealmColor }}>{primaryRealmName}</span>
           ) : (
             'INTEL'
           )}
         </span>
       </button>
 
-      {/* Thread header */}
       <article className="rounded-lg border border-border bg-bg-elevated p-5 md:p-6">
-        {/* Realm / Front / L2 badges — clickable to filter INTEL by that facet */}
-        {(thread.primaryRealm || thread.primaryFront || thread.primaryL2) && (
+        {(primaryRealmId || thread.primaryL2) && (
           <div className="mb-3 flex flex-wrap items-center gap-1.5">
-            {thread.primaryRealm && (
+            {primaryRealmId && primaryRealmName && (
               <button
                 type="button"
                 onClick={() => {
-                  setRealm(thread.primaryRealm);
-                  setFront(null);
+                  setRealmId(primaryRealmId);
                   setL2(null);
                   setL3(null);
                   navigate('/intel');
@@ -183,52 +164,21 @@ export function ThreadPage() {
                 className="rounded-md border px-2 py-0.5 font-mono transition-colors hover:brightness-125"
                 style={{
                   fontSize: '11px',
-                  color:
-                    REALM_COLORS[thread.primaryRealm as keyof typeof REALM_COLORS] ??
-                    '#E0E6EC',
-                  borderColor: `${
-                    REALM_COLORS[thread.primaryRealm as keyof typeof REALM_COLORS] ??
-                    '#8A94A0'
-                  }40`,
-                  background: `${
-                    REALM_COLORS[thread.primaryRealm as keyof typeof REALM_COLORS] ??
-                    '#8A94A0'
-                  }0D`,
+                  color: primaryRealmColor,
+                  borderColor: `${primaryRealmColor}40`,
+                  background: `${primaryRealmColor}0D`,
                 }}
                 data-size="meta"
-                title={`Filter INTEL by ${thread.primaryRealm}`}
+                title={`Filter INTEL by ${primaryRealmName}`}
               >
-                {thread.primaryRealm}
-              </button>
-            )}
-            {thread.primaryFront && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (thread.primaryRealm) setRealm(thread.primaryRealm);
-                  setFront(thread.primaryFront);
-                  setL2(null);
-                  setL3(null);
-                  navigate('/intel');
-                }}
-                className="rounded-md border px-2 py-0.5 font-display transition-colors hover:brightness-125"
-                style={{
-                  fontSize: '11px',
-                  color: FRONT_COLORS[thread.primaryFront],
-                  borderColor: FRONT_COLORS[thread.primaryFront] + '40',
-                  background: FRONT_COLORS[thread.primaryFront] + '0D',
-                }}
-                title={`Filter INTEL by ${thread.primaryFront}`}
-              >
-                {thread.primaryFront}
+                {primaryRealmName}
               </button>
             )}
             {thread.primaryL2 && (
               <button
                 type="button"
                 onClick={() => {
-                  if (thread.primaryRealm) setRealm(thread.primaryRealm);
-                  if (thread.primaryFront) setFront(thread.primaryFront);
+                  if (primaryRealmId) setRealmId(primaryRealmId);
                   setL2(thread.primaryL2);
                   setL3(null);
                   navigate('/intel');
@@ -296,7 +246,6 @@ export function ThreadPage() {
           {thread.body}
         </div>
 
-        {/* Linked atoms */}
         {linkedAtoms.length > 0 && (
           <div className="mt-5 border-t border-border pt-4">
             <div className="mb-2 flex items-center justify-between">
@@ -346,11 +295,9 @@ export function ThreadPage() {
                     key={a.id}
                     type="button"
                     onClick={() => {
-                      // Navigate to /intel with this atom's context as filter
-                      setRealm(a.realm);
-                      if (a.front) setFront(a.front);
-                      if (a.L2) setL2(a.L2);
-                      if (a.L3) setL3(a.L3);
+                      setRealmId(a.realmId);
+                      if (a.pathParts[1]) setL2(a.pathParts[1]);
+                      if (a.pathParts[2]) setL3(a.pathParts[2]);
                       navigate('/intel');
                     }}
                     className="inline-flex items-center gap-1.5 rounded-md border border-border bg-bg px-2 py-1 text-text-silver transition-colors hover:border-text-silver/50 hover:text-text"
@@ -370,24 +317,21 @@ export function ThreadPage() {
             {atomsView === 'tree' && tree && (
               <div className="rounded-md border border-border bg-bg-elevated p-2">
                 {(() => {
-                  // Group linked atoms by realm, render each realm's branch
-                  const realmsWithAtoms = new Set(linkedAtoms.map((a) => a.realm));
+                  const realmsWithAtoms = new Set<RealmId>(linkedAtoms.map((a) => a.realmId));
                   const linkedAtomIds = new Set(linkedAtoms.map((a) => a.id));
-                  return Array.from(realmsWithAtoms).map((realmName) => {
-                    const realmNode = tree.children.find((c) => c.name === realmName);
+                  return Array.from(realmsWithAtoms).map((realmId) => {
+                    const realmNode = tree.children.find((c) => c.realmId === realmId);
                     if (!realmNode) return null;
                     return (
                       <TaxonomyTree
-                        key={realmName}
+                        key={realmId}
                         root={realmNode}
                         mode="multi-atom"
                         selectedAtomIds={linkedAtomIds}
                         onToggleAtom={(atom) => {
-                          // Click atom = navigate to its context
-                          setRealm(atom.realm);
-                          if (atom.front) setFront(atom.front);
-                          if (atom.L2) setL2(atom.L2);
-                          if (atom.L3) setL3(atom.L3);
+                          setRealmId(atom.realmId);
+                          if (atom.pathParts[1]) setL2(atom.pathParts[1]);
+                          if (atom.pathParts[2]) setL3(atom.pathParts[2]);
                           navigate('/intel');
                         }}
                         compact={true}
@@ -400,7 +344,6 @@ export function ThreadPage() {
           </div>
         )}
 
-        {/* Action bar — reactions, save, share */}
         <div className="mt-5 flex flex-wrap items-center gap-2">
           <ReactionBar
             sourceSurface="intel"
@@ -417,7 +360,6 @@ export function ThreadPage() {
           </div>
         </div>
 
-        {/* Reply trigger */}
         {bee && !replyingTo && !thread.isLocked && (
           <button
             type="button"
@@ -430,7 +372,6 @@ export function ThreadPage() {
           </button>
         )}
 
-        {/* Root reply composer */}
         {replyingTo === 'root' && bee && (
           <div className="mt-3">
             <InlineComposer
@@ -440,8 +381,7 @@ export function ThreadPage() {
               onCancel={() => setReplyingTo(null)}
               draftKey={`intel-reply-${thread.id}-root`}
               inheritedContext={{
-                realm: thread.primaryRealm,
-                front: thread.primaryFront,
+                realmId: thread.primaryRealm,
                 l2: thread.primaryL2,
                 atomIds: linkedAtoms.map((a) => a.id),
               }}
@@ -460,7 +400,6 @@ export function ThreadPage() {
         )}
       </article>
 
-      {/* Replies */}
       <div className="mt-6 space-y-4">
         {topLevelPosts.length === 0 && !thread.isLocked && bee && (
           <p
@@ -496,8 +435,7 @@ export function ThreadPage() {
             canReply={!!bee && !thread.isLocked}
             threadId={thread.id}
             threadContext={{
-              realm: thread.primaryRealm,
-              front: thread.primaryFront,
+              realmId: thread.primaryRealm,
               l2: thread.primaryL2,
               atomIds: linkedAtoms.map((a) => a.id),
             }}
@@ -523,8 +461,7 @@ interface PostNodeProps {
   canReply: boolean;
   threadId: string;
   threadContext: {
-    realm?: string | null;
-    front?: Front | null;
+    realmId?: RealmId | null;
     l2?: string | null;
     atomIds?: string[];
   };
@@ -551,7 +488,6 @@ function PostNode({
       className={cn(indent && 'ml-4 border-l border-border pl-4 md:ml-6 md:pl-5')}
     >
       <div className="rounded-lg border border-border bg-bg-elevated p-4">
-        {/* Author + time */}
         <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-text-muted">
           {post.authorHandle && (
             <>
@@ -581,7 +517,6 @@ function PostNode({
           </span>
         </div>
 
-        {/* Body */}
         <div
           className="whitespace-pre-wrap text-text-silver"
           style={{ fontSize: '14px', lineHeight: '1.6' }}
@@ -589,7 +524,6 @@ function PostNode({
           {post.body}
         </div>
 
-        {/* Actions */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <ReactionBar
             sourceSurface="intel"
@@ -611,7 +545,6 @@ function PostNode({
         </div>
       </div>
 
-      {/* Reply composer for this post */}
       {replyingTo === post.id && (
         <div className="mt-3">
           <InlineComposer
@@ -635,7 +568,6 @@ function PostNode({
         </div>
       )}
 
-      {/* Nested replies */}
       {children.length > 0 && (
         <div className="mt-3 space-y-3">
           {children.map((child) => (

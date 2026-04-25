@@ -15,13 +15,18 @@ import { useManualData } from '@/lib/useManualData';
 import { useIntelStore } from '@/stores/useIntelStore';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { KETTLE_COLORS, FRONT_COLORS, REALM_COLORS, BEE_COLOR } from '@/lib/constants';
+import {
+  KETTLE_COLORS,
+  REALM_COLORS,
+  REALM_NAMES,
+  REALM_ID_BY_NAME,
+  BEE_COLOR,
+} from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import type { Front } from '@/types/manual';
+import type { RealmId } from '@/types/manual';
 
 interface ThreadListProps {
-  selectedRealm: string | null;
-  selectedFront: Front | null;
+  selectedRealmId: RealmId | null;
   selectedL2: string | null;
   selectedL3?: string | null;
   sortBy?: 'hot' | 'new' | 'top';
@@ -33,8 +38,7 @@ interface ThreadListProps {
 }
 
 export function ThreadList({
-  selectedRealm,
-  selectedFront,
+  selectedRealmId,
   selectedL2,
   selectedL3 = null,
   sortBy = 'hot',
@@ -45,9 +49,6 @@ export function ThreadList({
   const { atoms } = useManualData();
   const { bee } = useAuth();
 
-  // Personal-view sort mode (saved + mythreads). Each view remembers its own
-  // preference in localStorage. 'newest' = newest first. 'active' = most
-  // recently replied first.
   const personalSortKey = savedMode
     ? 'intel-sort-saved'
     : myThreadsMode
@@ -74,14 +75,11 @@ export function ThreadList({
     }
   }
 
-  // Track which threads the current Bee has saved. Batch-fetched when threads
-  // load. Optimistic toggle on click.
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
 
   async function handleToggleSave(threadId: string) {
     if (!bee?.id) return;
     const currentlySaved = savedIds.has(threadId);
-    // Optimistic
     setSavedIds((prev) => {
       const next = new Set(prev);
       if (currentlySaved) next.delete(threadId);
@@ -90,10 +88,8 @@ export function ThreadList({
     });
     try {
       await toggleSave('intel', threadId, bee.id);
-      // Notify sidebar to refresh Saved badge count
       window.dispatchEvent(new CustomEvent('intel-counts-refresh'));
     } catch (err) {
-      // Rollback
       console.warn('toggleSave failed:', err);
       setSavedIds((prev) => {
         const next = new Set(prev);
@@ -107,37 +103,29 @@ export function ThreadList({
   const [error, setError] = useState<string | null>(null);
 
   // Precompute atomIds-in-realm for the atom-link filter.
-  // Cap at 200: each atom ID is ~80 chars; with BATCH=50 in listThreads we
-  // make up to 4 requests per thread fetch. Higher caps cause wasted batches
-  // + URL-length 400s.
   const atomIdsInRealm = useMemo(() => {
-    if (!selectedRealm) return undefined;
+    if (!selectedRealmId) return undefined;
     const matches = atoms.filter((a) => {
-      if (a.realm !== selectedRealm) return false;
-      if (selectedFront && a.front !== selectedFront) return false;
-      if (selectedL2 && a.L2 !== selectedL2) return false;
-      if (selectedL3 && a.L3 !== selectedL3) return false;
+      if (a.realmId !== selectedRealmId) return false;
+      if (selectedL2 && a.pathParts[1] !== selectedL2) return false;
+      if (selectedL3 && a.pathParts[2] !== selectedL3) return false;
       return true;
     });
-    // Prefer leaves + sourced atoms when capping
     matches.sort((a, b) => {
-      const aScore = (a.isLeaf ? 2 : 0) + (a.kettle === 'Sourced' ? 1 : 0);
-      const bScore = (b.isLeaf ? 2 : 0) + (b.kettle === 'Sourced' ? 1 : 0);
+      const aScore = (a.isLeaf ? 2 : 0) + (a.kettle === 'Accepted' ? 1 : 0);
+      const bScore = (b.isLeaf ? 2 : 0) + (b.kettle === 'Accepted' ? 1 : 0);
       return bScore - aScore;
     });
     return matches.slice(0, 200).map((a) => a.id);
-  }, [atoms, selectedRealm, selectedFront, selectedL2, selectedL3]);
+  }, [atoms, selectedRealmId, selectedL2, selectedL3]);
 
-  // Map atoms by id for quick lookup on cards
   const atomById = useMemo(() => {
     const m = new Map(atoms.map((a) => [a.id, a]));
     return m;
   }, [atoms]);
 
-  // Fetch atom + category links for all visible threads so we can show chips
   const [threadAtomLinks, setThreadAtomLinks] = useState<Map<string, string[]>>(new Map());
   const [threadCategoryLinks, setThreadCategoryLinks] = useState<Map<string, string[]>>(new Map());
-  // Batch-fetched reaction summaries (per thread id)
   const [reactionSummaries, setReactionSummaries] = useState<Map<string, ReactionSummary>>(new Map());
 
   useEffect(() => {
@@ -149,8 +137,6 @@ export function ThreadList({
     setSavedIds(new Set());
     setReactionSummaries(new Map());
 
-    // Mode dispatch: savedMode → Bee's bookmarks; myThreadsMode → Bee's authored;
-    // otherwise → standard filtered listing.
     const threadPromise: Promise<ForumThread[]> =
       savedMode
         ? bee?.id
@@ -168,8 +154,7 @@ export function ThreadList({
             : Promise.resolve([] as ForumThread[])
           : listThreads(
               {
-                realm: selectedRealm,
-                front: selectedFront,
+                realmId: selectedRealmId,
                 l2: selectedL2,
                 sortBy,
                 timeWindowHours,
@@ -182,7 +167,6 @@ export function ThreadList({
         if (cancelled) return;
         setThreads(result);
 
-        // Fetch atom + category links + saved state for these threads (best effort)
         if (result.length > 0 && supabase) {
           const ids = result.map((t) => t.id);
           try {
@@ -219,42 +203,38 @@ export function ThreadList({
             }
             setThreadCategoryLinks(catMap);
           } catch {
-            // non-fatal (table may not exist pre-migration)
+            // non-fatal
           }
-          // Batch-fetch which of these threads the current Bee has saved.
-          // In savedMode all are saved by definition; skip the call.
           if (!savedMode && bee?.id) {
             try {
               const saved = await isSavedBatch(ids, bee.id);
               if (!cancelled) setSavedIds(saved);
             } catch {
-              // non-fatal (entity_saves table may not be migrated yet)
+              // non-fatal
             }
           } else if (savedMode) {
-            // All visible threads are saved in savedMode
             setSavedIds(new Set(ids));
           }
 
-          // Batch-fetch reaction summaries for all visible threads
           try {
             const reactions = await getReactionsBatch(ids, bee?.id ?? null);
             if (!cancelled) setReactionSummaries(reactions);
           } catch {
-            // non-fatal (entity_reactions table may not be migrated yet)
+            // non-fatal
           }
         }
       })
       .catch((err) => {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load threads');
-          setThreads([]); // allow empty state to render instead of infinite skeleton
+          setThreads([]);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [selectedRealm, selectedFront, selectedL2, sortBy, timeWindowHours, atomIdsInRealm, savedMode, myThreadsMode, personalSortMode, bee?.id]);
+  }, [selectedRealmId, selectedL2, sortBy, timeWindowHours, atomIdsInRealm, savedMode, myThreadsMode, personalSortMode, bee?.id]);
 
   if (error) {
     return (
@@ -269,8 +249,7 @@ export function ThreadList({
   if (threads === null)
     return (
       <ThreadListSkeleton
-        realm={selectedRealm}
-        front={selectedFront}
+        realmId={selectedRealmId}
         savedMode={savedMode}
         myThreadsMode={myThreadsMode}
       />
@@ -278,8 +257,7 @@ export function ThreadList({
   if (threads.length === 0)
     return (
       <EmptyThreads
-        realm={selectedRealm}
-        front={selectedFront}
+        realmId={selectedRealmId}
         l2={selectedL2}
         l3={selectedL3}
         savedMode={savedMode}
@@ -322,10 +300,9 @@ type AtomShape = {
   id: string;
   name: string;
   kettle: string;
-  realm: string;
-  front?: Front;
-  L2?: string;
-  L3?: string;
+  realmId: RealmId;
+  realmName: string;
+  pathParts: string[];
 };
 
 function ThreadCard({
@@ -347,27 +324,21 @@ function ThreadCard({
   onToggleSave: () => void;
   reactionSummary?: ReactionSummary;
 }) {
-  const { setRealm, setFront, setL2, setL3 } = useIntelStore();
+  const { setRealmId, setL2, setL3 } = useIntelStore();
 
   const linkedAtoms = atomIds
     .map((id) => atomById.get(id) as AtomShape | undefined)
     .filter((a): a is AtomShape => !!a)
     .slice(0, 4);
 
-  // Accent color: Front takes precedence (more specific), else realm
   const accentColor =
-    thread.primaryFront && FRONT_COLORS[thread.primaryFront]
-      ? FRONT_COLORS[thread.primaryFront]
-      : thread.primaryRealm &&
-          REALM_COLORS[thread.primaryRealm as keyof typeof REALM_COLORS]
-        ? REALM_COLORS[thread.primaryRealm as keyof typeof REALM_COLORS]
-        : '#6B94C8'; // default to INTEL blue
+    thread.primaryRealm && REALM_COLORS[thread.primaryRealm]
+      ? REALM_COLORS[thread.primaryRealm]
+      : '#6B94C8';
 
-  // Show up to 3 category chips (excluding ones that would duplicate primary)
+  const primaryRealmName = thread.primaryRealm ? REALM_NAMES[thread.primaryRealm] : null;
   const primarySet = new Set(
-    [thread.primaryRealm, thread.primaryFront, thread.primaryL2]
-      .filter(Boolean)
-      .map((s) => String(s)),
+    [primaryRealmName, thread.primaryL2].filter(Boolean).map((s) => String(s)),
   );
   const categoryChips = categoryPaths
     .filter((path) => {
@@ -379,36 +350,22 @@ function ThreadCard({
   function handleAtomClick(e: React.MouseEvent, atom: AtomShape) {
     e.preventDefault();
     e.stopPropagation();
-    setRealm(atom.realm);
-    if (atom.front) setFront(atom.front);
-    if (atom.L2) setL2(atom.L2);
-    if (atom.L3) setL3(atom.L3);
+    setRealmId(atom.realmId);
+    if (atom.pathParts[1]) setL2(atom.pathParts[1]);
+    if (atom.pathParts[2]) setL3(atom.pathParts[2]);
   }
 
   function handleCategoryClick(e: React.MouseEvent, path: string) {
     e.preventDefault();
     e.stopPropagation();
-    // Parse the category path to set realm/front/L2/L3 filters
     const parts = path.split(' / ').map((s) => s.trim()).filter(Boolean);
     if (parts.length === 0) return;
-    const FRONTS = [
-      'UNITE & RULE',
-      'INVESTIGATE',
-      'THE NEW WORLD ORDER',
-      'PROSECUTE',
-      'THE DEEP STATE',
-    ];
-    setRealm(parts[0]);
-    setFront(null);
+    const realmId = REALM_ID_BY_NAME[parts[0]];
+    if (!realmId) return;
+    setRealmId(realmId);
     setL2(null);
     setL3(null);
-    if (parts.length >= 2) {
-      if (FRONTS.includes(parts[1])) {
-        setFront(parts[1] as Front);
-      } else {
-        setL2(parts[1]);
-      }
-    }
+    if (parts.length >= 2) setL2(parts[1]);
     if (parts.length >= 3) setL3(parts[2]);
   }
 
@@ -422,8 +379,7 @@ function ThreadCard({
         <div className="p-4">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            {/* Primary realm/front/L2 breadcrumb badges */}
-            {thread.primaryRealm && (
+            {primaryRealmName && (
               <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                 <span
                   className="rounded px-1.5 py-0.5 font-mono"
@@ -434,19 +390,8 @@ function ThreadCard({
                   }}
                   data-size="meta"
                 >
-                  {thread.primaryRealm}
+                  {primaryRealmName}
                 </span>
-                {thread.primaryFront && (
-                  <span
-                    className="rounded bg-bg px-1.5 py-0.5 font-display"
-                    style={{
-                      fontSize: '10px',
-                      color: FRONT_COLORS[thread.primaryFront],
-                    }}
-                  >
-                    {thread.primaryFront}
-                  </span>
-                )}
                 {thread.primaryL2 && (
                   <span
                     className="rounded bg-bg px-1.5 py-0.5 font-mono text-text-dim"
@@ -477,7 +422,6 @@ function ThreadCard({
               </p>
             )}
 
-            {/* Linked atoms on card (clickable → filter by atom's context) */}
             {linkedAtoms.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">
                 {linkedAtoms.map((a) => (
@@ -487,7 +431,7 @@ function ThreadCard({
                     onClick={(e) => handleAtomClick(e, a)}
                     className="inline-flex items-center gap-1 rounded border border-transparent bg-bg/60 px-1.5 py-0.5 text-text-silver transition-colors hover:border-text-silver/30 hover:bg-bg-elevated hover:text-text"
                     style={{ fontSize: '10.5px' }}
-                    title={`Filter by ${a.realm}${a.L2 ? ` · ${a.L2}` : ''}${a.L3 ? ` · ${a.L3}` : ''}`}
+                    title={`Filter by ${a.realmName}${a.pathParts[1] ? ` · ${a.pathParts[1]}` : ''}${a.pathParts[2] ? ` · ${a.pathParts[2]}` : ''}`}
                   >
                     <span
                       className="h-1 w-1 rounded-full"
@@ -511,7 +455,6 @@ function ThreadCard({
               </div>
             )}
 
-            {/* Category tags (from schema v5 multi-category system) */}
             {categoryChips.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1">
                 {categoryChips.map((path) => {
@@ -542,7 +485,6 @@ function ThreadCard({
               </div>
             )}
           </div>
-          {/* Top-right actions: lock indicator + share + bookmark */}
           <div className="flex flex-shrink-0 items-start gap-0.5">
             {thread.isLocked && (
               <Lock size={14} className="mt-1.5 mr-1 text-text-muted" />
@@ -571,9 +513,6 @@ function ThreadCard({
           </div>
         </div>
 
-        {/* Reactions row — compact mode. ReactionBar handles hiding zero-count
-            reactions and stopping propagation per-button, so we just render
-            it unconditionally and trust it to go invisible when empty. */}
         {reactionSummary &&
           (reactionSummary.counts.honey > 0 ||
             reactionSummary.counts.fire > 0 ||
@@ -612,11 +551,6 @@ function ThreadCard({
   );
 }
 
-/**
- * Sort toggle for Saved + My Threads views. Segmented 2-button control:
- * Newest / Recently Active. Persists to localStorage via ThreadList parent.
- * Accent color mirrors the view (honey for Saved, BEE_COLOR for My Threads).
- */
 function PersonalSortToggle({
   mode,
   onChange,
@@ -680,11 +614,6 @@ function PersonalSortToggle({
   );
 }
 
-/**
- * Small icon-only share button for thread cards. Mirrors the bookmark icon's
- * visual weight. Stops propagation so the click doesn't open the thread.
- * Shows a Check icon for 2s after successful copy/share.
- */
 function CardShareButton({ threadId }: { threadId: string }) {
   const { bee } = useAuth();
   const [copied, setCopied] = useState(false);
@@ -701,7 +630,6 @@ function CardShareButton({ threadId }: { threadId: string }) {
         ? await createShareLink('intel', threadId, bee.id, absoluteUrl)
         : absoluteUrl;
 
-      // navigator.share on mobile, clipboard elsewhere
       if (navigator.share) {
         try {
           await navigator.share({ url: shareUrl });
@@ -774,30 +702,22 @@ function MetaPill({ icon, children }: { icon: React.ReactNode; children: React.R
 }
 
 function ThreadListSkeleton({
-  realm,
-  front,
+  realmId,
   savedMode = false,
   myThreadsMode = false,
 }: {
-  realm: string | null;
-  front: Front | null;
+  realmId: RealmId | null;
   savedMode?: boolean;
   myThreadsMode?: boolean;
 }) {
-  // Match ThreadCard accent-color logic for visual continuity between
-  // skeleton → real cards. Saved mode uses honey gold. My Threads uses
-  // soft amber (Bee color) — your output, earned, honey-family.
   const accentColor = savedMode
     ? '#FAD15E'
     : myThreadsMode
       ? BEE_COLOR
-      : front && FRONT_COLORS[front]
-        ? FRONT_COLORS[front]
-        : realm && REALM_COLORS[realm as keyof typeof REALM_COLORS]
-          ? REALM_COLORS[realm as keyof typeof REALM_COLORS]
-          : '#6B94C8'; // INTEL blue default
+      : realmId && REALM_COLORS[realmId]
+        ? REALM_COLORS[realmId]
+        : '#6B94C8';
 
-  // Randomized widths to feel like real content rather than uniform bars
   const cards = [
     { titleW: 75, bodyW1: 95, bodyW2: 60, atoms: 3 },
     { titleW: 60, bodyW1: 90, bodyW2: 72, atoms: 2 },
@@ -816,7 +736,6 @@ function ThreadListSkeleton({
           }}
         >
           <div className="p-4">
-            {/* Realm chip placeholder */}
             <div className="mb-2 flex flex-wrap items-center gap-1.5">
               <span
                 className="h-3.5 w-14 rounded"
@@ -825,13 +744,11 @@ function ThreadListSkeleton({
               <span className="h-3.5 w-20 rounded bg-bg" />
             </div>
 
-            {/* Title placeholder */}
             <div
               className="h-5 rounded bg-text-muted/15"
               style={{ width: `${c.titleW}%` }}
             />
 
-            {/* Body preview — 2 lines */}
             <div className="mt-2 space-y-1.5">
               <div
                 className="h-3 rounded bg-text-muted/10"
@@ -843,7 +760,6 @@ function ThreadListSkeleton({
               />
             </div>
 
-            {/* Atom chips placeholder */}
             <div className="mt-3 flex flex-wrap gap-1">
               {Array.from({ length: c.atoms }).map((_, j) => (
                 <span
@@ -857,7 +773,6 @@ function ThreadListSkeleton({
               ))}
             </div>
 
-            {/* Meta row placeholder */}
             <div className="mt-3 flex items-center gap-3">
               <span className="h-3 w-14 rounded bg-text-muted/10" />
               <span className="h-3 w-10 rounded bg-text-muted/10" />
@@ -871,24 +786,20 @@ function ThreadListSkeleton({
 }
 
 function EmptyThreads({
-  realm,
-  front,
+  realmId,
   l2,
   l3,
   savedMode = false,
   myThreadsMode = false,
   signedIn = true,
 }: {
-  realm: string | null;
-  front: Front | null;
+  realmId: RealmId | null;
   l2: string | null;
   l3: string | null;
   savedMode?: boolean;
   myThreadsMode?: boolean;
   signedIn?: boolean;
 }) {
-  // My Threads empty state — soft amber (Bee color). Your output earns honey.
-  // Frame as invitation, not absence: "your first thread is waiting."
   if (myThreadsMode) {
     const signedOut = !signedIn;
     const headline = signedOut ? 'Sign in to see your threads' : 'Your first thread is waiting';
@@ -903,7 +814,6 @@ function EmptyThreads({
           background: `${BEE_COLOR}08`,
         }}
       >
-        {/* Hex honeycomb cell, subtle — nod to Bee identity */}
         <div className="mx-auto mb-4 flex items-center justify-center">
           <svg width="36" height="40" viewBox="0 0 36 40" xmlns="http://www.w3.org/2000/svg">
             <polygon
@@ -974,7 +884,6 @@ function EmptyThreads({
     );
   }
 
-  // Saved-mode empty state — different messaging, honey-gold theming
   if (savedMode) {
     const signedOut = !signedIn;
     const headline = signedOut ? 'Sign in to see your Saved threads' : 'Nothing saved yet';
@@ -1047,28 +956,21 @@ function EmptyThreads({
     );
   }
 
-  // Build the "where" phrase for the empty message
-  const location =
-    [realm, front, l2, l3].filter(Boolean).join(' · ') || 'INTEL';
+  const realmName = realmId ? REALM_NAMES[realmId] : null;
+  const location = [realmName, l2, l3].filter(Boolean).join(' · ') || 'INTEL';
 
-  // Accent color matches the context
-  const accentColor = front
-    ? FRONT_COLORS[front]
-    : realm && REALM_COLORS[realm as keyof typeof REALM_COLORS]
-      ? REALM_COLORS[realm as keyof typeof REALM_COLORS]
-      : '#6B94C8'; // INTEL blue default
+  const accentColor = realmId && REALM_COLORS[realmId] ? REALM_COLORS[realmId] : '#6B94C8';
 
-  // Messaging adapts to depth
-  const isSpecific = Boolean(l2 || l3 || front);
+  const isSpecific = Boolean(l2 || l3);
   const headline = isSpecific
     ? `No threads in ${location} yet`
-    : realm
-      ? `No threads in ${realm} yet`
+    : realmName
+      ? `No threads in ${realmName} yet`
       : 'The feed is quiet';
 
   const subtext = isSpecific
     ? 'Be the first Bee to post here. Earn BLiNG! for sparking the conversation.'
-    : realm
+    : realmName
       ? 'Start the discussion for this realm. Your thread sets the tone.'
       : 'Pick a realm from the top, or start something from scratch. Every thread begins with one Bee.';
 
@@ -1080,14 +982,12 @@ function EmptyThreads({
         background: `${accentColor}08`,
       }}
     >
-      {/* Accent dot */}
       <div
         className="mx-auto mb-4 h-2 w-12 rounded-full"
         style={{ background: accentColor, opacity: 0.6 }}
       />
 
-      {/* Location chip */}
-      {realm && (
+      {realmName && (
         <div
           className="mb-3 inline-block rounded px-2 py-0.5 font-mono uppercase tracking-widest"
           style={{
@@ -1115,7 +1015,6 @@ function EmptyThreads({
         {subtext}
       </p>
 
-      {/* Primary CTA — matches context */}
       <Link
         to="/intel/new"
         className="mt-5 inline-flex items-center gap-1.5 rounded-md border-2 px-4 py-1.5 transition-colors"
@@ -1137,8 +1036,7 @@ function EmptyThreads({
         </span>
       </Link>
 
-      {/* Secondary hint when realm selected */}
-      {realm && (
+      {realmName && (
         <p
           className="mt-4 font-mono text-text-muted"
           style={{ fontSize: '10.5px' }}

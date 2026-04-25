@@ -27,15 +27,8 @@ export default {
         },
         // Honey signature (for BLiNG! only, not ambient)
         honey: '#FAD15E',
-        // Front colors
-        front: {
-          ur: '#FAD15E',      // UNITE & RULE
-          inv: '#E88938',     // INVESTIGATE
-          nwo: '#9B7FC8',     // THE NEW WORLD ORDER
-          pros: '#6FCF8F',    // PROSECUTE
-          ds: '#C94C4C',      // THE DEEP STATE
-        },
-        // Kettle states
+        // Kettle states (semantic palette — sourced/unsourced retained as
+        // green/red affordance colors used outside the Kettle metaphor)
         kettle: {
           sourced: '#6FCF8F',    // whistling / FACT (green)
           accepted: '#6B94C8',   // rolling boil (blue)

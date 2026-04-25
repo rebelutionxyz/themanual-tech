@@ -3,7 +3,7 @@ import { Search, X, Plus, Check, Network } from 'lucide-react';
 import { useManualData } from '@/lib/useManualData';
 import { KETTLE_COLORS } from '@/lib/constants';
 import { TaxonomyTree } from '@/components/manual/TaxonomyTree';
-import type { Atom, Front } from '@/types/manual';
+import type { Atom, RealmId } from '@/types/manual';
 import { cn } from '@/lib/utils';
 
 interface AtomPickerProps {
@@ -20,12 +20,11 @@ interface AtomPickerProps {
   /** Error message to display */
   error?: string;
   /**
-   * Context to prioritize atoms from a specific realm/front/l2.
+   * Context to prioritize atoms from a specific realm/l2.
    * These don't restrict selection — they just rank them higher when user types.
    */
   realmContext?: {
-    realm?: string | null;
-    front?: Front | null;
+    realmId?: RealmId | null;
     l2?: string | null;
   };
   /** Hide suggestions panel until user starts typing */
@@ -34,10 +33,6 @@ interface AtomPickerProps {
 
 /**
  * Universal atom picker — used in every composer UI where Bees link to the Manual.
- *
- * V2 improvements:
- * - searchOnly mode: no suggestions until user types
- * - realmContext: when supplied, atoms in that scope rank higher
  */
 export function AtomPicker({
   value,
@@ -66,12 +61,10 @@ export function AtomPicker({
     [value, atomById],
   );
 
-  /** Score an atom against the query + context */
   function scoreAtom(atom: Atom, q: string): number {
     const nameLower = atom.name.toLowerCase();
     let score = 0;
 
-    // Query match
     if (q) {
       if (nameLower === q) score += 1000;
       else if (nameLower.startsWith(q)) score += 600;
@@ -80,16 +73,11 @@ export function AtomPicker({
       if (atom.themeTags.some((t) => t.toLowerCase().includes(q))) score += 50;
     }
 
-    // Context boost
-    if (realmContext?.realm && atom.realm === realmContext.realm) score += 40;
-    if (realmContext?.front && atom.front === realmContext.front) score += 30;
-    if (realmContext?.l2 && atom.L2 === realmContext.l2) score += 20;
+    if (realmContext?.realmId && atom.realmId === realmContext.realmId) score += 40;
+    if (realmContext?.l2 && atom.pathParts[1] === realmContext.l2) score += 20;
 
-    // Leaf atoms preferred (actual content vs. structural categories)
     if (atom.isLeaf) score += 5;
-
-    // Sourced > unsourced
-    if (atom.kettle === 'Sourced') score += 3;
+    if (atom.kettle === 'Accepted') score += 3;
 
     return score;
   }
@@ -99,26 +87,21 @@ export function AtomPicker({
 
     const q = query.trim().toLowerCase();
 
-    // searchOnly mode: no suggestions without query
     if (searchOnly && !q) return [];
 
     let pool = atoms;
-    // If we have context but no query, narrow to context first (don't show ALL atoms)
-    if (!q && realmContext?.realm) {
-      pool = pool.filter((a) => a.realm === realmContext.realm);
-      if (realmContext.front) pool = pool.filter((a) => a.front === realmContext.front);
-      if (realmContext.l2) pool = pool.filter((a) => a.L2 === realmContext.l2);
+    if (!q && realmContext?.realmId) {
+      pool = pool.filter((a) => a.realmId === realmContext.realmId);
+      if (realmContext.l2) pool = pool.filter((a) => a.pathParts[1] === realmContext.l2);
     }
 
     if (!q) {
-      // Context-only view — show top leaves in that scope
       return pool
         .filter((a) => a.isLeaf)
         .sort((a, b) => scoreAtom(b, '') - scoreAtom(a, ''))
         .slice(0, 20);
     }
 
-    // Query-driven scoring
     return atoms
       .map((a) => ({ atom: a, score: scoreAtom(a, q) }))
       .filter((r) => r.score > 0)
@@ -126,7 +109,7 @@ export function AtomPicker({
       .slice(0, 20)
       .map((r) => r.atom);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [atoms, loaded, query, searchOnly, realmContext?.realm, realmContext?.front, realmContext?.l2]);
+  }, [atoms, loaded, query, searchOnly, realmContext?.realmId, realmContext?.l2]);
 
   const atMax = typeof max === 'number' && value.length >= max;
 
@@ -142,8 +125,8 @@ export function AtomPicker({
   }
 
   const hasContextHint =
-    !searchOnly === false && // searchOnly is true by default
-    realmContext?.realm &&
+    !searchOnly === false &&
+    realmContext?.realmId &&
     !query.trim();
 
   return (
@@ -162,7 +145,6 @@ export function AtomPicker({
               </span>
             )}
           </div>
-          {/* Mode toggle: Search ↔ Tree */}
           <div className="flex items-center gap-0.5 rounded-md border border-border bg-bg-elevated p-0.5">
             <button
               type="button"
@@ -221,7 +203,6 @@ export function AtomPicker({
       {/* SEARCH MODE */}
       {!treeMode && (
         <>
-          {/* Search input */}
           <div className="relative">
             <Search
               size={14}
@@ -255,7 +236,6 @@ export function AtomPicker({
         />
       </div>
 
-      {/* Context hint */}
       {hasContextHint && (
         <p
           className="mt-1 font-mono text-text-dim"
@@ -264,19 +244,17 @@ export function AtomPicker({
         >
           Showing atoms from{' '}
           <span className="text-text-silver">
-            {realmContext!.realm}
-            {realmContext!.front && ` · ${realmContext!.front}`}
+            {realmContext!.realmId}
             {realmContext!.l2 && ` · ${realmContext!.l2}`}
           </span>
           . Type to search all atoms.
         </p>
       )}
 
-      {/* Empty state when searchOnly and no query */}
       {searchOnly && !query.trim() && focused && suggestions.length === 0 && !atMax && (
         <div className="mt-1 rounded-md border border-border bg-bg-elevated px-3 py-2">
           <p className="text-text-muted" style={{ fontSize: '12px' }}>
-            Type to search 5,997 Manual atoms
+            Type to search 4,860 Manual atoms
           </p>
         </div>
       )}
@@ -287,7 +265,6 @@ export function AtomPicker({
         </p>
       )}
 
-      {/* Suggestions dropdown */}
       {showSuggestions && suggestions.length > 0 && !atMax && (
         <div className="mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-bg-elevated shadow-lg">
           {suggestions.map((atom) => {
@@ -342,7 +319,6 @@ export function AtomPicker({
       {/* TREE MODE */}
       {treeMode && tree && loaded && (
         <div className="max-h-96 overflow-y-auto rounded-md border border-border bg-bg-elevated p-2">
-          {/* Render each realm as a top-level expandable branch */}
           {tree.children.map((realmNode) => (
             <TaxonomyTree
               key={realmNode.path}

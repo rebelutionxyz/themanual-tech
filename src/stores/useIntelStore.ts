@@ -1,13 +1,12 @@
 import { create } from 'zustand';
-import type { Front } from '@/types/manual';
+import type { RealmId } from '@/types/manual';
 import type { IntelView } from '@/components/intel/IntelSidebar';
 
 /** Time window options in hours. 0 = All-time */
 export type TimeWindow = 1 | 4 | 12 | 24 | 48 | 72 | 0;
 
 interface IntelState {
-  selectedRealm: string | null;
-  selectedFront: Front | null;
+  selectedRealmId: RealmId | null;
   selectedL2: string | null;
   selectedL3: string | null;
   activeView: IntelView;
@@ -17,8 +16,7 @@ interface IntelState {
   /** Time window for Breaking view (default 12h) */
   breakingWindow: TimeWindow;
 
-  setRealm: (realm: string | null) => void;
-  setFront: (front: Front | null) => void;
+  setRealmId: (realmId: RealmId | null) => void;
   setL2: (l2: string | null) => void;
   setL3: (l3: string | null) => void;
   setActiveView: (view: IntelView) => void;
@@ -29,31 +27,22 @@ interface IntelState {
 }
 
 export const useIntelStore = create<IntelState>()((set) => ({
-  selectedRealm: null,
-  selectedFront: null,
+  selectedRealmId: null,
   selectedL2: null,
   selectedL3: null,
   activeView: 'home',
   hotWindow: 24,
   breakingWindow: 12,
 
-  setRealm: (realm) =>
+  setRealmId: (realmId) =>
     set({
-      selectedRealm: realm,
-      selectedFront: null,
-      selectedL2: null,
-      selectedL3: null,
-    }),
-  setFront: (front) =>
-    set({
-      selectedFront: front,
+      selectedRealmId: realmId,
       selectedL2: null,
       selectedL3: null,
     }),
   setL2: (l2) =>
     set({
       selectedL2: l2,
-      selectedFront: null,
       selectedL3: null,
     }),
   setL3: (l3) => set({ selectedL3: l3 }),
@@ -63,8 +52,7 @@ export const useIntelStore = create<IntelState>()((set) => ({
 
   reset: () =>
     set({
-      selectedRealm: null,
-      selectedFront: null,
+      selectedRealmId: null,
       selectedL2: null,
       selectedL3: null,
       activeView: 'home',

@@ -1,63 +1,52 @@
-import { REALM_ORDER, FRONT_ORDER, FRONT_CLASS } from '@/lib/constants';
+import { REALM_ORDER, REALM_NAMES } from '@/lib/constants';
 import { ScrollRow, RowLabel } from '@/components/ui/ScrollRow';
 import { cn } from '@/lib/utils';
-import type { Front } from '@/types/manual';
+import type { RealmId } from '@/types/manual';
 
 interface RealmBarProps {
-  selectedRealm: string | null;
-  selectedFront: Front | null;
+  selectedRealmId: RealmId | null;
   selectedL2: string | null;
-  onSelectRealm: (realm: string | null) => void;
-  onSelectFront: (front: Front | null) => void;
+  onSelectRealmId: (realmId: RealmId | null) => void;
   onSelectL2: (l2: string | null) => void;
   /** Reset L3 selection when parent context changes */
   onResetL3?: () => void;
-  realmSubs?: Record<string, string[]>;
+  /** Map of realmId -> array of L2 sub-paths */
+  realmSubs?: Partial<Record<RealmId, string[]>>;
 }
 
-const FRONT_SET = new Set<string>(FRONT_ORDER);
-
 export function RealmBar({
-  selectedRealm,
-  selectedFront,
+  selectedRealmId,
   selectedL2,
-  onSelectRealm,
-  onSelectFront,
+  onSelectRealmId,
   onSelectL2,
   onResetL3,
   realmSubs = {},
 }: RealmBarProps) {
-  // L2s for current realm, stripped of any Front names (defensive)
-  const subsForRealm = selectedRealm ? realmSubs[selectedRealm] ?? [] : [];
-  const l2Options = subsForRealm.filter((s) => !FRONT_SET.has(s));
-
-  const hasRealm = selectedRealm !== null;
-  const isPower = selectedRealm === 'Power';
+  const l2Options = selectedRealmId ? realmSubs[selectedRealmId] ?? [] : [];
+  const hasRealm = selectedRealmId !== null;
 
   return (
     <div className="sticky top-0 z-30 border-b border-border bg-bg-elevated/95 backdrop-blur-md">
       <div className="safe-pad-x">
-      {/* ROW 1 — 13 Realms */}
+      {/* ROW 1 — 14 Realms */}
       <ScrollRow>
         <RealmChip
           label="All"
-          active={selectedRealm === null}
+          active={selectedRealmId === null}
           onClick={() => {
-            onSelectRealm(null);
-            onSelectFront(null);
+            onSelectRealmId(null);
             onSelectL2(null);
             onResetL3?.();
           }}
         />
         <div className="h-5 w-px flex-shrink-0 bg-border" aria-hidden="true" />
-        {REALM_ORDER.map((realm) => (
+        {REALM_ORDER.map((realmId) => (
           <RealmChip
-            key={realm}
-            label={realm}
-            active={selectedRealm === realm}
+            key={realmId}
+            label={REALM_NAMES[realmId]}
+            active={selectedRealmId === realmId}
             onClick={() => {
-              onSelectRealm(selectedRealm === realm ? null : realm);
-              onSelectFront(null);
+              onSelectRealmId(selectedRealmId === realmId ? null : realmId);
               onSelectL2(null);
               onResetL3?.();
             }}
@@ -65,7 +54,7 @@ export function RealmBar({
         ))}
       </ScrollRow>
 
-      {/* ROW 2 — L2 subs for selected realm (excluding Fronts) */}
+      {/* ROW 2 — L2 subs for selected realm */}
       {hasRealm && l2Options.length > 0 && (
         <ScrollRow
           className="border-t border-border bg-bg/40"
@@ -81,36 +70,6 @@ export function RealmBar({
                 onResetL3?.();
               }}
             />
-          ))}
-        </ScrollRow>
-      )}
-
-      {/* ROW 3 — Fronts (Power only) */}
-      {isPower && (
-        <ScrollRow
-          className="border-t border-border bg-bg/40"
-          leading={<RowLabel>Fronts</RowLabel>}
-        >
-          {FRONT_ORDER.map((front) => (
-            <button
-              key={front}
-              type="button"
-              onClick={() => {
-                onSelectFront(selectedFront === front ? null : front);
-                onResetL3?.();
-              }}
-              className={cn(
-                'flex-shrink-0 rounded-md border px-2.5 py-1 transition-colors',
-                'font-display tracking-wide',
-                FRONT_CLASS[front],
-                selectedFront === front
-                  ? 'border-current bg-current/10'
-                  : 'border-transparent hover:border-current/40 hover:bg-bg-elevated',
-              )}
-              style={{ fontSize: '13px' }}
-            >
-              {front}
-            </button>
           ))}
         </ScrollRow>
       )}

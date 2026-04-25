@@ -41,3 +41,7 @@ supabase/.temp/
 # Environment files
 .env
 .env.local
+
+# Claude Code session state
+.claude/
+

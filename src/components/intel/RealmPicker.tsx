@@ -1,12 +1,11 @@
 import { useMemo } from 'react';
-import { REALM_ORDER, FRONT_ORDER, FRONT_CLASS, FRONT_COLORS } from '@/lib/constants';
+import { REALM_ORDER, REALM_NAMES } from '@/lib/constants';
 import { useManualData } from '@/lib/useManualData';
-import type { Front } from '@/types/manual';
+import type { RealmId } from '@/types/manual';
 import { cn } from '@/lib/utils';
 
 export interface RealmSelection {
-  realm: string | null;
-  front: Front | null;
+  realmId: RealmId | null;
   l2: string | null;
 }
 
@@ -26,14 +25,11 @@ interface RealmPickerProps {
 }
 
 /**
- * Universal realm/front/L2 picker.
+ * Universal realm/L2 picker.
  *
- * Behavior:
  * - Realm selected first (required when not auto-derived)
- * - Once realm chosen, L2 sub-categories auto-populate from atoms
- * - Power realm reveals Fronts alongside L2s
- * - When autoDerived is true, shows the derivation as informational,
- *   but allows manual override
+ * - Once realm chosen, L2 sub-categories auto-populate from atoms in that realm
+ * - When autoDerived is true, the derivation is shown but manually overridable
  */
 export function RealmPicker({
   value,
@@ -46,22 +42,16 @@ export function RealmPicker({
 }: RealmPickerProps) {
   const { atoms, loaded } = useManualData();
 
-  // Compute L2 categories for currently-selected realm
   const l2Options = useMemo(() => {
-    if (!loaded || !value.realm) return [] as string[];
+    if (!loaded || !value.realmId) return [] as string[];
     const set = new Set<string>();
-    const frontSet = new Set<string>(FRONT_ORDER);
     for (const a of atoms) {
-      if (a.realm !== value.realm) continue;
-      if (!a.L2) continue;
-      // Skip Front names when realm=Power (Fronts handled separately)
-      if (value.realm === 'Power' && frontSet.has(a.L2)) continue;
-      set.add(a.L2);
+      if (a.realmId !== value.realmId) continue;
+      const l2 = a.pathParts[1];
+      if (l2) set.add(l2);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [atoms, loaded, value.realm]);
-
-  const isPower = value.realm === 'Power';
+  }, [atoms, loaded, value.realmId]);
 
   return (
     <div className="w-full">
@@ -101,18 +91,17 @@ export function RealmPicker({
       <div className="scrollbar-none flex flex-wrap gap-1">
         <RealmChip
           label="— none —"
-          active={value.realm === null}
-          onClick={() => onChange({ realm: null, front: null, l2: null })}
+          active={value.realmId === null}
+          onClick={() => onChange({ realmId: null, l2: null })}
         />
         {REALM_ORDER.map((r) => (
           <RealmChip
             key={r}
-            label={r}
-            active={value.realm === r}
+            label={REALM_NAMES[r]}
+            active={value.realmId === r}
             onClick={() =>
               onChange({
-                realm: value.realm === r ? null : r,
-                front: null,
+                realmId: value.realmId === r ? null : r,
                 l2: null,
               })
             }
@@ -120,45 +109,8 @@ export function RealmPicker({
         ))}
       </div>
 
-      {/* Power → show Fronts row */}
-      {isPower && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          <span
-            className="mr-1 flex items-center font-mono uppercase tracking-wider text-text-muted"
-            style={{ fontSize: '10px' }}
-            data-size="meta"
-          >
-            Fronts:
-          </span>
-          {FRONT_ORDER.map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() =>
-                onChange({
-                  ...value,
-                  front: value.front === f ? null : f,
-                  l2: null,
-                })
-              }
-              className={cn(
-                'rounded-md border px-2 py-0.5 transition-colors',
-                'font-display tracking-wide',
-                FRONT_CLASS[f],
-                value.front === f
-                  ? 'border-current bg-current/10'
-                  : 'border-transparent hover:border-current/40 hover:bg-bg-elevated',
-              )}
-              style={{ fontSize: '12px' }}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* L2 row */}
-      {l2Options.length > 0 && !value.front && (
+      {l2Options.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           <span
             className="mr-1 flex items-center font-mono uppercase tracking-wider text-text-muted"
@@ -193,20 +145,14 @@ export function RealmPicker({
       )}
 
       {/* Current selection summary */}
-      {value.realm && (
+      {value.realmId && (
         <div
           className="mt-2 font-mono text-text-dim"
           style={{ fontSize: '11px' }}
           data-size="meta"
         >
           Selected:{' '}
-          <span className="text-text-silver">{value.realm}</span>
-          {value.front && (
-            <>
-              {' · '}
-              <span style={{ color: FRONT_COLORS[value.front] }}>{value.front}</span>
-            </>
-          )}
+          <span className="text-text-silver">{REALM_NAMES[value.realmId]}</span>
           {value.l2 && (
             <>
               {' · '}

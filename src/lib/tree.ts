@@ -1,6 +1,5 @@
-import type { Atom, TreeNode, Front } from '@/types/manual';
-import { FRONT_ORDER, REALM_ORDER } from './constants';
-import { isFront } from './utils';
+import type { Atom, TreeNode } from '@/types/manual';
+import { REALM_ORDER } from './constants';
 
 /**
  * Build a hierarchical tree from the flat atom list.
@@ -8,16 +7,15 @@ import { isFront } from './utils';
  * and children[] (nested deeper paths).
  *
  * Sort rules:
- * - Realm roots follow REALM_ORDER (Body → Power)
- * - Under Power L2, structural categories alphabetical, 5 Fronts at bottom in FRONT_ORDER
- * - Everything else alphabetical
+ * - Realm roots follow REALM_ORDER (palindrome: justice → religion)
+ * - Everything else alphabetical by display name
  */
 export function buildTree(atoms: Atom[]): TreeNode {
   const root: TreeNode = {
     name: 'ROOT',
     path: '',
     depth: 0,
-    realm: '',
+    realmId: '',
     atoms: [],
     children: [],
     atomCount: 0,
@@ -40,17 +38,15 @@ export function buildTree(atoms: Atom[]): TreeNode {
           name: part,
           path: newPath,
           depth: i + 1,
-          realm: atom.pathParts[0],
+          realmId: atom.realmId,
           atoms: [],
           children: [],
           atomCount: 0,
-          front: isFront(part) ? (part as Front) : undefined,
         };
         nodeMap.set(newPath, node);
         parent.children.push(node);
       }
 
-      // If this is the final path segment, attach the atom here
       if (i === atom.pathParts.length - 1) {
         node.atoms.push(atom);
       }
@@ -60,36 +56,24 @@ export function buildTree(atoms: Atom[]): TreeNode {
     }
   }
 
-  // Sort children recursively + aggregate atomCount
   sortAndCount(root);
-
   return root;
 }
 
 function sortAndCount(node: TreeNode): number {
-  // Children sort
   if (node.name === 'ROOT') {
-    const orderMap = new Map(REALM_ORDER.map((r, i) => [r as string, i]));
+    const orderMap = new Map(REALM_ORDER.map((r, i) => [r, i]));
     node.children.sort(
-      (a, b) => (orderMap.get(a.name) ?? 999) - (orderMap.get(b.name) ?? 999),
+      (a, b) =>
+        (orderMap.get(a.realmId as never) ?? 999) -
+        (orderMap.get(b.realmId as never) ?? 999),
     );
-  } else if (node.name === 'Power') {
-    const frontsSet = new Set<string>(FRONT_ORDER);
-    const structural = node.children
-      .filter((c) => !frontsSet.has(c.name))
-      .sort((a, b) => a.name.localeCompare(b.name));
-    const fronts = FRONT_ORDER.map((f) => node.children.find((c) => c.name === f)).filter(
-      (x): x is TreeNode => !!x,
-    );
-    node.children = [...structural, ...fronts];
   } else {
     node.children.sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  // Sort atoms in this node alphabetically
   node.atoms.sort((a, b) => a.name.localeCompare(b.name));
 
-  // Count recursively
   let total = node.atoms.length;
   for (const child of node.children) {
     total += sortAndCount(child);
