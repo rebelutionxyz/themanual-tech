@@ -1,69 +1,78 @@
-import type { Front, KettleState } from '@/types/manual';
+import type { KettleState, RealmId } from '@/types/manual';
 
-// Flow order — Body inside-out to Power (LOCKED April 21)
-export const REALM_ORDER = [
-  'Body',
-  'Mind',
-  'Spirit',
-  'Nature',
-  'Home',
-  'Craft',
-  'Play',
-  'Gear',
-  'Work',
-  'Money',
-  'Tech',
-  'World',
-  'Power',
-] as const;
-
-export type Realm = (typeof REALM_ORDER)[number];
-
-// Fronts at the BOTTOM of Power's L2 sort (in this specified order)
-export const FRONT_ORDER: Front[] = [
-  'UNITE & RULE',
-  'INVESTIGATE',
-  'THE NEW WORLD ORDER',
-  'PROSECUTE',
-  'THE DEEP STATE',
+/**
+ * REALM_ORDER — palindrome display order locked April 25, 2026.
+ *
+ * Reads same forward and backward — Bees scrolling either direction
+ * pass through a coherent arc. Pairings 1↔14, 2↔13, ..., 7↔8 are intentional.
+ */
+export const REALM_ORDER: RealmId[] = [
+  'justice',           // 1
+  'reference',         // 2
+  'human_activities',  // 3
+  'self',              // 4
+  'geography',         // 5
+  'health',            // 6
+  'society',           // 7
+  'math',              // 8
+  'science',           // 9
+  'philosophy',        // 10
+  'tech',              // 11
+  'history',           // 12
+  'culture',           // 13
+  'religion',          // 14
 ];
 
-export const FRONT_CLASS: Record<Front, string> = {
-  'UNITE & RULE': 'front-ur',
-  INVESTIGATE: 'front-inv',
-  'THE NEW WORLD ORDER': 'front-nwo',
-  PROSECUTE: 'front-pros',
-  'THE DEEP STATE': 'front-ds',
+/**
+ * REALM_NAMES — display labels for each realm id.
+ *
+ * Note: "Human activities" is intentionally lowercase 'a' (matches source data
+ * from the 4,860-atom canonical taxonomy).
+ */
+export const REALM_NAMES: Record<RealmId, string> = {
+  justice: 'Justice',
+  reference: 'Reference',
+  human_activities: 'Human activities',
+  self: 'Self',
+  geography: 'Geography',
+  health: 'Health',
+  society: 'Society',
+  math: 'Math',
+  science: 'Science',
+  philosophy: 'Philosophy',
+  tech: 'Tech',
+  history: 'History',
+  culture: 'Culture',
+  religion: 'Religion',
 };
 
-export const FRONT_COLORS: Record<Front, string> = {
-  'UNITE & RULE': '#FAD15E',
-  INVESTIGATE: '#E88938',
-  'THE NEW WORLD ORDER': '#9B7FC8',
-  PROSECUTE: '#6FCF8F',
-  'THE DEEP STATE': '#C94C4C',
-};
-
-// Realm colors — used for card accents, realm chips, breadcrumb highlights.
-// Chosen to evoke each realm's essence while staying harmonious as a palette.
-export const REALM_COLORS: Record<Realm, string> = {
-  Body: '#E88AB8',    // rose — vitality, physical
-  Mind: '#B8A8F0',    // lavender — thought, cognition
-  Spirit: '#F0C878',  // gold — soul, transcendence
-  Nature: '#6FCF8F',  // green — earth, living systems
-  Home: '#D4A574',    // warm tan — hearth, shelter
-  Craft: '#E8A868',   // terracotta — making, skill
-  Play: '#F78FB3',    // coral — joy, games
-  Gear: '#8A94A0',    // gunmetal — tools, equipment
-  Work: '#7AA8D4',    // steel blue — labor, production
-  Money: '#FAD15E',   // honey — currency, exchange
-  Tech: '#4FC3E8',    // cyan — digital, systems
-  World: '#9AC97A',   // sage — global, geography
-  Power: '#C94C4C',   // crimson — authority, sovereignty
+/**
+ * REALM_COLORS — accent colors for realm chips, breadcrumbs, card highlights.
+ *
+ * Colors carry semantic continuity from the prior 13-realm palette where
+ * meaningful (Justice inherits Power's gravity, Health inherits Nature's vitality, etc.).
+ * Override individual realms by editing this map. UI re-renders automatically.
+ */
+export const REALM_COLORS: Record<RealmId, string> = {
+  justice: '#C94C4C',           // crimson — authority, gravity
+  reference: '#8A94A0',         // gunmetal — neutral, lookup
+  human_activities: '#E8A868',  // terracotta — making, doing
+  self: '#E88AB8',              // rose — personal, vitality
+  geography: '#9AC97A',         // sage — global, place
+  health: '#6FCF8F',            // green — wellness
+  society: '#7AA8D4',           // steel blue — collective
+  math: '#B8A8F0',              // lavender — abstraction
+  science: '#4FC3E8',           // cyan — discovery
+  philosophy: '#F0C878',        // gold — wisdom
+  tech: '#6B94C8',              // cool blue — digital
+  history: '#D4A574',           // warm tan — antiquity
+  culture: '#F78FB3',           // coral — expression
+  religion: '#9B7FC8',          // violet — sacred
 };
 
 /**
  * BEE_COLOR — soft amber, honey family.
+ *
  * Used for user-authored content (My Threads), profile identity, and any
  * "this is you / yours" affordance. Distinct from BLiNG! honey (#FAD15E)
  * and Saved gold — lives in the same warm family without competing.
@@ -73,40 +82,45 @@ export const REALM_COLORS: Record<Realm, string> = {
  */
 export const BEE_COLOR = '#E8B86E';
 
+/**
+ * KETTLE_STATES — the 4 states of the Discovery Ladder.
+ *
+ * Locked April 24, 2026 alongside the taxonomy migration.
+ * Old states 'Sourced' and 'Unsourced' retired — every atom now lands
+ * in one of these 4 boil-states based on evidence weight.
+ *
+ * Kettle metaphor:
+ *   Fringe    = steam (minority claim with evidence)
+ *   Emerging  = bubbling (gaining credibility)
+ *   Contested = disputed (evidence on both sides)
+ *   Accepted  = rolling boil (mainstream acknowledged)
+ */
 export const KETTLE_STATES: KettleState[] = [
-  'Sourced',
   'Accepted',
   'Contested',
   'Emerging',
   'Fringe',
-  'Unsourced',
 ];
 
 export const KETTLE_COLORS: Record<KettleState, string> = {
-  Sourced: '#6FCF8F',
   Accepted: '#6B94C8',
   Contested: '#E8A838',
   Emerging: '#E88938',
   Fringe: '#9B7FC8',
-  Unsourced: '#C94C4C',
 };
 
 export const KETTLE_ABBREV: Record<KettleState, string> = {
-  Sourced: 'SOU',
   Accepted: 'ACC',
   Contested: 'CON',
   Emerging: 'EME',
   Fringe: 'FRI',
-  Unsourced: 'UNS',
 };
 
 export const KETTLE_DESCRIPTIONS: Record<KettleState, string> = {
-  Sourced: 'Whistling kettle — verified fact',
   Accepted: 'Rolling boil — mainstream acknowledged',
   Contested: 'Disputed — evidence on both sides',
   Emerging: 'Bubbling — gaining credibility',
   Fringe: 'Steam — minority claim with evidence',
-  Unsourced: 'Cold water — claim without sources',
 };
 
 export const ATOM_TYPE_COLORS = {
