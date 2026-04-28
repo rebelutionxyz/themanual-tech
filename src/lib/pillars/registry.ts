@@ -5,10 +5,12 @@
 import type { PillarConfig } from './pillar.types';
 import { atlasintelPillar } from './atlasintel';
 import { rebelutionFyiPillar } from './rebelution-fyi';
+import { atlasunitedPillar } from './atlasunited';
 
 export const PILLAR_REGISTRY: PillarConfig[] = [
   atlasintelPillar,
   rebelutionFyiPillar,
+  atlasunitedPillar,
 ];
 
 /**
