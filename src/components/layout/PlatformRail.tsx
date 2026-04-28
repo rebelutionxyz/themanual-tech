@@ -354,7 +354,7 @@ function SurfacePopup({
       <div
         className="overflow-hidden rounded-l-lg border border-r-0 shadow-lg"
         style={{
-          borderColor: surface.color + '50',
+          borderColor: `${surface.color}50`,
           background: 'rgba(15, 18, 23, 0.98)',
           backdropFilter: 'blur(12px)',
         }}
@@ -362,14 +362,14 @@ function SurfacePopup({
         <div
           className="flex items-center gap-2.5 border-b px-3 py-2.5"
           style={{
-            borderColor: surface.color + '30',
-            background: surface.color + '0F',
+            borderColor: `${surface.color}30`,
+            background: `${surface.color}0F`,
           }}
         >
           <div
             className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg"
             style={{
-              background: surface.color + '22',
+              background: `${surface.color}22`,
               border: `1px solid ${surface.color}40`,
             }}
           >
@@ -406,7 +406,7 @@ function SurfacePopup({
           <Link
             to={`/${surface.slug}`}
             className="flex items-center justify-between rounded-md border px-3 py-2 transition-colors"
-            style={{ borderColor: surface.color + '30', color: surface.color }}
+            style={{ borderColor: `${surface.color}30`, color: surface.color }}
           >
             <span className="font-display tracking-wide" style={{ fontSize: '13px' }}>
               Open {surface.name}
@@ -438,7 +438,7 @@ function SurfacePopup({
 
         <div
           className="border-t px-3 py-2"
-          style={{ borderColor: surface.color + '20' }}
+          style={{ borderColor: `${surface.color}20` }}
         >
           <p
             className="font-mono text-text-muted"
@@ -465,6 +465,7 @@ function MobileDrawer({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 md:hidden" aria-modal="true">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: mobile drawer backdrop dismiss; keyboard users close via Escape handled at the parent dialog level */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}

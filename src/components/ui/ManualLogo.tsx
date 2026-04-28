@@ -90,7 +90,7 @@ export function ManualLogo({ size = 32, className }: ManualLogoProps) {
       <g>
         {positions.map(([dx, dy], i) => (
           <polygon
-            key={i}
+            key={`hex-${dx}-${dy}`}
             points={hexPoints(cx + dx, cy + dy, r - 1.2)}
             fill={i === 0 ? 'url(#silverGrad)' : 'transparent'}
             stroke="#C8D1DA"

@@ -29,7 +29,7 @@ export function HomePage() {
         <div className="mx-auto mt-16 max-w-2xl space-y-4 md:mt-20">
           {MANIFESTO.map((line, i) => (
             <p
-              key={i}
+              key={line}
               className="font-display text-2xl italic leading-relaxed text-text-silver md:text-3xl"
               style={{ animationDelay: `${i * 200}ms` }}
             >
@@ -124,8 +124,8 @@ function SacredGeometry() {
       aria-hidden="true"
     >
       <g stroke="#C8D1DA" strokeWidth="0.6" fill="none">
-        {circles.map(([cx, cy], i) => (
-          <circle key={i} cx={cx} cy={cy} r={r} />
+        {circles.map(([cx, cy]) => (
+          <circle key={`circle-${cx}-${cy}`} cx={cx} cy={cy} r={r} />
         ))}
       </g>
     </svg>

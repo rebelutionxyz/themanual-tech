@@ -211,6 +211,7 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
     <>
       {/* Mobile overlay — only when pinned open (tap anywhere dims/closes) */}
       {pinned && (
+        // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop scrim is aria-hidden; keyboard users dismiss via Escape on the parent dialog
         <div
           className="fixed inset-0 z-10 bg-black/40 backdrop-blur-sm md:hidden"
           onClick={() => setPinned(false)}

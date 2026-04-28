@@ -38,6 +38,7 @@ export function IntelLayout() {
     setActiveView,
   } = useIntelStore();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only re-syncs store on route change; including store actions/state would cause unwanted re-runs
   useEffect(() => {
     const view = VIEW_ROUTE_MAP[location.pathname];
     if (view && view !== activeView) {
@@ -48,7 +49,6 @@ export function IntelLayout() {
         setL3(null);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
   const realmSubs = useMemo(() => {

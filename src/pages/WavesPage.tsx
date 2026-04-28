@@ -24,7 +24,7 @@ export function WavesPage() {
     <div
       className="h-full w-full overflow-hidden"
       style={{
-        background: `rgba(14, 165, 233, 0.06)`,
+        background: 'rgba(14, 165, 233, 0.06)',
       }}
     >
       <iframe

@@ -202,14 +202,14 @@ export function GraphView() {
 
         {/* Links */}
         <g>
-          {links.map((link, i) => {
+          {links.map((link) => {
             const s = nodes.find((n) => n.id === link.source);
             const t = nodes.find((n) => n.id === link.target);
             if (!s || !t) return null;
             const involvesCenter = s.id === centerId || t.id === centerId;
             return (
               <line
-                key={i}
+                key={`link-${link.source}-${link.target}`}
                 x1={s.x}
                 y1={s.y}
                 x2={t.x}
@@ -229,6 +229,7 @@ export function GraphView() {
             const typeColor = ATOM_TYPE_COLORS[n.atom.type] ?? '#8A94A0';
             const radius = isCenter ? 10 : 6;
             return (
+              // biome-ignore lint/a11y/useKeyWithClickEvents: SVG graph nodes are visual; per-node tabIndex would create unusable tab-order; keyboard navigation handled by separate atom list UI
               <g
                 key={n.id}
                 transform={`translate(${n.x}, ${n.y})`}
@@ -335,7 +336,7 @@ function ZoomBtn({
 }
 
 function truncate(s: string, n: number): string {
-  return s.length <= n ? s : s.slice(0, n - 1) + '…';
+  return s.length <= n ? s : `${s.slice(0, n - 1)}…`;
 }
 
 /**

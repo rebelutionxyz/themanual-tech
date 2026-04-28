@@ -585,6 +585,7 @@ function PersonalSortToggle({
             <button
               key={opt.value}
               type="button"
+              // biome-ignore lint/a11y/useSemanticElements: WAI-ARIA toggle-button-group pattern; <input type="radio"> would require refactoring all chip styling to override appearance
               role="radio"
               aria-checked={active}
               onClick={() => onChange(opt.value)}
@@ -728,7 +729,7 @@ function ThreadListSkeleton({
     <ul className="space-y-2" aria-label="Loading threads" aria-busy="true">
       {cards.map((c, i) => (
         <li
-          key={i}
+          key={`skel-${c.titleW}-${c.bodyW1}-${c.atoms}`}
           className="animate-pulse-slow overflow-hidden rounded-lg border border-border bg-bg-elevated"
           style={{
             borderLeft: `3px solid ${accentColor}80`,
@@ -763,6 +764,7 @@ function ThreadListSkeleton({
             <div className="mt-3 flex flex-wrap gap-1">
               {Array.from({ length: c.atoms }).map((_, j) => (
                 <span
+                  // biome-ignore lint/suspicious/noArrayIndexKey: decorative loading skeleton, fixed length per render, no stable identity
                   key={j}
                   className="h-4 rounded bg-bg/60"
                   style={{
@@ -816,6 +818,7 @@ function EmptyThreads({
       >
         <div className="mx-auto mb-4 flex items-center justify-center">
           <svg width="36" height="40" viewBox="0 0 36 40" xmlns="http://www.w3.org/2000/svg">
+            <title>No threads yet</title>
             <polygon
               points="18,2 34,11 34,29 18,38 2,29 2,11"
               fill="none"

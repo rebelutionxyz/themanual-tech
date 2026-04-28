@@ -347,9 +347,9 @@ function ComingSoonView({ view }: { view: 'forme' | 'prize' | 'following' }) {
           {info.description}
         </p>
         <ul className="mb-5 space-y-1.5">
-          {info.bullets.map((b, i) => (
+          {info.bullets.map((b) => (
             <li
-              key={i}
+              key={b}
               className="flex items-start gap-2 text-text-silver"
               style={{ fontSize: '13px' }}
             >

@@ -39,11 +39,10 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
       // Small delay so input is mounted
       const t = setTimeout(() => inputRef.current?.focus(), 50);
       return () => clearTimeout(t);
-    } else {
+    }
       // Reset state on close
       setQuery('');
       setScopeOpen(false);
-    }
   }, [open]);
 
   // ESC closes
@@ -83,6 +82,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
     <div
       className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-20 md:pt-24"
       aria-modal="true"
+      // biome-ignore lint/a11y/useSemanticElements: keeping div+role=dialog for manual focus management and animation control; native <dialog> would require refactoring focus traps
       role="dialog"
     >
       {/* Backdrop */}

@@ -185,7 +185,7 @@ export async function listThreads(
     .eq('primary_realm', filter.realmId);
   if (filter.l2) q = q.eq('primary_l2', filter.l2);
   const { data: direct } = await q;
-  (direct ?? []).forEach((r) => directIds.add(String(r.id)));
+  for (const r of direct ?? []) directIds.add(String(r.id));
 
   // Query 2 — via atom links (only if atomIdsInRealm provided; otherwise skip)
   // BATCH must stay small: each atom ID is ~80 chars average. PostgREST rejects
@@ -204,7 +204,7 @@ export async function listThreads(
         console.warn('atom link batch failed', linkErr.message);
         continue;
       }
-      (links ?? []).forEach((l) => linkedIds.add(String(l.source_id)));
+      for (const l of links ?? []) linkedIds.add(String(l.source_id));
     }
   }
 

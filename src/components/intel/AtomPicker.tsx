@@ -82,6 +82,7 @@ export function AtomPicker({
     return score;
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scoreAtom is component-scoped and re-created each render; deps list captures all reactive inputs intentionally
   const suggestions = useMemo(() => {
     if (!loaded) return [];
 
@@ -108,7 +109,6 @@ export function AtomPicker({
       .sort((a, b) => b.score - a.score)
       .slice(0, 20)
       .map((r) => r.atom);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [atoms, loaded, query, searchOnly, realmContext?.realmId, realmContext?.l2]);
 
   const atMax = typeof max === 'number' && value.length >= max;

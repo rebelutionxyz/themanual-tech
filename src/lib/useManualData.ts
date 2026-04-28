@@ -73,7 +73,8 @@ function buildThemeIndex(atoms: Atom[]): Record<string, string[]> {
   const idx: Record<string, string[]> = {};
   for (const a of atoms) {
     for (const tag of a.themeTags) {
-      (idx[tag] ??= []).push(a.id);
+      idx[tag] ??= [];
+      idx[tag].push(a.id);
     }
   }
   return idx;
