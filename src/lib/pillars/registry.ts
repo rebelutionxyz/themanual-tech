@@ -4,9 +4,11 @@
 
 import type { PillarConfig } from './pillar.types';
 import { atlasintelPillar } from './atlasintel';
+import { rebelutionFyiPillar } from './rebelution-fyi';
 
 export const PILLAR_REGISTRY: PillarConfig[] = [
   atlasintelPillar,
+  rebelutionFyiPillar,
 ];
 
 /**

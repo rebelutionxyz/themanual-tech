@@ -8,6 +8,11 @@ export function SiteHeader() {
   const { configured } = useAuth();
   const pillar = resolvePillarByHost(window.location.hostname);
   const wordmark = pillar?.wordmark ?? 'The Manual';
+  // wordmarkShort: explicit value from config, or derive from full wordmark via toUpperCase().
+  // Fallback ensures AtlasINTEL.fyi (no wordmarkShort set) produces 'ATLASINTEL'.
+  const wordmarkShort = pillar
+    ? (pillar.wordmarkShort ?? pillar.wordmark.toUpperCase())
+    : 'THE MANUAL';
   const accentColor = pillar?.accent;
 
   return (
@@ -28,8 +33,13 @@ export function SiteHeader() {
           aria-label="Home"
         >
           <ManualLogo size={28} className="transition-opacity group-hover:opacity-90" />
+          {/* Expanded wordmark — visible at sm+ breakpoint */}
           <span className="hidden font-display text-lg font-semibold tracking-wide text-text-silver-bright sm:inline">
             {wordmark}
+          </span>
+          {/* Condensed wordmark — visible below sm breakpoint (collapsed / mobile menu context) */}
+          <span className="font-display text-sm font-semibold tracking-widest text-text-silver-bright sm:hidden">
+            {wordmarkShort}
           </span>
         </Link>
 

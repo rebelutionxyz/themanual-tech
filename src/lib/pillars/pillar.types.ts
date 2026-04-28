@@ -1,6 +1,7 @@
 // Single source of truth for PillarConfig across all Cat 1 pillars.
 // Created on first Cat 1 pillar build (AtlasINTEL.fyi, 2026-04-27).
 // Subsequent pillars append to registry.ts only — this file does not change per-pillar.
+// v2 (2026-04-27): added optional wordmarkShort for dual-wordmark pillars (Rebelution.fyi).
 
 export type Constellation = 'honeycomb' | 'atlasnation';
 
@@ -9,8 +10,14 @@ export interface PillarConfig {
   slug: string;
   /** Hostnames that resolve to this pillar (apex + www; subdomains added as needed) */
   hosts: string[];
-  /** Display wordmark shown in SiteHeader. Casing is load-bearing — match brand exactly. */
+  /** Display wordmark shown in SiteHeader expanded state. Casing is load-bearing — match brand exactly. */
   wordmark: string;
+  /**
+   * Condensed wordmark shown when sidebar is collapsed or in menu chip.
+   * If absent, SiteHeader falls back to `wordmark.toUpperCase()`.
+   * e.g. wordmark: 'Intelligence' → wordmarkShort: 'INTEL'
+   */
+  wordmarkShort?: string;
   /**
    * Primary surface slug — must match an entry in src/lib/surfaces.ts SURFACES[].slug.
    * The pillar's root route (/) renders this surface's layout.
