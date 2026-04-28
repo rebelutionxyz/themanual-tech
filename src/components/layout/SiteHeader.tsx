@@ -12,7 +12,7 @@ export function SiteHeader() {
   // Fallback ensures AtlasINTEL.fyi (no wordmarkShort set) produces 'ATLASINTEL'.
   const wordmarkShort = pillar
     ? (pillar.wordmarkShort ?? pillar.wordmark.toUpperCase())
-    : 'THE MANUAL';
+    : 'The Manual';
   const accentColor = pillar?.accent;
 
   return (
