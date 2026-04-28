@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from '@/lib/auth';
+import { resolvePillarByHost } from '@/lib/pillars/registry';
 import { HomePage } from '@/pages/HomePage';
 import { ManualPage } from '@/pages/ManualPage';
 import { IntelLayout } from '@/pages/intel/IntelLayout';
@@ -15,13 +16,22 @@ import { SiteHeader } from '@/components/layout/SiteHeader';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
 
 export default function App() {
+  const activePillar = resolvePillarByHost(window.location.hostname);
+
   return (
     <AuthProvider>
       <div className="min-h-screen bg-bg text-text">
         <SiteHeader />
         <Routes>
-          {/* Home */}
-          <Route path="/" element={<HomePage />} />
+          {/* Home — pillar-aware. If on a pillar host, redirect to that pillar's primary surface */}
+          <Route
+            path="/"
+            element={
+              activePillar
+                ? <Navigate to={`/${activePillar.primarySurface}`} replace />
+                : <HomePage />
+            }
+          />
 
           {/* Auth */}
           <Route path="/login" element={<LoginPage />} />

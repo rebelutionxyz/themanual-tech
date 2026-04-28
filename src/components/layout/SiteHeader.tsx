@@ -1,13 +1,25 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
+import { resolvePillarByHost } from '@/lib/pillars/registry';
 import { ManualLogo } from '@/components/ui/ManualLogo';
 import { UtilityChrome } from './UtilityChrome';
 
 export function SiteHeader() {
   const { configured } = useAuth();
+  const pillar = resolvePillarByHost(window.location.hostname);
+  const wordmark = pillar?.wordmark ?? 'The Manual';
+  const accentColor = pillar?.accent;
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-bg/95 backdrop-blur-md">
+      {/* Pillar accent stripe — additive on pillar hosts only, invisible on themanual.tech */}
+      {accentColor && (
+        <span
+          aria-hidden
+          className="block h-0.5 w-full"
+          style={{ background: accentColor }}
+        />
+      )}
       <div className="safe-pad-x flex h-14 items-center gap-3 px-4 md:px-6">
         {/* Logo + wordmark (clickable, goes home) */}
         <Link
@@ -17,7 +29,7 @@ export function SiteHeader() {
         >
           <ManualLogo size={28} className="transition-opacity group-hover:opacity-90" />
           <span className="hidden font-display text-lg font-semibold tracking-wide text-text-silver-bright sm:inline">
-            The Manual
+            {wordmark}
           </span>
         </Link>
 
