@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
-import { resolvePillarByHost } from '@/lib/pillars/registry';
+import { usePillar } from '@/lib/pillars/PillarContext';
 import { ManualLogo } from '@/components/ui/ManualLogo';
 import { UtilityChrome } from './UtilityChrome';
 
 export function SiteHeader() {
   const { configured } = useAuth();
-  const pillar = resolvePillarByHost(window.location.hostname);
+  const pillar = usePillar();
   const wordmark = pillar?.wordmark ?? 'The Manual';
   // wordmarkShort: explicit value from config, or derive from full wordmark via toUpperCase().
   // Fallback ensures AtlasINTEL.fyi (no wordmarkShort set) produces 'ATLASINTEL'.

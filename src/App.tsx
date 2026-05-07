@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from '@/lib/auth';
-import { resolvePillarByHost } from '@/lib/pillars/registry';
+import { PillarProvider, usePillar } from '@/lib/pillars/PillarContext';
 import { HomePage } from '@/pages/HomePage';
 import { ManualPage } from '@/pages/ManualPage';
 import { IntelLayout } from '@/pages/intel/IntelLayout';
@@ -16,58 +16,66 @@ import { SiteHeader } from '@/components/layout/SiteHeader';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
 
 export default function App() {
-  const activePillar = resolvePillarByHost(window.location.hostname);
-
   return (
     <AuthProvider>
-      <div className="min-h-screen bg-bg text-text">
-        <SiteHeader />
-        <Routes>
-          {/* Home — pillar-aware. If on a pillar host, redirect to that pillar's primary surface */}
-          <Route
-            path="/"
-            element={
-              activePillar
-                ? <Navigate to={`/${activePillar.primarySurface}`} replace />
-                : <HomePage />
-            }
-          />
+      <PillarProvider>
+        <AppContent />
+      </PillarProvider>
+    </AuthProvider>
+  );
+}
 
-          {/* Auth */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
+function AppContent() {
+  const activePillar = usePillar();
 
-          {/* Platform surfaces (right rail + utility chrome) */}
-          <Route element={<PlatformLayout />}>
-            {/* Manual surface */}
-            <Route path="/manual" element={<ManualPage />} />
+  return (
+    <div className="min-h-screen bg-bg text-text">
+      <SiteHeader />
+      <Routes>
+        {/* Home — pillar-aware. If on a pillar host, redirect to that pillar's primary surface */}
+        <Route
+          path="/"
+          element={
+            activePillar
+              ? <Navigate to={`/${activePillar.primarySurface}`} replace />
+              : <HomePage />
+          }
+        />
 
-            {/* INTEL surface + all sub-routes share the same IntelLayout
-                (sidebar + realm bar persist across thread list, composer, detail) */}
-            <Route path="/intel" element={<IntelLayout />}>
-              <Route index element={<IntelPage />} />
-              <Route path="mine" element={<IntelPage />} />
-              <Route path="new" element={<NewThreadPage />} />
-              <Route path="t/:threadId" element={<ThreadPage />} />
-            </Route>
+        {/* Auth */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
 
-            {/* Waves surface — Mini Waves V76 embedded via iframe */}
-            <Route path="/waves" element={<WavesPage />} />
+        {/* Platform surfaces (right rail + utility chrome) */}
+        <Route element={<PlatformLayout />}>
+          {/* Manual surface */}
+          <Route path="/manual" element={<ManualPage />} />
 
-            {/* BLiNG! surface — freedomblings.com embedded via iframe */}
-            <Route path="/bling" element={<BlingsPage />} />
-
-            {/* All other surfaces use generic SurfacePage */}
-            <Route path="/:slug" element={<SurfacePage />} />
+          {/* INTEL surface + all sub-routes share the same IntelLayout
+              (sidebar + realm bar persist across thread list, composer, detail) */}
+          <Route path="/intel" element={<IntelLayout />}>
+            <Route index element={<IntelPage />} />
+            <Route path="mine" element={<IntelPage />} />
+            <Route path="new" element={<NewThreadPage />} />
+            <Route path="t/:threadId" element={<ThreadPage />} />
           </Route>
 
-          {/* Legacy redirects: old /s/foo URLs → /foo */}
-          <Route path="/s/:slug" element={<RedirectSlashS />} />
+          {/* Waves surface — Mini Waves V76 embedded via iframe */}
+          <Route path="/waves" element={<WavesPage />} />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </div>
-    </AuthProvider>
+          {/* BLiNG! surface — freedomblings.com embedded via iframe */}
+          <Route path="/bling" element={<BlingsPage />} />
+
+          {/* All other surfaces use generic SurfacePage */}
+          <Route path="/:slug" element={<SurfacePage />} />
+        </Route>
+
+        {/* Legacy redirects: old /s/foo URLs → /foo */}
+        <Route path="/s/:slug" element={<RedirectSlashS />} />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </div>
   );
 }
 
