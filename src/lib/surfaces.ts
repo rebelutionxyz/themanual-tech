@@ -63,8 +63,12 @@ export interface SurfaceDef {
 }
 
 /**
- * The 19 Surfaces of HoneyComb.
- * Ordered by group, grouping matters for sidebar presentation.
+ * The 20 Surfaces of HoneyComb. Currently 20; lockable architecture but
+ * grows when pillars graduate (see MMF v2.2 §6.1 footnote).
+ * Each entry pairs `name` (canonical UI label, used across both
+ * constellations) with `function` (semantic category / MMF taxonomy term).
+ * Both fields are load-bearing — not alternative names.
+ * Ordered by group; grouping matters for sidebar presentation.
  * All live at launch — no "coming soon" fakery.
  */
 export const SURFACES: SurfaceDef[] = [
