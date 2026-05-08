@@ -286,4 +286,36 @@ Butch should run scenarios 1-6 in Supabase Studio against the live DB after `is_
 - [x] Branch pushed to `origin/feat/phase-c-component-d-promotion-slots`
 - [x] **Not** merged to main — awaits sequential review and merge with Code 23
 
+---
+
+## Merge complete (appended 2026-05-08T17:19Z)
+
+**Sequence:**
+1. `feat/phase-c-component-c-geo-lens` merged into `main` with `--no-ff` (no conflicts) — merge commit **`f864913`** (over Code 23 commit `0fb4992`).
+2. `main` pushed to origin.
+3. `feat/phase-c-component-d-promotion-slots` merged into `main` with `--no-ff` — merge commit **`3408009`** (over Code 24 commit `93a408d`). **Five files conflicted**, all resolved by keeping both Code 23 and Code 24 additions:
+   - `src/App.tsx` — kept both `import { GeoLensBar }` and `import { TopTickerSlot }`; kept `<GeoLensBar />` after `<Routes>` and dropped the placeholder `{/* TODO Code 23 */}` comment from Code 24's tree (its job was done by the actual mount).
+   - `src/lib/pillars/pillar.types.ts` — kept both header lines (v3 + v4), kept `import type { GeoLocation }`, kept `defaultGeo?: GeoLocation` field adjacent to `promotionSlots`. Field order preserved: `defaultGeo` immediately before `promotionSlots`.
+   - `src/lib/pillars/{atlasintel,atlasunited,rebelution-fyi}.ts` — kept both header lines (v2/v3 + v3/v4) and both fields (`promotionSlots: { ...DEFAULT_PROMOTION_SLOTS }` and `defaultGeo: 'Global'`).
+   - No conflicts in `ProfilePage.tsx` (Code 23 only touched it) or in any of the new directories (`src/lib/geo/`, `src/components/geo/`, `src/components/profile/`, `src/lib/promotions/`, `src/components/promotions/`).
+4. Verification before pushing the merge commit: `npx tsc -b` → exit 0; `npm run build` → exit 0 (242.20 kB main bundle, 5.58s); `npm run lint` (Biome on `./src`, 77 files) → exit 0.
+5. `main` pushed to origin: `f864913..3408009`.
+6. Both feature branches deleted **local** and **remote**.
+
+**Deploy:** Railway picked up the push and rolled the new bundle live within ~22s of the polling start. Both `themanual.tech` and `atlasintel.fyi` now serve `assets/index-B5V9Vhy9.js` (256.8 kB). Verified the live bundle contains: `honeycomb:geo:search-location` (Code 23 storage key, 1 hit), `top-ticker`/`TopTicker` (Code 24, 2 hits), `Geo lens`/`GeoLensBar`/`geo-bar` (Code 23, 1 hit). HTTP 200 on both apex hosts.
+
+**Final state:**
+- `main` HEAD: `3408009` (merge of Code 24)
+- Phase C Components A, B, C, D all SHIPPED (commits `15f1047`, `d6eaca7`, `0fb4992`, `93a408d`) and live in production.
+- Schema commit `f8a2d5d` already provisioned all foundations needed (`bee_profiles`, `promotions`, `bees.is_admin`, `bling_free` rename).
+
+**Surprises during merge:**
+- Mid-session, the working tree was reverted to a pre-Code-23 state (likely `git checkout main` between the two `--no-ff` merges), which masked Code 23's `defaultGeo` additions in the file-modified system reminders. The branch on origin always had the correct content; the working-tree reverts were superficial. Final merge SHAs are correct.
+- Code 24 placed its audit inside the repo at `shared/notes/audits/...` (tracked in git as part of `feat/phase-c-component-d-promotion-slots`). Code 23's audit lives in `HONEYCOMB/shared/notes/audits/...` (untracked, matching the existing pattern of audit files in that folder). The two audits live in different repos but cover the matching pair of components.
+
+**NOT done in this session:**
+- Browser smoke testing of the live deploy (Butch's review task — flagged in both audits).
+- Seeding `promotions` rows via Supabase Studio.
+- Setting any bee's `is_admin = true` (Butch must do this manually before the admin write path is testable).
+
 🐝
