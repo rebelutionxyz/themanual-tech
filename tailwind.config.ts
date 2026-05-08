@@ -56,6 +56,10 @@ export default {
         'bling-hop': 'bling-hop 0.9s cubic-bezier(0.32, 0.72, 0.35, 1)',
         'pulse-slow': 'pulse 3s ease-in-out infinite',
         'slide-in-right': 'slide-in-right 0.18s ease-out',
+        // Promotion top-ticker (Phase C Component D, Code 24, 2026-05-08).
+        // Pairs with a duplicated content track inside the ticker so the
+        // scroll appears continuous when transform hits -50%.
+        'promo-ticker': 'promo-ticker 40s linear infinite',
       },
       keyframes: {
         'honey-drop': {
@@ -77,6 +81,10 @@ export default {
         'slide-in-right': {
           '0%': { transform: 'translateX(8px)', opacity: '0' },
           '100%': { transform: 'translateX(0)', opacity: '1' },
+        },
+        'promo-ticker': {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
         },
       },
     },
