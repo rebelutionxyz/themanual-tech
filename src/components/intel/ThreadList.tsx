@@ -172,13 +172,13 @@ export function ThreadList({
           try {
             const { data } = await supabase
               .from('entity_atom_links')
-              .select('source_id, atom_id')
-              .eq('source_surface', 'intel')
-              .in('source_id', ids);
+              .select('entity_id, atom_id')
+              .eq('entity_type', 'forum_thread')
+              .in('entity_id', ids);
             if (cancelled || !data) return;
             const map = new Map<string, string[]>();
             for (const link of data) {
-              const sid = String(link.source_id);
+              const sid = String(link.entity_id);
               const arr = map.get(sid) ?? [];
               arr.push(String(link.atom_id));
               map.set(sid, arr);
