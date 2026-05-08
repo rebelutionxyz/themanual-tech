@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MessageSquare, Lock, Clock, Bookmark, BookmarkCheck, Share2, Check } from 'lucide-react';
 import { listThreads, listThreadsByIds, listThreadIdsByAuthor, relativeTime, type ForumThread } from '@/lib/intel';
@@ -15,6 +15,8 @@ import { useManualData } from '@/lib/useManualData';
 import { useIntelStore } from '@/stores/useIntelStore';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { FeedInlineSlot } from '@/components/promotions/FeedInlineSlot';
+import { usePromotionSlot } from '@/lib/promotions/usePromotionSlot';
 import {
   KETTLE_COLORS,
   REALM_COLORS,
@@ -278,20 +280,76 @@ export function ThreadList({
         />
       )}
       <ul className="space-y-2">
-        {threads.map((t) => (
+        <ThreadListWithInlinePromo
+          threads={threads}
+          atomIds={threadAtomLinks}
+          categoryPaths={threadCategoryLinks}
+          atomById={atomById}
+          savedIds={savedIds}
+          canSave={Boolean(bee?.id)}
+          onToggleSave={handleToggleSave}
+          reactionSummaries={reactionSummaries}
+          realmSlug={selectedRealmId ?? null}
+        />
+      </ul>
+    </>
+  );
+}
+
+/**
+ * Renders thread cards with a single feed-inline promotion injected after
+ * the configured Nth card. When no promotion matches and no astra fallback
+ * exists, the slot is omitted entirely — feed cards continue without a gap
+ * (MMF §19.7 D-4).
+ */
+function ThreadListWithInlinePromo({
+  threads,
+  atomIds,
+  categoryPaths,
+  atomById,
+  savedIds,
+  canSave,
+  onToggleSave,
+  reactionSummaries,
+  realmSlug,
+}: {
+  threads: ForumThread[];
+  atomIds: Map<string, string[]>;
+  categoryPaths: Map<string, string[]>;
+  atomById: Map<string, ReturnType<Map<string, unknown>['get']>>;
+  savedIds: Set<string>;
+  canSave: boolean;
+  onToggleSave: (id: string) => void;
+  reactionSummaries: Map<string, ReactionSummary>;
+  realmSlug: string | null;
+}) {
+  const slot = usePromotionSlot({
+    slotKey: 'feed-inline',
+    realmSlug,
+  });
+  const position = slot.feedInlinePosition ?? 10;
+
+  return (
+    <>
+      {threads.map((t, i) => (
+        <Fragment key={t.id}>
           <ThreadCard
-            key={t.id}
             thread={t}
-            atomIds={threadAtomLinks.get(t.id) ?? []}
-            categoryPaths={threadCategoryLinks.get(t.id) ?? []}
+            atomIds={atomIds.get(t.id) ?? []}
+            categoryPaths={categoryPaths.get(t.id) ?? []}
             atomById={atomById}
             saved={savedIds.has(t.id)}
-            canSave={Boolean(bee?.id)}
-            onToggleSave={() => handleToggleSave(t.id)}
+            canSave={canSave}
+            onToggleSave={() => onToggleSave(t.id)}
             reactionSummary={reactionSummaries.get(t.id)}
           />
-        ))}
-      </ul>
+          {i + 1 === position && (
+            <li>
+              <FeedInlineSlot realmSlug={realmSlug} />
+            </li>
+          )}
+        </Fragment>
+      ))}
     </>
   );
 }

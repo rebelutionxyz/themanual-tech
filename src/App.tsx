@@ -14,6 +14,7 @@ import { WavesPage } from '@/pages/WavesPage';
 import { BlingsPage } from '@/pages/BlingsPage';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
+import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
 
 export default function App() {
   return (
@@ -31,6 +32,9 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-bg text-text">
       <SiteHeader />
+      {/* Phase C Component D: top-ticker promotion slot below header.
+          Hides itself when no DB match + no astra fallback (D-4). */}
+      <TopTickerSlot />
       <Routes>
         {/* Home — pillar-aware. If on a pillar host, redirect to that pillar's primary surface */}
         <Route
@@ -75,6 +79,8 @@ function AppContent() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
+      {/* TODO Code 23: GeoLensBar mounts here */}
     </div>
   );
 }

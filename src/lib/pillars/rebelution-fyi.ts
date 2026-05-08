@@ -2,8 +2,9 @@
 // HoneyComb constellation. Reuses the intel (Forum) surface from TheMANUAL.tech.
 // Dual-wordmark: expanded header shows 'Intelligence'; collapsed/menu shows 'INTEL'.
 // v1: no copy overrides, no schema changes. Spec: shared/pillar-specs/rebelution-fyi.md.
+// v2 (Code 24 / 2026-05-08): canonical promotionSlots configuration (Phase C Component D).
 
-import type { PillarConfig } from './pillar.types';
+import { DEFAULT_PROMOTION_SLOTS, type PillarConfig } from './pillar.types';
 
 export const rebelutionFyiPillar: PillarConfig = {
   slug: 'rebelution-fyi',
@@ -14,4 +15,5 @@ export const rebelutionFyiPillar: PillarConfig = {
   constellation: 'honeycomb',
   accent: '#87CEEB', // sky blue — first HoneyComb-constellation accent
   copyOverrides: {}, // v1: ride canonical HoneyComb lexicon (Bees, Drips, Drops, BLiNG!)
+  promotionSlots: { ...DEFAULT_PROMOTION_SLOTS },
 };

@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils';
 import { usePillar } from '@/lib/pillars/PillarContext';
 import { PILLAR_REGISTRY } from '@/lib/pillars/registry';
+import { SidebarPromotedSlot } from '@/components/promotions/SidebarPromotedSlot';
 
 // Deterministic-from-string hash so the accent rotation is stable on a given
 // surface but cycles as the Bee navigates.
@@ -208,7 +209,8 @@ export function PlatformRail() {
           </button>
 
           {/* Surface list grouped */}
-          <div className="flex-1">
+          <div className="flex-1 flex flex-col">
+            <div className="flex-1">
             {SURFACE_GROUPS.map((group) => {
               const surfaces = getSurfacesByGroup(group);
               return (
@@ -247,6 +249,15 @@ export function PlatformRail() {
                 </div>
               );
             })}
+            </div>
+            {/* Phase C Component D: sidebar-promoted slot. Visible only in
+                expanded mode — collapsed rail is icon-only. Hides itself when
+                no DB match + no astra fallback (D-4). */}
+            {expandedEffective && (
+              <div className="px-2 py-2">
+                <SidebarPromotedSlot />
+              </div>
+            )}
           </div>
         </aside>
 
