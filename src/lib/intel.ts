@@ -144,11 +144,11 @@ export async function listThreads(
   if (filter.atomId) {
     const { data: links } = await supabase
       .from('entity_atom_links')
-      .select('source_id')
-      .eq('source_surface', 'intel')
+      .select('entity_id')
+      .eq('entity_type', 'forum_thread')
       .eq('atom_id', filter.atomId);
     if (!links?.length) return [];
-    const ids = links.map((l) => l.source_id);
+    const ids = links.map((l) => l.entity_id);
     let q = supabase
       .from('forum_threads')
       .select('*')
@@ -196,15 +196,15 @@ export async function listThreads(
       const chunk = atomIdsInRealm.slice(i, i + BATCH);
       const { data: links, error: linkErr } = await supabase
         .from('entity_atom_links')
-        .select('source_id')
-        .eq('source_surface', 'intel')
+        .select('entity_id')
+        .eq('entity_type', 'forum_thread')
         .in('atom_id', chunk);
       if (linkErr) {
         // Log but keep going — partial results better than no thread list
         console.warn('atom link batch failed', linkErr.message);
         continue;
       }
-      for (const l of links ?? []) linkedIds.add(String(l.source_id));
+      for (const l of links ?? []) linkedIds.add(String(l.entity_id));
     }
   }
 
@@ -292,8 +292,8 @@ export async function getThread(threadId: string): Promise<ForumThread | null> {
   const { data: links } = await supabase
     .from('entity_atom_links')
     .select('atom_id, link_type')
-    .eq('source_surface', 'intel')
-    .eq('source_id', threadId);
+    .eq('entity_type', 'forum_thread')
+    .eq('entity_id', threadId);
   thread.atomLinks = (links ?? []).map((l) => ({
     atomId: String(l.atom_id),
     linkType: String(l.link_type),
@@ -342,8 +342,8 @@ export async function createThread(
 
   if (input.atomIds && input.atomIds.length > 0) {
     const links = input.atomIds.map((atomId) => ({
-      source_surface: 'intel',
-      source_id: thread.id,
+      entity_type: 'forum_thread',
+      entity_id: thread.id,
       atom_id: atomId,
       link_type: 'reference',
       created_by: authorBeeId,
@@ -413,9 +413,11 @@ export async function createPost(
   // Link atoms to this reply (if any were provided)
   if (atomIds.length > 0) {
     const links = atomIds.map((atomId) => ({
-      source_type: 'forum_post',
-      source_id: postId,
+      entity_type: 'forum_post',
+      entity_id: postId,
       atom_id: atomId,
+      link_type: 'reference',
+      created_by: authorBeeId,
     }));
     await supabase.from('entity_atom_links').insert(links);
   }
