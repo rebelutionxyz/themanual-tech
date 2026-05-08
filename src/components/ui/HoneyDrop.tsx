@@ -2,20 +2,27 @@ interface HoneyDropProps {
   size?: number;
   className?: string;
   animate?: boolean;
+  /**
+   * When true, applies the `animate-bling-hop` motion (hop/skip/jump signature
+   * per MMF §15.1). Caller is responsible for toggling on/off — see SiteHeader's
+   * use of the `bling-hop` window event.
+   */
+  hopping?: boolean;
 }
 
 /**
  * Custom honey drop SVG — replaces the blue water 💧 emoji everywhere.
  * Gold, luminescent. BLiNG! signature mark.
  */
-export function HoneyDrop({ size = 14, className, animate = false }: HoneyDropProps) {
+export function HoneyDrop({ size = 14, className, animate = false, hopping = false }: HoneyDropProps) {
+  const animClass = hopping ? 'animate-bling-hop' : animate ? 'animate-honey-drop' : '';
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 16 20"
       fill="none"
-      className={`inline-block ${animate ? 'animate-honey-drop' : ''} ${className ?? ''}`}
+      className={`inline-block ${animClass} ${className ?? ''}`}
       aria-hidden="true"
     >
       <defs>

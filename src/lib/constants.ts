@@ -81,6 +81,13 @@ export const REALM_ID_BY_NAME: Record<string, RealmId> = Object.fromEntries(
 ) as Record<string, RealmId>;
 
 /**
+ * SILVER — The Manual's canonical silver (matches text-silver token / 13-hex flower
+ * logo gradient endpoint per MMF §15.5). Used as the realm-strip fallback when no
+ * realm is selected and no pillar is active (themanual.tech foundation).
+ */
+export const SILVER = '#C8D1DA';
+
+/**
  * BEE_COLOR — soft amber, honey family.
  *
  * Used for user-authored content (My Threads), profile identity, and any

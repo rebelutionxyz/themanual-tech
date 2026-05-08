@@ -142,9 +142,11 @@ themanual-tech/
 │   │
 │   ├── components/
 │   │   ├── layout/
-│   │   │   ├── SiteHeader.tsx       # Top bar (logo, nav, profile)
-│   │   │   ├── PlatformLayout.tsx   # Wraps surfaces with sidebar
-│   │   │   └── PlatformSidebar.tsx  # 19-surface grouped nav
+│   │   │   ├── SiteHeader.tsx       # Top bar (logo, wordmark, BLiNG! drop, utility chrome)
+│   │   │   ├── PlatformLayout.tsx   # Realm-accent strip · main · right rail
+│   │   │   ├── PlatformRail.tsx     # Right surfaces rail (collapsed/expanded/mobile drawer)
+│   │   │   ├── UtilityChrome.tsx    # Search · notif · msg · cart · BLiNG! pill · profile
+│   │   │   └── SearchModal.tsx      # Cross-surface search
 │   │   ├── manual/
 │   │   │   ├── OutlookView.tsx      # Tree view of 5,997 atoms
 │   │   │   ├── ListView.tsx         # Flat searchable list

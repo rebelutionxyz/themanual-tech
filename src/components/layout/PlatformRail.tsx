@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { X, ChevronRight, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import {
@@ -8,6 +8,16 @@ import {
   type SurfaceDef,
 } from '@/lib/surfaces';
 import { cn } from '@/lib/utils';
+import { usePillar } from '@/lib/pillars/PillarContext';
+import { PILLAR_REGISTRY } from '@/lib/pillars/registry';
+
+// Deterministic-from-string hash so the accent rotation is stable on a given
+// surface but cycles as the Bee navigates.
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
 
 /**
  * Right-side platform rail.
@@ -26,6 +36,7 @@ import { cn } from '@/lib/utils';
 export function PlatformRail() {
   const location = useLocation();
   const navigate = useNavigate();
+  const pillar = usePillar();
   const activeSlug =
     location.pathname.length > 1 ? location.pathname.slice(1).split('/')[0] : null;
 
@@ -36,6 +47,34 @@ export function PlatformRail() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const railRef = useRef<HTMLDivElement>(null);
+
+  // Per MMF §15.1: right-rail accent rotates through the active constellation's
+  // pillar pool on page change. Deterministic-by-surface so it doesn't jitter
+  // mid-render but cycles as Bees navigate.
+  const constellationAccent = useMemo(() => {
+    const constellation = pillar?.constellation ?? 'honeycomb';
+    const pool = PILLAR_REGISTRY
+      .filter((p) => p.constellation === constellation)
+      .map((p) => p.accent);
+    if (pool.length === 0) return '#FAD15E'; // honey fallback (shouldn't hit)
+    const seed = activeSlug ?? 'home';
+    return pool[hashString(seed) % pool.length];
+  }, [pillar?.constellation, activeSlug]);
+
+  // Hover expands the rail (desktop only). Click toggle pins.
+  const expandedEffective = expanded || hoverExpanded;
+
+  // Dispatch bling-hop on rail-open transition. Gated on pillar !== null —
+  // only signal pillar-ID motion when there's a pillar to identify.
+  // (Read C clarification, Code 17 plan May 7.)
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    const isOpen = expandedEffective || drawerOpen;
+    if (isOpen && !wasOpenRef.current && pillar) {
+      window.dispatchEvent(new CustomEvent('bling-hop'));
+    }
+    wasOpenRef.current = isOpen;
+  }, [expandedEffective, drawerOpen, pillar]);
 
   // Popups only apply in COLLAPSED mode (not expanded and not hover-expanded)
   const popupSlug = !expanded && !hoverExpanded ? pinnedSlug ?? hoveredSlug : null;
@@ -104,9 +143,6 @@ export function PlatformRail() {
     return () => window.removeEventListener('open-surfaces-drawer', onOpen);
   }, []);
 
-  // Hover expands the rail (desktop only). Click toggle pins.
-  const expandedEffective = expanded || hoverExpanded;
-
   function handleIconClick(slug: string) {
     if (expandedEffective) {
       navigate(`/${slug}`);
@@ -132,11 +168,18 @@ export function PlatformRail() {
       >
         <aside
           className={cn(
-            'flex h-full flex-col overflow-y-auto border-l border-border bg-bg-elevated/60 transition-[width] duration-200 ease-out',
+            'relative flex h-full flex-col overflow-y-auto border-l border-border bg-bg-elevated/60 transition-[width] duration-200 ease-out',
             expandedEffective ? 'w-48' : 'w-14',
           )}
           aria-label="Platform surfaces"
+          data-constellation-accent={constellationAccent}
         >
+          {/* Constellation accent stripe — rotates per surface (MMF §15.1) */}
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute left-0 right-0 top-0 h-0.5 transition-colors duration-300"
+            style={{ background: constellationAccent }}
+          />
           {/* Expand/collapse toggle */}
           <button
             type="button"
