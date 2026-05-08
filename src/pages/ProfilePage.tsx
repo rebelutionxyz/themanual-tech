@@ -2,6 +2,7 @@ import { Navigate, Link } from 'react-router-dom';
 import { LogOut, Crown, Sparkles } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
+import { ProfileLocationEditor } from '@/components/profile/ProfileLocationEditor';
 
 const BLING_RANK_NAMES = [
   'Seed', 'Sprout', 'Sapling', 'Ranger', 'Scout', 'Squire', 'Knight', 'Protector',
@@ -93,6 +94,9 @@ export function ProfilePage() {
           nextThreshold={nextRingThreshold}
         />
       </div>
+
+      {/* Phase C Component C-4: location editor — reads/writes bee_profiles */}
+      <ProfileLocationEditor />
 
       {/* Contributions placeholder */}
       <div className="mt-10 rounded-lg border border-border bg-bg-elevated/40 p-6">
