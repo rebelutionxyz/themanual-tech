@@ -357,9 +357,9 @@ export async function createThread(
   // Category tags — additive L2+ branches for cross-discovery
   if (input.categoryPaths && input.categoryPaths.length > 0) {
     const catLinks = input.categoryPaths.map((path) => ({
-      source_surface: 'intel',
-      source_id: thread.id,
-      category_path: path,
+      entity_type: 'forum_thread',
+      entity_id: thread.id,
+      category_key: path,
       created_by: authorBeeId,
     }));
     const { error: catErr } = await supabase
@@ -425,9 +425,9 @@ export async function createPost(
   // Link categories to this reply (if any were provided)
   if (categoryPaths.length > 0) {
     const catLinks = categoryPaths.map((path) => ({
-      source_surface: 'intel',
-      source_id: postId,
-      category_path: path,
+      entity_type: 'forum_post',
+      entity_id: postId,
+      category_key: path,
       created_by: authorBeeId,
     }));
     await supabase.from('entity_category_links').insert(catLinks);

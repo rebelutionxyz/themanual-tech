@@ -190,15 +190,15 @@ export function ThreadList({
           try {
             const { data: catData } = await supabase
               .from('entity_category_links')
-              .select('source_id, category_path')
-              .eq('source_surface', 'intel')
-              .in('source_id', ids);
+              .select('entity_id, category_key')
+              .eq('entity_type', 'forum_thread')
+              .in('entity_id', ids);
             if (cancelled || !catData) return;
             const catMap = new Map<string, string[]>();
             for (const link of catData) {
-              const sid = String(link.source_id);
+              const sid = String(link.entity_id);
               const arr = catMap.get(sid) ?? [];
-              arr.push(String(link.category_path));
+              arr.push(String(link.category_key));
               catMap.set(sid, arr);
             }
             setThreadCategoryLinks(catMap);
