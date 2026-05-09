@@ -70,7 +70,7 @@ export function UtilityChrome() {
             ariaLabel="Notifications"
             title="Notifications"
             badge={notificationCount}
-            onClick={() => console.log('notifications clicked')}
+            onClick={() => { /* TODO: notifications panel */ }}
           >
             <Bell size={16} />
           </IconButton>
@@ -82,7 +82,7 @@ export function UtilityChrome() {
             ariaLabel="Messages"
             title="Messages"
             badge={messageCount}
-            onClick={() => console.log('messages clicked')}
+            onClick={() => { /* TODO: messages panel */ }}
           >
             <MessageCircle size={16} />
           </IconButton>
@@ -94,7 +94,7 @@ export function UtilityChrome() {
             ariaLabel="Cart"
             title="Cart"
             badge={cartCount}
-            onClick={() => console.log('cart clicked')}
+            onClick={() => { /* TODO: cart drawer */ }}
           >
             <ShoppingCart size={16} />
           </IconButton>

@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AuthProvider } from '@/lib/auth';
+import { AuthProvider, useAuth } from '@/lib/auth';
 import { PillarProvider, usePillar } from '@/lib/pillars/PillarContext';
 import { HomePage } from '@/pages/HomePage';
 import { ManualPage } from '@/pages/ManualPage';
@@ -12,6 +12,9 @@ import { ProfilePage } from '@/pages/ProfilePage';
 import { SurfacePage } from '@/pages/SurfacePage';
 import { WavesPage } from '@/pages/WavesPage';
 import { BlingsPage } from '@/pages/BlingsPage';
+import { MyHexPage } from '@/pages/MyHexPage';
+import { NexusPage } from '@/pages/NexusPage';
+import { NucleusPage } from '@/pages/NucleusPage';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
 import { GeoLensBar } from '@/components/geo/GeoLensBar';
@@ -27,25 +30,42 @@ export default function App() {
   );
 }
 
+const ADMIN_SURFACE_PATHS = new Set(['/myhex', '/nexus', '/nucleus']);
+
 function AppContent() {
   const activePillar = usePillar();
+  const { bee, loading: authLoading } = useAuth();
+  const { pathname } = useLocation();
+  const isAdminSurface = ADMIN_SURFACE_PATHS.has(pathname);
 
   return (
-    <div className="min-h-screen bg-bg text-text">
+    <div className="flex min-h-screen flex-col bg-bg text-text">
       <SiteHeader />
       {/* Phase C Component D: top-ticker promotion slot below header.
-          Hides itself when no DB match + no astra fallback (D-4). */}
-      <TopTickerSlot />
+          Hides itself when no DB match + no astra fallback (D-4).
+          Suppressed on admin surfaces — they own their own chrome. */}
+      {!isAdminSurface && <TopTickerSlot />}
       <Routes>
-        {/* Home — pillar-aware. If on a pillar host, redirect to that pillar's primary surface */}
+        {/* Home — pillar-aware first, then admin tier-1 redirect for signed-in
+            Bees on theMANUAL.tech root, then anonymous HomePage. */}
         <Route
           path="/"
           element={
-            activePillar
-              ? <Navigate to={`/${activePillar.primarySurface}`} replace />
-              : <HomePage />
+            activePillar ? (
+              <Navigate to={`/${activePillar.primarySurface}`} replace />
+            ) : authLoading ? null : bee ? (
+              <Navigate to="/myhex" replace />
+            ) : (
+              <HomePage />
+            )
           }
         />
+
+        {/* Admin tier surfaces (My Hex / Nexus / Nucleus) — outside
+            PlatformLayout because they own their own chrome. */}
+        <Route path="/myhex" element={<MyHexPage />} />
+        <Route path="/nexus" element={<NexusPage />} />
+        <Route path="/nucleus" element={<NucleusPage />} />
 
         {/* Auth */}
         <Route path="/login" element={<LoginPage />} />
@@ -81,10 +101,10 @@ function AppContent() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
-      {/* Phase C Component C: sticky bottom geo lens, visible across all surfaces.
-          Placed outside <Routes> so it survives navigation and is reachable from
-          public pages (login, home) as well as authenticated ones. */}
-      <GeoLensBar />
+      {/* Phase C Component C: sticky bottom geo lens. Placed outside <Routes>
+          so it survives navigation. Suppressed on admin surfaces (they own
+          their own chrome). */}
+      {!isAdminSurface && <GeoLensBar />}
     </div>
   );
 }

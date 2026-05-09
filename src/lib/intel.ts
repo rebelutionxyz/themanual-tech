@@ -201,7 +201,7 @@ export async function listThreads(
         .in('atom_id', chunk);
       if (linkErr) {
         // Log but keep going — partial results better than no thread list
-        console.warn('atom link batch failed', linkErr.message);
+        console.warn('[intel] atom link batch failed', linkErr.message);
         continue;
       }
       for (const l of links ?? []) linkedIds.add(String(l.entity_id));
@@ -350,7 +350,7 @@ export async function createThread(
     }));
     const { error: linkErr } = await supabase.from('entity_atom_links').insert(links);
     if (linkErr) {
-      console.warn('Atom link insert failed (thread was created):', linkErr.message);
+      console.warn('[intel] Atom link insert failed (thread was created):', linkErr.message);
     }
   }
 
@@ -366,7 +366,7 @@ export async function createThread(
       .from('entity_category_links')
       .insert(catLinks);
     if (catErr) {
-      console.warn('Category link insert failed (thread was created):', catErr.message);
+      console.warn('[intel] Category link insert failed (thread was created):', catErr.message);
     }
   }
 
