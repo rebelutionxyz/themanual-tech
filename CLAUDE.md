@@ -55,9 +55,13 @@ Always run `npm run build` before considering a change ready. Never push if buil
 
 **BLiNG! v8 RPCs deployed:**
 - `bling_send` — peer-to-peer transfer
-- `bling_free` — bonding curve "mint" (always say FREE not MINT)
-- `bling_escrow_create`, `bling_escrow_release`, `bling_escrow_cancel`
+- `bling_free` — bonding curve "mint" (renamed from `bling_mint` 2026-05-08; always say FREE not MINT)
+- `bling_create_escrow`, `bling_release_escrow`, `bling_cancel_escrow`, `bling_dispute_escrow` — escrow lifecycle
+- `bling_place_order`, `bling_fill_order` — order book
+- `bling_credit_purchase` — Stripe webhook credit grant (service-role only)
 - Treasury bee: `@combtreasury` (UUID ends in `...0bee`)
+
+v9 security hardening (REVOKE PUBLIC + `auth.uid()` guards on user-callable RPCs) deployed 2026-05-06 — see `../shared/notes/audits/v9-security-production-verification-2026-05-06.md`.
 
 ## The Manual (taxonomy)
 
@@ -119,7 +123,7 @@ TheMANUAL.tech/
 └── package.json
 ```
 
-`themanual-tech_v5.2/` was a stale nested folder — **already relocated to `HONEYCOMB/archive/`**. Don't recreate.
+`themanual-tech_v5.2/` was a stale nested folder — **already pruned from the repo**. Don't recreate.
 
 ## Environment variables required
 
@@ -165,7 +169,7 @@ BLiNG! v8 RPCs are deployed in DB. Edge Functions for HTTP-callable wrapping are
 
 ## Where deeper context lives
 
-- `../shared/notes/HONEYCOMB_MASTER_MASTER_FILE_v2_0.md` — full spec
+- `../shared/notes/MMF_v2_3_working.md` — full spec (current MMF working file)
 - `../shared/notes/BLING_ABUSE_DETERRENCE_THREAT_MODEL_04-26-26.md` — security architecture
 - `../shared/notes/BLING_ORDER_BOOK_WALKING_BRIEF_04-26-26.md` — order book UX flow
 - Supabase Studio for live DB schema inspection
