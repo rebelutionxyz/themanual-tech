@@ -39,12 +39,12 @@ Always run `npm run build` before considering a change ready. Never push if buil
 
 ## Schema conventions (BLiNG! v8 — deployed)
 
-- All BLiNG! amounts: `numeric(20,3)` — supports up to 99,999,999,999,999,999.999
+- All BLiNG! amounts: `numeric(20,6)` post-Monday 2026-05-11 (Lock 7 widens from `(20,3)`); Bee-facing min send remains 0.1 BLiNG!; internal accounting precision 0.000001
 - Primary keys: `uuid DEFAULT gen_random_uuid()`
 - Foreign keys: `text` for slug-based IDs (atoms), `uuid` for entity IDs (bees, transactions)
 - Timestamps: `timestamptz DEFAULT now()`
 - RLS policies: required on every table, no exceptions
-- Auto-create-bee trigger: post-insert UPDATE on auth.users (not INSERT — known constraint)
+- Auto-create-bee trigger (`public.handle_new_bee()`): authored out-of-repo via Studio; body lives only in production catalog. Ratification migration `20260512090000_ratify_handle_new_bee_function.sql` (placeholder Tuesday morning — paste `pg_get_functiondef()` output). Trigger-timing description ("post-insert UPDATE" vs. "AFTER INSERT") is in tension; resolved by the Tuesday recovery. See `../shared/canon/auto-create-bee-trigger-analysis.md`.
 
 **BLiNG! v8 tables in production:**
 - `bling_transactions` — all BLiNG! flows
@@ -55,13 +55,16 @@ Always run `npm run build` before considering a change ready. Never push if buil
 
 **BLiNG! v8 RPCs deployed:**
 - `bling_send` — peer-to-peer transfer
-- `bling_free` — bonding curve "mint" (renamed from `bling_mint` 2026-05-08; always say FREE not MINT)
+- `bling_free` — bonding curve free-issuance (renamed from the old name 2026-05-08; always say FREE)
 - `bling_create_escrow`, `bling_release_escrow`, `bling_cancel_escrow`, `bling_dispute_escrow` — escrow lifecycle
-- `bling_place_order`, `bling_fill_order` — order book
+- `bling_place_order`, `bling_fill_order`, `bling_cancel_order` — order book (CR-5 hardening lands Monday: place_order pre-debits, cancel_order refunds, fill_order companion at `20260511145000_lock_cr5_companion_fill_order.sql` keeps balance accounting consistent on partial fills)
 - `bling_credit_purchase` — Stripe webhook credit grant (service-role only)
+- `bling_chargeback_clawback` — Stripe dispute handler (service-role only, lands Monday via `20260511130000_lock2_chargeback_infra.sql`)
 - Treasury bee: `@combtreasury` (UUID ends in `...0bee`)
 
 v9 security hardening (REVOKE PUBLIC + `auth.uid()` guards on user-callable RPCs) deployed 2026-05-06 — see `../shared/notes/audits/v9-security-production-verification-2026-05-06.md`.
+
+**Tier-1 federation schema (lands Monday 2026-05-11):** Lock 7 precision tightening, Lock 3 discriminators (`astra_or_nova_status` enum + `bling_transactions.currency_type`), Lock 2 chargeback infra, CR-5 order-book hardening + companion, role-hierarchy tables, optional `bees.bio/name/avatar_url` columns. Full plan + verification: `../shared/canon/monday-2026-05-11-execution-plan.md` + `../shared/canon/monday-post-apply-verification.md`. Lock 8 (registries + per-table `astra_id`/`nova_id` + RLS rewrite) deferred to Wednesday 2026-05-13 — see `../shared/canon/wednesday-2026-05-13-lock8-prescope.md`.
 
 ## The Manual (taxonomy)
 
@@ -161,15 +164,17 @@ BLiNG! v8 RPCs are deployed in DB. Edge Functions for HTTP-callable wrapping are
 
 ## Current build state
 
-- ea576f7 (BLiNG! v8 schema migration) deployed to production
-- Production verified via successful Bee post (Apr 27)
+- ea576f7 (BLiNG! v8 schema) + Phase C foundations (commit 7eb71fa) deployed to production
+- Production verified via successful Bee post (Apr 27); Phase C smoke-tested 2026-05-08
 - 14-realm taxonomy live with 4,860 atoms
 - pg_trgm enabled
+- Tier-1 federation schema queued for Monday 2026-05-11 (Lock 3/7, chargeback, CR-5, role hierarchy, bees profile cols); Tuesday 2026-05-12 = BLiNG! day; Wednesday 2026-05-13 = Lock 8 (registries + RLS rewrite); Friday 2026-05-15 = BRANDoSOPHIC build day
 - Phase 5+ in progress for orchestration system (lives in `../TheWORKSHOP.to/`)
 
 ## Where deeper context lives
 
 - `../shared/notes/MMF_v2_3_working.md` — full spec (current MMF working file)
+- `../shared/canon/` — locked canon docs (open-questions index, schema-state, astra-readiness, bee-role-hierarchy, federation-tier-1, cancel-recovery ADR, admin-tier conventions, language-firewall sweep, build-day pre-flights + execution plans + verification checklists)
 - `../shared/notes/BLING_ABUSE_DETERRENCE_THREAT_MODEL_04-26-26.md` — security architecture
 - `../shared/notes/BLING_ORDER_BOOK_WALKING_BRIEF_04-26-26.md` — order book UX flow
 - Supabase Studio for live DB schema inspection
