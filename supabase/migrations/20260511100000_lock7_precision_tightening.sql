@@ -62,6 +62,24 @@
 --     (avoids quoting collision with embedded format() strings).
 --   * Verification queries at end (commented out — run AFTER COMMIT).
 --   * Rollback block at end (commented out, with explicit warning — see notes).
+--
+-- Trigger interlude (added 2026-05-11 after first apply attempt):
+--   The first apply attempt of this migration on 2026-05-11 failed with:
+--     ERROR  0A000: cannot alter type of a column used in a trigger definition
+--     DETAIL: trigger bees_bling_rank_refresh on table bees depends on
+--             column "bling_balance"
+--   The trigger uses `BEFORE INSERT OR UPDATE OF bling_balance`, which creates
+--   a column-type dependency. Fix:
+--     1. DROP TRIGGER IF EXISTS (pre-A interlude, between pre-flight and Block A).
+--     2. Block D (post-C interlude, between last RPC and COMMIT) — byte-identical
+--        CREATE TRIGGER restoring the dropped trigger. Spec verified via
+--        pg_get_triggerdef before the retry edit:
+--          BEFORE INSERT OR UPDATE OF bling_balance ON bees
+--          FOR EACH ROW EXECUTE FUNCTION refresh_bling_rank()
+--   refresh_bling_rank() is type-agnostic (operates on NEW.bling_balance which
+--   inherits the column type), so the (20,3)→(20,6) widening is transparent
+--   to it. ALTER TABLE holds ACCESS EXCLUSIVE for the whole transaction, so
+--   no concurrent writer can sneak in between DROP and CREATE TRIGGER.
 -- =============================================================================
 
 BEGIN;
@@ -104,6 +122,16 @@ BEGIN
     END IF;
 END
 $$;
+
+-- ───────────────────────────────────────────────────────────────────────
+-- Trigger interlude (pre-A) · drop bees_bling_rank_refresh
+-- Postgres ERROR 0A000 ("cannot alter type of a column used in a trigger
+-- definition") blocks Block A unless this trigger is dropped first. The
+-- trigger uses `UPDATE OF bling_balance` which creates a column-type
+-- dependency. We re-create it byte-identically in Block D below.
+-- IF EXISTS makes this idempotent on replay / branch DBs.
+-- ───────────────────────────────────────────────────────────────────────
+DROP TRIGGER IF EXISTS bees_bling_rank_refresh ON public.bees;
 
 -- ───────────────────────────────────────────────────────────────────────
 -- Block A · Column widenings  (numeric(20, 3) → numeric(20, 6))
@@ -411,6 +439,19 @@ BEGIN
     RETURN jsonb_build_object('success', true, 'filled', p_fill_amt, 'fee', v_fee);
 END;
 $function$;
+
+
+-- ───────────────────────────────────────────────────────────────────────
+-- Block D · Trigger interlude (post-C) · re-create bees_bling_rank_refresh
+-- Restores the trigger dropped before Block A. Definition is byte-identical
+-- to the original (verified via pg_get_triggerdef on 2026-05-11 before this
+-- edit). refresh_bling_rank() is type-agnostic — it operates on NEW.bling_balance
+-- which now inherits the (20, 6) type, transparent to the function body.
+-- ───────────────────────────────────────────────────────────────────────
+CREATE TRIGGER bees_bling_rank_refresh
+    BEFORE INSERT OR UPDATE OF bling_balance ON public.bees
+    FOR EACH ROW
+    EXECUTE FUNCTION public.refresh_bling_rank();
 
 
 COMMIT;
