@@ -1,14 +1,13 @@
 -- =============================================================================
 -- Migration 20260512090000 — Ratify handle_new_bee() into the repo
 -- =============================================================================
--- Date:        2026-05-12
+-- Date:        2026-05-12 (placeholder authored); ratified 2026-05-14
 -- Author:      Code 2 (Claude) — supervised by Butch
--- Status:      PLACEHOLDER. The function body is not yet pasted into the
---              CREATE OR REPLACE block below. **DO NOT APPLY** as-is —
---              applying with the placeholder body in place would replace
---              the production function with an empty body and break the
---              entire auth.users → bees → bee_profiles trigger chain.
---              See "Operator instructions" below before applying.
+-- Status:      RATIFIED. Body below captured via pg_get_functiondef() against
+--              production catalog 2026-05-14 on branch
+--              wed-canon-lock-2026-05-13. CREATE OR REPLACE with this exact
+--              body is a no-op against production — migration is purely a
+--              documentation / repo-hygiene ratification.
 -- Source:      shared/canon/auto-create-bee-trigger-analysis.md (§6a — the
 --              recommendation to recover and ratify the function body)
 --              shared/canon/bling-build-day-2026-05-12-preflight.md §5
@@ -157,39 +156,35 @@ BEGIN
 END $$;
 
 -- ───────────────────────────────────────────────────────────────────────
--- Function definition.
---
--- ⚠ PLACEHOLDER — DO NOT APPLY AS-IS.
--- Tuesday morning, replace everything between "-- BEGIN PASTE" and
--- "-- END PASTE" with the output of:
---   SELECT pg_get_functiondef('public.handle_new_bee'::regproc);
--- See "Operator instructions" in the header for the full procedure.
+-- Function definition — captured 2026-05-14 from production catalog via
+-- pg_get_functiondef('public.handle_new_bee'::regproc). Reproduced
+-- verbatim below. Note: search_path is set to 'public' only (NOT
+-- 'public, pg_temp' as the original placeholder header recommended).
+-- Tightening search_path is a behavior change; deferred to a separate
+-- hygiene migration if/when Butch decides.
 -- ───────────────────────────────────────────────────────────────────────
 
 -- BEGIN PASTE ─────────────────────────────────────────────────────────
--- The placeholder below intentionally raises an exception so that any
--- accidental application of this migration without the real body
--- aborts the transaction rather than silently replacing the live
--- function. Replace this entire CREATE OR REPLACE block with the
--- captured definition before applying.
-
 CREATE OR REPLACE FUNCTION public.handle_new_bee()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
 AS $function$
-BEGIN
-    RAISE EXCEPTION
-        'Migration 20260512090000 was applied with the placeholder body '
-        'still in place. The real handle_new_bee() body must be pasted '
-        'in before applying. Aborting to protect the auth.users trigger '
-        'chain. Roll back this migration immediately and re-author per '
-        'the operator instructions in the migration header.';
-    RETURN NEW;
-END;
+begin
+  insert into public.bees (id, handle, email)
+  values (
+    new.id,
+    coalesce(
+      nullif(new.raw_user_meta_data->>'handle', ''),
+      'bee_' || substr(new.id::text, 1, 8)
+    ),
+    new.email
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
 $function$;
-
 -- END PASTE ───────────────────────────────────────────────────────────
 
 COMMIT;
