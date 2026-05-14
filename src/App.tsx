@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/lib/auth';
-import { PillarProvider, usePillar } from '@/lib/pillars/PillarContext';
+import { AstraProvider, useAstra } from '@/lib/astras/AstraContext';
 import { HomePage } from '@/pages/HomePage';
 import { ManualPage } from '@/pages/ManualPage';
 import { IntelLayout } from '@/pages/intel/IntelLayout';
@@ -23,9 +23,9 @@ import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
 export default function App() {
   return (
     <AuthProvider>
-      <PillarProvider>
+      <AstraProvider>
         <AppContent />
-      </PillarProvider>
+      </AstraProvider>
     </AuthProvider>
   );
 }
@@ -33,7 +33,7 @@ export default function App() {
 const ADMIN_SURFACE_PATHS = new Set(['/myhex', '/nexus', '/nucleus']);
 
 function AppContent() {
-  const activePillar = usePillar();
+  const activeAstra = useAstra();
   const { bee, loading: authLoading } = useAuth();
   const { pathname } = useLocation();
   const isAdminSurface = ADMIN_SURFACE_PATHS.has(pathname);
@@ -46,13 +46,13 @@ function AppContent() {
           Suppressed on admin surfaces — they own their own chrome. */}
       {!isAdminSurface && <TopTickerSlot />}
       <Routes>
-        {/* Home — pillar-aware first, then admin tier-1 redirect for signed-in
+        {/* Home — astra-aware first, then admin tier-1 redirect for signed-in
             Bees on theMANUAL.tech root, then anonymous HomePage. */}
         <Route
           path="/"
           element={
-            activePillar ? (
-              <Navigate to={`/${activePillar.primarySurface}`} replace />
+            activeAstra ? (
+              <Navigate to={`/${activeAstra.primarySurface}`} replace />
             ) : authLoading ? null : bee ? (
               <Navigate to="/myhex" replace />
             ) : (

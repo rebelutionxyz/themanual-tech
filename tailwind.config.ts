@@ -68,7 +68,7 @@ export default {
           '100%': { transform: 'translateY(0) scale(1)', opacity: '1' },
         },
         // BLiNG! drop hop/skip/jump — three vertical hops with subtle horizontal sway.
-        // Pillar-ID motion signature per MMF §15.1; gated to pillar contexts at the call site.
+        // Astra-ID motion signature per MMF §15.1; gated to astra contexts at the call site.
         'bling-hop': {
           '0%':   { transform: 'translate(0, 0) scale(1)' },
           '15%':  { transform: 'translate(0, -6px) scale(1.06)' },

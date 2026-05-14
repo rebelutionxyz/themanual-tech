@@ -1,7 +1,7 @@
-// Single source of truth for PillarConfig across all Cat 1 pillars.
-// Created on first Cat 1 pillar build (AtlasINTEL.fyi, 2026-04-27).
-// Subsequent pillars append to registry.ts only — this file does not change per-pillar.
-// v2 (2026-04-27): added optional wordmarkShort for dual-wordmark pillars (Rebelution.fyi).
+// Single source of truth for AstraConfig across all Cat 1 astras.
+// Created on first Cat 1 astra build (AtlasINTEL.fyi, 2026-04-27).
+// Subsequent astras append to registry.ts only — this file does not change per-astra.
+// v2 (2026-04-27): added optional wordmarkShort for dual-wordmark astras (Rebelution.fyi).
 // v3 (2026-05-08, Code 24): added promotionSlots (Phase C Component D — promotion slot framework).
 // v4 (2026-05-08, Code 23): added defaultGeo (Phase C Component C-5 — geo cascade fallback).
 
@@ -36,10 +36,10 @@ export interface SlotConfig {
   feedInlinePosition?: number;
 }
 
-export interface PillarConfig {
-  /** Pillar slug — registry key. Lowercase, no spaces. e.g. 'atlasintel' */
+export interface AstraConfig {
+  /** Astra slug — registry key. Lowercase, no spaces. e.g. 'atlasintel' */
   slug: string;
-  /** Hostnames that resolve to this pillar (apex + www; subdomains added as needed) */
+  /** Hostnames that resolve to this astra (apex + www; subdomains added as needed) */
   hosts: string[];
   /** Display wordmark shown in SiteHeader expanded state. Casing is load-bearing — match brand exactly. */
   wordmark: string;
@@ -51,16 +51,16 @@ export interface PillarConfig {
   wordmarkShort?: string;
   /**
    * Primary surface slug — must match an entry in src/lib/surfaces.ts SURFACES[].slug.
-   * The pillar's root route (/) renders this surface's layout.
+   * The astra's root route (/) renders this surface's layout.
    */
   primarySurface: string;
   /** Constellation membership — affects sidebar tonal palette in v2 */
   constellation: Constellation;
-  /** Pillar accent color (hex) — used in right-sidebar rotation + favicon tint */
+  /** Astra accent color (hex) — used in right-sidebar rotation + favicon tint */
   accent: string;
   /**
    * Optional copy overrides applied at render-time.
-   * v1: empty for HoneyComb-base pillars. AtlasNation pillars may swap "Bees"→"Members" in v2.
+   * v1: empty for HoneyComb-base astras. AtlasNation astras may swap "Bees"→"Members" in v2.
    * Keys are exact strings to find; values are replacements. Case-sensitive.
    */
   copyOverrides: Record<string, string>;
@@ -69,7 +69,7 @@ export interface PillarConfig {
    * and no logged-in profile location is set. Per MMF §19.7 C-5 cascade:
    *   1. localStorage (honeycomb:geo:search-location)
    *   2. bee_profiles row (when authenticated)
-   *   3. PillarConfig.defaultGeo (this field)
+   *   3. AstraConfig.defaultGeo (this field)
    *   4. 'Global' (final fallback)
    * All canonical Astras = 'Global'. Novas (Bee-clones) may localize.
    */
@@ -88,7 +88,7 @@ export interface PillarConfig {
 
 /**
  * Canonical slot defaults. All three slots enabled with canonical behaviors.
- * Astras can override individual slot keys via PillarConfig.promotionSlots.
+ * Astras can override individual slot keys via AstraConfig.promotionSlots.
  * Per MMF §19.7 D-2 — bottom-scrolling slot is deferred to v2.
  */
 export const DEFAULT_PROMOTION_SLOTS: Record<SlotKey, SlotConfig> = {
@@ -100,11 +100,11 @@ export const DEFAULT_PROMOTION_SLOTS: Record<SlotKey, SlotConfig> = {
 /**
  * Resolve the effective slot config for a given astra + slot key.
  * Falls through to DEFAULT_PROMOTION_SLOTS when the astra does not specify
- * the slot, or when called on the foundation (no pillar — themanual.tech itself).
+ * the slot, or when called on the foundation (no astra — themanual.tech itself).
  */
 export function resolveSlotConfig(
-  pillar: PillarConfig | null,
+  astra: AstraConfig | null,
   slotKey: SlotKey,
 ): SlotConfig {
-  return pillar?.promotionSlots?.[slotKey] ?? DEFAULT_PROMOTION_SLOTS[slotKey];
+  return astra?.promotionSlots?.[slotKey] ?? DEFAULT_PROMOTION_SLOTS[slotKey];
 }

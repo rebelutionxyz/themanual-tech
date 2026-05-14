@@ -1,12 +1,12 @@
 // Phase C Component D — reader hook for promotion slots (Code 24).
 // Hybrid resolution per MMF §19.7 D-1:
 //   1. DB row matching the (slot_key, scope, geo) cascade
-//   2. PillarConfig fallbackContent
+//   2. AstraConfig fallbackContent
 //   3. nothing (caller hides slot — D-4)
 
 import { useEffect, useRef, useState } from 'react';
-import { resolveSlotConfig, type SlotKey } from '@/lib/pillars/pillar.types';
-import { usePillar } from '@/lib/pillars/PillarContext';
+import { resolveSlotConfig, type SlotKey } from '@/lib/astras/astra.types';
+import { useAstra } from '@/lib/astras/AstraContext';
 import { queryPromotionForSlot } from './query';
 import type { Promotion, SlotResult } from './types';
 
@@ -18,7 +18,7 @@ import type { Promotion, SlotResult } from './types';
  * changes.
  *
  * Note on `astra` defaulting: when the caller does not pass `astra`, the hook
- * substitutes the current PillarContext slug (foundation = no substitution).
+ * substitutes the current AstraContext slug (foundation = no substitution).
  * This matches the common case where slots are mounted in shared layouts and
  * the astra is implicit from the host.
  */
@@ -30,12 +30,12 @@ export function usePromotionSlot(input: {
   atomId?: string | null;
   geoCountry?: string | null;
 }): SlotResult {
-  const pillar = usePillar();
+  const astraConfig = useAstra();
   const slotKey = input.slotKey;
-  const config = resolveSlotConfig(pillar, slotKey);
+  const config = resolveSlotConfig(astraConfig, slotKey);
 
-  // Astra substitution: caller-provided wins; otherwise pillar slug; else null.
-  const astra = input.astra ?? pillar?.slug ?? null;
+  // Astra substitution: caller-provided wins; otherwise astra config slug; else null.
+  const astra = input.astra ?? astraConfig?.slug ?? null;
   const realmSlug = input.realmSlug ?? null;
   const branchPath = input.branchPath ?? null;
   const atomId = input.atomId ?? null;
