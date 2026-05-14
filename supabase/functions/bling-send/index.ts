@@ -41,8 +41,8 @@ Deno.serve(async (req) => {
   if (typeof recipient_id !== 'string' || !UUID_RE.test(recipient_id)) {
     return errorResponse('recipient_id must be a UUID');
   }
-  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0.001) {
-    return errorResponse('amount must be a number ≥ 0.001');
+  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0.1) {
+    return errorResponse('amount must be a number ≥ 0.1');
   }
   if (typeof category !== 'string' || !VALID_CATEGORIES.includes(category as Category)) {
     return errorResponse(`category must be one of: ${VALID_CATEGORIES.join(', ')}`);

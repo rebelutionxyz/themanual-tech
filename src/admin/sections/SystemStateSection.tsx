@@ -14,18 +14,18 @@ interface State {
   beeCount: number | null;
   astraCount: number | null;
   novaCount: number | null;
-  mintActive: boolean | null;
+  freeActive: boolean | null;
   totalSupply: string | null;
-  mintPrice: string | null;
+  freedomPrice: string | null;
 }
 
 const INITIAL: State = {
   beeCount: null,
   astraCount: null,
   novaCount: null,
-  mintActive: null,
+  freeActive: null,
   totalSupply: null,
-  mintPrice: null,
+  freedomPrice: null,
 };
 
 async function safeCount(table: string): Promise<number | null> {
@@ -50,22 +50,22 @@ export function SystemStateSection() {
         safeCount('nova_registry'),
         supabase
           .from('bling_system_state')
-          .select('mint_active, total_supply, mint_price')
+          .select('free_active, total_supply, freedom_price')
           .eq('id', 1)
           .maybeSingle(),
       ]);
 
       if (cancelled) return;
       const sys = sysRes.data as
-        | { mint_active: boolean; total_supply: string; mint_price: string }
+        | { free_active: boolean; total_supply: string; freedom_price: string }
         | null;
       setState({
         beeCount,
         astraCount,
         novaCount,
-        mintActive: sys?.mint_active ?? null,
+        freeActive: sys?.free_active ?? null,
         totalSupply: sys?.total_supply ?? null,
-        mintPrice: sys?.mint_price ?? null,
+        freedomPrice: sys?.freedom_price ?? null,
       });
     })();
     return () => {
@@ -97,18 +97,18 @@ export function SystemStateSection() {
           <Metric
             label="FREE active"
             value={
-              state.mintActive === null
+              state.freeActive === null
                 ? '—'
-                : state.mintActive
+                : state.freeActive
                   ? 'YES'
                   : 'PAUSED'
             }
             tone={
-              state.mintActive === false ? 'warn' : state.mintActive ? 'ok' : 'neutral'
+              state.freeActive === false ? 'warn' : state.freeActive ? 'ok' : 'neutral'
             }
           />
           <Metric label="Total supply" value={fmtAmount(state.totalSupply)} />
-          <Metric label="Curve price" value={fmtAmount(state.mintPrice)} />
+          <Metric label="Curve price" value={fmtAmount(state.freedomPrice)} />
           <Metric label="Hard cap" value={fmt(BLING_HARD_CAP)} />
         </div>
       </div>
