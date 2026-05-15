@@ -161,6 +161,9 @@ BLiNG! v8 RPCs are deployed in DB. Edge Functions for HTTP-callable wrapping are
 5. **Don't bypass the language firewall** in error messages or developer-facing strings that might surface to Bees.
 6. **Don't skip pg_trgm** when adding searchable text columns.
 7. **Don't test against production.** Use local Supabase or staging for destructive ops.
+8. **Don't prefix bash commands with `cd <repo path> && ...`** — working directory is set to the repo root at session start. Run commands directly. The cd-prefix pattern triggers Claude Code's hard-coded directory-change warning regardless of `settings.local.json` allowlist, causing unnecessary y/n prompts on every command.
+   - Bad: `cd "/c/Users/Butch/Documents/HONEYCOMB/TheMANUAL.tech" && git status`
+   - Good: `git status`
 
 ## Current build state
 
