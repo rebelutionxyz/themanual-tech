@@ -228,7 +228,7 @@ export const SURFACES: SurfaceDef[] = [
     slug: 'manual',
     name: 'MANUAL',
     function: 'The Manual',
-    description: '5,997 atoms · 13 realms · the sovereign record.',
+    description: '4,860 atoms · 14 realms · the sovereign record.',
     purpose:
       'The knowledge backbone. Every other surface can tag atoms here. Research, verify, add sources.',
     icon: Book,
