@@ -45,3 +45,6 @@ supabase/.temp/
 # Claude Code session state
 .claude/
 
+
+# Migration scratch
+.tmp-*
