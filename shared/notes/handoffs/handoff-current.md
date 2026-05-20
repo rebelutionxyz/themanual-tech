@@ -1,77 +1,97 @@
-# Handoff — 2026-05-09
+# HONEYCOMB — Handoff
 
-**Status.** Heavy canon day. Two tier-1 design docs shipped, four-tier admin framework locked and scaffolded with three live surfaces, one drift fix queued for Tuesday pre-flight. Three local commits, none pushed.
-
-**Up next.** Sun 2026-05-10 — theMANUAL spine perfection. Mon 2026-05-11 — BLiNG! prep. Tue 2026-05-12 — BLiNG! build day.
-
----
-
-## Architecture locked (canon)
-
-- **Federation tier-1 scoping** — `shared/canon/federation-tier-1-scoping.md`. Nine locks plus Lock 1.1 resilience posture (read replica + hourly snapshot in scope; active-active hot failover out) and Lock 9.6 sovereignty tiers (Standard / Dedicated / Off-Grid framework). Three-database tier-1 architecture: BLiNG! (`freedomblings.com`) + theMANUAL spine + Platform; fourth (Regulated Data) anticipated when the first regulated Astra ships. **~$75/mo committed across the three Pro projects, instantiation deferred to triggers** (Open #30 for Platform DB cutover, Open #32 for Regulated DB).
-- **Cancel-recovery ADR** — `shared/canon/cancel-recovery-adr.md`. Three locks. **Lock 1** Bee-to-Bee `bling_send` is atomic and final, no cancel mechanism, recovery is social (sender contacts receiver, optional counter-`bling_send`). **Lock 2** Stripe chargeback handling — explicit handler at `freedomblings.com` claws back BLiNG!, burns from `total_supply`, negative balance permitted, Bee transaction-locked while balance < 0. **Lock 3** escrow cancel/dispute policy verified against actual RPC bodies. Drift appendix flags four items (see Loose Ends).
-- **Admin tier framework** — four tiers locked: **My Hex** (every Bee, amber), **Ops** (workspace-scoped), **Nexus** (cross-Astra silver), **Nucleus** (platform honey-gold). Self-assembly manifest pattern in `src/admin/`.
-- **Logging convention** — `shared/canon/logging-convention.md`. Bracket-prefix pattern locked. Structured logger (`logPillar`) deferred indefinitely; not built tonight, not built next session unless a real signal demands it.
-- **Visual treatment** — dark-blue base `#0A1628` + per-tier accent + dark-blue inset cards. The sandwich pattern is the canonical layout for admin surfaces.
+**As of:** 2026-05-19 ~21:00 PT (post-tier-1-cold-storage)
+**Resume cue:** Open this file. Run `ogo` hotkey to relaunch into next session.
 
 ---
 
-## Code landed
+## Current state
 
-- **Three admin routes live:** `/myhex` (Bee amber), `/nexus` (silver), `/nucleus` (honey gold).
-- **`src/admin/`** — manifest pattern + tier registry + shared types + `AdminLayout`. New surfaces are additive: drop a manifest, register, route exists.
-- **`src/lib/useUserRole.ts`** — role hook with safe fallbacks; surfaces fail closed when role data is absent.
-- **`supabase/functions/check-keyholder/`** — Edge Function source built; **not yet deployed**. Deploy in own session per `CLAUDE.md` Edge Functions discipline.
-- **Migration queued for Tuesday pre-flight:** `supabase/migrations/20260509120000_phase_c_b4_credit_purchase_callsite_fix.sql`. **NOT YET APPLIED.** Closes a latent failure: `bling_credit_purchase`'s body still calls `bling_mint` by name; `bling_mint` was renamed to `bling_free` on 2026-05-08; PL/pgSQL resolves at execution time so every Stripe purchase that needs the curve-FREE branch will error. Bug is latent only because Stripe is deferred. **Apply BEFORE any Stripe webhook activation Tuesday.** See `cancel-recovery-adr.md` Appendix item 3.
-- **Logging cleanup** — three `UtilityChrome` stubs converted to TODO no-ops; `intel.ts` prefix consistency pass applied.
-- **Admin chrome polish** — `TopTickerSlot` / `GeoLensBar` suppressed on admin surfaces; sidebar height made robust (no longer assumes a 56px header).
+**Spine (TheMANUAL.tech):**
+- **4892 atoms** across 14 realms + Justice
+- **Reference reduced to 2 L2s**: `Standards` (32 atoms) + `Reference works` (15 atoms) — TARGET REACHED
+- Human Activities at 10 L2s
+- Snapshot table `atoms_backup_2026_05_19` at 5011 rows (30-day Supabase retention)
+- RLS + FK integrity verified: 0 orphans across atom_kettle_votes / atom_sources / atom_comments / entity_atom_links / promotions
+- Live site: themanual.tech (Railway — was briefly down during session due to Railway-wide edge-network outage, since recovered)
 
----
+**Canon docs:**
+- **MMF is STALE at v2.6** — doesn't reflect post-disposition state
+- v2.7 patch spec drafted (`mmf-v2-7-patch-spec.md`) — apply tomorrow per MASTER RULE (compress first)
+- All disposition artifacts committed and pushed: commit `956f9c4` on branch `chore/claude-md-no-cd-prefix` (TheMANUAL.tech)
 
-## Infrastructure
+**Backups (4 independent layers now active):**
+1. Local disk: `~/Documents/HONEYCOMB/`
+2. GitHub: `TheMANUAL.tech` @ `956f9c4` + `honeycomb-ops` @ `82c65c1` both pushed
+3. Supabase snapshot: `atoms_backup_2026_05_19` table (30-day retention)
+4. **NEW — Physical USB cold storage:** `/c/Users/Butch/HONEYCOMB-backups/2026-05-19_205256` (50 MB, 12 files) copied to jump drive tonight. First sovereign offline backup of HONEYCOMB.
 
-- **Hotkey naming locked** — Path A: `HONEYCOMB_MASTER_current.md` is the stable target. Versioned snapshots use the dated form; "current" always points to the live working file.
-- **Domain inventory** — `ibee.to` confirmed owned, pinned for future product use. **No canonical domain list exists yet** — flagged for a future cleanup session.
-
----
-
-## Loose ends deferred
-
-| ID | Item | Resolves at |
-|----|------|-------------|
-| #30 | Platform DB migration plan (move platform tables out of theMANUAL spine into a new Pro project) | Triggered by Tuesday's BLiNG! work / own design session |
-| #32 | Regulated Data DB instantiation | When the first regulated Astra ships |
-| #CR-1…#CR-7 | Cancel-recovery follow-ups (Stripe handler build, Bee notifications, dispute-closed reconcile, Board of Astras dispute resolution, `bling_cancel_order` RPC + pre-debit hardening, DiGiTs cancel posture, deletion-during-chargeback edge case) | Mostly BLiNG! build day Tue 2026-05-12; one to §32 |
-| §32 | Board of Astras governance design (membership, voting, scope of authority over `freedomblings.com` parameters) | Own session post-BLiNG! build day |
-| #33 | Sovereignty Tier pricing | Sovereignty Tiers design session |
-| #34 | BRANDoSOPHIC tier-selection integration | BRANDoSOPHIC build day · Fri 2026-05-15 |
-| #35 | Off-grid jurisdiction list | Infrastructure design session |
-| — | Claude Design `DESIGN.md` | Ready when she's available |
-| — | `KEYHOLDER_BEE_IDS` not yet set; `check-keyholder` Edge Function not yet deployed | Tuesday pre-flight (own session) |
-| — | `bling_transactions.type` CHECK still allows `'minted'`; `bling_free` body writes `type='minted'` — language-firewall debt | Separate session — bigger than a one-line fix (rename CHECK enum value, decide on backfill vs. dual-allowed window) |
-
-**Cancel-recovery ADR drift appendix** also flags two items beyond #CR-5 worth re-reading before Tuesday: `bling_cancel_order` RPC is missing entirely, and `bling_place_order` does not pre-debit balance (v9 hardening that did not land). Both are tracked in #CR-5.
+**Backup scripts in place:**
+- Tier 1: `~/Documents/HONEYCOMB/honeycomb-ops/scripts/master-backup.sh` (manual; ~5–15 min due to pooler latency)
+- Tier 2: GitHub Actions cron in private `honeycomb-ops` repo
+- Tier 3: Windows scheduled task, Sundays 09:00 local
 
 ---
 
-## Calendar
+## What closed this session
 
-| Date | Slot |
-|------|------|
-| Sun 2026-05-10 | theMANUAL spine perfection day |
-| Mon 2026-05-11 | BLiNG! prep |
-| Tue 2026-05-12 | **BLiNG! build day** |
-| Fri 2026-05-15 | BRANDoSOPHIC build day |
+1. **Lists disposition pass — fully closed.** 4896 → 4892 atoms net across all phases. Step-3 destructive gate dissolved 67 atoms; Step-5b iterative shell drain removed 21 empty Lists shells; Step-7 resolved final 3 ADJUDICATEs. Reference target of 2 L2s reached.
 
-**Tuesday pre-flight checklist** (do these in order, before Stripe webhook is wired):
-1. Deploy `check-keyholder` Edge Function (own session per CLAUDE.md).
-2. Set `KEYHOLDER_BEE_IDS` in environment.
-3. Apply `20260509120000_phase_c_b4_credit_purchase_callsite_fix.sql`. The pre-flight `DO $$` block aborts if the rename precondition does not hold; if that fires, stop and investigate before proceeding.
+2. **Adjudication patterns locked as canon:**
+   - **"Deletion is not a quality tool — the kettle is."** Curiosities subnodes (bow-tie-wearers, selfie-deaths, unusual-deaths, US-presidents-facial-hair, sexually-active-popes) kept as a class.
+   - **Common misconceptions** repathed to `Society / Society concepts` — fits "Show me who got it wrong" manifesto.
+   - **DSM codes** repathed under `Health / Mental health / Diagnostic frameworks`.
+
+3. **Tier-1 backup script shipped.** Built, debugged (pg_dump pooler-latency root cause identified — ~200ms/query, ~500 queries = ~100s schema introspection), placed at `honeycomb-ops/scripts/master-backup.sh`, pushed to GitHub at commit `82c65c1`. First USB cold-storage executed tonight.
+
+4. **Repo consolidation.** `honeycomb-ops` moved from `~/Documents/honeycomb ops/` (with space) into `~/Documents/HONEYCOMB/honeycomb-ops/`. Legacy ops scripts (`00_dump_pre_migration.ps1`, `03_seed_atoms.cjs`) archived under `honeycomb-ops/scripts/legacy/`. Empty `TheMANUAL.tech/scripts/` removed.
+
+5. **Terminal config fixed permanently.** Bracketed-paste glitches and history-expansion errors resolved via `~/.inputrc` (`set enable-bracketed-paste off`) and `~/.bashrc` (`set +H`). Multi-line pastes now work cleanly.
+
+6. **Railway outage scare survived.** themanual.tech went down mid-session (Railway-wide edge-network incident, not us); DB confirmed healthy throughout via direct queries. Seeded new planned feature: **INFRA STATUS SLIDER** — make platform dependencies (Railway, GitHub, Supabase) visible in-product.
+
+7. **Anon key was pasted in chat earlier today.** Decision: not rotated (public-by-design, embedded in client bundle, respects RLS). Service-role key + DB password remain clean.
 
 ---
 
-## Commit status
+## Open queue (prioritized for tomorrow)
 
-Three local commits today (Code 1 closeout pass): canon docs, HQ scaffolding code, drift-fix migration. **Local only, not pushed.** Remote state is unchanged.
+**Tier 1 — high signal, contained scope:**
 
-🐝🍯
+1. **MMF v2.7 sync.** Apply `mmf-v2-7-patch-spec.md` against current MMF. Per MASTER RULE: compress current MMF *before* adding new content. Patch adds: 4892 atom count, Reference 2 L2s, disposition methodology section (5-bucket classifier + tree-completeness rule + integrity-gate discipline + kettle ethos), INFRA STATUS SLIDER planned feature, tier-1 backup script ops entry, version bump v2.6 → v2.7.
+
+2. **Backup scope-limit decision.** Public-only schema test: 39s/186KB vs full schema 93s/330KB. Meaningful for GitHub Action cron (saves Action minutes). Decide whether daily backups should be scoped to `--schema=public --schema=auth` only, or keep full for safety. Recommend: scope the *cron* (frequent runs, latency matters), keep the *manual master-backup.sh* full (rare runs, completeness matters more than speed).
+
+**Tier 2 — medium scope:**
+
+3. **Drill-stack dispatch write-up.** Deep-drill UI bars, queues behind L1/L2/L3 bar dispatch — was queued behind Railway returning (now back).
+
+4. **Investigate `shared/` bulk.** The `shared.tar.gz` is 42M — 84% of last backup's total size. What lives in `~/Documents/HONEYCOMB/shared/` (separate from `TheMANUAL.tech/shared/canon/`)? Likely reference material / screenshots / docs that don't need nightly capture. Decide what to exclude.
+
+5. **Cleanup empty top-level dirs.** `~/Documents/HONEYCOMB/scripts/` (1K tarball) and `~/Documents/HONEYCOMB/docs/` (4K) are essentially empty. Delete or fill.
+
+6. **Branch housekeeping.** `chore/claude-md-no-cd-prefix` now carries the entire disposition canon (way out of scope from its name). Either rename or PR-merge to clean up.
+
+**Tier 3 — parked for bigger sessions:**
+
+7. Bonding curve step-function arbitrage concern (memory pin #30)
+8. Patchboard + Connected Accounts schema (#29)
+9. Freedom Network §23 timeslot bidding spec recovery (#23)
+10. Pillar→Astra code sweep (#3)
+11. Step-4 lens conversions on the 23 LENS atoms still in 10 surviving Lists shells (waits for §12 lens mechanism to ship)
+
+---
+
+## Operational reminders
+
+- **MASTER RULE:** Compress master files BEFORE each daily spine-perfection session.
+- **Pace rule:** Butch sets pace. No suggestions about timing, energy, rest.
+- **Execution split:** Code drives execution; Butch ratifies; Chat reviews. Git push/pull/commit stay with Butch.
+- **Backup ritual after major DB change:** Run `bash ~/Documents/HONEYCOMB/honeycomb-ops/scripts/master-backup.sh`, drag latest folder to USB. Each backup is its own timestamp — don't reuse folders.
+- **pg_dump quirk pinned:** Schema-only ~1.5 min, full dump 5–15 min via pooler. Not hung when silent — just slow. Be patient.
+
+---
+
+## Resume cue
+
+Tomorrow's first move: read `mmf-v2-7-patch-spec.md`, run MASTER RULE compression pass on current MMF, then apply the patch in order (Phase 0 → 5).
