@@ -3,7 +3,12 @@
 //
 // Per shared/canon/manual-spine-api-v1-amendment-1.md §2.2.
 // verify_jwt = true (Bee-auth required).
-// Inserts a tier-classification vote for the caller (auth.uid()) on the atom.
+//
+// UPSERT semantics (per OG HUMAN follow-up direction, 2026-05-27):
+// One vote per Bee per atom; latest classification wins. Bees can change
+// their tier vote as evidence develops (e.g. atom moves Emerging → Accepted).
+// Backed by UNIQUE (atom_id, bee_id) constraint from migration
+// 20260527210000_atom_kettle_votes_uniqueness.
 
 import { errorResponse, handleCors, jsonResponse } from '../_shared/cors.ts';
 import { verifyAuth } from '../_shared/auth.ts';
@@ -72,22 +77,29 @@ Deno.serve(async (req) => {
   }
   if (!atom) return errorResponse('Atom not found', 404);
 
+  // UPSERT — latest vote per (atom_id, bee_id) wins. `created_at` refreshes
+  // to now() on each vote so it represents the timestamp of the current
+  // classification, not the Bee's first-ever vote on this atom.
   const { data: insertRow, error: insertErr } = await sb
     .from('atom_kettle_votes')
-    .insert({
-      atom_id: slug,
-      bee_id: beeId,
-      kettle: tier,
-      weight,
-    })
+    .upsert(
+      {
+        atom_id: slug,
+        bee_id: beeId,
+        kettle: tier,
+        weight,
+        created_at: new Date().toISOString(),
+      },
+      { onConflict: 'atom_id,bee_id' },
+    )
     .select('id')
     .single();
   if (insertErr || !insertRow) {
-    console.error('manual-atom-kettle-vote insert failed', {
+    console.error('manual-atom-kettle-vote upsert failed', {
       slug, bee_id: beeId, tier, weight,
       message: insertErr?.message ?? 'no row',
     });
-    return errorResponse('Vote insert failed', 500);
+    return errorResponse('Vote upsert failed', 500);
   }
 
   // Recompute tier_vote_counts post-insert (lightweight; one query).
