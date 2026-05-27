@@ -26,10 +26,11 @@ import { cn } from '@/lib/utils';
 import { FailedLogins } from './sections/FailedLogins';
 import { PageViews } from './sections/PageViews';
 import { TrendingAtomsAdmin } from './sections/TrendingAtomsAdmin';
-import {
-  ActiveBees, RecentKettleVotes, TreasuryBalances,
-  EconomySnapshot, AstraStatus, AdminActions,
-} from './sections/Stubs';
+import { ActiveBees } from './sections/ActiveBees';
+import { RecentKettleVotes } from './sections/RecentKettleVotes';
+import { TreasuryBalances } from './sections/TreasuryBalances';
+import { EconomySnapshot } from './sections/EconomySnapshot';
+import { AstraStatus, AdminActions } from './sections/Stubs';
 
 interface SectionDef {
   slug: string;
@@ -43,10 +44,10 @@ const SECTIONS: SectionDef[] = [
   { slug: 'failed-logins',     label: 'Failed Logins',        icon: AlertOctagon, status: 'live', Component: FailedLogins },
   { slug: 'page-views',        label: 'Page Views',           icon: BarChart3,    status: 'live', Component: PageViews },
   { slug: 'trending-atoms',    label: 'Trending Atoms',       icon: TrendingUp,   status: 'live', Component: TrendingAtomsAdmin },
-  { slug: 'active-bees',       label: 'Active Bees',          icon: Users,        status: 'stub', Component: ActiveBees },
-  { slug: 'recent-votes',      label: 'Recent Kettle Votes',  icon: Vote,         status: 'stub', Component: RecentKettleVotes },
-  { slug: 'treasury',          label: 'Treasury Balances',    icon: Wallet,       status: 'stub', Component: TreasuryBalances },
-  { slug: 'economy',           label: 'Economy Snapshot',     icon: Activity,     status: 'stub', Component: EconomySnapshot },
+  { slug: 'active-bees',       label: 'Active Bees',          icon: Users,        status: 'live', Component: ActiveBees },
+  { slug: 'recent-votes',      label: 'Recent Kettle Votes',  icon: Vote,         status: 'live', Component: RecentKettleVotes },
+  { slug: 'treasury',          label: 'Treasury Balances',    icon: Wallet,       status: 'live', Component: TreasuryBalances },
+  { slug: 'economy',           label: 'Economy Snapshot',     icon: Activity,     status: 'live', Component: EconomySnapshot },
   { slug: 'astra-status',      label: 'Astra Status',         icon: ServerCog,    status: 'stub', Component: AstraStatus },
   { slug: 'admin-actions',     label: 'Admin Actions',        icon: Wrench,       status: 'stub', Component: AdminActions },
 ];

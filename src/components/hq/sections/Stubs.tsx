@@ -1,10 +1,15 @@
-// HQ stub sections — land live in HQ-2 / HQ-3 dispatches.
+// HQ stub sections — land live in subsequent dispatches.
 // Each renders the section title + one-line description so the sidebar is
 // clickable + the admin can see what's coming.
+//
+// HQ-2 (2026-05-27) retired the ActiveBees / RecentKettleVotes /
+// TreasuryBalances / EconomySnapshot stubs from this file — those now
+// live as their own files under sections/. AstraStatus + AdminActions
+// remain stubbed; HQ-3 dispatch wires them.
 
 interface StubProps {
   title: string;
-  dispatch: 'HQ-2' | 'HQ-3';
+  dispatch: 'HQ-3';
   description: string;
 }
 
@@ -21,46 +26,6 @@ function Stub({ title, dispatch, description }: StubProps) {
         <p className="text-text-dim" style={{ fontSize: '13px' }}>{description}</p>
       </div>
     </div>
-  );
-}
-
-export function ActiveBees() {
-  return (
-    <Stub
-      title="Active Bees"
-      dispatch="HQ-2"
-      description="Currently-active sessions and recent-activity Bees. Joins bees + auth.sessions."
-    />
-  );
-}
-
-export function RecentKettleVotes() {
-  return (
-    <Stub
-      title="Recent Kettle Votes"
-      dispatch="HQ-2"
-      description="Latest tier-classification votes across all atoms; flag suspicious patterns."
-    />
-  );
-}
-
-export function TreasuryBalances() {
-  return (
-    <Stub
-      title="Treasury Balances"
-      dispatch="HQ-2"
-      description="@combtreasury sub-bucket balances (operational / reserve / defense / promotions / campaign / newbee / honeypot)."
-    />
-  );
-}
-
-export function EconomySnapshot() {
-  return (
-    <Stub
-      title="Economy Snapshot"
-      dispatch="HQ-2"
-      description="Total BLiNG! freed from curve · circulating supply · OPS umbrella sums."
-    />
   );
 }
 
