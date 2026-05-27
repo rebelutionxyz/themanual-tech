@@ -7,11 +7,18 @@
 // Pairings (1↔14, 2↔13, 3↔12, 4↔11, 5↔10, 6↔9, 7↔8) are intentional —
 // scrolling either direction passes through a coherent arc.
 
+// 5-tier Discovery Ladder per manual-spine-api-v1-amendment-1.md §2.1.
+// Migrated 2026-05-27 from old 4-tier (Accepted/Contested/Emerging/Fringe);
+// Contested → Emerging in production data (107 atoms), Sourced + Unsourced added.
+// Kept as `KettleState` for back-compat with existing callsites; the new
+// canonical name is `DiscoveryTier` (src/lib/discovery-ladder/colors.ts) and
+// the two are structurally identical.
 export type KettleState =
+  | 'Sourced'
   | 'Accepted'
-  | 'Contested'
   | 'Emerging'
-  | 'Fringe';
+  | 'Fringe'
+  | 'Unsourced';
 
 export type AtomType = 'person' | 'event' | 'document' | 'organization' | 'place';
 

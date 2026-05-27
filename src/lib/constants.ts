@@ -100,44 +100,48 @@ export const SILVER = '#C8D1DA';
 export const BEE_COLOR = '#E8B86E';
 
 /**
- * KETTLE_STATES — the 4 states of the Discovery Ladder.
+ * KETTLE_STATES — the 5 tiers of the Discovery Ladder.
  *
- * Locked April 24, 2026 alongside the taxonomy migration.
- * Old states 'Sourced' and 'Unsourced' retired — every atom now lands
- * in one of these 4 boil-states based on evidence weight.
+ * Re-locked 2026-05-27 per manual-spine-api-v1-amendment-1.md §2.1. The
+ * prior 4-tier model (Accepted/Contested/Emerging/Fringe) was migrated to
+ * the canonical 5-tier (Sourced → Accepted → Emerging → Fringe → Unsourced).
+ * Contested was folded into Emerging in production data (107 atoms).
  *
- * Kettle metaphor:
- *   Fringe    = steam (minority claim with evidence)
- *   Emerging  = bubbling (gaining credibility)
- *   Contested = disputed (evidence on both sides)
- *   Accepted  = rolling boil (mainstream acknowledged)
+ * Colors and descriptions are sourced from
+ * `src/lib/discovery-ladder/colors.ts` (DISCOVERY_TIER_COLORS) so the
+ * single-source-of-truth lives next to DiscoveryTierChip. Constants here
+ * are kept as re-exports for back-compat with OutlookView + GraphView +
+ * the ManualPage filter chip array.
  */
-export const KETTLE_STATES: KettleState[] = [
-  'Accepted',
-  'Contested',
-  'Emerging',
-  'Fringe',
-];
+import {
+  DISCOVERY_TIER_COLORS,
+  DISCOVERY_TIERS_ORDERED,
+} from '@/lib/discovery-ladder/colors';
+
+export const KETTLE_STATES: KettleState[] = [...DISCOVERY_TIERS_ORDERED];
 
 export const KETTLE_COLORS: Record<KettleState, string> = {
-  Accepted: '#6B94C8',
-  Contested: '#E8A838',
-  Emerging: '#E88938',
-  Fringe: '#9B7FC8',
+  Sourced:   DISCOVERY_TIER_COLORS.Sourced.bg,
+  Accepted:  DISCOVERY_TIER_COLORS.Accepted.bg,
+  Emerging:  DISCOVERY_TIER_COLORS.Emerging.bg,
+  Fringe:    DISCOVERY_TIER_COLORS.Fringe.bg,
+  Unsourced: DISCOVERY_TIER_COLORS.Unsourced.bg,
 };
 
 export const KETTLE_ABBREV: Record<KettleState, string> = {
-  Accepted: 'ACC',
-  Contested: 'CON',
-  Emerging: 'EME',
-  Fringe: 'FRI',
+  Sourced:   'SOU',
+  Accepted:  'ACC',
+  Emerging:  'EME',
+  Fringe:    'FRI',
+  Unsourced: 'UNS',
 };
 
 export const KETTLE_DESCRIPTIONS: Record<KettleState, string> = {
-  Accepted: 'Rolling boil — mainstream acknowledged',
-  Contested: 'Disputed — evidence on both sides',
-  Emerging: 'Bubbling — gaining credibility',
-  Fringe: 'Steam — minority claim with evidence',
+  Sourced:   DISCOVERY_TIER_COLORS.Sourced.description,
+  Accepted:  DISCOVERY_TIER_COLORS.Accepted.description,
+  Emerging:  DISCOVERY_TIER_COLORS.Emerging.description,
+  Fringe:    DISCOVERY_TIER_COLORS.Fringe.description,
+  Unsourced: DISCOVERY_TIER_COLORS.Unsourced.description,
 };
 
 export const ATOM_TYPE_COLORS = {
