@@ -20,7 +20,6 @@ import { PlatformLayout } from '@/components/layout/PlatformLayout';
 import { GeoLensBar } from '@/components/geo/GeoLensBar';
 import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
 import {
-  HQControlRoom,
   ManualGroupsPlaceholder,
   CommsPlaceholder,
   NotificationCenter,
@@ -28,6 +27,7 @@ import {
   OpenAPIDocs,
   StatusPage,
 } from '@/components/universal/UniversalPlaceholders';
+import { HQControlRoom } from '@/components/hq/HQControlRoom';
 
 export default function App() {
   return (

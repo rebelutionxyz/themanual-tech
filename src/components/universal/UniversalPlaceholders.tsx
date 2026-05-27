@@ -48,14 +48,9 @@ function Placeholder({ surfaceName, description }: PlaceholderProps) {
   );
 }
 
-export function HQControlRoom() {
-  return (
-    <Placeholder
-      surfaceName="HQ Control Room"
-      description="Admin-only operational dashboard. 9 sections build in a follow-up dispatch."
-    />
-  );
-}
+// HQControlRoom placeholder retired 2026-05-27: real component lives at
+// src/components/hq/HQControlRoom.tsx with auth gate + 9-section sidebar +
+// 3 live sections. The other 6 sections land in HQ-2 + HQ-3 dispatches.
 
 export function ManualGroupsPlaceholder() {
   return (
