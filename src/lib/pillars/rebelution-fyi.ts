@@ -16,6 +16,7 @@ export const rebelutionFyiPillar: PillarConfig = {
   // Brand is dual-wordmark (Intelligence / INTEL); using the Rebelution stem
   // for the site title. Refine when OG HUMAN locks the canonical.
   siteTitle: 'Rebelution · HONEYCOMB Forum',
+  tagline: 'Show me who got it wrong.', // first line of the three-line manifesto (honeycomb-vocabulary-v1.md §9)
   primarySurface: 'intel',
   constellation: 'honeycomb',
   accent: '#87CEEB', // sky blue — first HoneyComb-constellation accent
