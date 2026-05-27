@@ -26,3 +26,20 @@ export function anonClient(): SupabaseClient {
   }
   return createClient(url, key);
 }
+
+// userClient — anon-keyed Supabase client that forwards the Bee's JWT on
+// every request. RLS evaluates as the Bee; auth.uid() inside SECURITY DEFINER
+// RPCs resolves to the Bee's UUID. Use this when the RPC body relies on
+// auth.uid() rather than taking an explicit p_bee_id argument (e.g. the
+// AtlasOracle escrow deposit / withdraw RPCs).
+export function userClient(jwt: string): SupabaseClient {
+  const url = Deno.env.get('SUPABASE_URL');
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  if (!url || !anonKey) {
+    throw new Error('SUPABASE_URL or SUPABASE_ANON_KEY missing');
+  }
+  return createClient(url, anonKey, {
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}

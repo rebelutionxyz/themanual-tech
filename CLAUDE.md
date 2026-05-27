@@ -69,7 +69,7 @@ v9 security hardening (REVOKE PUBLIC + `auth.uid()` guards on user-callable RPCs
 ## The Manual (taxonomy)
 
 - 14 realms in palindrome order: Justice → Reference → Human Activities → Self → Geography → Health → Society → Math → Science → Philosophy → Tech → History → Culture → Religion
-- 4,860 atoms with slug IDs (e.g. `justice/freedom-of-speech`)
+- Atoms with slug IDs (e.g. `justice/freedom-of-speech`) — live count is whatever `select count(*) from atoms` returns; never hard-code. Same de-numbering principle as the MMF Part C sweep — the spine moves continually (Lists disposition, entity-import passes) and frozen counts go stale immediately.
 - Discovery Ladder: Sourced / Accepted / Emerging / Fringe / Unsourced
 - Any Bee can add unlimited pro OR anti sources — both move atom UP the ladder (more evidence = more discovery)
 - pg_trgm for fuzzy search on atom titles and content
@@ -161,12 +161,15 @@ BLiNG! v8 RPCs are deployed in DB. Edge Functions for HTTP-callable wrapping are
 5. **Don't bypass the language firewall** in error messages or developer-facing strings that might surface to Bees.
 6. **Don't skip pg_trgm** when adding searchable text columns.
 7. **Don't test against production.** Use local Supabase or staging for destructive ops.
+8. **Don't prefix bash commands with `cd <repo path> && ...`** — working directory is set to the repo root at session start. Run commands directly. The cd-prefix pattern triggers Claude Code's hard-coded directory-change warning regardless of `settings.local.json` allowlist, causing unnecessary y/n prompts on every command.
+   - Bad: `cd "/c/Users/Butch/Documents/HONEYCOMB/TheMANUAL.tech" && git status`
+   - Good: `git status`
 
 ## Current build state
 
 - ea576f7 (BLiNG! v8 schema) + Phase C foundations (commit 7eb71fa) deployed to production
 - Production verified via successful Bee post (Apr 27); Phase C smoke-tested 2026-05-08
-- 14-realm taxonomy live with 4,860 atoms
+- 14-realm taxonomy live (atom count: `select count(*) from atoms` — no hard number, mirrors MMF Part C de-numbering)
 - pg_trgm enabled
 - Tier-1 federation schema queued for Monday 2026-05-11 (Lock 3/7, chargeback, CR-5, role hierarchy, bees profile cols); Tuesday 2026-05-12 = BLiNG! day; Wednesday 2026-05-13 = Lock 8 (registries + RLS rewrite); Friday 2026-05-15 = BRANDoSOPHIC build day
 - Phase 5+ in progress for orchestration system (lives in `../TheWORKSHOP.to/`)

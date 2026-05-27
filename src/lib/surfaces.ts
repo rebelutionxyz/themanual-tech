@@ -77,7 +77,7 @@ export const SURFACES: SurfaceDef[] = [
     slug: 'bling',
     name: 'BLiNG!',
     function: 'Currency',
-    description: 'Earn. Mint. Send. Escrow. The sovereign currency layer.',
+    description: 'Earn. Free. Send. Escrow. The Freedom Ledger.',
     purpose:
       'Every productive action earns Drops. Every popular contribution earns Drips. BLiNG! flows through the whole platform.',
     icon: Coins,
