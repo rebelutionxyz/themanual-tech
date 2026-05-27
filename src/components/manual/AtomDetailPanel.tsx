@@ -3,7 +3,8 @@ import type { Atom } from '@/types/manual';
 import { useManualStore } from '@/stores/useManualStore';
 import { getAtomById, getRelatedAtoms } from '@/lib/useManualData';
 import { getPathSegments } from '@/lib/tree';
-import { KettlePill } from '@/components/ui/KettlePill';
+import { DiscoveryTierChip } from '@/components/ui/DiscoveryTierChip';
+import { TrendingAtoms } from '@/components/manual/TrendingAtoms';
 import { TagChip } from '@/components/ui/TagChip';
 import { cn } from '@/lib/utils';
 
@@ -15,13 +16,14 @@ export function AtomDetailPanel() {
 
   if (!selectedAtomId) {
     return (
-      <div className="flex h-full items-center justify-center px-6 text-center">
-        <div>
+      <div className="h-full overflow-y-auto px-5 py-4">
+        <TrendingAtoms />
+        <div className="mt-8 border-t border-border pt-6 text-center">
           <p className="text-text-dim" style={{ fontSize: '13px' }}>
             Select an atom from the Manual to view its details
           </p>
           <p className="mt-2 font-mono text-text-muted" data-size="meta">
-            4,860 atoms · 14 realms · graph model
+            14 realms · graph model
           </p>
         </div>
       </div>
@@ -69,7 +71,7 @@ export function AtomDetailPanel() {
             {atom.name}
           </h1>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <KettlePill state={atom.kettle} expanded />
+            <DiscoveryTierChip tier={atom.kettle} />
             <span
               className="font-mono uppercase text-text-muted"
               style={{ fontSize: '11px', letterSpacing: '0.08em' }}

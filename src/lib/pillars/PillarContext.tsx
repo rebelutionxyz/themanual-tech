@@ -7,6 +7,22 @@ import { resolvePillarByHost } from './registry';
 // undefined when no provider — usePillar throws in that case.
 const PillarContext = createContext<PillarConfig | null | undefined>(undefined);
 
+// Foundation site title — used ONLY when no pillar resolves (themanual.tech
+// itself, localhost). Per manual-spine-api-v1.md §2.1 canonical values list.
+const FOUNDATION_SITE_TITLE = 'The Manual · HONEYCOMB Knowledge Spine';
+
+function setMetaProperty(property: string, content: string): void {
+  let el = document.head.querySelector<HTMLMetaElement>(
+    `meta[property="${property}"]`,
+  );
+  if (!el) {
+    el = document.createElement('meta');
+    el.setAttribute('property', property);
+    document.head.appendChild(el);
+  }
+  el.setAttribute('content', content);
+}
+
 export function PillarProvider({ children }: { children: ReactNode }) {
   const [pillar] = useState<PillarConfig | null>(() =>
     resolvePillarByHost(window.location.hostname),
@@ -22,6 +38,26 @@ export function PillarProvider({ children }: { children: ReactNode }) {
       document.body.removeAttribute('data-constellation');
     };
   }, [pillar?.constellation]);
+
+  // Drive <title> + og:title from PillarConfig. The static <title>The Manual</title>
+  // in index.html serves until React mounts; this effect overrides per-host
+  // immediately on mount. Foundation (no pillar resolved) → "The Manual ·
+  // HONEYCOMB Knowledge Spine". Resolved pillar → its siteTitle (required field).
+  // Defensive `${wordmark} · HONEYCOMB` fallback handles a hypothetical future
+  // pillar where siteTitle slipped past the type check; NEVER falls back to bare
+  // "The Manual" on a non-foundation host (that's the atlasintel.fyi bug fix).
+  useEffect(() => {
+    let title: string;
+    if (pillar?.siteTitle) {
+      title = pillar.siteTitle;
+    } else if (pillar) {
+      title = `${pillar.wordmark} · HONEYCOMB`;
+    } else {
+      title = FOUNDATION_SITE_TITLE;
+    }
+    document.title = title;
+    setMetaProperty('og:title', title);
+  }, [pillar?.siteTitle, pillar?.wordmark]);
 
   return <PillarContext.Provider value={pillar}>{children}</PillarContext.Provider>;
 }

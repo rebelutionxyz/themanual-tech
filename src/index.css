@@ -90,21 +90,34 @@
     text-transform: uppercase;
     font-weight: 500;
   }
-  .kettle-Accepted {
-    background: rgba(107, 148, 200, 0.15);
-    color: #6b94c8;
+  /* Discovery Ladder tier pills — 5-tier per amendment §2.1. Colors mirror
+     DISCOVERY_TIER_COLORS (src/lib/discovery-ladder/colors.ts). No red. */
+  .kettle-Sourced {
+    background: rgba(22, 163, 74, 0.15);
+    color: #16a34a;
   }
-  .kettle-Contested {
-    background: rgba(232, 168, 56, 0.15);
-    color: #e8a838;
+  .kettle-Accepted {
+    background: rgba(234, 179, 8, 0.18);
+    color: #ca8a04;       /* yellow-600 — darker for readability on dark bg */
   }
   .kettle-Emerging {
-    background: rgba(232, 137, 56, 0.15);
-    color: #e88938;
+    background: rgba(249, 115, 22, 0.15);
+    color: #f97316;
   }
   .kettle-Fringe {
-    background: rgba(155, 127, 200, 0.15);
-    color: #9b7fc8;
+    background: rgba(156, 163, 175, 0.18);
+    color: #9ca3af;
+  }
+  .kettle-Unsourced {
+    background: rgba(75, 85, 99, 0.25);
+    color: #9ca3af;       /* lighter gray for legibility */
+  }
+  /* Deprecated 4-tier class — Contested merged into Emerging post-amendment.
+     Kept as visual no-op (same color) for any stale references; safe to delete
+     once a sweep confirms no atoms render with this value. */
+  .kettle-Contested {
+    background: rgba(249, 115, 22, 0.15);
+    color: #f97316;
   }
 
   /* Monospace path display */

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { Atom } from '@/types/manual';
 import { useManualStore } from '@/stores/useManualStore';
 import { useManualData } from '@/lib/useManualData';
-import { KettlePill } from '@/components/ui/KettlePill';
+import { DiscoveryTierChip } from '@/components/ui/DiscoveryTierChip';
 import { cn, formatCount } from '@/lib/utils';
 
 export function ListView() {
@@ -105,7 +105,7 @@ function ListRow({
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <KettlePill state={atom.kettle} />
+        <DiscoveryTierChip tier={atom.kettle} compact />
       </div>
     </button>
   );

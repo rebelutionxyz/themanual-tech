@@ -19,6 +19,15 @@ import { SiteHeader } from '@/components/layout/SiteHeader';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
 import { GeoLensBar } from '@/components/geo/GeoLensBar';
 import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
+import {
+  ManualGroupsPlaceholder,
+  CommsPlaceholder,
+  NotificationCenter,
+  CartPlaceholder,
+  OpenAPIDocs,
+  StatusPage,
+} from '@/components/universal/UniversalPlaceholders';
+import { HQControlRoom } from '@/components/hq/HQControlRoom';
 
 export default function App() {
   return (
@@ -88,8 +97,25 @@ function AppContent() {
           {/* Waves surface — Mini Waves V76 embedded via iframe */}
           <Route path="/waves" element={<WavesPage />} />
 
-          {/* BLiNG! surface — freedomblings.com embedded via iframe */}
+          {/* BLiNG! surface — freedomblings.com embedded via iframe.
+              Per manual-spine-api-v1.md §3, /bling is a canonical universal
+              path. The iframe wrapper IS the v1 implementation; replacing
+              with a placeholder would regress functionality. When
+              FreedomBLiNGs ships as a first-class registered Astra, a real
+              BlingWallet component replaces the iframe here. */}
           <Route path="/bling" element={<BlingsPage />} />
+
+          {/* Cross-Astra universal utility routes (per manual-spine-api-v1.md §3).
+              These resolve identically from any host; PillarConfig provides
+              theming via usePillar(). MUST be registered BEFORE the /:slug
+              catch-all or react-router-dom will match them as Astra surfaces. */}
+          <Route path="/hq" element={<HQControlRoom />} />
+          <Route path="/groups" element={<ManualGroupsPlaceholder />} />
+          <Route path="/comms" element={<CommsPlaceholder />} />
+          <Route path="/notifications" element={<NotificationCenter />} />
+          <Route path="/cart" element={<CartPlaceholder />} />
+          <Route path="/api/docs" element={<OpenAPIDocs />} />
+          <Route path="/status" element={<StatusPage />} />
 
           {/* All other surfaces use generic SurfacePage */}
           <Route path="/:slug" element={<SurfacePage />} />

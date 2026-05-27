@@ -12,6 +12,10 @@ export const rebelutionFyiPillar: PillarConfig = {
   hosts: ['rebelution.fyi', 'www.rebelution.fyi'],
   wordmark: 'Intelligence',
   wordmarkShort: 'INTEL',
+  // Conservative value — dispatch didn't list canonical for rebelution-fyi.
+  // Brand is dual-wordmark (Intelligence / INTEL); using the Rebelution stem
+  // for the site title. Refine when OG HUMAN locks the canonical.
+  siteTitle: 'Rebelution · HONEYCOMB Forum',
   primarySurface: 'intel',
   constellation: 'honeycomb',
   accent: '#87CEEB', // sky blue — first HoneyComb-constellation accent

@@ -9,6 +9,10 @@ export const atlasunitedPillar: PillarConfig = {
   slug: 'atlasunited',
   hosts: ['atlasunited.fyi', 'www.atlasunited.fyi'],
   wordmark: 'AtlasUNITED',
+  // Conservative value — dispatch didn't list canonical for atlasunited;
+  // matches the dispatch fallback pattern `${brand} · HONEYCOMB`. Refine when
+  // OG HUMAN locks the Rule-of-Law surface copy.
+  siteTitle: 'AtlasUNITED · HONEYCOMB',
   primarySurface: 'rule',
   constellation: 'atlasnation',
   accent: '#C16E2A',
