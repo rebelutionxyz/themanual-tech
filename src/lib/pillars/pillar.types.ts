@@ -4,6 +4,10 @@
 // v2 (2026-04-27): added optional wordmarkShort for dual-wordmark pillars (Rebelution.fyi).
 // v3 (2026-05-08, Code 24): added promotionSlots (Phase C Component D — promotion slot framework).
 // v4 (2026-05-08, Code 23): added defaultGeo (Phase C Component C-5 — geo cascade fallback).
+// v5 (2026-05-27, Code A): added siteTitle (required) + tagline + taglineSecondary
+// per manual-spine-api-v1.md §2.1. siteTitle drives <title> + og:title and is
+// REQUIRED so a new Astra cannot compile without setting it (no silent "The
+// Manual" fallback on a non-foundation host).
 
 import type { GeoLocation } from '@/lib/geo/types';
 
@@ -43,6 +47,17 @@ export interface PillarConfig {
   hosts: string[];
   /** Display wordmark shown in SiteHeader expanded state. Casing is load-bearing — match brand exactly. */
   wordmark: string;
+  /**
+   * Site title — drives <title>, <meta og:title>, and any header positioning
+   * copy that reads from PillarConfig. REQUIRED for every pillar so a new
+   * Astra can't ship without it. Canonical pattern: "Brand · HONEYCOMB Surface".
+   * Per manual-spine-api-v1.md §2.1.
+   */
+  siteTitle: string;
+  /** Optional positioning line (sub-tagline below wordmark). */
+  tagline?: string;
+  /** Optional philosophy line (e.g. DingleBERRY's paranoia tagline). */
+  taglineSecondary?: string;
   /**
    * Condensed wordmark shown when sidebar is collapsed or in menu chip.
    * If absent, SiteHeader falls back to `wordmark.toUpperCase()`.

@@ -10,6 +10,9 @@ export const atlasintelPillar: PillarConfig = {
   slug: 'atlasintel',
   hosts: ['atlasintel.fyi', 'www.atlasintel.fyi'],
   wordmark: 'AtlasINTEL',
+  // siteTitle fix: previously inheriting "The Manual" from index.html static title.
+  // Canonical value per manual-spine-api-v1.md §2.1.
+  siteTitle: 'AtlasINTEL · HONEYCOMB Forum',
   primarySurface: 'intel',
   constellation: 'atlasnation',
   accent: '#4A6E96', // deeper steel blue, ~30% darker than INTEL surface #6B94C8
