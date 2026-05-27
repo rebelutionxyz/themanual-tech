@@ -1,33 +1,36 @@
 // POST /functions/v1/atlasoracle-route
-// AtlasOracle minimal-viable directive router.
-// Hardcoded tier='standard', provider='claude-sonnet-4-6', cost=1.0 BLiNG! flat.
-// Full tier routing + rate caps + frontier cost preview come in follow-up
-// dispatches.
+// AtlasOracle directive router — v1 completion (tier routing, cost-shape
+// pricing, rate caps, frontier cost-preview).
 //
 // Body:
 //   {
-//     directive:   string,   // required, the directive text
-//     astra_slug?: string,   // optional; resolved against astra_registry
-//     category?:   string,   // optional; one of the 10 directive categories
+//     directive:    string,                                // required, non-empty
+//     tier?:        'free' | 'standard' | 'frontier',      // default 'standard'
+//     astra_slug?:  string,                                // default themanual
+//     category?:    string,                                // default 'suggest'
+//     confirm_cost?: boolean,                              // frontier preview override
 //   }
 //
-// On success (200):
-//   {
-//     directive_id, response, cost_bling, provider, tokens, escrow_balance_after
-//   }
+// Tier behavior:
+//   - free      → claude-haiku-4-5, cost 0
+//   - standard  → claude-sonnet-4-6, cost-shape pricing (0.5 / 1.0 / 2.0 BLiNG!)
+//   - frontier  → claude-opus-4-7, base 5 + surcharges, cap 50, preview > 10
 //
-// Content-leak posture (per v1 escrow migration + platform_thesis.md):
-//   The response is returned in the HTTP body and NEVER persisted.
-//   atlasoracle_directives carries metadata only (cost, tokens, latency,
-//   status). error_message captures SYSTEM-level errors, never directive or
-//   response content.
+// Rate caps (per rate-cap-pricing.md §5.1) enforced server-side via
+// atlasoracle_check_rate_caps RPC.
 //
-// Replaces the prior scaffold mock dispatch. logDirective() helper from
-// audit-log.ts was designed for one-shot INSERT after directive completion;
-// the dispatch's pending-then-UPDATE lifecycle needs direct INSERT/UPDATE.
-// The no-content-column guarantee is preserved by explicit column listing
-// in both calls below — no directive_text or response_text references
-// anywhere in this file.
+// Charge-the-lesser (per bling-ledger-interface.md §13 Q8): Bee is debited
+// min(estimated, actual). Treasury absorbs underestimates. If actual exceeds
+// estimate by >25 %, console.warn for cost-model tuning.
+//
+// Content-leak posture (per v1 escrow migration + platform_thesis.md): the
+// response is returned in the HTTP body and NEVER persisted. atlasoracle_directives
+// carries metadata only.
+//
+// Frontier-preview row policy: NO directive row inserted for preview-only
+// returns (the request didn't fire Anthropic and didn't debit). Trade-off
+// flagged in commit — observability of preview→confirm conversion is the
+// cost; can be added later with a dedicated event table or new column.
 
 import { errorResponse, handleCors, jsonResponse } from '../_shared/cors.ts';
 import { verifyAuth } from '../_shared/auth.ts';
@@ -40,19 +43,46 @@ const ALLOWED_CATEGORIES = [
 ] as const;
 type Category = typeof ALLOWED_CATEGORIES[number];
 
-const PROVIDER_MODEL = 'claude-sonnet-4-6';
-const PROVIDER_NAME = 'claude-sonnet-4-6';
-const TIER = 'standard';
-const COST_BLING = 1.0;
-const MAX_TOKENS = 1500;
+const ALLOWED_TIERS = ['free', 'standard', 'frontier'] as const;
+type Tier = typeof ALLOWED_TIERS[number];
+
+const TIER_PROVIDER_MODEL: Record<Tier, string> = {
+  free:     'claude-haiku-4-5',
+  standard: 'claude-sonnet-4-6',
+  frontier: 'claude-opus-4-7',
+};
+
+// Default expected output tokens by tier — used in cost estimation.
+const TIER_DEFAULT_OUTPUT_TOKENS: Record<Tier, number> = {
+  free:     500,
+  standard: 1500,
+  frontier: 5000,
+};
+
+// max_tokens passed to Anthropic by tier — slightly above expected output
+// to give the model headroom.
+const TIER_MAX_TOKENS: Record<Tier, number> = {
+  free:     800,
+  standard: 1500,
+  frontier: 5000,
+};
+
+const FRONTIER_PREVIEW_THRESHOLD_BLING = 10.0;
+const ACTUAL_OVERAGE_WARN_RATIO = 1.25;
+const CHARS_PER_TOKEN = 4; // rough English heuristic
 const MAX_DIRECTIVE_CHARS = 10_000;
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
 
+// Canon bundle length is fixed — compute once at module init for estimation.
+const CANON_BUNDLE_LENGTH = assembleCrossAstraCanon().length;
+
 interface RouteBody {
-  directive?: unknown;
-  astra_slug?: unknown;
-  category?: unknown;
+  directive?:    unknown;
+  tier?:         unknown;
+  astra_slug?:   unknown;
+  category?:     unknown;
+  confirm_cost?: unknown;
 }
 
 interface AnthropicUsage {
@@ -70,6 +100,41 @@ interface AnthropicMessageBlock {
 interface AnthropicResponse {
   content?: AnthropicMessageBlock[];
   usage?: AnthropicUsage;
+}
+
+// Token estimation from text length. Coarse but predictable.
+function estimateInputTokens(directive: string): number {
+  return Math.ceil(directive.length / CHARS_PER_TOKEN)
+    + Math.ceil(CANON_BUNDLE_LENGTH / CHARS_PER_TOKEN);
+}
+
+// Cost calculation in BLiNG! per rate-cap-pricing.md §4.
+//
+// Standard cost-shape boundaries from the dispatch overlap (e.g. input=5000
+// output=2000 matches both medium and large). Resolution: largest shape
+// wins. Check large first, then medium, default short.
+function calculateCostBling(
+  tier: Tier,
+  inputTokens: number,
+  outputTokens: number,
+): number {
+  if (tier === 'free') return 0;
+
+  if (tier === 'standard') {
+    if (inputTokens >= 10000 || outputTokens >= 1500) return 2.0; // large
+    if (inputTokens >= 3000  || outputTokens >= 500)  return 1.0; // medium
+    return 0.5;                                                    // short
+  }
+
+  // frontier
+  let cost = 5.0;
+  if (inputTokens > 10000) {
+    cost += Math.ceil((inputTokens - 10000) / 1000) * 0.1;
+  }
+  if (outputTokens > 2000) {
+    cost += Math.ceil((outputTokens - 2000) / 1000) * 0.5;
+  }
+  return Math.min(cost, 50.0);
 }
 
 Deno.serve(async (req) => {
@@ -110,6 +175,16 @@ Deno.serve(async (req) => {
   }
   const directive = body.directive.trim();
 
+  // Tier (default 'standard').
+  let tier: Tier = 'standard';
+  if (body.tier !== undefined) {
+    if (typeof body.tier !== 'string' || !ALLOWED_TIERS.includes(body.tier as Tier)) {
+      return errorResponse(`tier must be one of: ${ALLOWED_TIERS.join(', ')}`);
+    }
+    tier = body.tier as Tier;
+  }
+
+  // Category (default 'suggest').
   let category: Category = 'suggest';
   if (body.category !== undefined) {
     if (
@@ -123,6 +198,7 @@ Deno.serve(async (req) => {
     category = body.category as Category;
   }
 
+  const confirmCost = body.confirm_cost === true;
   const astraSlug =
     typeof body.astra_slug === 'string' && body.astra_slug.length > 0
       ? body.astra_slug
@@ -132,8 +208,29 @@ Deno.serve(async (req) => {
   const userSb = userClient(jwt);
   const service = serviceClient();
 
-  // Resolve astra_id. Per OG HUMAN direction: missing or unknown slug falls
-  // back to the themanual row + log a warning for unknown.
+  // ─── Rate cap check (BEFORE astra lookup / escrow check / directive insert). ───
+  const { data: rateCapResult, error: rateCapErr } = await service.rpc(
+    'atlasoracle_check_rate_caps',
+    { p_bee_id: beeId, p_tier: tier },
+  );
+  if (rateCapErr) {
+    console.error('atlasoracle-route rate cap check failed', {
+      bee_id: beeId, tier, message: rateCapErr.message,
+    });
+    return errorResponse('Rate cap check failed', 500);
+  }
+  if (rateCapResult?.allowed === false) {
+    console.log('atlasoracle-route rate capped', {
+      bee_id: beeId, tier, caps_hit: rateCapResult.caps_hit,
+    });
+    return jsonResponse({
+      error: 'Rate cap reached. Try again later.',
+      retry_after_seconds: rateCapResult.retry_after_seconds ?? 60,
+      caps_hit: rateCapResult.caps_hit ?? [],
+    }, 429);
+  }
+
+  // ─── Resolve astra_id (themanual fallback per OG HUMAN direction). ───
   let astraId: string | null = null;
   {
     const { data: fallback } = await service
@@ -165,35 +262,69 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Pre-flight escrow balance check (cold-start UX cue, not a debit guarantee).
-  const { data: balanceResult, error: balanceErr } = await userSb.rpc(
-    'atlasoracle_get_escrow_balance',
-    { p_bee_id: beeId },
+  // ─── Cost estimation. ───
+  const estimatedInputTokens  = estimateInputTokens(directive);
+  const estimatedOutputTokens = TIER_DEFAULT_OUTPUT_TOKENS[tier];
+  const estimatedCostBling = calculateCostBling(
+    tier, estimatedInputTokens, estimatedOutputTokens,
   );
-  if (balanceErr) {
-    console.error('atlasoracle-route balance lookup failed', {
-      bee_id: beeId, message: balanceErr.message,
+
+  // ─── Frontier cost-preview gate. ───
+  if (
+    tier === 'frontier'
+    && estimatedCostBling > FRONTIER_PREVIEW_THRESHOLD_BLING
+    && !confirmCost
+  ) {
+    console.log('atlasoracle-route frontier preview', {
+      bee_id: beeId,
+      estimated_cost_bling: estimatedCostBling,
+      estimated_input_tokens: estimatedInputTokens,
+      estimated_output_tokens: estimatedOutputTokens,
     });
-    return errorResponse('Escrow balance lookup failed', 500);
-  }
-  const escrowBalance = Number(balanceResult?.balance ?? 0);
-  if (escrowBalance < COST_BLING) {
     return jsonResponse({
-      error: 'Insufficient AtlasOracle escrow. Fund your escrow to continue.',
-      escrow_balance: escrowBalance,
-      cost_bling: COST_BLING,
-      action: 'fund_escrow',
-    }, 402);
+      cost_preview: true,
+      tier,
+      provider: TIER_PROVIDER_MODEL[tier],
+      estimated_cost_bling: estimatedCostBling,
+      estimated_input_tokens: estimatedInputTokens,
+      estimated_output_tokens: estimatedOutputTokens,
+      action: 'confirm_cost',
+      hint: 'Re-call with confirm_cost: true to execute this directive.',
+    });
   }
 
-  // Insert pending directive row. Metadata only — no directive content.
+  // ─── Escrow pre-check (using ESTIMATED cost). ───
+  // Free tier (cost 0) skips the pre-check entirely.
+  if (estimatedCostBling > 0) {
+    const { data: balanceResult, error: balanceErr } = await userSb.rpc(
+      'atlasoracle_get_escrow_balance',
+      { p_bee_id: beeId },
+    );
+    if (balanceErr) {
+      console.error('atlasoracle-route balance lookup failed', {
+        bee_id: beeId, message: balanceErr.message,
+      });
+      return errorResponse('Escrow balance lookup failed', 500);
+    }
+    const escrowBalance = Number(balanceResult?.balance ?? 0);
+    if (escrowBalance < estimatedCostBling) {
+      return jsonResponse({
+        error: 'Insufficient AtlasOracle escrow. Fund your escrow to continue.',
+        escrow_balance: escrowBalance,
+        cost_bling: estimatedCostBling,
+        action: 'fund_escrow',
+      }, 402);
+    }
+  }
+
+  // ─── Insert pending directive row (metadata only, no content). ───
   const { data: pendingRow, error: insertErr } = await service
     .from('atlasoracle_directives')
     .insert({
       bee_id: beeId,
       astra_id: astraId,
       directive_category: category,
-      tier: TIER,
+      tier,
       status: 'pending',
     })
     .select('id')
@@ -206,10 +337,14 @@ Deno.serve(async (req) => {
   }
   const directiveId: string = pendingRow.id;
   console.log('atlasoracle-route directive created', {
-    directive_id: directiveId, bee_id: beeId, category, astra_slug: astraSlug,
+    directive_id: directiveId, bee_id: beeId, tier, category,
+    astra_slug: astraSlug,
+    estimated_cost_bling: estimatedCostBling,
   });
 
-  // Call Anthropic.
+  // ─── Call Anthropic. ───
+  const providerModel = TIER_PROVIDER_MODEL[tier];
+  const maxTokens = TIER_MAX_TOKENS[tier];
   const systemBlock = [
     {
       type: 'text',
@@ -228,8 +363,8 @@ Deno.serve(async (req) => {
         'anthropic-version': ANTHROPIC_VERSION,
       },
       body: JSON.stringify({
-        model: PROVIDER_MODEL,
-        max_tokens: MAX_TOKENS,
+        model: providerModel,
+        max_tokens: maxTokens,
         system: systemBlock,
         messages: [{ role: 'user', content: directive }],
       }),
@@ -247,11 +382,8 @@ Deno.serve(async (req) => {
 
   if (!providerResponse.ok) {
     let providerBodyText = '';
-    try {
-      providerBodyText = await providerResponse.text();
-    } catch {
-      providerBodyText = '<unreadable>';
-    }
+    try { providerBodyText = await providerResponse.text(); }
+    catch { providerBodyText = '<unreadable>'; }
     const sanitized = `provider_http_${providerResponse.status}`;
     await markFailed(service, directiveId, latencyMs, sanitized);
     console.error('atlasoracle-route provider http error', {
@@ -287,40 +419,66 @@ Deno.serve(async (req) => {
   }
 
   const usage = payload.usage ?? {};
-  const inputTokens = usage.input_tokens ?? 0;
+  const inputTokens  = usage.input_tokens  ?? 0;
   const outputTokens = usage.output_tokens ?? 0;
   const cachedTokens =
     (usage.cache_creation_input_tokens ?? 0)
     + (usage.cache_read_input_tokens ?? 0);
 
-  // Debit escrow. May fail on race (escrow drained between pre-check and
-  // debit) — handle the 402 case explicitly.
-  const { data: debitResult, error: debitErr } = await service.rpc(
-    'atlasoracle_debit',
-    { p_bee_id: beeId, p_amount: COST_BLING, p_source_ref: directiveId },
-  );
-  if (debitErr) {
-    const msg = debitErr.message ?? 'debit failed';
-    await markFailed(service, directiveId, latencyMs, `debit: ${msg}`);
-    console.error('atlasoracle-route debit failed', {
-      directive_id: directiveId, message: msg,
+  // ─── Charge-the-lesser cost. ───
+  const actualCostBling = calculateCostBling(tier, inputTokens, outputTokens);
+  const finalCostBling = Math.min(estimatedCostBling, actualCostBling);
+  if (
+    estimatedCostBling > 0
+    && actualCostBling > estimatedCostBling * ACTUAL_OVERAGE_WARN_RATIO
+  ) {
+    console.warn('atlasoracle-route actual cost exceeded estimate >25%', {
+      directive_id: directiveId,
+      tier,
+      estimated_cost_bling: estimatedCostBling,
+      actual_cost_bling: actualCostBling,
+      treasury_absorbed_bling: actualCostBling - estimatedCostBling,
+      estimated_input_tokens: estimatedInputTokens,
+      actual_input_tokens: inputTokens,
+      estimated_output_tokens: estimatedOutputTokens,
+      actual_output_tokens: outputTokens,
     });
-    if (/insufficient/i.test(msg)) {
-      return jsonResponse({
-        error: 'Escrow drained during directive execution. Fund and retry.',
-        action: 'fund_escrow',
-      }, 402);
-    }
-    return errorResponse('Failed to debit escrow', 500);
   }
-  const escrowBalanceAfter = Number(debitResult?.escrow_balance_after ?? 0);
 
-  // Finalize directive row.
+  // ─── Debit (skip for free tier / zero cost). ───
+  let escrowBalanceAfter: number | null = null;
+  if (finalCostBling > 0) {
+    const { data: debitResult, error: debitErr } = await service.rpc(
+      'atlasoracle_debit',
+      {
+        p_bee_id: beeId,
+        p_amount: finalCostBling,
+        p_source_ref: directiveId,
+      },
+    );
+    if (debitErr) {
+      const msg = debitErr.message ?? 'debit failed';
+      await markFailed(service, directiveId, latencyMs, `debit: ${msg}`);
+      console.error('atlasoracle-route debit failed', {
+        directive_id: directiveId, message: msg,
+      });
+      if (/insufficient/i.test(msg)) {
+        return jsonResponse({
+          error: 'Escrow drained during directive execution. Fund and retry.',
+          action: 'fund_escrow',
+        }, 402);
+      }
+      return errorResponse('Failed to debit escrow', 500);
+    }
+    escrowBalanceAfter = Number(debitResult?.escrow_balance_after ?? 0);
+  }
+
+  // ─── Finalize directive row. ───
   const { error: finalizeErr } = await service
     .from('atlasoracle_directives')
     .update({
-      provider_selected: PROVIDER_NAME,
-      cost_bling: COST_BLING,
+      provider_selected: providerModel,
+      cost_bling: finalCostBling,
       latency_ms: latencyMs,
       input_tokens: inputTokens,
       output_tokens: outputTokens,
@@ -331,8 +489,6 @@ Deno.serve(async (req) => {
     })
     .eq('id', directiveId);
   if (finalizeErr) {
-    // Debit landed; log but don't fail the request. Bee paid for the
-    // directive — best-effort audit-row cleanup at this stage.
     console.error('atlasoracle-route directive finalize failed', {
       directive_id: directiveId, message: finalizeErr.message,
     });
@@ -341,9 +497,12 @@ Deno.serve(async (req) => {
   console.log('atlasoracle-route directive ok', {
     directive_id: directiveId,
     bee_id: beeId,
+    tier,
     category,
-    provider: PROVIDER_NAME,
-    cost_bling: COST_BLING,
+    provider: providerModel,
+    estimated_cost_bling: estimatedCostBling,
+    actual_cost_bling: actualCostBling,
+    final_cost_bling: finalCostBling,
     latency_ms: latencyMs,
     input_tokens: inputTokens,
     output_tokens: outputTokens,
@@ -354,8 +513,9 @@ Deno.serve(async (req) => {
   return jsonResponse({
     directive_id: directiveId,
     response: responseText,
-    cost_bling: COST_BLING,
-    provider: PROVIDER_NAME,
+    cost_bling: finalCostBling,
+    provider: providerModel,
+    tier,
     tokens: {
       input: inputTokens,
       output: outputTokens,
