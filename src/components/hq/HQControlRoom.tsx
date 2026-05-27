@@ -30,7 +30,8 @@ import { ActiveBees } from './sections/ActiveBees';
 import { RecentKettleVotes } from './sections/RecentKettleVotes';
 import { TreasuryBalances } from './sections/TreasuryBalances';
 import { EconomySnapshot } from './sections/EconomySnapshot';
-import { AstraStatus, AdminActions } from './sections/Stubs';
+import { AstraStatus } from './sections/AstraStatus';
+import { AdminActions } from './sections/AdminActions';
 
 interface SectionDef {
   slug: string;
@@ -48,8 +49,8 @@ const SECTIONS: SectionDef[] = [
   { slug: 'recent-votes',      label: 'Recent Kettle Votes',  icon: Vote,         status: 'live', Component: RecentKettleVotes },
   { slug: 'treasury',          label: 'Treasury Balances',    icon: Wallet,       status: 'live', Component: TreasuryBalances },
   { slug: 'economy',           label: 'Economy Snapshot',     icon: Activity,     status: 'live', Component: EconomySnapshot },
-  { slug: 'astra-status',      label: 'Astra Status',         icon: ServerCog,    status: 'stub', Component: AstraStatus },
-  { slug: 'admin-actions',     label: 'Admin Actions',        icon: Wrench,       status: 'stub', Component: AdminActions },
+  { slug: 'astra-status',      label: 'Astra Status',         icon: ServerCog,    status: 'live', Component: AstraStatus },
+  { slug: 'admin-actions',     label: 'Admin Actions',        icon: Wrench,       status: 'live', Component: AdminActions },
 ];
 
 const DEFAULT_SECTION = SECTIONS[0].slug;
