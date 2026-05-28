@@ -1,25 +1,25 @@
 // Express HTML-transform server for TheMANUAL.tech.
 //
 // Wraps Vite's dist/ output. On each HTML request, reads the Host header,
-// resolves PillarConfig server-side via the shared registry, and rewrites
+// resolves AstraConfig server-side via the shared registry, and rewrites
 // <title> + injects og:title + og:description + meta description before
 // sending. Static assets (/assets/*, /favicon.svg, etc.) are served as-is.
 //
 // Why: client-side React updates document.title once it mounts (see
-// PillarContext useEffect), but social/SEO crawlers that don't execute JS
+// AstraContext useEffect), but social/SEO crawlers that don't execute JS
 // (Twitter, Facebook, search engines) only see the static HTML response.
 // Pre-this-server they'd always see "The Manual" as <title>, even on
 // atlasintel.fyi. This is the per-host fix.
 //
 // Per shared/canon/manual-spine-api-v1.md §2.1.
 //
-// Runtime: tsx (npm start). No transpile step. The PillarConfig registry
+// Runtime: tsx (npm start). No transpile step. The AstraConfig registry
 // imports from src/ — type aliases resolve via tsconfig paths.
 
 import express, { type Request, type Response } from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
-import { resolvePillarByHost } from '../src/lib/pillars/registry';
+import { resolveAstraByHost } from '../src/lib/astras/registry';
 
 const FOUNDATION_SITE_TITLE = 'The Manual · HONEYCOMB Knowledge Spine';
 const FOUNDATION_DESCRIPTION =
@@ -64,22 +64,22 @@ app.get(/.*/, (req: Request, res: Response) => {
   // Strip any :port suffix (Host header may include it, e.g. ":3000" locally).
   const host = rawHost.split(':')[0].toLowerCase();
 
-  const pillar = resolvePillarByHost(host);
+  const astra = resolveAstraByHost(host);
 
   let title: string;
-  if (pillar?.siteTitle) {
-    title = pillar.siteTitle;
-  } else if (pillar) {
-    // Defensive: pillar resolved but siteTitle not set. Shouldn't fire because
+  if (astra?.siteTitle) {
+    title = astra.siteTitle;
+  } else if (astra) {
+    // Defensive: astra resolved but siteTitle not set. Shouldn't fire because
     // siteTitle is required at compile time, but guards against runtime
     // anomalies. NEVER falls back to bare "The Manual" on a non-foundation host.
-    title = `${pillar.wordmark} · HONEYCOMB`;
+    title = `${astra.wordmark} · HONEYCOMB`;
   } else {
-    // No pillar match → foundation (themanual.tech, localhost, unknown host).
+    // No astra match → foundation (themanual.tech, localhost, unknown host).
     title = FOUNDATION_SITE_TITLE;
   }
 
-  const description = pillar?.tagline ?? FOUNDATION_DESCRIPTION;
+  const description = astra?.tagline ?? FOUNDATION_DESCRIPTION;
 
   const titleEsc = escapeHtmlText(title);
   const titleAttr = escapeHtmlAttr(title);

@@ -49,7 +49,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'forme', label: 'For Me', icon: Sparkles, group: 'primary', comingSoon: true, comingSoonHint: 'Personalized feed — pick atoms, realms, and pillars to follow' },
+  { id: 'forme', label: 'For Me', icon: Sparkles, group: 'primary', comingSoon: true, comingSoonHint: 'Personalized feed — pick atoms, realms, and astras to follow' },
   { id: 'home', label: 'Home', icon: Home, group: 'primary' },
   { id: 'hot', label: 'Hot', icon: Flame, group: 'primary' },
   { id: 'new', label: 'Breaking', icon: Clock, group: 'primary' },

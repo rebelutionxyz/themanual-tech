@@ -1,13 +1,13 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { PillarConfig } from './pillar.types';
-import { resolvePillarByHost } from './registry';
+import type { AstraConfig } from './astra.types';
+import { resolveAstraByHost } from './registry';
 
-// Context value: PillarConfig when host matches a registered pillar,
+// Context value: AstraConfig when host matches a registered astra,
 // null when host doesn't match (themanual.tech itself, localhost, etc.),
-// undefined when no provider — usePillar throws in that case.
-const PillarContext = createContext<PillarConfig | null | undefined>(undefined);
+// undefined when no provider — useAstra throws in that case.
+const AstraContext = createContext<AstraConfig | null | undefined>(undefined);
 
-// Foundation site title — used ONLY when no pillar resolves (themanual.tech
+// Foundation site title — used ONLY when no astra resolves (themanual.tech
 // itself, localhost). Per manual-spine-api-v1.md §2.1 canonical values list.
 const FOUNDATION_SITE_TITLE = 'The Manual · HONEYCOMB Knowledge Spine';
 
@@ -23,66 +23,66 @@ function setMetaProperty(property: string, content: string): void {
   el.setAttribute('content', content);
 }
 
-export function PillarProvider({ children }: { children: ReactNode }) {
-  const [pillar] = useState<PillarConfig | null>(() =>
-    resolvePillarByHost(window.location.hostname),
+export function AstraProvider({ children }: { children: ReactNode }) {
+  const [astra] = useState<AstraConfig | null>(() =>
+    resolveAstraByHost(window.location.hostname),
   );
 
   useEffect(() => {
-    if (pillar?.constellation) {
-      document.body.setAttribute('data-constellation', pillar.constellation);
+    if (astra?.constellation) {
+      document.body.setAttribute('data-constellation', astra.constellation);
     } else {
       document.body.removeAttribute('data-constellation');
     }
     return () => {
       document.body.removeAttribute('data-constellation');
     };
-  }, [pillar?.constellation]);
+  }, [astra?.constellation]);
 
-  // Drive <title> + og:title from PillarConfig. The static <title>The Manual</title>
+  // Drive <title> + og:title from AstraConfig. The static <title>The Manual</title>
   // in index.html serves until React mounts; this effect overrides per-host
-  // immediately on mount. Foundation (no pillar resolved) → "The Manual ·
-  // HONEYCOMB Knowledge Spine". Resolved pillar → its siteTitle (required field).
+  // immediately on mount. Foundation (no astra resolved) → "The Manual ·
+  // HONEYCOMB Knowledge Spine". Resolved astra → its siteTitle (required field).
   // Defensive `${wordmark} · HONEYCOMB` fallback handles a hypothetical future
-  // pillar where siteTitle slipped past the type check; NEVER falls back to bare
+  // astra where siteTitle slipped past the type check; NEVER falls back to bare
   // "The Manual" on a non-foundation host (that's the atlasintel.fyi bug fix).
   useEffect(() => {
     let title: string;
-    if (pillar?.siteTitle) {
-      title = pillar.siteTitle;
-    } else if (pillar) {
-      title = `${pillar.wordmark} · HONEYCOMB`;
+    if (astra?.siteTitle) {
+      title = astra.siteTitle;
+    } else if (astra) {
+      title = `${astra.wordmark} · HONEYCOMB`;
     } else {
       title = FOUNDATION_SITE_TITLE;
     }
     document.title = title;
     setMetaProperty('og:title', title);
-  }, [pillar?.siteTitle, pillar?.wordmark]);
+  }, [astra?.siteTitle, astra?.wordmark]);
 
-  return <PillarContext.Provider value={pillar}>{children}</PillarContext.Provider>;
+  return <AstraContext.Provider value={astra}>{children}</AstraContext.Provider>;
 }
 
-export function usePillar(): PillarConfig | null {
-  const ctx = useContext(PillarContext);
+export function useAstra(): AstraConfig | null {
+  const ctx = useContext(AstraContext);
   if (ctx === undefined) {
-    throw new Error('usePillar must be used within PillarProvider');
+    throw new Error('useAstra must be used within AstraProvider');
   }
   return ctx;
 }
 
 /**
- * Look up a copy string with pillar-specific override support.
- * Returns pillar.copyOverrides[key] when defined; otherwise returns the key itself.
- * Example: useCopy('Bees') → 'Members' on AtlasNation pillars carrying the override; 'Bees' otherwise.
+ * Look up a copy string with astra-specific override support.
+ * Returns astra.copyOverrides[key] when defined; otherwise returns the key itself.
+ * Example: useCopy('Bees') → 'Members' on AtlasNation astras carrying the override; 'Bees' otherwise.
  */
 export function useCopy(key: string): string {
-  const pillar = usePillar();
-  return pillar?.copyOverrides?.[key] ?? key;
+  const astra = useAstra();
+  return astra?.copyOverrides?.[key] ?? key;
 }
 
 type LogLevel = 'log' | 'info' | 'warn' | 'error';
 
-export interface PillarLogger {
+export interface AstraLogger {
   log: (msg: string, ...args: unknown[]) => void;
   info: (msg: string, ...args: unknown[]) => void;
   warn: (msg: string, ...args: unknown[]) => void;
@@ -92,22 +92,22 @@ export interface PillarLogger {
 }
 
 /**
- * Pillar-aware logger. Every emitted line is prefixed with `[pillar:<slug>]`
- * (or `[pillar:foundation]` when no pillar is active — themanual.tech itself,
+ * Astra-aware logger. Every emitted line is prefixed with `[astra:<slug>]`
+ * (or `[astra:foundation]` when no astra is active — themanual.tech itself,
  * localhost, etc.). Per MMF §19.6, this is the canonical safety precaution for
- * disambiguating logs across pillars sharing one Railway service.
+ * disambiguating logs across astras sharing one Railway service.
  *
  * Usage:
- *   const log = usePillarLogger();
+ *   const log = useAstraLogger();
  *   log.warn('user attempted to send bling', { handle, amount });
- *   // → "[pillar:atlasintel] user attempted to send bling { handle, amount }"
+ *   // → "[astra:atlasintel] user attempted to send bling { handle, amount }"
  *
  * Opt-in only — does NOT replace existing console calls anywhere in the
  * codebase. Sweep is a separate task.
  */
-export function usePillarLogger(): PillarLogger {
-  const pillar = usePillar();
-  const prefix = `[pillar:${pillar?.slug ?? 'foundation'}]`;
+export function useAstraLogger(): AstraLogger {
+  const astra = useAstra();
+  const prefix = `[astra:${astra?.slug ?? 'foundation'}]`;
   const emit = (level: LogLevel, msg: string, ...args: unknown[]) => {
     // eslint-disable-next-line no-console
     console[level](prefix, msg, ...args);

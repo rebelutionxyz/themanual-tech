@@ -36,7 +36,7 @@ interface AtomRow {
   is_leaf: boolean;
   theme_tags: string[] | null;
   realm_tags: string[] | null;
-  pillar_tags: string[] | null;
+  astra_tags: string[] | null;
   skin_tags: string[] | null;
   geo: Record<string, unknown> | null;
   note: string | null;
@@ -59,7 +59,7 @@ function rowToAtom(r: AtomRow): Atom {
     isLeaf: r.is_leaf,
     themeTags: r.theme_tags ?? [],
     realmTags: r.realm_tags ?? [],
-    pillarTags: r.pillar_tags ?? [],
+    astraTags: r.astra_tags ?? [],
     skinTags: r.skin_tags ?? [],
     geo: r.geo,
     note: r.note,

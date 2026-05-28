@@ -70,7 +70,7 @@ export function LoginPage() {
           data-size="meta"
         >
           {mode === 'signup'
-            ? 'One identity · every pillar'
+            ? 'One identity · every astra'
             : 'Sign in to contribute sources'}
         </p>
       </div>

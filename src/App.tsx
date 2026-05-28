@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/lib/auth';
-import { PillarProvider, usePillar } from '@/lib/pillars/PillarContext';
+import { AstraProvider, useAstra } from '@/lib/astras/AstraContext';
 import { HomePage } from '@/pages/HomePage';
 import { ManualPage } from '@/pages/ManualPage';
 import { IntelLayout } from '@/pages/intel/IntelLayout';
@@ -32,9 +32,9 @@ import { HQControlRoom } from '@/components/hq/HQControlRoom';
 export default function App() {
   return (
     <AuthProvider>
-      <PillarProvider>
+      <AstraProvider>
         <AppContent />
-      </PillarProvider>
+      </AstraProvider>
     </AuthProvider>
   );
 }
@@ -42,7 +42,7 @@ export default function App() {
 const ADMIN_SURFACE_PATHS = new Set(['/myhex', '/nexus', '/nucleus']);
 
 function AppContent() {
-  const activePillar = usePillar();
+  const activeAstra = useAstra();
   const { bee, loading: authLoading } = useAuth();
   const { pathname } = useLocation();
   const isAdminSurface = ADMIN_SURFACE_PATHS.has(pathname);
@@ -55,13 +55,13 @@ function AppContent() {
           Suppressed on admin surfaces — they own their own chrome. */}
       {!isAdminSurface && <TopTickerSlot />}
       <Routes>
-        {/* Home — pillar-aware first, then admin tier-1 redirect for signed-in
+        {/* Home — astra-aware first, then admin tier-1 redirect for signed-in
             Bees on theMANUAL.tech root, then anonymous HomePage. */}
         <Route
           path="/"
           element={
-            activePillar ? (
-              <Navigate to={`/${activePillar.primarySurface}`} replace />
+            activeAstra ? (
+              <Navigate to={`/${activeAstra.primarySurface}`} replace />
             ) : authLoading ? null : bee ? (
               <Navigate to="/myhex" replace />
             ) : (
@@ -106,8 +106,8 @@ function AppContent() {
           <Route path="/bling" element={<BlingsPage />} />
 
           {/* Cross-Astra universal utility routes (per manual-spine-api-v1.md §3).
-              These resolve identically from any host; PillarConfig provides
-              theming via usePillar(). MUST be registered BEFORE the /:slug
+              These resolve identically from any host; AstraConfig provides
+              theming via useAstra(). MUST be registered BEFORE the /:slug
               catch-all or react-router-dom will match them as Astra surfaces. */}
           <Route path="/hq" element={<HQControlRoom />} />
           <Route path="/groups" element={<ManualGroupsPlaceholder />} />

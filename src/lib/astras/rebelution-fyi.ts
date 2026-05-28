@@ -1,13 +1,13 @@
-// Rebelution.fyi pillar config — second Cat 1 pillar (2026-04-27).
+// Rebelution.fyi astra config — second Cat 1 astra (2026-04-27).
 // HoneyComb constellation. Reuses the intel (Forum) surface from TheMANUAL.tech.
 // Dual-wordmark: expanded header shows 'Intelligence'; collapsed/menu shows 'INTEL'.
-// v1: no copy overrides, no schema changes. Spec: shared/pillar-specs/rebelution-fyi.md.
+// v1: no copy overrides, no schema changes. Spec: shared/astra-specs/rebelution-fyi.md.
 // v2 (Code 24 / 2026-05-08): canonical promotionSlots configuration (Phase C Component D).
 // v3 (Code 23 / 2026-05-08): defaultGeo: 'Global' (Phase C Component C-5).
 
-import { DEFAULT_PROMOTION_SLOTS, type PillarConfig } from './pillar.types';
+import { DEFAULT_PROMOTION_SLOTS, type AstraConfig } from './astra.types';
 
-export const rebelutionFyiPillar: PillarConfig = {
+export const rebelutionFyiAstra: AstraConfig = {
   slug: 'rebelution-fyi',
   hosts: ['rebelution.fyi', 'www.rebelution.fyi'],
   wordmark: 'Intelligence',
