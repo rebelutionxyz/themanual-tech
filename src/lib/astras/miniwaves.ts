@@ -11,9 +11,8 @@
 // JUDGMENT CALLS (pattern-derived; flagged for OG HUMAN ratification on the PR):
 //   - constellation: 'honeycomb' — non-Atlas, HoneyComb-native productivity surface.
 //   - accent: '#0EA5E9' — adopted from the WAVES surface color (water blue).
-//   - siteTitle: "Mini Waves · HONEYCOMB Motion Flow" — derived from the
-//     "Brand · HONEYCOMB <surface function>" pattern (cf. atlasintel).
-//     (Still the spoken form; left unchanged by this amend — flag for ratify.)
+//   - siteTitle: "MiNiWaVeS · HONEYCOMB Motion Flow" — uses the stylized
+//     wordmark form, matching the existing Astra pattern (cf. atlasintel).
 // NOTE: astra-catalog.ts marks miniwaves status 'live'; task says pre-launch /
 // scaffolded. AstraConfig has no status field, so nothing is set here.
 
@@ -23,7 +22,7 @@ export const miniwavesAstra: AstraConfig = {
   slug: 'miniwaves',
   hosts: ['miniwaves.app', 'www.miniwaves.app'],
   wordmark: 'MiNiWaVeS',
-  siteTitle: 'Mini Waves · HONEYCOMB Motion Flow',
+  siteTitle: 'MiNiWaVeS · HONEYCOMB Motion Flow',
   tagline: 'Orchestrate your life by motion, Ocean to Trickle.',
   primarySurface: 'waves',
   constellation: 'honeycomb',
