@@ -49,34 +49,37 @@ export function ActiveBees() {
         '30d': new Date(now - MS['30d']).toISOString(),
       };
 
-      const [totalRes, a24Res, a7Res, a30Res] = await Promise.all([
-        supabase.from('bees').select('id', { head: true, count: 'exact' }),
-        supabase.from('bees').select('id', { head: true, count: 'exact' }).gte('updated_at', cutoffs['24h']),
-        supabase.from('bees').select('id', { head: true, count: 'exact' }).gte('updated_at', cutoffs['7d']),
-        supabase.from('bees').select('id', { head: true, count: 'exact' }).gte('updated_at', cutoffs['30d']),
-      ]);
-      if (cancelled) return;
-      setCounts({
-        total: totalRes.count ?? 0,
-        active_24h: a24Res.count ?? 0,
-        active_7d: a7Res.count ?? 0,
-        active_30d: a30Res.count ?? 0,
+      // Admin-gated read via list_bees_admin RPC (direct bees read is locked
+      // down, and updated_at — the activity signal — is admin-only). Counts +
+      // leaderboard are computed client-side from the returned set; fine at
+      // current Bee volume, swap to a server-side count RPC if it grows.
+      const { data, error: e } = await supabase.rpc('list_bees_admin', {
+        limit_n: 5000,
+        offset_n: 0,
       });
-
-      const cutoff = cutoffs[range];
-      const { data, error: e } = await supabase
-        .from('bees')
-        .select('id, handle, name, bling_rank, action_count, created_at, updated_at')
-        .gte('updated_at', cutoff)
-        .order('updated_at', { ascending: false })
-        .limit(20);
       if (cancelled) return;
       if (e) {
         setError(e.message);
         setRows([]);
+        setCounts({ total: 0, active_24h: 0, active_7d: 0, active_30d: 0 });
         return;
       }
-      setRows((data ?? []) as BeeRow[]);
+      const all = (data ?? []) as BeeRow[];
+      const since = (iso: string) => all.filter((b) => b.updated_at >= iso).length;
+      setCounts({
+        total: all.length,
+        active_24h: since(cutoffs['24h']),
+        active_7d: since(cutoffs['7d']),
+        active_30d: since(cutoffs['30d']),
+      });
+
+      const cutoff = cutoffs[range];
+      setRows(
+        all
+          .filter((b) => b.updated_at >= cutoff)
+          .sort((x, y) => (x.updated_at < y.updated_at ? 1 : -1))
+          .slice(0, 20),
+      );
     })();
     return () => { cancelled = true; };
   }, [range]);

@@ -36,7 +36,6 @@ interface RawRow {
   atom_id: string;
   bee_id: string;
   atoms: { name: string; realm_id: string } | { name: string; realm_id: string }[] | null;
-  bees: { handle: string } | { handle: string }[] | null;
 }
 
 export function RecentKettleVotes() {
@@ -55,7 +54,7 @@ export function RecentKettleVotes() {
       setRows(null);
       let q = supabase
         .from('atom_kettle_votes')
-        .select('id, created_at, weight, kettle, atom_id, bee_id, atoms!inner(name, realm_id), bees(handle)')
+        .select('id, created_at, weight, kettle, atom_id, bee_id, atoms!inner(name, realm_id)')
         .order('created_at', { ascending: false })
         .limit(100);
       const cutoff = rangeToCutoff(range);
@@ -67,10 +66,23 @@ export function RecentKettleVotes() {
         setRows([]);
         return;
       }
-      const flat: Row[] = ((data ?? []) as unknown as RawRow[])
+      const raw = (data ?? []) as unknown as RawRow[];
+
+      // Resolve voter handles via bees_public (direct bees read is locked down).
+      const beeIds = Array.from(new Set(raw.map((r) => r.bee_id).filter(Boolean)));
+      const handleMap = new Map<string, string>();
+      if (beeIds.length > 0) {
+        const { data: bees } = await supabase
+          .from('bees_public')
+          .select('id, handle')
+          .in('id', beeIds);
+        if (cancelled) return;
+        for (const b of bees ?? []) handleMap.set(String(b.id), String(b.handle));
+      }
+
+      const flat: Row[] = raw
         .map((r) => {
           const atom = Array.isArray(r.atoms) ? (r.atoms[0] ?? null) : r.atoms;
-          const bee  = Array.isArray(r.bees)  ? (r.bees[0]  ?? null) : r.bees;
           if (!atom) return null;
           return {
             id: r.id,
@@ -81,7 +93,7 @@ export function RecentKettleVotes() {
             bee_id: r.bee_id,
             atom_name: atom.name,
             atom_realm: atom.realm_id,
-            bee_handle: bee?.handle ?? '(deleted)',
+            bee_handle: handleMap.get(r.bee_id) ?? '(deleted)',
           };
         })
         .filter((x): x is Row => x !== null);

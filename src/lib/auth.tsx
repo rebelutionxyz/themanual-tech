@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!supabase) return;
     const { data } = await supabase
       .from('bees')
-      .select('id, handle, email, bling_rank, honeycomb_ring, created_at')
+      .select('id, handle, bling_rank, honeycomb_ring, created_at')
       .eq('id', u.id)
       .maybeSingle();
 
@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setBee({
         id: data.id,
         handle: data.handle,
-        email: data.email,
+        email: u.email ?? '',
         blingRank: data.bling_rank ?? 0,
         honeycombRing: data.honeycomb_ring ?? 0,
         createdAt: data.created_at,

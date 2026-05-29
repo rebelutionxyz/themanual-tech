@@ -208,7 +208,7 @@ function SystemHealthSnapshotAction() {
     };
 
     const [bees, atoms, votes, state, treasury, failed, pageviews] = await Promise.all([
-      safe(supabase.from('bees').select('id', { head: true, count: 'exact' })),
+      safe(supabase.from('bees_public').select('id', { head: true, count: 'exact' })),
       safe(supabase.from('atoms').select('id', { head: true, count: 'exact' })),
       safe(supabase.from('atom_kettle_votes').select('id', { head: true, count: 'exact' })),
       safe(supabase.from('bling_system_state').select('total_supply, freedom_price').order('updated_at', { ascending: false }).limit(1).maybeSingle()),

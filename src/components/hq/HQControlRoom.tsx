@@ -76,17 +76,13 @@ export function HQControlRoom() {
     }
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
-        .from('bees')
-        .select('is_admin')
-        .eq('id', bee.id)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc('am_i_admin');
       if (cancelled) return;
       if (error) {
         setAdminCheck({ checked: true, isAdmin: false, error: error.message });
         return;
       }
-      setAdminCheck({ checked: true, isAdmin: !!data?.is_admin, error: null });
+      setAdminCheck({ checked: true, isAdmin: data === true, error: null });
     })();
     return () => { cancelled = true; };
   }, [bee, authLoading]);

@@ -471,7 +471,7 @@ async function enrichWithAuthors(rows: Record<string, unknown>[]): Promise<Forum
   if (beeIds.length === 0) return threads;
 
   const { data: bees } = await supabase
-    .from('bees')
+    .from('bees_public')
     .select('id, handle')
     .in('id', beeIds);
   const handleMap = new Map((bees ?? []).map((b) => [String(b.id), String(b.handle)]));
@@ -490,7 +490,7 @@ async function enrichPostsWithAuthors(rows: Record<string, unknown>[]): Promise<
   if (beeIds.length === 0) return posts;
 
   const { data: bees } = await supabase
-    .from('bees')
+    .from('bees_public')
     .select('id, handle')
     .in('id', beeIds);
   const handleMap = new Map((bees ?? []).map((b) => [String(b.id), String(b.handle)]));
