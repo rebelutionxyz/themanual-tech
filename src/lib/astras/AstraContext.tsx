@@ -57,7 +57,7 @@ export function AstraProvider({ children }: { children: ReactNode }) {
     }
     document.title = title;
     setMetaProperty('og:title', title);
-  }, [astra?.siteTitle, astra?.wordmark]);
+  }, [astra]);
 
   return <AstraContext.Provider value={astra}>{children}</AstraContext.Provider>;
 }
