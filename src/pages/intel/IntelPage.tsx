@@ -281,11 +281,11 @@ function ComingSoonView({ view }: { view: 'forme' | 'prize' | 'following' }) {
     forme: {
       title: 'For Me',
       description:
-        'Your personalized INTEL feed. Pick the atoms, realms, and pillars you want to follow — your "For Me" view will be the union of everything you subscribe to.',
+        'Your personalized INTEL feed. Pick the atoms, realms, and astras you want to follow — your "For Me" view will be the union of everything you subscribe to.',
       bullets: [
         'Subscribe to atoms (9/11, JFK, Epstein, Fed, etc.)',
         'Subscribe to realms (Justice, Tech, Religion, etc.)',
-        'Subscribe to pillars (Rebelution, FreedomBLiNGs)',
+        'Subscribe to astras (Rebelution, FreedomBLiNGs)',
         'Follow specific Bees (coming with Following)',
       ],
       cta: 'Set up preferences',

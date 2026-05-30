@@ -101,15 +101,15 @@ export function AtomDetailPanel() {
           </Section>
         )}
 
-        {/* Realm/Pillar/Skin tags */}
-        {(atom.realmTags.length > 0 || atom.pillarTags.length > 0) && (
+        {/* Realm/Astra/Skin tags */}
+        {(atom.realmTags.length > 0 || atom.astraTags.length > 0) && (
           <Section icon={<MapPin size={12} />} title="Categorization">
             <div className="space-y-1.5">
               {atom.realmTags.length > 0 && (
                 <TagRow label="Realm" tags={atom.realmTags} />
               )}
-              {atom.pillarTags.length > 0 && (
-                <TagRow label="Pillar" tags={atom.pillarTags} />
+              {atom.astraTags.length > 0 && (
+                <TagRow label="Astra" tags={atom.astraTags} />
               )}
               {atom.skinTags.length > 0 && (
                 <TagRow label="Skin" tags={atom.skinTags} />

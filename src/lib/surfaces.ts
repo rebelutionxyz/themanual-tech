@@ -64,7 +64,7 @@ export interface SurfaceDef {
 
 /**
  * The 20 Surfaces of HoneyComb. Currently 20; lockable architecture but
- * grows when pillars graduate (see MMF v2.2 §6.1 footnote).
+ * grows when astras graduate (see MMF v2.2 §6.1 footnote).
  * Each entry pairs `name` (canonical UI label, used across both
  * constellations) with `function` (semantic category / MMF taxonomy term).
  * Both fields are load-bearing — not alternative names.
