@@ -70,8 +70,8 @@ export function TreasuryBalances() {
 
       {pots === null && (
         <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-16 animate-pulse-slow rounded-md border border-border bg-bg-elevated/40" />
+          {['sk-1', 'sk-2', 'sk-3', 'sk-4', 'sk-5'].map((k) => (
+            <div key={k} className="h-16 animate-pulse-slow rounded-md border border-border bg-bg-elevated/40" />
           ))}
         </div>
       )}
