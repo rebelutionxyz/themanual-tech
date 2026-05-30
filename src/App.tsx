@@ -79,6 +79,10 @@ function AppContent() {
         {/* Auth */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        {/* /bees/me — owner-profile alias → canonical /profile. Public
+            /bees/:handle is deferred pending a bees-RLS migration (email +
+            bling_balance are anon-readable; see feat/profile-public-view notes). */}
+        <Route path="/bees/me" element={<Navigate to="/profile" replace />} />
 
         {/* Platform surfaces (right rail + utility chrome) */}
         <Route element={<PlatformLayout />}>
