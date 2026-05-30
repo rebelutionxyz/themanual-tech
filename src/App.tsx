@@ -9,6 +9,7 @@ import { NewThreadPage } from '@/pages/intel/NewThreadPage';
 import { ThreadPage } from '@/pages/intel/ThreadPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { ProfilePage } from '@/pages/ProfilePage';
+import { HandleSettingsPage } from '@/pages/HandleSettingsPage';
 import { SurfacePage } from '@/pages/SurfacePage';
 import { WavesPage } from '@/pages/WavesPage';
 import { BlingsPage } from '@/pages/BlingsPage';
@@ -79,6 +80,9 @@ function AppContent() {
         {/* Auth */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        {/* Premium handle claims — SINK 1. Standalone (own <main>), inherits
+            the global SiteHeader chrome like /profile. */}
+        <Route path="/settings/handle" element={<HandleSettingsPage />} />
         {/* /bees/me — owner-profile alias → canonical /profile. Public
             /bees/:handle is deferred pending a bees-RLS migration (email +
             bling_balance are anon-readable; see feat/profile-public-view notes). */}
