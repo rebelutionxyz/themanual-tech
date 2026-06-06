@@ -41,9 +41,10 @@ Deno.serve(async (req) => {
   }
   if (!atom) return errorResponse('Atom not found', 404);
 
+  // Join bees for a public attribution (handle/name) — NEVER expose raw bee_id.
   const { data: rows, error: srcErr } = await sb
     .from('atom_sources')
-    .select('url, title, stance, note, bee_id, created_at')
+    .select('url, title, stance, note, created_at, bees:bee_id(handle, name)')
     .eq('atom_id', slug)
     .order('created_at', { ascending: false });
   if (srcErr) {
@@ -53,21 +54,24 @@ Deno.serve(async (req) => {
     return errorResponse('Sources lookup failed', 500);
   }
 
+  type BeeRef = { handle: string | null; name: string | null };
   const sources = (rows ?? []).map((r) => {
     const s = r as {
       url: string;
       title: string | null;
       stance: string;
       note: string | null;
-      bee_id: string;
       created_at: string;
+      bees: BeeRef | BeeRef[] | null;
     };
+    const bee = Array.isArray(s.bees) ? s.bees[0] : s.bees;
     return {
       url: s.url,
       title: s.title,
       stance: s.stance,
       note: s.note,
-      added_by_bee_id: s.bee_id,
+      added_by_handle: bee?.handle ?? null,
+      added_by_name: bee?.name ?? null,
       added_at: s.created_at,
     };
   });
