@@ -1,11 +1,18 @@
 -- =============================================================================
--- Migration 20260602120000 — Competition Engine v1 (schema + RPCs + RLS)
+-- Migration 20260602182706 — Competition Engine v1 (schema + RPCs + RLS)
 -- =============================================================================
 -- Date:        2026-06-02
 -- Author:      Code (Claude Opus 4.8) — DISPATCH: Competition Engine v1
--- Status:      *** UNAPPLIED — PENDING RATIFICATION ***  Do NOT apply until the
---              ratification gate (see shared/canon/competition-stack-v1.md §7)
---              is cleared by OG HUMAN. This file is the SQL-for-review artifact.
+-- Status:      APPLIED to production (anxmqiehpyznifqgskzc) 2026-06-02 as
+--              version 20260602182706 (ratification gate cleared by OG HUMAN).
+--              File renamed from the draft stamp 20260602120000 to the real prod
+--              version for repo==prod ledger parity (2026-06-06).
+-- NOTE:        comp_create_room as first applied at 182706 omitted join_code from
+--              its INSERT (NOT NULL violation on call). Corrected in prod by the
+--              companion migration 20260602182958_competition_engine_v1_fix_join_code.
+--              The comp_create_room body in THIS file already carries the corrected
+--              join_code-inclusive INSERT, so a from-scratch repo replay is safe and
+--              never produces a callable-but-broken intermediate.
 -- Source:      shared/canon/competition-stack-v1.md (Code-derived v1)
 --              shared/canon/economy-v3-reconciliation-delta-2026-06-02.md (Sink #5)
 --

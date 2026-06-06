@@ -1,9 +1,11 @@
 -- =============================================================================
--- Migration 20260602130000 — Economy v3: cap + precision + faucet + safe drops
+-- Migration 20260602201522 — Economy v3: cap + precision + faucet + safe drops
 -- =============================================================================
--- *** UNAPPLIED — committed production apply is OG HUMAN's explicit gate. ***
+-- APPLIED to production (anxmqiehpyznifqgskzc) 2026-06-02 as version 20260602201522
+-- (OG HUMAN's explicit GO gate cleared). File renamed from the draft stamp
+-- 20260602130000 to the real prod version for repo==prod ledger parity (2026-06-06).
 -- Dry-run verified rollback-wrapped against production 2026-06-02 (no branch, no
--- persistence). Author: Code (Claude Opus 4.8). RED-ZONE.
+-- persistence) before the real apply. Author: Code (Claude Opus 4.8). RED-ZONE.
 -- Plan: shared/canon/economy-v3-migration-plan.md
 -- Gate ratified (Butch, 2026-06-02): remainder well · hard_cap config · NO seed ·
 --   DROP deprecated (verify-no-dependency) · demurrage deferred.
