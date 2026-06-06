@@ -1,4 +1,4 @@
-// Manual types — the shape of the 4,860-atom dataset (LOCKED April 25, 2026)
+// Manual types — the shape of the Manual atom dataset (LOCKED April 25, 2026)
 //
 // 14 realms in palindrome display order:
 //   Justice → Reference → Human activities → Self → Geography → Health

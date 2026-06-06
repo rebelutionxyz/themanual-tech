@@ -2,8 +2,10 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { MANIFESTO } from '@/lib/manifesto';
 import { ManualLogo } from '@/components/ui/ManualLogo';
+import { useAtomCount } from '@/lib/useAtomCount';
 
 export function HomePage() {
+  const atomCount = useAtomCount();
   return (
     <main className="relative mx-auto max-w-5xl px-4 py-16 md:px-8 md:py-28">
       {/* Background sacred geometry (very subtle) */}
@@ -22,7 +24,7 @@ export function HomePage() {
           style={{ fontSize: '13px' }}
           data-size="meta"
         >
-          5,997 atoms · 13 realms · one sovereign record
+          {atomCount != null ? `${atomCount.toLocaleString()} atoms · ` : ''}13 realms · one sovereign record
         </p>
 
         {/* Three-line manifesto */}

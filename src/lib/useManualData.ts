@@ -84,7 +84,7 @@ function buildThemeIndex(atoms: Atom[]): Record<string, string[]> {
  * Loads atoms from Supabase once, caches globally.
  *
  * Supabase enforces a 1000-row default limit per request — we page through
- * with .range() to pull all 4,860 atoms.
+ * with .range() to pull all atoms (count grows with Bee contributions).
  */
 export function useManualData(): ManualData {
   const [state, setState] = useState<ManualData>(

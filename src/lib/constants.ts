@@ -27,7 +27,7 @@ export const REALM_ORDER: RealmId[] = [
  * REALM_NAMES — display labels for each realm id.
  *
  * Note: "Human activities" is intentionally lowercase 'a' (matches source data
- * from the 4,860-atom canonical taxonomy).
+ * from the canonical taxonomy).
  */
 export const REALM_NAMES: Record<RealmId, string> = {
   justice: 'Justice',
