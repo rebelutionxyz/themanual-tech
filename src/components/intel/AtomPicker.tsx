@@ -254,7 +254,9 @@ export function AtomPicker({
       {searchOnly && !query.trim() && focused && suggestions.length === 0 && !atMax && (
         <div className="mt-1 rounded-md border border-border bg-bg-elevated px-3 py-2">
           <p className="text-text-muted" style={{ fontSize: '12px' }}>
-            Type to search 4,860 Manual atoms
+            {loaded && atoms.length > 0
+              ? `Type to search ${atoms.length.toLocaleString()} Manual atoms`
+              : 'Type to search Manual atoms'}
           </p>
         </div>
       )}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Search, LayoutList, Network, TreePine, X, Filter } from 'lucide-react';
 import { useManualData } from '@/lib/useManualData';
+import { useAtomCount } from '@/lib/useAtomCount';
 import { useManualStore } from '@/stores/useManualStore';
 import { RealmSidebar } from '@/components/manual/RealmSidebar';
 import { OutlookView } from '@/components/manual/OutlookView';
@@ -13,6 +14,7 @@ import type { KettleState } from '@/types/manual';
 
 export function ManualPage() {
   const { loaded, error, tree } = useManualData();
+  const atomCount = useAtomCount();
   const view = useManualStore((s) => s.view);
   const setView = useManualStore((s) => s.setView);
   const searchQuery = useManualStore((s) => s.searchQuery);
@@ -51,7 +53,7 @@ export function ManualPage() {
             style={{ fontSize: '11px' }}
             data-size="meta"
           >
-            loading 5,997 atoms...
+            {atomCount != null ? `loading ${atomCount.toLocaleString()} atoms...` : 'Loading The Manual…'}
           </p>
         </div>
       </div>

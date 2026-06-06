@@ -65,7 +65,7 @@ export const ASTRA_CATALOG: AstraCatalogEntry[] = [
   { slug: 'beehold',       wordmark: 'BeeHold',         category: 'economy', hosts: [],                                                          status: 'post-Swarm',                            description: 'Bee life-insurance instrument.' },
 
   // ─── Knowledge (5) ──────────────────────────────────────────────────
-  { slug: 'themanual',     wordmark: 'The Manual',      category: 'knowledge', hosts: ['TheMANUAL.tech'],                                        status: 'live',       director: 'Harrison Smith',  description: '4,892-atom knowledge spine + Discovery Ladder.' },
+  { slug: 'themanual',     wordmark: 'The Manual',      category: 'knowledge', hosts: ['TheMANUAL.tech'],                                        status: 'live',       director: 'Harrison Smith',  description: 'Knowledge spine + Discovery Ladder.' },
   { slug: 'forum',         wordmark: 'Forum',           category: 'knowledge', hosts: ['rebelution.fyi', 'atlasINTEL.fyi'],                      status: 'scaffolded', director: 'Edward Snowden',  description: 'Threaded discussion + INTEL surface.' },
   { slug: 'learning',      wordmark: 'Learning',        category: 'knowledge', hosts: ['rebelution.you', 'atlasENLIGHTENED.com'],                status: 'scaffolded',                              description: 'Course + curriculum surface.' },
   { slug: 'memories',      wordmark: 'Memories',        category: 'knowledge', hosts: [],                                                        status: 'deferred',                                description: 'Long-form Bee memoirs + family archive.' },
