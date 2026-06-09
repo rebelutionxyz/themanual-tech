@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Network } from 'lucide-react';
 import type { Atom, TreeNode } from '@/types/manual';
 import { useManualStore } from '@/stores/useManualStore';
 import { cn, formatCount } from '@/lib/utils';
@@ -65,26 +65,26 @@ function RealmBranch({ node, matches }: BranchProps) {
 
   return (
     <div className="mb-3">
-      <button
-        type="button"
-        onClick={() => toggleExpanded(node.path)}
-        className={cn(
-          'group flex w-full items-center gap-2 rounded px-1.5 py-1.5 text-left',
-          'hover:bg-bg-elevated transition-colors',
-        )}
-      >
-        <Caret expanded={isExpanded} />
-        <span className="font-display text-xl font-semibold text-text-silver-bright tracking-wide">
-          {node.name}
-        </span>
-        <span
-          className="ml-auto font-mono text-text-muted"
-          style={{ fontSize: '11px' }}
-          data-size="meta"
+      <div className="group flex w-full items-center gap-2 rounded px-1.5 hover:bg-bg-elevated transition-colors">
+        <button
+          type="button"
+          onClick={() => toggleExpanded(node.path)}
+          className="flex flex-1 items-center gap-2 py-1.5 text-left"
         >
-          {formatCount(node.atomCount)}
-        </span>
-      </button>
+          <Caret expanded={isExpanded} />
+          <span className="font-display text-xl font-semibold text-text-silver-bright tracking-wide">
+            {node.name}
+          </span>
+          <span
+            className="ml-auto font-mono text-text-muted"
+            style={{ fontSize: '11px' }}
+            data-size="meta"
+          >
+            {formatCount(node.atomCount)}
+          </span>
+        </button>
+        <GraphLaunch path={node.path} />
+      </div>
       {isExpanded && (
         <div className="ml-3 mt-1 border-l border-border pl-3">
           {node.children.map((c) => (
@@ -96,6 +96,25 @@ function RealmBranch({ node, matches }: BranchProps) {
         </div>
       )}
     </div>
+  );
+}
+
+function GraphLaunch({ path }: { path: string }) {
+  const setView = useManualStore((s) => s.setView);
+  const setGraphCenter = useManualStore((s) => s.setGraphCenter);
+  return (
+    <button
+      type="button"
+      title="Launch graph from here"
+      onClick={(e) => {
+        e.stopPropagation();
+        setGraphCenter({ path });
+        setView('graph');
+      }}
+      className="shrink-0 rounded p-1 text-text-muted opacity-0 transition-opacity hover:text-text-silver group-hover:opacity-100"
+    >
+      <Network size={13} />
+    </button>
   );
 }
 
@@ -111,32 +130,32 @@ const TreeBranch = memo(function TreeBranch({ node, matches, depth }: TreeBranch
 
   return (
     <div className="my-0.5">
-      <button
-        type="button"
-        onClick={() => hasChildren && toggleExpanded(node.path)}
-        className={cn(
-          'group flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-left',
-          'hover:bg-bg-elevated transition-colors',
-        )}
-      >
-        <Caret expanded={isExpanded} hidden={!hasChildren} />
-        <span
-          className={cn(
-            depth === 1 && 'text-[15px] font-medium text-text',
-            depth === 2 && 'text-sm text-text-silver',
-            depth >= 3 && 'text-sm text-text-dim',
-          )}
+      <div className="group flex w-full items-center gap-1.5 rounded px-1.5 hover:bg-bg-elevated transition-colors">
+        <button
+          type="button"
+          onClick={() => hasChildren && toggleExpanded(node.path)}
+          className="flex flex-1 items-center gap-1.5 py-1 text-left"
         >
-          {node.name}
-        </span>
-        <span
-          className="ml-auto font-mono text-text-muted"
-          style={{ fontSize: '11px' }}
-          data-size="meta"
-        >
-          {formatCount(node.atomCount)}
-        </span>
-      </button>
+          <Caret expanded={isExpanded} hidden={!hasChildren} />
+          <span
+            className={cn(
+              depth === 1 && 'text-[15px] font-medium text-text',
+              depth === 2 && 'text-sm text-text-silver',
+              depth >= 3 && 'text-sm text-text-dim',
+            )}
+          >
+            {node.name}
+          </span>
+          <span
+            className="ml-auto font-mono text-text-muted"
+            style={{ fontSize: '11px' }}
+            data-size="meta"
+          >
+            {formatCount(node.atomCount)}
+          </span>
+        </button>
+        {hasChildren && <GraphLaunch path={node.path} />}
+      </div>
       {isExpanded && hasChildren && (
         <div className="ml-3 border-l border-border pl-3">
           {node.children.map((c) => (

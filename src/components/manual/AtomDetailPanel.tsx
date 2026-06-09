@@ -1,4 +1,4 @@
-import { X, Tag, Link2, MapPin } from 'lucide-react';
+import { X, Tag, Link2, MapPin, Network } from 'lucide-react';
 import type { Atom } from '@/types/manual';
 import { useManualStore } from '@/stores/useManualStore';
 import { getAtomById, getRelatedAtoms } from '@/lib/useManualData';
@@ -13,6 +13,8 @@ export function AtomDetailPanel() {
   const selectAtom = useManualStore((s) => s.selectAtom);
   const selectedTags = useManualStore((s) => s.selectedTags);
   const toggleTag = useManualStore((s) => s.toggleTag);
+  const setView = useManualStore((s) => s.setView);
+  const setGraphCenter = useManualStore((s) => s.setGraphCenter);
 
   if (!selectedAtomId) {
     return (
@@ -45,6 +47,19 @@ export function AtomDetailPanel() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <DetailHeader atom={atom} onClose={() => selectAtom(null)} />
+
+      <div className="border-b border-border px-5 py-2">
+        <button
+          type="button"
+          onClick={() => {
+            setGraphCenter({ atomId: atom.id });
+            setView('graph');
+          }}
+          className="flex items-center gap-1.5 rounded-md border border-border bg-bg px-2.5 py-1 text-text-silver transition-colors hover:border-border-bright hover:text-text"
+        >
+          <Network size={14} /> View in graph
+        </button>
+      </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         {/* Breadcrumb */}
