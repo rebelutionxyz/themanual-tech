@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { Atom, AtomType, KettleState, RealmId, TreeNode } from '@/types/manual';
 import { buildTree } from '@/lib/tree';
+import { buildPathIndexes, type PathIndexes } from '@/lib/graph-neighbors';
 import { supabase } from '@/lib/supabase';
 
 interface ManualData {
   atoms: Atom[];
   tree: TreeNode;
   themeIndex: Record<string, string[]>;
+  pathIndexes: PathIndexes;
   loaded: boolean;
   error: string | null;
 }
@@ -92,6 +94,7 @@ export function useManualData(): ManualData {
       atoms: [],
       tree: EMPTY_TREE,
       themeIndex: {},
+      pathIndexes: { byId: new Map(), byPath: new Map(), childrenByPath: new Map() },
       loaded: false,
       error: null,
     },
@@ -120,13 +123,27 @@ export function useManualData(): ManualData {
         }
 
         const atoms = all.map(rowToAtom);
+        if (import.meta.env.DEV) {
+          const bad = atoms.find((a) => a.path !== a.pathParts.join(' / '));
+          if (bad) {
+            console.error(
+              '[Manual] path invariant violated — childrenByPath/byPath joins will silently fail:',
+              bad.id,
+              JSON.stringify(bad.path),
+              '!==',
+              JSON.stringify(bad.pathParts.join(' / ')),
+            );
+          }
+        }
         const themeIndex = buildThemeIndex(atoms);
         const tree = buildTree(atoms);
+        const pathIndexes = buildPathIndexes(atoms);
 
         const data: ManualData = {
           atoms,
           tree,
           themeIndex,
+          pathIndexes,
           loaded: true,
           error: null,
         };

@@ -3,6 +3,7 @@ import { Network } from 'lucide-react';
 import type { Atom } from '@/types/manual';
 import { useManualStore } from '@/stores/useManualStore';
 import { useManualData, getAtomById } from '@/lib/useManualData';
+import { getNeighbors, type EdgeType } from '@/lib/graph-neighbors';
 import { ATOM_TYPE_COLORS, KETTLE_COLORS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
@@ -13,12 +14,14 @@ interface GraphNode {
   y: number;
   vx: number;
   vy: number;
+  synthetic?: boolean;
 }
 
 interface GraphLink {
   source: string;
   target: string;
   strength: number;
+  type?: EdgeType;
 }
 
 /**
@@ -27,9 +30,12 @@ interface GraphLink {
  */
 export function GraphView() {
   const svgRef = useRef<SVGSVGElement>(null);
-  const { atoms, themeIndex } = useManualData();
+  const { atoms, themeIndex, pathIndexes } = useManualData();
+  const gcAtomId = useManualStore((s) => s.graphCenter?.atomId);
+  const gcPath = useManualStore((s) => s.graphCenter?.path);
   const selectedAtomId = useManualStore((s) => s.selectedAtomId);
   const selectAtom = useManualStore((s) => s.selectAtom);
+  const setGraphCenter = useManualStore((s) => s.setGraphCenter);
 
   const [dims, setDims] = useState({ w: 800, h: 600 });
   const [scale, setScale] = useState(1);
@@ -38,76 +44,56 @@ export function GraphView() {
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
 
-  // Compute the subgraph centered on selected atom
-  const { nodes, links } = useMemo(() => {
-    if (!selectedAtomId || atoms.length === 0) {
-      return { nodes: [] as GraphNode[], links: [] as GraphLink[] };
+  // Compute the bounded neighborhood centered on the graph center (atom or category/realm path).
+  // `center` is built INSIDE the memo from primitive deps so physics only re-simulates on real change.
+  const { nodes, links, centerId } = useMemo(() => {
+    const center = gcAtomId
+      ? { atomId: gcAtomId }
+      : gcPath
+        ? { path: gcPath }
+        : selectedAtomId
+          ? { atomId: selectedAtomId }
+          : null;
+    if (!center || atoms.length === 0) {
+      return { nodes: [] as GraphNode[], links: [] as GraphLink[], centerId: null as string | null };
+    }
+    const { centerKey, centerLabel, neighborIds, edges } = getNeighbors(center, pathIndexes, themeIndex, {
+      hops: 2,
+      cap: 28,
+    });
+    if (!centerKey) {
+      return { nodes: [] as GraphNode[], links: [] as GraphLink[], centerId: null as string | null };
     }
 
-    const center = atoms.find((a) => a.id === selectedAtomId);
-    if (!center) return { nodes: [] as GraphNode[], links: [] as GraphLink[] };
-
-    // Collect 1-hop neighbors (share any theme tag)
-    const neighborIds = new Map<string, number>(); // id → sharedTagCount
-    for (const tag of center.themeTags) {
-      const ids = themeIndex[tag] ?? [];
-      for (const id of ids) {
-        if (id === center.id) continue;
-        neighborIds.set(id, (neighborIds.get(id) ?? 0) + 1);
-      }
-    }
-
-    // Take top 25 neighbors by shared tag count
-    const topNeighbors = Array.from(neighborIds.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 25)
-      .map(([id]) => id);
-
-    const includeIds = new Set<string>([center.id, ...topNeighbors]);
-
-    // Build nodes with initial random positions on a circle
+    const nodeKeys = [centerKey, ...neighborIds];
+    const n = nodeKeys.length;
     const nodeList: GraphNode[] = [];
-    const n = includeIds.size;
-    let i = 0;
-    for (const id of includeIds) {
-      const atom = atoms.find((a) => a.id === id);
-      if (!atom) continue;
-      const isCenter = id === center.id;
+    nodeKeys.forEach((key, i) => {
+      const real = pathIndexes.byId.get(key);
+      const isCenter = key === centerKey;
+      // synthetic center is used only for non-atom realm/category roots
+      const atom = real ?? ({ id: centerKey, name: centerLabel } as Atom);
       const angle = (i / n) * Math.PI * 2;
       const r = isCenter ? 0 : 180 + Math.random() * 60;
       nodeList.push({
-        id,
+        id: key,
         atom,
         x: Math.cos(angle) * r,
         y: Math.sin(angle) * r,
         vx: 0,
         vy: 0,
+        synthetic: !real,
       });
-      i++;
-    }
+    });
 
-    // Build links — center to each neighbor, plus neighbors to each other if they share tags
-    const linkList: GraphLink[] = [];
-    const idPairsAdded = new Set<string>();
+    const present = new Set(nodeList.map((nd) => nd.id));
+    const linkList: GraphLink[] = edges
+      .filter((e) => present.has(e.source) && present.has(e.target))
+      .map((e) => ({ source: e.source, target: e.target, strength: e.strength, type: e.type }));
 
-    for (const a of nodeList) {
-      for (const b of nodeList) {
-        if (a.id >= b.id) continue;
-        const key = `${a.id}:${b.id}`;
-        if (idPairsAdded.has(key)) continue;
-        const shared = a.atom.themeTags.filter((t) => b.atom.themeTags.includes(t));
-        if (shared.length > 0) {
-          linkList.push({ source: a.id, target: b.id, strength: shared.length });
-          idPairsAdded.add(key);
-        }
-      }
-    }
-
-    // Run physics iterations
     runPhysics(nodeList, linkList, 250);
-
-    return { nodes: nodeList, links: linkList };
-  }, [selectedAtomId, atoms, themeIndex]);
+    return { nodes: nodeList, links: linkList, centerId: centerKey };
+  }, [gcAtomId, gcPath, selectedAtomId, atoms, themeIndex, pathIndexes]);
 
   // Resize observer
   useEffect(() => {
@@ -151,7 +137,7 @@ export function GraphView() {
     setDragStart(null);
   };
 
-  if (!selectedAtomId || nodes.length === 0) {
+  if (!centerId || nodes.length === 0) {
     return (
       <div className="flex h-full items-center justify-center px-6 text-center">
         <div>
@@ -171,8 +157,6 @@ export function GraphView() {
       </div>
     );
   }
-
-  const centerId = selectedAtomId;
 
   return (
     <div className="relative h-full w-full">
@@ -206,6 +190,7 @@ export function GraphView() {
             const s = nodes.find((n) => n.id === link.source);
             const t = nodes.find((n) => n.id === link.target);
             if (!s || !t) return null;
+            const structural = link.type !== 'tag';
             const involvesCenter = s.id === centerId || t.id === centerId;
             return (
               <line
@@ -214,9 +199,9 @@ export function GraphView() {
                 y1={s.y}
                 x2={t.x}
                 y2={t.y}
-                stroke={involvesCenter ? '#C8D1DA' : '#2A3138'}
-                strokeOpacity={involvesCenter ? 0.5 + link.strength * 0.1 : 0.2}
-                strokeWidth={involvesCenter ? 1 + link.strength * 0.3 : 0.8}
+                stroke={link.type === 'tag' ? '#3A4048' : involvesCenter ? '#C8D1DA' : '#5A6B7A'}
+                strokeOpacity={structural ? 0.45 + link.strength * 0.12 : 0.22}
+                strokeWidth={structural ? 1 + link.strength * 0.4 : 0.7}
               />
             );
           })}
@@ -226,7 +211,7 @@ export function GraphView() {
         <g>
           {nodes.map((n) => {
             const isCenter = n.id === centerId;
-            const typeColor = ATOM_TYPE_COLORS[n.atom.type] ?? '#8A94A0';
+            const typeColor = n.synthetic ? '#C8D1DA' : (ATOM_TYPE_COLORS[n.atom.type] ?? '#8A94A0');
             const radius = isCenter ? 10 : 6;
             return (
               // biome-ignore lint/a11y/useKeyWithClickEvents: SVG graph nodes are visual; per-node tabIndex would create unusable tab-order; keyboard navigation handled by separate atom list UI
@@ -234,7 +219,16 @@ export function GraphView() {
                 key={n.id}
                 transform={`translate(${n.x}, ${n.y})`}
                 className="graph-node cursor-pointer"
-                onClick={() => selectAtom(n.id)}
+                onClick={() => {
+                  if (n.synthetic) {
+                    // realm/category root → drill its path in place
+                    setGraphCenter({ path: n.id });
+                  } else {
+                    // atom → re-center the graph and update the detail panel
+                    setGraphCenter({ atomId: n.id });
+                    selectAtom(n.id);
+                  }
+                }}
               >
                 <circle
                   r={radius}
@@ -242,13 +236,15 @@ export function GraphView() {
                   stroke={isCenter ? '#F8F9FA' : '#14171C'}
                   strokeWidth={isCenter ? 2 : 1.5}
                 />
-                <circle
-                  r={radius + 2}
-                  fill="transparent"
-                  stroke={KETTLE_COLORS[n.atom.kettle]}
-                  strokeWidth={1}
-                  strokeOpacity={0.6}
-                />
+                {!n.synthetic && (
+                  <circle
+                    r={radius + 2}
+                    fill="transparent"
+                    stroke={KETTLE_COLORS[n.atom.kettle] ?? '#3A4048'}
+                    strokeWidth={1}
+                    strokeOpacity={0.6}
+                  />
+                )}
                 <text
                   x={radius + 4}
                   y={3}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, LayoutList, Network, TreePine, X, Filter } from 'lucide-react';
+import { Search, LayoutList, TreePine, X, Filter } from 'lucide-react';
 import { useManualData } from '@/lib/useManualData';
 import { useAtomCount } from '@/lib/useAtomCount';
 import { useManualStore } from '@/stores/useManualStore';
@@ -186,9 +186,6 @@ function ViewToggle({
       </ViewBtn>
       <ViewBtn active={view === 'list'} onClick={() => onChange('list')} label="List">
         <LayoutList size={14} />
-      </ViewBtn>
-      <ViewBtn active={view === 'graph'} onClick={() => onChange('graph')} label="Graph">
-        <Network size={14} />
       </ViewBtn>
     </div>
   );
