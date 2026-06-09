@@ -108,9 +108,9 @@ export function TrendingAtoms() {
 
       {rows === null && (
         <div className="space-y-2" aria-hidden>
-          {Array.from({ length: 4 }).map((_, i) => (
+          {['sk-1', 'sk-2', 'sk-3', 'sk-4'].map((k) => (
             <div
-              key={i}
+              key={k}
               className="h-12 animate-pulse-slow rounded-md border border-border bg-bg-elevated/40"
             />
           ))}

@@ -1,7 +1,7 @@
 // Phase C Component D — promotion slot framework types (Code 24, 2026-05-08).
 // Shape mirrors the `promotions` table from migration 20260508120000.
 
-import type { SlotBehavior, SlotConfig, SlotKey } from '@/lib/pillars/pillar.types';
+import type { SlotBehavior, SlotConfig, SlotKey } from '@/lib/astras/astra.types';
 
 /**
  * One row from public.promotions. Shape matches the migration-applied schema.
@@ -50,7 +50,7 @@ export interface SlotContext {
 
 /**
  * Result returned to render code.
- *   enabled        — slot is allowed to render at all (PillarConfig flag)
+ *   enabled        — slot is allowed to render at all (AstraConfig flag)
  *   promotion      — winning DB row, if any matched the cascade
  *   fallbackContent — astra-defined HTML when no DB match
  *   behavior       — effective behavior (DB row's behavior if matched, else slot config's)

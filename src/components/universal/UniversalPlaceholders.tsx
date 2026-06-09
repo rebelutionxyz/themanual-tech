@@ -3,12 +3,12 @@
 // Per shared/canon/manual-spine-api-v1.md §3 (cross-Astra utility-path
 // architecture): every utility surface lives at a canonical path that
 // resolves correctly from any Astra's host. The Astra context affects
-// theming/copy via PillarConfig; the functional surface is identical
+// theming/copy via AstraConfig; the functional surface is identical
 // across hosts.
 //
 // These are PLACEHOLDERS until the real surfaces ship in follow-up
 // dispatches (HQ Control Room build, Manual Groups, Comms/CHAT, etc.).
-// Each reads usePillar() so host theming applies on render.
+// Each reads useAstra() so host theming applies on render.
 //
 // Note: /bling is NOT registered here — it already exists in App.tsx as
 // an iframe wrapper around freedomblings.com (BlingsPage). Replacing
@@ -16,7 +16,7 @@
 // first-class registered Astra, the iframe wrapper can retire and a
 // real BlingWallet component lands here.
 
-import { usePillar } from '@/lib/pillars/PillarContext';
+import { useAstra } from '@/lib/astras/AstraContext';
 
 interface PlaceholderProps {
   surfaceName: string;
@@ -24,8 +24,8 @@ interface PlaceholderProps {
 }
 
 function Placeholder({ surfaceName, description }: PlaceholderProps) {
-  const pillar = usePillar();
-  const accent = pillar?.accent ?? '#9ca3af'; // gray-400 default for foundation
+  const astra = useAstra();
+  const accent = astra?.accent ?? '#9ca3af'; // gray-400 default for foundation
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 text-center">
@@ -39,7 +39,7 @@ function Placeholder({ surfaceName, description }: PlaceholderProps) {
       </h1>
       <p className="mt-4 text-base text-text-muted">
         Coming soon
-        {pillar ? ` on ${pillar.wordmark}` : ''}.
+        {astra ? ` on ${astra.wordmark}` : ''}.
       </p>
       {description && (
         <p className="mt-2 text-sm text-text-muted/80">{description}</p>

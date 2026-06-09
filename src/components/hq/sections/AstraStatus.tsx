@@ -1,7 +1,7 @@
 // HQ §8 — Astra Status (INFRA STATUS SLIDER)
 //
 // Panel A: 38-Astra catalog from astra-registry-canonical-v1.md, grouped by
-//   category, with runtime cross-reference against PILLAR_REGISTRY for live
+//   category, with runtime cross-reference against ASTRA_REGISTRY for live
 //   status. Filterable by free-text search across slug/wordmark/host.
 // Panel B: infrastructure layer status cards (hardcoded "operational" for
 //   v1; live API polling pending env-token config in a follow-up dispatch).

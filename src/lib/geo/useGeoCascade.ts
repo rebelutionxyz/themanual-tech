@@ -3,7 +3,7 @@
 // Resolution order (most-specific first):
 //   1. localStorage `honeycomb:geo:search-location`              source: 'storage'
 //   2. authenticated bee_profiles.location_country/_region        source: 'profile'
-//   3. PillarConfig.defaultGeo (current astra)                    source: 'astra'
+//   3. AstraConfig.defaultGeo (current astra)                    source: 'astra'
 //   4. 'Global'                                                   source: 'global'
 //
 // On first hit of (2) — logged-in Bee with profile location and no localStorage
@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { usePillar } from '@/lib/pillars/PillarContext';
+import { useAstra } from '@/lib/astras/AstraContext';
 import { supabase } from '@/lib/supabase';
 import {
   getProfilePromptShown,
@@ -68,19 +68,19 @@ function profileRowToGeo(row: BeeProfileLocation): GeoLocation | null {
 
 export function useGeoCascade(): CascadeResult {
   const { bee } = useAuth();
-  const pillar = usePillar();
+  const astra = useAstra();
 
   // Initialize synchronously from localStorage + astra fallback so the bottom
   // bar paints with the correct value on first render.
   const [geo, setGeoState] = useState<GeoLocation>(() => {
     const stored = getSearchLocation();
     if (stored !== null) return stored;
-    return pillar?.defaultGeo ?? 'Global';
+    return astra?.defaultGeo ?? 'Global';
   });
   const [source, setSource] = useState<GeoSource>(() =>
     getSearchLocation() !== null
       ? 'storage'
-      : pillar?.defaultGeo
+      : astra?.defaultGeo
         ? 'astra'
         : 'global',
   );

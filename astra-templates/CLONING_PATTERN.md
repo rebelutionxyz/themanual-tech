@@ -1,8 +1,8 @@
 # CLONING_PATTERN.md
 
-Canonical reference for cloning a Cat 1 pillar from an existing one in the HONEYCOMB RING constellation.
+Canonical reference for cloning a Cat 1 astra from an existing one in the HONEYCOMB RING constellation.
 
-- **Audience:** future Code sessions kicking off Cat 1 pillar builds.
+- **Audience:** future Code sessions kicking off Cat 1 astra builds.
 - **Reading time:** <10 min.
 - **Outcome:** ship a working Cat 1 clone in 30–60 minutes, no mid-build decisions required.
 - **Status:** v1 — authored 2026-05-07 from P1 (AtlasINTEL.fyi), P2 (Rebelution.fyi), P3 (AtlasUNITED.fyi) precedents.
@@ -11,11 +11,11 @@ Canonical reference for cloning a Cat 1 pillar from an existing one in the HONEY
 
 ## 1. What gets cloned vs. what stays universal
 
-Pillars are **configs and skins over universal surfaces**. The boundary is sharp.
+Astras are **configs and skins over universal surfaces**. The boundary is sharp.
 
-### 1.1 Per-pillar (varies — defined in PillarConfig)
+### 1.1 Per-astra (varies — defined in AstraConfig)
 
-Every Cat 1 pillar is fully described by a single `PillarConfig` object. Schema: `src/lib/pillars/pillar.types.ts` (v2, 36 lines).
+Every Cat 1 astra is fully described by a single `AstraConfig` object. Schema: `src/lib/astras/astra.types.ts` (v2, 36 lines).
 
 Fields that vary:
 
@@ -28,15 +28,15 @@ Fields that vary:
 - `accent` — hex color; drives right-sidebar rotation + favicon tint
 - `copyOverrides` — exact-string map applied at render time (case-sensitive)
 
-### 1.2 Universal (does not vary — shared across all pillars)
+### 1.2 Universal (does not vary — shared across all astras)
 
-- **Surfaces** — `src/lib/surfaces.ts` (the universal surface library; pillars pick a `primarySurface`, never define new ones)
+- **Surfaces** — `src/lib/surfaces.ts` (the universal surface library; astras pick a `primarySurface`, never define new ones)
 - **Spine** — top bar, sidebars, BLiNG! drop, AtlasOracle wallet
 - **Logic** — RLS, RPCs, BLiNG! mechanics (Drops/Drips), auth, settlement
-- **Auth** — Supabase Auth + RLS canon (resolved 2026-05-07; no per-pillar auth config; no SHIELD pillar)
-- **Settlement** — Stripe + BTC dual-rail (resolved 2026-05-07; foundation-level, not per-pillar)
+- **Auth** — Supabase Auth + RLS canon (resolved 2026-05-07; no per-astra auth config; no SHIELD astra)
+- **Settlement** — Stripe + BTC dual-rail (resolved 2026-05-07; foundation-level, not per-astra)
 
-If a "pillar-specific" need touches anything in the universal list, it is **not a Cat 1 build** — escalate to Butch.
+If a "astra-specific" need touches anything in the universal list, it is **not a Cat 1 build** — escalate to Butch.
 
 ---
 
@@ -46,10 +46,10 @@ If a "pillar-specific" need touches anything in the universal list, it is **not 
 
 Before opening Code:
 
-- [ ] Pillar slot exists in MMF v2.2 §6 constellation
+- [ ] Astra slot exists in MMF v2.2 §6 constellation
 - [ ] Domain owned (apex + www DNS pointed at Railway)
-- [ ] Spec file present at `shared/pillar-specs/{slug}.md`
-- [ ] Accent color locked (hex, distinct from neighboring pillars in same constellation)
+- [ ] Spec file present at `shared/astra-specs/{slug}.md`
+- [ ] Accent color locked (hex, distinct from neighboring astras in same constellation)
 - [ ] `primarySurface` chosen — must match an entry in `src/lib/surfaces.ts SURFACES[]`
 - [ ] `wordmarkShort` decision made (see §4)
 - [ ] Constellation membership confirmed (`'honeycomb'` vs `'atlasnation'`)
@@ -57,13 +57,13 @@ Before opening Code:
 
 ### 2.2 Build steps
 
-1. **Create the pillar config file:** `src/lib/pillars/{slug}.ts`. Use one of the three reference configs verbatim as the template (§5–§7). Keep the leading comment block — it tracks build provenance (date, constellation, surface choice, v1 caveat, spec link).
+1. **Create the astra config file:** `src/lib/astras/{slug}.ts`. Use one of the three reference configs verbatim as the template (§5–§7). Keep the leading comment block — it tracks build provenance (date, constellation, surface choice, v1 caveat, spec link).
 
-2. **Register in `PILLAR_REGISTRY`:** edit `src/lib/pillars/registry.ts`. Append two lines: an `import` near the top, and the exported config object in the array. The registry is **append-only** — never reorder existing entries.
+2. **Register in `ASTRA_REGISTRY`:** edit `src/lib/astras/registry.ts`. Append two lines: an `import` near the top, and the exported config object in the array. The registry is **append-only** — never reorder existing entries.
 
-3. **Apply skin from BRANDoSOPHIC** if the pillar has a custom brand kit (logo, type ramp, secondary palette). If not, the constellation default applies. See MMF v2.2 §25.
+3. **Apply skin from BRANDoSOPHIC** if the astra has a custom brand kit (logo, type ramp, secondary palette). If not, the constellation default applies. See MMF v2.2 §25.
 
-4. **Set `copyOverrides`** if the pillar diverges from canonical lexicon. Empty `{}` is the default — most v1 pillars ride canonical HoneyComb lexicon (Bees, Drips, Drops, BLiNG!). See §3.2 for the AtlasNation override pattern.
+4. **Set `copyOverrides`** if the astra diverges from canonical lexicon. Empty `{}` is the default — most v1 astras ride canonical HoneyComb lexicon (Bees, Drips, Drops, BLiNG!). See §3.2 for the AtlasNation override pattern.
 
 5. **Verify build:** `npm run build`. Fix type errors before committing. Never push if build fails.
 
@@ -76,9 +76,9 @@ Before opening Code:
 - [ ] Right-sidebar accent rotation includes the new accent color
 - [ ] BLiNG! drop, AtlasOracle wallet, top bar all render unchanged (universal spine)
 - [ ] No console errors related to host resolution or surface lookup
-- [ ] `resolvePillarByHost('{host}')` returns the new config in browser devtools
+- [ ] `resolveAstraByHost('{host}')` returns the new config in browser devtools
 
-If any check fails, do not consider the pillar shipped. Roll back the commit and re-plan.
+If any check fails, do not consider the astra shipped. Roll back the commit and re-plan.
 
 ---
 
@@ -88,11 +88,11 @@ HoneyComb and AtlasNation are dual constellations — both ride the same univers
 
 ### 3.1 Sidebar palette
 
-`PillarConfig.constellation` drives the sidebar tonal palette. No code changes needed beyond setting the field correctly. The accent color rotation pool is constellation-scoped.
+`AstraConfig.constellation` drives the sidebar tonal palette. No code changes needed beyond setting the field correctly. The accent color rotation pool is constellation-scoped.
 
 ### 3.2 Lexicon swap (Bees → Members)
 
-AtlasNation pillars may swap "Bees" → "Members" via `copyOverrides`:
+AtlasNation astras may swap "Bees" → "Members" via `copyOverrides`:
 
 ```ts
 copyOverrides: {
@@ -109,7 +109,7 @@ Match is **case-sensitive exact-string**. Plurals and lowercase variants are sep
 
 ### 3.3 Accent color rotation
 
-Right-sidebar rotates accent colors from a constellation pool. `PillarConfig.accent` adds the pillar's color to its constellation's pool. Pick a hex visually distinct from neighboring pillars in the same constellation.
+Right-sidebar rotates accent colors from a constellation pool. `AstraConfig.accent` adds the astra's color to its constellation's pool. Pick a hex visually distinct from neighboring astras in the same constellation.
 
 **Derivation patterns observed:**
 - **AtlasNation:** P1 derived its accent (`#4A6E96`) by darkening the chosen primarySurface color (`intel` = `#6B94C8`) by ~30%. P3 picked a warm orange (`#C16E2A`) independent of its primarySurface (`rule` = `#E88938`) but still in the warm family.
@@ -130,16 +130,16 @@ This was the v2 schema bump on 2026-04-27 — discovered during P2 build, not pr
 
 ## 5. P1 — AtlasINTEL.fyi (precedent: AtlasNation Cat 1 baseline)
 
-**File:** `src/lib/pillars/atlasintel.ts`
+**File:** `src/lib/astras/atlasintel.ts`
 
 ```ts
-// AtlasINTEL.fyi pillar config — first Cat 1 pillar (2026-04-27).
+// AtlasINTEL.fyi astra config — first Cat 1 astra (2026-04-27).
 // AtlasNation constellation. Reuses the intel (Forum) surface from TheMANUAL.tech.
-// v1: no copy overrides, no schema changes. Spec: shared/pillar-specs/atlasintel.md.
+// v1: no copy overrides, no schema changes. Spec: shared/astra-specs/atlasintel.md.
 
-import type { PillarConfig } from './pillar.types';
+import type { AstraConfig } from './astra.types';
 
-export const atlasintelPillar: PillarConfig = {
+export const atlasintelAstra: AstraConfig = {
   slug: 'atlasintel',
   hosts: ['atlasintel.fyi', 'www.atlasintel.fyi'],
   wordmark: 'AtlasINTEL',
@@ -154,35 +154,35 @@ export const atlasintelPillar: PillarConfig = {
 
 - AtlasNation constellation, `intel` (Forum) primary surface
 - No `wordmarkShort` — `AtlasINTEL` is display-stable when uppercased
-- Accent derived as a darker variant of the INTEL surface color (`#6B94C8` → `#4A6E96`, ~30% darker) — recommended derivation when reusing a surface color for an AtlasNation pillar
+- Accent derived as a darker variant of the INTEL surface color (`#6B94C8` → `#4A6E96`, ~30% darker) — recommended derivation when reusing a surface color for an AtlasNation astra
 - `copyOverrides: {}` — rides canonical lexicon
 
 **Why the build was autonomous:**
 
-- Spec file (`shared/pillar-specs/atlasintel.md`) was complete before build
-- Schema (`PillarConfig`) was already defined from prior planning
+- Spec file (`shared/astra-specs/atlasintel.md`) was complete before build
+- Schema (`AstraConfig`) was already defined from prior planning
 - Registry pattern was scaffolded (registry.ts importing the new config + appending to array)
 - No new surface needed (`intel` already existed in `surfaces.ts`)
 - No copy overrides needed
 - All decisions were locked at spec time → Code had zero ambiguity
 
-**Replicate this pattern:** any future Cat 1 pillar with no copy overrides and an existing surface should be a fully autonomous Code build.
+**Replicate this pattern:** any future Cat 1 astra with no copy overrides and an existing surface should be a fully autonomous Code build.
 
 ---
 
 ## 6. P2 — Rebelution.fyi (precedent: HoneyComb Cat 1, dual-wordmark)
 
-**File:** `src/lib/pillars/rebelution-fyi.ts`
+**File:** `src/lib/astras/rebelution-fyi.ts`
 
 ```ts
-// Rebelution.fyi pillar config — second Cat 1 pillar (2026-04-27).
+// Rebelution.fyi astra config — second Cat 1 astra (2026-04-27).
 // HoneyComb constellation. Reuses the intel (Forum) surface from TheMANUAL.tech.
 // Dual-wordmark: expanded header shows 'Intelligence'; collapsed/menu shows 'INTEL'.
-// v1: no copy overrides, no schema changes. Spec: shared/pillar-specs/rebelution-fyi.md.
+// v1: no copy overrides, no schema changes. Spec: shared/astra-specs/rebelution-fyi.md.
 
-import type { PillarConfig } from './pillar.types';
+import type { AstraConfig } from './astra.types';
 
-export const rebelutionFyiPillar: PillarConfig = {
+export const rebelutionFyiAstra: AstraConfig = {
   slug: 'rebelution-fyi',
   hosts: ['rebelution.fyi', 'www.rebelution.fyi'],
   wordmark: 'Intelligence',
@@ -207,18 +207,18 @@ export const rebelutionFyiPillar: PillarConfig = {
 - Different constellation (`honeycomb` vs `atlasnation`)
 - `wordmarkShort` set (P1 omits it)
 - Accent picked from the HoneyComb pool, not derived from the surface color
-- Slug uses TLD-disambiguating suffix (`'rebelution-fyi'`) — pattern for any pillar where the bare brand name might collide with future variants on different TLDs
+- Slug uses TLD-disambiguating suffix (`'rebelution-fyi'`) — pattern for any astra where the bare brand name might collide with future variants on different TLDs
 
 ---
 
 ## 7. P3 — AtlasUNITED.fyi (precedent: cross-surface, scaffolded)
 
-**File:** `src/lib/pillars/atlasunited.ts`
+**File:** `src/lib/astras/atlasunited.ts`
 
 ```ts
-import type { PillarConfig } from './pillar.types';
+import type { AstraConfig } from './astra.types';
 
-export const atlasunitedPillar: PillarConfig = {
+export const atlasunitedAstra: AstraConfig = {
   slug: 'atlasunited',
   hosts: ['atlasunited.fyi', 'www.atlasunited.fyi'],
   wordmark: 'AtlasUNITED',
@@ -231,7 +231,7 @@ export const atlasunitedPillar: PillarConfig = {
 
 **Pattern notes:**
 
-- First Cat 1 pillar to use a primary surface other than `intel` — uses `rule` (Events; Social group; Tier 1)
+- First Cat 1 astra to use a primary surface other than `intel` — uses `rule` (Events; Social group; Tier 1)
 - AtlasNation constellation, like P1 — proves the cloning pattern works across surfaces within a single constellation
 - No `wordmarkShort` — `AtlasUNITED` follows the AtlasXXX display-stable-uppercase pattern
 - Accent: warm orange (`#C16E2A`), distinct from P1's steel blue — both AtlasNation, accent rotation pool needs separation
@@ -240,16 +240,16 @@ export const atlasunitedPillar: PillarConfig = {
 
 **Follow-up gaps (flagged for Butch):**
 
-- The pillar config file lacks the leading comment block that P1 and P2 carry (no provenance line, no surface justification, no v1 caveat, no spec link). Future builds should match P1/P2 commenting style. Consider patching `atlasunited.ts` to add the missing header before P3 ships.
-- The header comment in `pillar.types.ts` v2 only mentions `wordmarkShort` for `Rebelution.fyi`. The schema is general — cross-surface pillars (P3+) are valid even though early commit history suggests forum-centric origin. Consider updating the schema header comment to reflect P3 precedent.
+- The astra config file lacks the leading comment block that P1 and P2 carry (no provenance line, no surface justification, no v1 caveat, no spec link). Future builds should match P1/P2 commenting style. Consider patching `atlasunited.ts` to add the missing header before P3 ships.
+- The header comment in `astra.types.ts` v2 only mentions `wordmarkShort` for `Rebelution.fyi`. The schema is general — cross-surface astras (P3+) are valid even though early commit history suggests forum-centric origin. Consider updating the schema header comment to reflect P3 precedent.
 
 ---
 
 ## 8. What needs to happen next (Phase C dependency)
 
-Cat 1 mass-build (8 remaining pillars) is **blocked on Phase C** — shared infrastructure that this doc presumes exists:
+Cat 1 mass-build (8 remaining astras) is **blocked on Phase C** — shared infrastructure that this doc presumes exists:
 
-- Pillar config loader (already in `registry.ts`)
+- Astra config loader (already in `registry.ts`)
 - Sidebar/header surface (already in `SiteHeader`)
 - Spine strips (in progress)
 - Geo lens (not yet started)
@@ -261,13 +261,13 @@ Once Phase C ships, this doc should be cross-referenced from Phase C's anchor do
 
 ## 9. Reference pointers
 
-- **PillarConfig schema:** `src/lib/pillars/pillar.types.ts` (v2 as of 2026-04-27)
-- **Pillar registry:** `src/lib/pillars/registry.ts` (append-only)
+- **AstraConfig schema:** `src/lib/astras/astra.types.ts` (v2 as of 2026-04-27)
+- **Astra registry:** `src/lib/astras/registry.ts` (append-only)
 - **Surface library:** `src/lib/surfaces.ts`
-- **MMF v2.2 §6** — Pillar Constellation (canonical source for pillar slots)
-- **MMF v2.2 §6.2** — Pillar build categories (Cat 1 definition)
+- **MMF v2.2 §6** — Astra Constellation (canonical source for astra slots)
+- **MMF v2.2 §6.2** — Astra build categories (Cat 1 definition)
 - **MMF v2.2 §25** — BRANDoSOPHIC + Skinning (skin substrate)
-- **Pillar specs:** `shared/pillar-specs/{slug}.md` (per-pillar prerequisite)
+- **Astra specs:** `shared/astra-specs/{slug}.md` (per-astra prerequisite)
 
 ---
 
@@ -276,7 +276,7 @@ Once Phase C ships, this doc should be cross-referenced from Phase C's anchor do
 - **HONEYCOMB RING** — never "Hive"
 - **All-caps middle word** — `TheMANUAL.tech`, `AtlasORACLE.to`, `AtlasINTEL.fyi`, `AtlasUNITED.fyi`
 - **BRANDoSOPHIC** — lowercase 'o'
-- **Pillar slug** — lowercase, hyphenated for multi-word (e.g. `'rebelution-fyi'`)
+- **Astra slug** — lowercase, hyphenated for multi-word (e.g. `'rebelution-fyi'`)
 - **Wordmark casing is load-bearing** — match brand exactly, do not normalize
 
 ---

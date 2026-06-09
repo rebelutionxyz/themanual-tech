@@ -3,6 +3,7 @@ import { LogOut, Crown, Sparkles } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { ProfileLocationEditor } from '@/components/profile/ProfileLocationEditor';
+import { getOGGeneration, getOGDisplayLabel } from '@/lib/og-generation';
 
 const BLING_RANK_NAMES = [
   'Seed', 'Sprout', 'Sapling', 'Ranger', 'Scout', 'Squire', 'Knight', 'Protector',
@@ -37,6 +38,7 @@ export function ProfilePage() {
   const rankName = BLING_RANK_NAMES[Math.min(blingRank, 32)];
   const ringName = RING_NAMES[Math.min(ring, 8)];
   const nextRingThreshold = ring < 8 ? RING_THRESHOLDS[ring + 1] : null;
+  const ogLabel = getOGDisplayLabel(getOGGeneration(bee.createdAt));
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10 md:px-8">
@@ -58,6 +60,16 @@ export function ProfilePage() {
           >
             Ringbearer · {ringName}
           </p>
+          <div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-honey/40 bg-honey/10 px-2 py-0.5">
+            <Sparkles size={11} className="text-honey" />
+            <span
+              className="font-mono uppercase tracking-wider text-honey"
+              style={{ fontSize: '10.5px' }}
+              data-size="meta"
+            >
+              {ogLabel}
+            </span>
+          </div>
         </div>
         <button
           type="button"
