@@ -8,8 +8,8 @@ import {
   type SurfaceDef,
 } from '@/lib/surfaces';
 import { cn } from '@/lib/utils';
-import { usePillar } from '@/lib/pillars/PillarContext';
-import { PILLAR_REGISTRY } from '@/lib/pillars/registry';
+import { useAstra } from '@/lib/astras/AstraContext';
+import { ASTRA_REGISTRY } from '@/lib/astras/registry';
 import { SidebarPromotedSlot } from '@/components/promotions/SidebarPromotedSlot';
 
 // Deterministic-from-string hash so the accent rotation is stable on a given
@@ -37,7 +37,7 @@ function hashString(s: string): number {
 export function PlatformRail() {
   const location = useLocation();
   const navigate = useNavigate();
-  const pillar = usePillar();
+  const astra = useAstra();
   const activeSlug =
     location.pathname.length > 1 ? location.pathname.slice(1).split('/')[0] : null;
 
@@ -50,32 +50,32 @@ export function PlatformRail() {
   const railRef = useRef<HTMLDivElement>(null);
 
   // Per MMF §15.1: right-rail accent rotates through the active constellation's
-  // pillar pool on page change. Deterministic-by-surface so it doesn't jitter
+  // astra pool on page change. Deterministic-by-surface so it doesn't jitter
   // mid-render but cycles as Bees navigate.
   const constellationAccent = useMemo(() => {
-    const constellation = pillar?.constellation ?? 'honeycomb';
-    const pool = PILLAR_REGISTRY
+    const constellation = astra?.constellation ?? 'honeycomb';
+    const pool = ASTRA_REGISTRY
       .filter((p) => p.constellation === constellation)
       .map((p) => p.accent);
     if (pool.length === 0) return '#FAD15E'; // honey fallback (shouldn't hit)
     const seed = activeSlug ?? 'home';
     return pool[hashString(seed) % pool.length];
-  }, [pillar?.constellation, activeSlug]);
+  }, [astra?.constellation, activeSlug]);
 
   // Hover expands the rail (desktop only). Click toggle pins.
   const expandedEffective = expanded || hoverExpanded;
 
-  // Dispatch bling-hop on rail-open transition. Gated on pillar !== null —
-  // only signal pillar-ID motion when there's a pillar to identify.
+  // Dispatch bling-hop on rail-open transition. Gated on astra !== null —
+  // only signal astra-ID motion when there's a astra to identify.
   // (Read C clarification, Code 17 plan May 7.)
   const wasOpenRef = useRef(false);
   useEffect(() => {
     const isOpen = expandedEffective || drawerOpen;
-    if (isOpen && !wasOpenRef.current && pillar) {
+    if (isOpen && !wasOpenRef.current && astra) {
       window.dispatchEvent(new CustomEvent('bling-hop'));
     }
     wasOpenRef.current = isOpen;
-  }, [expandedEffective, drawerOpen, pillar]);
+  }, [expandedEffective, drawerOpen, astra]);
 
   // Popups only apply in COLLAPSED mode (not expanded and not hover-expanded)
   const popupSlug = !expanded && !hoverExpanded ? pinnedSlug ?? hoveredSlug : null;

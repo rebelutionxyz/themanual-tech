@@ -1,32 +1,32 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
-import { usePillar, useCopy } from '@/lib/pillars/PillarContext';
+import { useAstra, useCopy } from '@/lib/astras/AstraContext';
 import { ManualLogo } from '@/components/ui/ManualLogo';
 import { HoneyDrop } from '@/components/ui/HoneyDrop';
 import { UtilityChrome } from './UtilityChrome';
 
 export function SiteHeader() {
   const { configured } = useAuth();
-  const pillar = usePillar();
-  const wordmark = pillar?.wordmark ?? 'The Manual';
+  const astra = useAstra();
+  const wordmark = astra?.wordmark ?? 'The Manual';
   // wordmarkShort: explicit value from config, or derive from full wordmark via toUpperCase().
   // Fallback ensures AtlasINTEL.fyi (no wordmarkShort set) produces 'ATLASINTEL'.
-  const wordmarkShort = pillar
-    ? (pillar.wordmarkShort ?? pillar.wordmark.toUpperCase())
+  const wordmarkShort = astra
+    ? (astra.wordmarkShort ?? astra.wordmark.toUpperCase())
     : 'The Manual';
-  const accentColor = pillar?.accent;
+  const accentColor = astra?.accent;
 
   /* data-bees-label is a verification artifact for Component B's useCopy()
-     mechanism. On HoneyComb pillars (and foundation), expect 'Bees'. On
-     AtlasNation pillars (atlasintel.fyi, atlasunited.fyi), expect 'Members'.
+     mechanism. On HoneyComb astras (and foundation), expect 'Bees'. On
+     AtlasNation astras (atlasintel.fyi, atlasunited.fyi), expect 'Members'.
      The attribute is intentionally non-rendering — full lexicon swap sweep
      is queued as a separate Component B follow-up. */
   const beesLabel = useCopy('Bees');
 
   // BLiNG! drop hop animation. Listens for `bling-hop` events dispatched by
-  // PlatformRail when the rail expands on a pillar host (Read C clarification).
-  // Drop is always visible; animation gated upstream by pillar presence.
+  // PlatformRail when the rail expands on a astra host (Read C clarification).
+  // Drop is always visible; animation gated upstream by astra presence.
   const [hopping, setHopping] = useState(false);
   useEffect(() => {
     const onHop = () => {
@@ -46,7 +46,7 @@ export function SiteHeader() {
       className="sticky top-0 z-40 border-b border-border bg-bg/95 backdrop-blur-md"
       data-bees-label={beesLabel}
     >
-      {/* Pillar accent stripe — additive on pillar hosts only, invisible on themanual.tech */}
+      {/* Astra accent stripe — additive on astra hosts only, invisible on themanual.tech */}
       {accentColor && (
         <span
           aria-hidden
@@ -70,7 +70,7 @@ export function SiteHeader() {
           <span className="font-display text-sm font-semibold tracking-widest text-text-silver-bright sm:hidden">
             {wordmarkShort}
           </span>
-          {/* BLiNG! drop — brand identity (always present), pillar-ID motion when rail opens */}
+          {/* BLiNG! drop — brand identity (always present), astra-ID motion when rail opens */}
           <HoneyDrop size={14} hopping={hopping} className="ml-0.5" />
         </Link>
 

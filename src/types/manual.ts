@@ -36,7 +36,7 @@ export interface Atom {
   isLeaf: boolean;
   themeTags: string[];
   realmTags: string[];
-  pillarTags: string[];
+  astraTags: string[];
   skinTags: string[];
   geo?: Record<string, unknown> | null;
   note?: string | null;

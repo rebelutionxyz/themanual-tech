@@ -5,7 +5,7 @@
 // 38 Astras across 7 categories. Constellation hubs + director persona
 // surfaces are NOT Astras and live in their own arrays below.
 
-import { PILLAR_REGISTRY } from '@/lib/pillars/registry';
+import { ASTRA_REGISTRY } from '@/lib/astras/registry';
 
 export type AstraCategory =
   | 'core'
@@ -46,7 +46,7 @@ export const ASTRA_STATUS_COLOR: Record<AstraStatus, { bg: string; text: string 
 };
 
 // 38 Astras per canon v1. Status field reflects canon-stated status; runtime
-// cross-reference with PILLAR_REGISTRY upgrades to 'live' when hosts intersect.
+// cross-reference with ASTRA_REGISTRY upgrades to 'live' when hosts intersect.
 export const ASTRA_CATALOG: AstraCatalogEntry[] = [
   // ─── Core (3) ───────────────────────────────────────────────────────
   { slug: 'atlasoracle',   wordmark: 'AtlasORACLE',     category: 'core', hosts: ['AtlasOracle.to'],                     status: 'scaffolded', director: 'Ryan Matta',     description: 'AI router/dispatcher — every Astra calls AtlasORACLE for AI features.' },
@@ -116,13 +116,13 @@ export const CONSTELLATION_HUBS: ConstellationHub[] = [
 ];
 
 // ─── Runtime effective status ────────────────────────────────────────
-// Cross-references the canon-stated status with PILLAR_REGISTRY: if any
-// host in PILLAR_REGISTRY's configs matches any host on this Astra, mark
-// it 'live' regardless of canon status (PillarConfig present = renderable).
+// Cross-references the canon-stated status with ASTRA_REGISTRY: if any
+// host in ASTRA_REGISTRY's configs matches any host on this Astra, mark
+// it 'live' regardless of canon status (AstraConfig present = renderable).
 export function effectiveStatus(entry: AstraCatalogEntry): AstraStatus {
   if (entry.status === 'live') return 'live';
   const liveHosts = new Set(
-    PILLAR_REGISTRY.flatMap((p) => p.hosts.map((h) => h.toLowerCase())),
+    ASTRA_REGISTRY.flatMap((p) => p.hosts.map((h) => h.toLowerCase())),
   );
   const intersects = entry.hosts.some((h) => liveHosts.has(h.toLowerCase()));
   return intersects ? 'live' : entry.status;
