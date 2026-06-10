@@ -1,60 +1,56 @@
-# Session Close Handoff — 2026-06-06
-*prod: themanual-tech (anxmqiehpyznifqgskzc). Everything below verified from prod this session.*
+# HONEYCOMB — Session Handoff
 
-## 🔴 FIRST THING NEXT SESSION — protect the data (Butch's stated worry)
-Migrations + canon are safe (GitHub repo, squashed+merged today; prod ledger). But the ATOM DATA
-(5,565 hand-built atoms) is only as safe as the last backup run. BEFORE any new work next session:
-1. VERIFY the backup tiers actually ran: Tier-2 (GitHub Actions weekly), Tier-3 (Windows scheduled
-   task, Sundays), and confirm the USB cold-storage copy date. Don't assume — check the actual run logs.
-2. Take a FRESH point-in-time data export (pg_dump of atoms + economy tables, or Supabase dashboard
-   backup) and store it off-prod. Migrations rebuild STRUCTURE, not hand-built CONTENT.
-3. Consider Supabase Pro scheduled backups / PITR if not already on (was flagged pending).
-This is the one real risk to "we've built a lot, I'd hate to lose it." Close it first.
+**Date:** 2026-06-10 (later session)
+**Arc:** Stripe F6 — subscription webhook → `subscription_sync()`, shipped live & verified
+**Supabase:** `anxmqiehpyznifqgskzc` (prod) · slate certified clean · `total_supply = 0` · `economy_integrity_check()` → `ok: true`
+**Launch:** July 4 2026 soft beta · Sep 11 2026 full Swarm
 
-## What got DONE + VERIFIED today
-- **Manual spine COMPLETE**: 5,565 atoms, 14 realms, 0 orphans, 0 dupes, 0 cruft. Consolidation done (4 deletes).
-- **Canonical text links**: 18 live, every URL fetch-verified. ~41 text-atoms null (fine, future pass).
-- **Security pass — ZERO ERROR lints**:
-  - Money RPCs: anon=0 (REVOKE; verified). Internal auth.uid() guards confirmed sound.
-  - manual_groups (create/join/leave): anon=0, sign-in only.
-  - question_bank_public: security_invoker + column-grants; answer key (correct_idx) protected.
-  - atoms_backup_2026_05_19: DROPPED (stale 5,011-row snapshot).
-  - bee_id leak (manual-atom-sources edge fn): FIXED + DEPLOYED v2 (returns handle/name, no bee_id). Verified live.
-  - function_search_path ×3: hardened (Code).
-  - Confirm-intent items (pg_trgm, atom_trending matviews, atlasoracle_canon_reads): all verified, left as-is intentionally.
-- **Git**: squashed + merged. Repo == prod.
-- **Migration ledger**: fully reconciled, 1 file per prod version, incl. June-2 batch renames + the fix_join_code backfill.
+---
 
-## Open / Butch-side
-- **Leaked-password protection**: Auth dashboard toggle — Butch's switch (can't be done via tooling).
-- **Edge-fn cosmetic**: manual-atom-sources deployed with a doubled `source/source/` path — works fine,
-  optional clean redeploy from repo someday. ("We'll fix it.")
-- **Live-count display**: fix is in repo (useAtomCount.ts), committed; live themanual.tech won't show
-  the right count until push+deploy. Deferred ("may eliminate altogether").
+## What this session shipped
 
-## FreedomBLiNGS (phase 1 done; phase 2 scoped)
-- whitepaper-v2.1.md: reconciled to canon (product surfaces fixed, 28-count softened to aspirational),
-  economics verified against prod. Save over v2.0.
-- astra-domain-registry.md: locked source of truth, 25 surfaces.
-- freedomblings-design-foundation.md: bare brief for Design (mechanics deferred).
-- freedomblings-phase2-scope.md: maps phase-2 detail pack. NEW today: **BLiNG! DNA issuing-bucket
-  provenance rule** — each BLiNG! tracks which Treasury bucket it was most recently issued from
-  (Howey-relevant; verify whether bling_transactions source_type/source_ref already does this or a
-  new last-issued-bucket stamp is needed). Phase 2 = read every bling_* table from prod before specing.
+**F6 — `stripe-subscription-webhook` — LIVE (v3, ACTIVE, `verify_jwt=false`).** The first Stripe edge function. Subscription lifecycle + `invoice.paid` → `subscription_sync()`. Fiat-in services-only; payer never credited BLiNG!; affiliate reward freed from the Reserve on paid periods only.
 
-## Build tracks queued for Code (gated/deferred)
-- **Entity bulk-import**: BLOCKED — the spec `justice-entity-bulk-import-spec.md` does NOT exist in the
-  tree (Code searched). Next step: either Butch points to it (OG Claude chat / Drive) OR Claude authors
-  it as a draft from the design brief + the 5 existing society_*_entity_harvest migrations as precedent,
-  Butch ratifies, then dev-branch run. create_branch now available.
-- **Justice UI**: hand justice-design-brief-v2-full.md to Design (entities live in home realms as neutral
-  atoms; Justice = runtime lens/post-tagging).
+1. **Migration applied (prod):** `20260610125331_bees_stripe_customer_id` — adds `bees.stripe_customer_id` + partial-unique index (Stripe customer ↔ Bee cache).
+2. **F6 built for `2026-03-25.dahlia`:** reads moved fields (`items[].current_period_end`, `invoice.parent.subscription_details.subscription`); for `invoice.paid` retrieves the subscription once and reads everything off it.
+3. **Classification fallback:** `product_type`/`tier` from Price metadata → falls back per-key to Product metadata (locked Prices can't take new metadata).
+4. **Two-layer idempotency:** `stripe_events.event_id` (event-level, self-healing at `processed`) + deterministic `invoiceRef` uuid (invoice-level, via `affiliate_holds.source_ref`). Upline freed exactly once per paid invoice.
+5. **Real-status fix:** `invoice.paid` records the true subscription status (trial $0 invoice stays `trialing`, never trips `one-active-per-product`).
+6. **Stripe config (Butch):** new `Your account` destination, 4 events (`customer.subscription.{created,updated,deleted}`, `invoice.paid`), Snapshot payloads. Secrets `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET_SUBSCRIPTION` set.
 
-## Standing rules reaffirmed
-- No Assertions From Memory: deep-read source before asserting any platform fact. Earned its keep
-  repeatedly today (caught Code's partial revoke, the PUBLIC-vs-direct grant distinction both ways,
-  a money-RPC false alarm, bad proof-set URLs).
-- EXECUTE-REVOKE: read proacl first. PUBLIC grant (`=X`) → REVOKE FROM PUBLIC; role grant (`anon=X`)
-  → REVOKE FROM anon. (Code saved this to memory.)
-- Clean lanes: for a given batch, EITHER chat applies via MCP + backfills, OR Code does — not both.
-- git push = Butch only.
+## Deployed / applied via MCP this session
+
+| kind | what |
+|---|---|
+| migration | 20260610125331 bees_stripe_customer_id |
+| edge fn | stripe-subscription-webhook v1 → v2 (product-metadata fallback) → v3 (real status) |
+
+Canon to commit: `stripe-f6-subscription-rail-v1.md`, `mmf-insert-stripe-fiat-f6.md` (slot into MMF fiat/Exchange §).
+
+## Repo sync (Code)
+
+Commit the F6 set (live == these bytes); rename the migration file to the `20260610125331` version. Do **not** `supabase db push` / `functions deploy` (applied/deployed via MCP).
+- `TheMANUAL.tech/supabase/functions/stripe-subscription-webhook/index.ts`
+- `TheMANUAL.tech/supabase/functions/_shared/{stripe,cors,supabase,ids}.ts`
+- `TheMANUAL.tech/supabase/migrations/20260610125331_bees_stripe_customer_id.sql`
+
+## Verified clean
+
+`stripe_events 0 · subscriptions 0 · affiliate_holds 0 · total_supply 0 · integrity ok`. Test trial-subscription ran the full path (both events processed, product+Bee resolved, customer pinned, row upserted, **no** affiliate on $0), then all test artifacts were wiped.
+
+## GO-LIVE checklist (carry forward — do NOT do pre-launch)
+
+- **Delete the Stripe test customer/subscription** (`cus_…`, `sub_1Tgndk…`) at go-live — Butch's call, deliberately deferred.
+- **Retire the legacy `FreedomBLiNGs!` destination** — disable→delete once F6 has carried live traffic.
+- **Stage-2 validation:** real affiliate freeing (`amount > 0`) as a conscious economy-on rehearsal, not against the clean slate.
+
+## Next arc (fresh session) — F5, the Fountain
+
+Crowdfunding, **one-time / charge-at-close — not a subscription.** Build order:
+1. **DB layer first** (the real work): pledges/contributions table, AON/KWYR close+settle RPC (reward freed from Reserve), Express Connect payout linkage, charge-at-close Pattern B.
+2. **Then F5 edge function** (`payment_intent.*` / Connect events) on top.
+`give_campaigns` exists but has no financial columns yet — that's where the DB layer lands.
+
+## Still open (unchanged)
+
+Thermostat pool sizes (Economic-Constitution values); wire `record_drop`/`record_drip`; daily `pg_cron` for `economy_integrity_check()`; tier taxonomy → `subscriptions.tier` CHECK; ops funding execution from Treasury at end-of-build.
