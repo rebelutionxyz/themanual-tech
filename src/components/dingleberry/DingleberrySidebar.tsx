@@ -32,7 +32,7 @@ const NAV: NavItem[] = [
   { key: 'dispatch', icon: 'zap', label: 'Dispatch auth', count: '3.4k', to: '/dingleberry/dispatch' },
   { key: 'threat', icon: 'shieldCheck', label: 'Threat interception', count: '1', to: '/dingleberry/threat' },
   { key: 'mesh', icon: 'network', label: 'Member mesh', count: '4.1k', to: '/dingleberry/mesh' },
-  { key: 'karma', icon: 'scale', label: 'Karma Credit', count: 'AI', to: '/dingleberry/karma' },
+  { key: 'karma', icon: 'scale', label: 'Karma Read', count: 'AI', to: '/dingleberry/karma' },
   { key: 'godark', icon: 'wifiOff', label: 'Go Dark monitor', count: '', to: '/dingleberry/godark' },
 ];
 

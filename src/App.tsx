@@ -18,6 +18,7 @@ import { ThreatInterceptionPage } from '@/pages/dingleberry/ThreatInterceptionPa
 import { InfraHealthPage } from '@/pages/dingleberry/InfraHealthPage';
 import { MemberMeshPage } from '@/pages/dingleberry/MemberMeshPage';
 import { KarmaCreditPage } from '@/pages/dingleberry/KarmaCreditPage';
+import { JusticeHandoffPage } from '@/pages/dingleberry/JusticeHandoffPage';
 import { DrillPlaceholder } from '@/pages/dingleberry/DrillPlaceholder';
 import { LoginPage } from '@/pages/LoginPage';
 import { ProfilePage } from '@/pages/ProfilePage';
@@ -131,7 +132,7 @@ function AppContent() {
             <Route path="karma" element={<KarmaCreditPage />} />
             <Route path="godark" element={<DrillPlaceholder slug="godark" />} />
             <Route path="oracle" element={<AtlasOraclePage />} />
-            <Route path="justice" element={<DrillPlaceholder slug="justice" />} />
+            <Route path="justice" element={<JusticeHandoffPage />} />
           </Route>
 
           {/* Waves surface — Mini Waves V76 embedded via iframe */}

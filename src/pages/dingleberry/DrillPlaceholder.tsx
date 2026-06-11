@@ -34,7 +34,7 @@ export const SCREEN_META: Record<string, ScreenMeta> = {
     count: (d) => `${d.threatInterception.threats.length} threats` },
   mesh: { icon: 'network', name: 'Member mesh', live: 'Mock-only · Phase-2 device-sharing (do not fake a backend)',
     count: (d) => `${d.memberMesh.layers.length} layers` },
-  karma: { icon: 'scale', name: 'Karma Credit', live: 'Mostly unbuilt — standing tables not yet defined',
+  karma: { icon: 'scale', name: 'Karma Read', live: 'Mostly unbuilt — standing tables not yet defined',
     count: (d) => `${d.karmaCredit.actors.length} actors` },
   godark: { icon: 'wifiOff', name: 'Go Dark monitor', live: 'Derived from mesh-relay health signal',
     count: (d) => d.posture === 'critical' ? 'engaged' : 'standby' },
