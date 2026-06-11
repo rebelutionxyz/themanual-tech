@@ -19,6 +19,7 @@ import {
   Book,
   // Safety
   Shield,
+  ShieldAlert,
   Eye,
   // Services
   Wrench,
@@ -63,7 +64,7 @@ export interface SurfaceDef {
 }
 
 /**
- * The 20 Surfaces of HoneyComb. Currently 20; lockable architecture but
+ * The Surfaces of HoneyComb. Currently 21; lockable architecture but
  * grows when astras graduate (see MMF v2.2 §6.1 footnote).
  * Each entry pairs `name` (canonical UI label, used across both
  * constellations) with `function` (semantic category / MMF taxonomy term).
@@ -239,6 +240,18 @@ export const SURFACES: SurfaceDef[] = [
   },
 
   // ═══ SAFETY ═══
+  {
+    slug: 'dingleberry',
+    name: 'DingleBERRY',
+    function: 'Security Command',
+    description: "The comb's immune system. Posture at a glance across six security surfaces.",
+    purpose:
+      'DingleBERRY watches the platform: infra health, transaction integrity, source verification, shill/abuse detection, dispatch authority, and threat interception. Funded by @combtreasury.defense.',
+    icon: ShieldAlert,
+    color: '#DC2626',
+    group: 'Safety',
+    tier: 2,
+  },
   {
     slug: 'secure',
     name: 'SECURE',

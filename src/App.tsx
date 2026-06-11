@@ -7,6 +7,9 @@ import { IntelLayout } from '@/pages/intel/IntelLayout';
 import { IntelPage } from '@/pages/intel/IntelPage';
 import { NewThreadPage } from '@/pages/intel/NewThreadPage';
 import { ThreadPage } from '@/pages/intel/ThreadPage';
+import { DingleberryLayout } from '@/pages/dingleberry/DingleberryLayout';
+import { CommandCenterPage } from '@/pages/dingleberry/CommandCenterPage';
+import { DrillPlaceholder } from '@/pages/dingleberry/DrillPlaceholder';
 import { LoginPage } from '@/pages/LoginPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { HandleSettingsPage } from '@/pages/HandleSettingsPage';
@@ -100,6 +103,26 @@ function AppContent() {
             <Route path="mine" element={<IntelPage />} />
             <Route path="new" element={<NewThreadPage />} />
             <Route path="t/:threadId" element={<ThreadPage />} />
+          </Route>
+
+          {/* DingleBERRY surface (SECURITY Astra) — Command Center + drills share
+              DingleberryLayout (own left sidebar persists across screens). STEP-2
+              port: overview is fully ported; drill screens render honest mock
+              placeholders until slices B+ land. Registered before /:slug so the
+              explicit tree wins over the generic SurfacePage, exactly like /intel. */}
+          <Route path="/dingleberry" element={<DingleberryLayout />}>
+            <Route index element={<CommandCenterPage />} />
+            <Route path="infra" element={<DrillPlaceholder slug="infra" />} />
+            <Route path="txn" element={<DrillPlaceholder slug="txn" />} />
+            <Route path="source" element={<DrillPlaceholder slug="source" />} />
+            <Route path="shill" element={<DrillPlaceholder slug="shill" />} />
+            <Route path="dispatch" element={<DrillPlaceholder slug="dispatch" />} />
+            <Route path="threat" element={<DrillPlaceholder slug="threat" />} />
+            <Route path="mesh" element={<DrillPlaceholder slug="mesh" />} />
+            <Route path="karma" element={<DrillPlaceholder slug="karma" />} />
+            <Route path="godark" element={<DrillPlaceholder slug="godark" />} />
+            <Route path="oracle" element={<DrillPlaceholder slug="oracle" />} />
+            <Route path="justice" element={<DrillPlaceholder slug="justice" />} />
           </Route>
 
           {/* Waves surface — Mini Waves V76 embedded via iframe */}
