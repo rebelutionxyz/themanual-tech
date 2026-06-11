@@ -13,7 +13,10 @@ export function getStripe(): Stripe {
   const key = Deno.env.get('STRIPE_SECRET_KEY');
   if (!key) throw new Error('STRIPE_SECRET_KEY missing');
   _stripe = new Stripe(key, {
-    apiVersion: '2024-06-20',
+    // Match the account's webhook delivery version so objects we retrieve
+    // share the same shape as the event payloads (basil+ moved current_period_end
+    // onto items, and the invoice→subscription link to parent.subscription_details).
+    apiVersion: '2026-03-25.dahlia',
     httpClient: Stripe.createFetchHttpClient(),
   });
   return _stripe;

@@ -17,3 +17,13 @@ export async function invoiceRef(stripeInvoiceId: string): Promise<string> {
   const data = new TextEncoder().encode(`stripe_invoice:${stripeInvoiceId}`);
   return await v5.generate(HONEYCOMB_NS, data);
 }
+
+// Generic deterministic ref: v5(HONEYCOMB_NS, `${kind}:${id}`). Same namespace +
+// byte-string convention as invoiceRef (which is exactly refFor('stripe_invoice', id)),
+// so any caller — record_drop/record_drip source_ref, etc. — gets a STABLE uuid that
+// collapses retries / re-fires of the same logical event to one row (dedup preserved,
+// no SQL). SQL mirror for the trigger-lane: uuid_generate_v5(HONEYCOMB_NS, kind || ':' || id::text).
+export async function refFor(kind: string, id: string | number): Promise<string> {
+  const data = new TextEncoder().encode(`${kind}:${id}`);
+  return await v5.generate(HONEYCOMB_NS, data);
+}
