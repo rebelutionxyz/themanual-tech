@@ -16,6 +16,8 @@ import { DispatchAuthPage } from '@/pages/dingleberry/DispatchAuthPage';
 import { AtlasOraclePage } from '@/pages/dingleberry/AtlasOraclePage';
 import { ThreatInterceptionPage } from '@/pages/dingleberry/ThreatInterceptionPage';
 import { InfraHealthPage } from '@/pages/dingleberry/InfraHealthPage';
+import { MemberMeshPage } from '@/pages/dingleberry/MemberMeshPage';
+import { KarmaCreditPage } from '@/pages/dingleberry/KarmaCreditPage';
 import { DrillPlaceholder } from '@/pages/dingleberry/DrillPlaceholder';
 import { LoginPage } from '@/pages/LoginPage';
 import { ProfilePage } from '@/pages/ProfilePage';
@@ -125,8 +127,8 @@ function AppContent() {
             <Route path="shill" element={<ShillDetectionPage />} />
             <Route path="dispatch" element={<DispatchAuthPage />} />
             <Route path="threat" element={<ThreatInterceptionPage />} />
-            <Route path="mesh" element={<DrillPlaceholder slug="mesh" />} />
-            <Route path="karma" element={<DrillPlaceholder slug="karma" />} />
+            <Route path="mesh" element={<MemberMeshPage />} />
+            <Route path="karma" element={<KarmaCreditPage />} />
             <Route path="godark" element={<DrillPlaceholder slug="godark" />} />
             <Route path="oracle" element={<AtlasOraclePage />} />
             <Route path="justice" element={<DrillPlaceholder slug="justice" />} />
