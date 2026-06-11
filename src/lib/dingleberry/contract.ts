@@ -30,7 +30,7 @@ export interface LedgerEntry {
 export interface LedgerAnomaly {
   id: string;              // e.g. LDG-3391
   sev: 'critical' | 'warn' | string;
-  kind: string;            // human label, e.g. "Fiat → BLiNG! sale brokered on-platform"
+  kind: string;            // human label, e.g. "Fiat → BLiNG! exchange brokered on-platform"
   detail: string;
 }
 export interface TransactionSecurityData {

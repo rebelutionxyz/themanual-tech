@@ -28,8 +28,8 @@ export const STREAM_S2 = [
 
 // --- S02-TransactionSecurity :: ANOMALIES ---
 export const ANOMALIES_S2 = [
-  { id: 'LDG-3391', sev: 'critical', kind: 'Fiat → BLiNG! sale brokered on-platform', detail: 'an account was credited BLiNG! against an incoming fiat payment', entry: '0x4f2c…91ad', amt: '8,800', status: 'held',
-    check: 'Path A invariant · no-sale rule', oracle: 'Under Path A the platform never sells BLiNG! — it is only ever earned and freed from the Well. A fiat-for-BLiNG! credit cannot be legitimate, so its mere appearance is the alarm. Held; nothing settled.' },
+  { id: 'LDG-3391', sev: 'critical', kind: 'Fiat → BLiNG! exchange brokered on-platform', detail: 'an account was credited BLiNG! against an incoming fiat payment', entry: '0x4f2c…91ad', amt: '8,800', status: 'held',
+    check: 'Path A invariant · no-exchange rule', oracle: 'Under Path A the platform never sells BLiNG! — it is only ever earned and freed from the Well. A fiat-for-BLiNG! credit cannot be legitimate, so its mere appearance is the alarm. Held; nothing settled.' },
   { id: 'LDG-3390', sev: 'critical', kind: 'Unsanctioned freeing', detail: 'total_supply rose with no sanctioned path behind it', entry: '0x77be…02e1', amt: '50,000', status: 'held',
     check: 'Freeing-path attestation', oracle: 'New BLiNG! appeared without a sanctioned freeing path attached. Every increase in total_supply must trace to Drops/Drips, affiliate_distribute, AtlasOracle credit or HoneyPOT. This one does not — held pending trace.' },
   { id: 'LDG-3387', sev: 'watch', kind: 'Demurrage not applied', detail: 'a tier-2 cohort skipped its 5% demurrage cycle', entry: '0x3a90…ccf2', amt: '—', status: 'review',

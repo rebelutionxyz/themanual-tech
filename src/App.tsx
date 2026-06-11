@@ -9,6 +9,13 @@ import { NewThreadPage } from '@/pages/intel/NewThreadPage';
 import { ThreadPage } from '@/pages/intel/ThreadPage';
 import { DingleberryLayout } from '@/pages/dingleberry/DingleberryLayout';
 import { CommandCenterPage } from '@/pages/dingleberry/CommandCenterPage';
+import { TransactionSecurityPage } from '@/pages/dingleberry/TransactionSecurityPage';
+import { SourceVerificationPage } from '@/pages/dingleberry/SourceVerificationPage';
+import { ShillDetectionPage } from '@/pages/dingleberry/ShillDetectionPage';
+import { DispatchAuthPage } from '@/pages/dingleberry/DispatchAuthPage';
+import { AtlasOraclePage } from '@/pages/dingleberry/AtlasOraclePage';
+import { ThreatInterceptionPage } from '@/pages/dingleberry/ThreatInterceptionPage';
+import { InfraHealthPage } from '@/pages/dingleberry/InfraHealthPage';
 import { DrillPlaceholder } from '@/pages/dingleberry/DrillPlaceholder';
 import { LoginPage } from '@/pages/LoginPage';
 import { ProfilePage } from '@/pages/ProfilePage';
@@ -112,16 +119,16 @@ function AppContent() {
               explicit tree wins over the generic SurfacePage, exactly like /intel. */}
           <Route path="/dingleberry" element={<DingleberryLayout />}>
             <Route index element={<CommandCenterPage />} />
-            <Route path="infra" element={<DrillPlaceholder slug="infra" />} />
-            <Route path="txn" element={<DrillPlaceholder slug="txn" />} />
-            <Route path="source" element={<DrillPlaceholder slug="source" />} />
-            <Route path="shill" element={<DrillPlaceholder slug="shill" />} />
-            <Route path="dispatch" element={<DrillPlaceholder slug="dispatch" />} />
-            <Route path="threat" element={<DrillPlaceholder slug="threat" />} />
+            <Route path="infra" element={<InfraHealthPage />} />
+            <Route path="txn" element={<TransactionSecurityPage />} />
+            <Route path="source" element={<SourceVerificationPage />} />
+            <Route path="shill" element={<ShillDetectionPage />} />
+            <Route path="dispatch" element={<DispatchAuthPage />} />
+            <Route path="threat" element={<ThreatInterceptionPage />} />
             <Route path="mesh" element={<DrillPlaceholder slug="mesh" />} />
             <Route path="karma" element={<DrillPlaceholder slug="karma" />} />
             <Route path="godark" element={<DrillPlaceholder slug="godark" />} />
-            <Route path="oracle" element={<DrillPlaceholder slug="oracle" />} />
+            <Route path="oracle" element={<AtlasOraclePage />} />
             <Route path="justice" element={<DrillPlaceholder slug="justice" />} />
           </Route>
 
