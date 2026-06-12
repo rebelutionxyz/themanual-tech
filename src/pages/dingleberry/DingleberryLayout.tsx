@@ -1,5 +1,6 @@
 import { Outlet, useOutletContext } from 'react-router-dom';
 import { DingleberrySidebar } from '@/components/dingleberry/DingleberrySidebar';
+import { PostureSwitcher } from '@/components/dingleberry/PostureSwitcher';
 import { useDingleberryData } from '@/lib/dingleberry/useDingleberryData';
 import type { DingleberrySnapshot, Posture } from '@/lib/dingleberry/contract';
 
@@ -26,8 +27,18 @@ export function DingleberryLayout() {
   return (
     <div className="flex h-full overflow-hidden">
       <DingleberrySidebar />
-      <main className="min-w-0 flex-1 overflow-y-auto bg-bg">
-        <Outlet context={{ data, posture, setPosture } satisfies DingleberryContextValue} />
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-bg">
+        {/* Shared header — the mock-demo posture switcher is hoisted here so it
+            drives every drill page from one shared state (was overview-only). */}
+        <div className="flex flex-none items-center justify-between gap-3 border-b border-border bg-bg px-6 py-2.5">
+          <span className="font-mono uppercase text-text-muted" style={{ fontSize: 10, letterSpacing: '0.1em' }}>
+            Posture · recolors every surface
+          </span>
+          <PostureSwitcher posture={posture} setPosture={setPosture} />
+        </div>
+        <div className="min-w-0 flex-1 overflow-y-auto">
+          <Outlet context={{ data, posture, setPosture } satisfies DingleberryContextValue} />
+        </div>
       </main>
     </div>
   );

@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { dbIcon } from '@/components/dingleberry/icons';
 import { DbCard, Eyebrow, Spark, StatusPill } from '@/components/dingleberry/primitives';
-import { DATA_BLUE, POSTURE_TONE, TONE } from '@/components/dingleberry/tone';
+import { DATA_BLUE, TONE } from '@/components/dingleberry/tone';
 import type { Posture, Tone } from '@/lib/dingleberry/contract';
 import { useDingleberry } from './DingleberryLayout';
 
@@ -140,46 +140,6 @@ const MESH_LAYERS: MeshLayerDef[] = [
 ];
 
 /* ---- small pieces ---- */
-
-function PostureSwitcher({ posture, setPosture }: { posture: Posture; setPosture: (p: Posture) => void }) {
-  const options: [Posture, string][] = [
-    ['secure', 'Secure'],
-    ['degraded', 'Degraded'],
-    ['critical', 'Go Dark'],
-  ];
-  return (
-    <div className="flex items-center gap-2">
-      <span
-        className="rounded-full border border-dashed border-border-bright px-2 py-0.5 font-mono uppercase text-text-muted"
-        style={{ fontSize: '9px', letterSpacing: '0.1em' }}
-      >
-        sample data
-      </span>
-      <div className="flex overflow-hidden rounded-md border border-border-bright">
-        {options.map(([k, label]) => {
-          const active = posture === k;
-          const tone = TONE[POSTURE_TONE[k]];
-          return (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setPosture(k)}
-              className="border-r border-border-bright px-3 py-1 font-sans transition-colors last:border-r-0"
-              style={{
-                fontSize: '12.5px',
-                fontWeight: active ? 700 : 500,
-                background: active ? tone.tint : 'transparent',
-                color: active ? tone.c : 'var(--text-muted, #6B7580)',
-              }}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 function LoadDots({ load }: { load: number }) {
   return (
@@ -444,7 +404,7 @@ function SectionRule({ children }: { children: ReactNode }) {
 /* ---- page ---- */
 
 export function CommandCenterPage() {
-  const { posture, setPosture } = useDingleberry();
+  const { posture } = useDingleberry();
 
   return (
     <div className="mx-auto" style={{ maxWidth: 1100, padding: '22px 26px 48px' }}>
@@ -460,7 +420,6 @@ export function CommandCenterPage() {
             <b className="text-text">0</b> unverified sources trusted
           </span>
         </div>
-        <PostureSwitcher posture={posture} setPosture={setPosture} />
       </div>
 
       <PostureBanner posture={posture} />

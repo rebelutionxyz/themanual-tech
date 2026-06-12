@@ -19,7 +19,7 @@ import { InfraHealthPage } from '@/pages/dingleberry/InfraHealthPage';
 import { MemberMeshPage } from '@/pages/dingleberry/MemberMeshPage';
 import { KarmaCreditPage } from '@/pages/dingleberry/KarmaCreditPage';
 import { JusticeHandoffPage } from '@/pages/dingleberry/JusticeHandoffPage';
-import { DrillPlaceholder } from '@/pages/dingleberry/DrillPlaceholder';
+import { GoDarkMonitorPage } from '@/pages/dingleberry/GoDarkMonitorPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { HandleSettingsPage } from '@/pages/HandleSettingsPage';
@@ -130,7 +130,7 @@ function AppContent() {
             <Route path="threat" element={<ThreatInterceptionPage />} />
             <Route path="mesh" element={<MemberMeshPage />} />
             <Route path="karma" element={<KarmaCreditPage />} />
-            <Route path="godark" element={<DrillPlaceholder slug="godark" />} />
+            <Route path="godark" element={<GoDarkMonitorPage />} />
             <Route path="oracle" element={<AtlasOraclePage />} />
             <Route path="justice" element={<JusticeHandoffPage />} />
           </Route>

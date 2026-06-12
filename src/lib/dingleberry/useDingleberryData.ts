@@ -61,6 +61,8 @@ export function useDingleberryData() {
         atlasOracle:        { queue: M.QUEUE_AtlasOracle as any },
         // biome-ignore lint/suspicious/noExplicitAny: mock → contract seam
         justiceHandoff:     { evidence: M.EVIDENCE_JusticeHandoff as any },
+        // biome-ignore lint/suspicious/noExplicitAny: AUTHORED mock (no artifact) → contract seam; posture-keyed live telemetry + static history/ceremony
+        goDark:             M.GODARK_GoDark as any,
       };
 
       // ----- LIVE (wire here, screen by screen) ---------------------
