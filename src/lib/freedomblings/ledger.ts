@@ -51,6 +51,13 @@ export function fmtMicros(micros: bigint): string {
   return `${neg ? '-' : ''}${grouped}.${frac}`;
 }
 
+/** Like fmtMicros but drops a .000000 tail — for whole-BLiNG! economy aggregates
+    (cap, well, ops). Keeps 6 decimals only when the fraction is non-zero. */
+export function fmtBling(micros: bigint): string {
+  const full = fmtMicros(micros);
+  return full.endsWith('.000000') ? full.slice(0, -7) : full;
+}
+
 /* ---- transaction taxonomy → member-facing meaning ------------------------ */
 // FREEd = newly FREE'd into the Bee's ledger (issuance).
 const FREED_TYPES = new Set([

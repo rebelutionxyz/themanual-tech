@@ -18,14 +18,14 @@ const LEDGER_NAV: NavDef[] = [
   { id: 'earning', label: 'Earning' },
   { id: 'circulation', label: 'Circulation' },
   { id: 'ledger', label: 'The Ledger', path: '/freedomblings/ledger' },
-  { id: 'openbooks', label: 'The Open Books' },
+  { id: 'openbooks', label: 'The Open Books', path: '/freedomblings/openbooks' },
   { id: 'charter', label: 'The Charter' },
   { id: 'move', label: 'Give · Get · Offer' },
 ];
 
 const MEMBER_NAV: NavDef[] = [
   { id: 'standing', label: 'Standing' },
-  { id: 'gradations', label: 'Gradations' },
+  { id: 'gradations', label: 'Gradations', path: '/freedomblings/gradations' },
   { id: 'commons', label: 'Commons' },
   { id: 'lineage', label: 'Lineage' },
   { id: 'legacy', label: 'Legacy' },
@@ -59,13 +59,21 @@ function NavItem({ n, active, onGo }: { n: NavDef; active: boolean; onGo: (p: st
   );
 }
 
-export function FreedomblingsSidebar() {
+export function FreedomblingsSidebar({ onLaunch }: { onLaunch?: () => void }) {
   const { bee } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const path = pathname.replace(/\/+$/, '');
   const active =
-    path === '/freedomblings/ledger' ? 'ledger' : path === '/freedomblings' ? 'balance' : '';
+    path === '/freedomblings/ledger'
+      ? 'ledger'
+      : path === '/freedomblings/openbooks'
+        ? 'openbooks'
+        : path === '/freedomblings/gradations'
+          ? 'gradations'
+          : path === '/freedomblings'
+            ? 'balance'
+            : '';
   const go = (p: string) => navigate(p);
 
   const handle = bee?.handle ?? null;
@@ -73,8 +81,13 @@ export function FreedomblingsSidebar() {
 
   return (
     <aside className="app-side">
-      {/* brand = constellation launcher (overlay arrives in a later slice) */}
-      <button type="button" className="side-brand sb-launch" title="The HoneyComb constellation">
+      {/* brand = constellation launcher */}
+      <button
+        type="button"
+        className="side-brand sb-launch"
+        title="The HoneyComb constellation"
+        onClick={onLaunch}
+      >
         <Mark size={24} />
         <div className="nm">
           Freedom<b>BLiNGS</b>

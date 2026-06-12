@@ -1063,3 +1063,581 @@
     animation: none;
   }
 }
+
+/* ---- The Open Books (Slice 3) -------------------------------------------- */
+[data-surface="freedomblings"] .ob-live {
+  gap: 8px;
+  white-space: nowrap;
+}
+[data-surface="freedomblings"] .ob-supply {
+  margin-top: 6px;
+  padding: calc(20px * var(--sp)) calc(24px * var(--sp));
+}
+[data-surface="freedomblings"] .ob-supply-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+[data-surface="freedomblings"] .ob-supply-fig {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 7px;
+}
+[data-surface="freedomblings"] .ob-supply-fig .heromark {
+  width: 26px;
+  height: 26px;
+  margin-top: 0;
+}
+[data-surface="freedomblings"] .ob-supply-fig .sacred-num {
+  font-family: var(--font-num);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-size: clamp(20px, 3cqi, 30px);
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+[data-surface="freedomblings"] .palindrome {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 8px;
+}
+[data-surface="freedomblings"] .ob-supply-pct {
+  text-align: right;
+  margin-top: 4px;
+}
+[data-surface="freedomblings"] .ob-supply-pct .num {
+  font-family: var(--font-num);
+  font-size: 30px;
+  font-weight: 500;
+  color: var(--accent-deep);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+[data-surface="freedomblings"] .pct-s {
+  font-size: 16px;
+}
+[data-surface="freedomblings"] .ob-pct-l {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+[data-surface="freedomblings"] .supply-meter {
+  position: relative;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--paper-sunken);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+[data-surface="freedomblings"] .supply-meter i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+}
+[data-surface="freedomblings"] .supply-legend {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-top: 11px;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+[data-surface="freedomblings"] .supply-legend b {
+  color: var(--ink);
+  font-weight: 600;
+}
+[data-surface="freedomblings"] .ob-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+[data-surface="freedomblings"] .ob-stat {
+  padding: calc(15px * var(--sp)) calc(18px * var(--sp));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+[data-surface="freedomblings"] .obs-k {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+[data-surface="freedomblings"] .obs-v {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+[data-surface="freedomblings"] .obs-v .n {
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+[data-surface="freedomblings"] .obs-sub {
+  font-size: 11px;
+  color: var(--ink-ghost);
+}
+[data-surface="freedomblings"] .ob-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 14px;
+  align-items: start;
+}
+[data-surface="freedomblings"] .ob-panel {
+  padding: calc(20px * var(--sp)) calc(22px * var(--sp));
+}
+[data-surface="freedomblings"] .ob-panel h3 {
+  font-family: var(--font-head);
+  font-size: 15px;
+}
+[data-surface="freedomblings"] .ob-panel-sub {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin: 6px 0 16px;
+  line-height: 1.4;
+}
+[data-surface="freedomblings"] .cap-list {
+  display: flex;
+  flex-direction: column;
+}
+[data-surface="freedomblings"] .cap-row {
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+[data-surface="freedomblings"] .cap-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+[data-surface="freedomblings"] .cap-name {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+[data-surface="freedomblings"] .cap-dia {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  transform: rotate(45deg);
+  border-radius: 2px;
+  border: 1.5px solid var(--accent-deep);
+}
+[data-surface="freedomblings"] .cap-dia.fill {
+  background: var(--accent);
+}
+[data-surface="freedomblings"] .cap-dia.out {
+  background: transparent;
+}
+[data-surface="freedomblings"] .cap-dia.ghost {
+  border-color: var(--ink-ghost);
+}
+[data-surface="freedomblings"] .cap-fig {
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+[data-surface="freedomblings"] .cap-fig .cap-u {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-family: var(--font-body);
+}
+[data-surface="freedomblings"] .cap-hint {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 3px;
+  line-height: 1.4;
+}
+[data-surface="freedomblings"] .faucet-list {
+  display: flex;
+  flex-direction: column;
+}
+[data-surface="freedomblings"] .faucet-item {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+[data-surface="freedomblings"] .faucet-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+[data-surface="freedomblings"] .fi-mark {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  transform: rotate(45deg);
+  border-radius: 2px;
+  border: 1.5px solid var(--accent-deep);
+  margin-top: 3px;
+}
+[data-surface="freedomblings"] .fi-k {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 14px;
+}
+[data-surface="freedomblings"] .fi-d {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+[data-surface="freedomblings"] .ob-feed {
+  margin-top: 14px;
+  padding: calc(18px * var(--sp)) calc(22px * var(--sp));
+}
+[data-surface="freedomblings"] .ob-feed-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+[data-surface="freedomblings"] .ob-feed-head h3 {
+  font-family: var(--font-head);
+  font-size: 15px;
+  white-space: nowrap;
+}
+[data-surface="freedomblings"] .ob-feed-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--accent-deep);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+@container (max-width: 720px) {
+  [data-surface="freedomblings"] .ob-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  [data-surface="freedomblings"] .ob-grid {
+    grid-template-columns: 1fr;
+  }
+}
+[data-surface="freedomblings"] .ob-imbalance {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 13px 15px;
+  border-radius: var(--radius);
+  border: 1px solid var(--accent-deep);
+  background: var(--accent-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+[data-surface="freedomblings"] .ob-imbalance .live-dot {
+  margin-top: 4px;
+  background: var(--accent-deep);
+}
+[data-surface="freedomblings"] .ob-imbalance b {
+  font-weight: 600;
+}
+
+/* ---- Honey Gradations (Slice 4) ------------------------------------------ */
+[data-surface="freedomblings"] .commons-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+[data-surface="freedomblings"] .commons-top h1 {
+  font-size: 30px;
+  margin-top: 6px;
+}
+[data-surface="freedomblings"] .commons-top .sub {
+  color: var(--ink-faint);
+  font-size: 13.5px;
+  margin-top: 6px;
+  max-width: 52ch;
+}
+[data-surface="freedomblings"] .commons-tags .pill {
+  white-space: nowrap;
+}
+[data-surface="freedomblings"] .grad-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-top: 6px;
+  align-items: stretch;
+}
+[data-surface="freedomblings"] .grad-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: calc(20px * var(--sp)) calc(20px * var(--sp));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-sm);
+}
+[data-surface="freedomblings"] .grad-card.feature {
+  border-color: var(--accent-deep);
+  box-shadow: 0 0 0 1px var(--accent-deep) inset, var(--shadow);
+}
+[data-surface="freedomblings"] .grad-card.current {
+  background: var(--paper);
+}
+[data-surface="freedomblings"] .grad-tag {
+  position: absolute;
+  top: -9px;
+  left: 18px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: var(--paper-sunken);
+  border: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+}
+[data-surface="freedomblings"] .grad-card.feature .grad-tag {
+  background: var(--accent);
+  border-color: var(--accent-deep);
+  color: #fff;
+}
+[data-surface="freedomblings"] .grad-name {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 18px;
+}
+[data-surface="freedomblings"] .grad-price {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+[data-surface="freedomblings"] .gp-cur {
+  font-family: var(--font-num);
+  font-size: 16px;
+  color: var(--ink-faint);
+  align-self: flex-start;
+  margin-top: 4px;
+}
+[data-surface="freedomblings"] .gp-n {
+  font-size: 40px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+[data-surface="freedomblings"] .gp-cad {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin-left: 4px;
+}
+[data-surface="freedomblings"] .grad-perks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+[data-surface="freedomblings"] .grad-perks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+[data-surface="freedomblings"] .gp-tick {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  margin-top: 4px;
+  transform: rotate(45deg);
+  border-radius: 1px;
+  background: var(--accent);
+  border: 1px solid var(--accent-deep);
+}
+[data-surface="freedomblings"] .grad-btn {
+  appearance: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 11px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--ink);
+}
+[data-surface="freedomblings"] .grad-btn.solid {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+[data-surface="freedomblings"] .grad-btn.ghost {
+  background: transparent;
+  color: var(--ink-faint);
+}
+[data-surface="freedomblings"] .grad-btn[disabled] {
+  cursor: default;
+}
+[data-surface="freedomblings"] .grad-caption {
+  margin-top: 14px;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+/* ---- Constellation launcher (Slice 4) ------------------------------------ */
+[data-surface="freedomblings"] .constel-panel {
+  position: relative;
+  z-index: 1;
+  width: min(720px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 26px 28px;
+  box-shadow: var(--shadow);
+  animation: fbConstelPop 0.3s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+[data-surface="freedomblings"] .astra-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+  gap: 12px;
+}
+[data-surface="freedomblings"] .astra-card {
+  appearance: none;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+  padding: 15px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  cursor: default;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+[data-surface="freedomblings"] .astra-card.steppable {
+  cursor: pointer;
+}
+[data-surface="freedomblings"] .astra-card.steppable:hover {
+  border-color: var(--ink-ghost);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+[data-surface="freedomblings"] .astra-card.current {
+  border-color: var(--accent-deep);
+  background: var(--accent-soft);
+}
+[data-surface="freedomblings"] .ac-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+[data-surface="freedomblings"] .ac-mark {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  transform: rotate(45deg);
+  border-radius: 2px;
+  margin-top: 3px;
+  border: 1.5px solid var(--accent-deep);
+}
+[data-surface="freedomblings"] .astra-card.current .ac-mark {
+  background: var(--accent);
+}
+[data-surface="freedomblings"] .ac-name {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.2;
+  min-width: 0;
+}
+[data-surface="freedomblings"] .ac-role {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+[data-surface="freedomblings"] .ac-here {
+  font-size: 10.5px;
+  color: var(--accent-deep);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+[data-surface="freedomblings"] .astra-status {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  flex: none;
+  margin-top: 2px;
+}
+[data-surface="freedomblings"] .astra-status .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-ghost);
+  flex: none;
+}
+[data-surface="freedomblings"] .astra-status.live {
+  color: var(--accent-deep);
+}
+[data-surface="freedomblings"] .astra-status.live .dot {
+  background: var(--accent);
+}
+[data-surface="freedomblings"] .astra-status.here {
+  color: var(--accent-deep);
+}
+[data-surface="freedomblings"] .astra-status.here .dot {
+  background: var(--accent-deep);
+}
+[data-surface="freedomblings"] .astra-status.soon .dot {
+  background: transparent;
+  border: 1.4px solid var(--ink-ghost);
+  width: 7px;
+  height: 7px;
+}
+[data-surface="freedomblings"] .constel-foot {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11.5px;
+  color: var(--ink-ghost);
+}
+[data-surface="freedomblings"] .constel-foot b {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+[data-surface="freedomblings"] .constel-foot .seal {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  border-radius: 3px;
+  border: 1.5px solid var(--ink-ghost);
+}
