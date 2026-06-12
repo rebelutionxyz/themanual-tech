@@ -334,11 +334,12 @@ export function ShillDetectionPage() {
                   </span>
                 </div>
                 <div className="mb-[11px] text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
-                  Coordinated abuse aimed at accountability isn’t just moderation — it’s evidence. DingleBERRY can hand the
-                  ring, its signals and its timeline to <b>Justice</b> as a Manual Group.
+                  Coordinated abuse aimed at accountability isn’t just moderation — it’s evidence. DingleBERRY packages the
+                  ring, its signals and its timeline into a <b>class-action Docket</b> carried by AtlasADVOCATE; affected
+                  members are pointed to it and each opts in.
                 </div>
                 <ActionButton variant="danger" icon="scale">
-                  Refer ring to Justice
+                  Open class-action Docket
                 </ActionButton>
                 <div className="mt-2">
                   <ActionCaption />

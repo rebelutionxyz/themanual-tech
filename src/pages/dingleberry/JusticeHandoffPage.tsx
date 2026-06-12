@@ -1,22 +1,25 @@
 /* DingleBERRY — Justice Handoff (detector → venue seam).
    ------------------------------------------------------------
    DingleBERRY surfaces the collective-harm angle, packages the evidence, and
-   FILES a Manual Group into The Manual's Justice REALM (the record). The legal
-   venue/actor that carries the case forward is AtlasADVOCATE. DingleBERRY never
-   runs the group and is not the court.
+   OPENS a class-action Docket; affected members are pointed to it and EACH OPTS
+   IN (nobody is enrolled). AtlasADVOCATE — the legal Astra — carries the case
+   forward; the docket record is auto-filed in The Manual's Justice REALM (a
+   permanent public record). DingleBERRY never runs the docket and is not the
+   court.
 
-   CANON (per §6.6.1 / §6.6.2): "Justice" here is a taxonomy REALM (the record's
-   home), NOT an Astra. The legal Astra is AtlasADVOCATE. The artifact carried
-   some "Justice-as-venue" phrasing ("Justice is where you act", "proceeds
-   entirely in Justice"); that has been aligned to realm = record, AtlasADVOCATE
-   = venue. (Rebelution.app is NOT the legal hub — the actor is AtlasADVOCATE.)
+   CANON (per §6.6.1 / §6.6.2 / §6.6.3 Docket model): "Justice" here is a
+   taxonomy REALM (the record's home), NOT an Astra. The legal Astra is
+   AtlasADVOCATE (justice system + attorney marketplace). The §6.6.3 Docket model
+   supersedes the earlier "Manual Group" framing: this is a class-action Docket
+   that members OPT INTO, not a group they join. (Rebelution.app is NOT the legal
+   hub — the actor is AtlasADVOCATE.)
 
    Ported from the artifact's JusticeHandoff screen and re-skinned to the
    Slice-A..F conventions. STEP-2: the evidence list is fed by useDingleberry()/
    contract (JusticeHandoffData); the Justice-realm record preview (EntityHeader
    + CaseCard) is shell-baked demo content. Never touches Supabase. No posture
-   gating. The "file Manual Group" control is a WRITE (creates a Justice-realm
-   record) → inert + Step-4 captioned. */
+   gating. The "open class-action Docket" control is a WRITE (creates a
+   Justice-realm record) → inert + Step-4 captioned. */
 import { useNavigate } from 'react-router-dom';
 import { dbIcon } from '@/components/dingleberry/icons';
 import { ActionButton, ActionCaption, DbCard, Eyebrow } from '@/components/dingleberry/primitives';
@@ -67,7 +70,7 @@ function RecordPreview() {
         <div className="rounded-md border border-border bg-bg-panel" style={{ padding: '13px 14px' }}>
           <div className="mb-[6px] flex flex-wrap items-center gap-2">
             <span className="font-mono text-text-muted" style={{ fontSize: 11 }}>
-              JX-MESHUTILS-001
+              DKT-MESHUTILS-001
             </span>
             <span
               className="rounded-full font-mono font-bold uppercase"
@@ -81,7 +84,7 @@ function RecordPreview() {
           </div>
           <div className="mt-[5px] text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
             A maintained dependency was hijacked to inject a crypto-miner into every site that pulled the update.
-            DingleBERRY detected and blocked it; this group forms to seek accountability.
+            DingleBERRY detected and blocked it; this Docket opens to seek accountability.
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-text-muted" style={{ fontSize: 11 }}>
             <span>
@@ -95,7 +98,7 @@ function RecordPreview() {
             </span>
             <span>Comb-wide · 3 Astra</span>
             <span>
-              <b className="text-text-silver">1,204</b> joined
+              <b className="text-text-silver">1,204</b> opted in
             </span>
           </div>
         </div>
@@ -154,9 +157,10 @@ export function JusticeHandoffPage() {
               DingleBERRY found it. AtlasADVOCATE is where you act.
             </h1>
             <div className="text-text-silver" style={{ fontSize: 14.5, maxWidth: 580 }}>
-              1,204 members were hit by the same payload from the same source. DingleBERRY packages the evidence and
-              files a <b>Manual Group into The Manual’s Justice realm</b> — the record. <b>AtlasADVOCATE</b> is the legal
-              Astra that carries it forward.
+              1,204 members were hit by the same payload from the same source. DingleBERRY packages the evidence and{' '}
+              <b>opens a class-action Docket</b> — affected members are pointed to it and <b>each opts in</b> (nobody is
+              enrolled). <b>AtlasADVOCATE</b> — the legal Astra — carries it forward; the docket record is auto-filed in
+              the Justice realm.
             </div>
           </div>
         </div>
@@ -210,14 +214,16 @@ export function JusticeHandoffPage() {
             <Shield size={16} style={{ color: DATA_BLUE, flex: 'none', marginTop: 1 }} />
             <div className="text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
               <b>DingleBERRY is the detector and the on-ramp — not the court.</b> It packages findings and surfaces the
-              affected class, then files the Manual Group into the Justice realm. The case is carried forward in{' '}
-              <b>AtlasADVOCATE</b>, the legal Astra; its record lives in the Justice realm.{' '}
+              affected class, then opens a <b>class-action Docket</b>. Affected members are pointed to it and{' '}
+              <b>each opts in</b> — nobody is enrolled. The case is carried forward in <b>AtlasADVOCATE</b>, the legal
+              Astra (justice system + attorney marketplace); the docket record is auto-filed in the Justice realm — a
+              permanent public record.{' '}
               <span className="font-mono text-text-muted">No finding is entered here.</span>
             </div>
           </div>
         </div>
 
-        {/* right — the Manual Group, previewed in the Justice realm */}
+        {/* right — the class-action Docket, previewed in the Justice realm */}
         <div className="flex flex-col gap-[14px] self-start lg:sticky lg:top-4">
           <div className="flex items-center gap-[7px]">
             <Scale size={13} style={{ color: DINGLEBERRY_COLOR }} />
@@ -232,12 +238,12 @@ export function JusticeHandoffPage() {
                 1,204
               </span>
               <span className="text-text-muted" style={{ fontSize: 13 }}>
-                members eligible to join the group
+                affected · each decides — opt in or not
               </span>
             </div>
             <div className="flex flex-col gap-2">
               <ActionButton variant="danger" icon="scale">
-                File Manual Group into the Justice realm
+                Open class-action Docket
               </ActionButton>
               <div className="flex gap-2">
                 <ActionButton variant="secondary" icon="fileText">
