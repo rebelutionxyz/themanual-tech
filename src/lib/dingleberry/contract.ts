@@ -32,6 +32,15 @@ export interface LedgerAnomaly {
   sev: 'critical' | 'warn' | string;
   kind: string; // human label, e.g. "Fiat → BLiNG! exchange brokered on-platform"
   detail: string;
+  // S02 detail-panel fields — live: economy_integrity_log via the snapshot RPC;
+  // mock: design data. Widened Step-3 so the page reads LedgerAnomaly directly
+  // (the in-page S2Anomaly cast is retired).
+  entry?: string; // offending ledger entry id / hash
+  amt?: string; // formatted amount (STRING — never Number())
+  status: 'held' | 'review' | string; // disposition
+  check?: string; // which invariant caught it
+  oracle?: string; // AtlasOracle assessment
+  at?: string; // timestamp
 }
 export interface TransactionSecurityData {
   conservationOk: boolean; // economy_integrity_check().ok
@@ -42,6 +51,26 @@ export interface TransactionSecurityData {
   stream: LedgerEntry[]; // recent bling_transactions
   anomalies: LedgerAnomaly[]; // open integrity flags
   anomByPosture: Record<Posture, string[]>; // which anomaly ids show per posture
+}
+
+/* ---- S02 LIVE (Step-3) — dingleberry_s02_snapshot() RPC (SECURITY DEFINER,
+   admin-gated, read-only). Carried on the DingleBERRY context, NOT the shared
+   mock snapshot: S02 follows its own DERIVED posture (§6.6.4) + a live/error
+   status, while the global mock PostureSwitcher keeps driving the other screens.
+   CRITICAL: totalSupply / hardCap / amounts are STRINGS (the Sacred Sum exceeds
+   JS safe integers) — display verbatim, never Number() them. pct is numeric. */
+export interface S02Live {
+  status: 'loading' | 'live' | 'unavailable';
+  errorCode?: string; // postgrest code, e.g. '42501' (operator role required)
+  errorMessage?: string;
+  posture: Posture; // DERIVED: any critical → critical · any watch → degraded · else secure
+  securedToday: string;
+  demurrage24h: string;
+  well: { totalSupply: string; hardCap: string; pct: number };
+  stream: LedgerEntry[];
+  anomalies: LedgerAnomaly[];
+  lastCheck: string; // economy_integrity_check timestamp
+  integrityOk: boolean;
 }
 
 /* ---- S03 · SourceVerification ----  PARTIAL backend
