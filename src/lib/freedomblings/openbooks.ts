@@ -71,7 +71,12 @@ export function useOpenBooks(): OpenBooks {
     async function load() {
       const { data, error } = await client
         .from('bling_system_state')
-        .select('total_supply, hard_cap, reserve, treasury, offer_donation_pct')
+        // Cast numeric(24,6) → text at the wire: PostgREST emits numerics as JSON
+        // numbers, so anything past 2^53 is corrupted by JSON.parse BEFORE our
+        // String() runs. ::text keeps the column name as the key.
+        .select(
+          'total_supply::text, hard_cap::text, reserve::text, treasury::text, offer_donation_pct::text',
+        )
         .eq('id', 1)
         .maybeSingle();
       if (!alive) return;

@@ -180,12 +180,13 @@ export function useFreedomblingsBalance(): FbBalance {
       const [lotsRes, txRes] = await Promise.all([
         client
           .from('bling_lots')
-          .select('amount_remaining')
+          // ::text — numeric past 2^53 is clipped by PostgREST's JSON before String()
+          .select('amount_remaining::text')
           .eq('bee_id', user!.id)
           .eq('status', 'active'),
         client
           .from('bling_transactions')
-          .select('id, type, amount, counterparty, memo, created_at')
+          .select('id, type, amount::text, counterparty, memo, created_at')
           .eq('bee_id', user!.id)
           .order('created_at', { ascending: false })
           .limit(60),
@@ -349,12 +350,13 @@ export function useFreedomblingsLedger(): LedgerState {
       const [lotsRes, txRes] = await Promise.all([
         client
           .from('bling_lots')
-          .select('amount_remaining')
+          // ::text — numeric past 2^53 is clipped by PostgREST's JSON before String()
+          .select('amount_remaining::text')
           .eq('bee_id', user!.id)
           .eq('status', 'active'),
         client
           .from('bling_transactions')
-          .select('id, type, amount, counterparty, memo, created_at, balance_after')
+          .select('id, type, amount::text, counterparty, memo, created_at, balance_after::text')
           .eq('bee_id', user!.id)
           .order('created_at', { ascending: false })
           .limit(200),
@@ -553,7 +555,11 @@ export function useProvenance(tx: ProvTx): ProvState {
       const hi = new Date(created + 120_000).toISOString();
       const { data, error } = await client
         .from('bling_lots')
-        .select('origin, vintage, dna, sealed_multiplier, sealed_revealed, amount_original')
+        // ::text on the numerics (2^53 clip guard); the .eq filter below compares
+        // tx.amount (string) against the DB-side numeric — that comparison is fine.
+        .select(
+          'origin, vintage, dna, sealed_multiplier::text, sealed_revealed, amount_original::text',
+        )
         .eq('bee_id', user!.id)
         .eq('amount_original', tx.amount)
         .gte('freed_at', lo)
