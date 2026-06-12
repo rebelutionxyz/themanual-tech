@@ -1,47 +1,49 @@
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AuthProvider, useAuth } from '@/lib/auth';
+import { GeoLensBar } from '@/components/geo/GeoLensBar';
+import { HQControlRoom } from '@/components/hq/HQControlRoom';
+import { PlatformLayout } from '@/components/layout/PlatformLayout';
+import { SiteHeader } from '@/components/layout/SiteHeader';
+import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
+import {
+  CartPlaceholder,
+  CommsPlaceholder,
+  ManualGroupsPlaceholder,
+  NotificationCenter,
+  OpenAPIDocs,
+  StatusPage,
+} from '@/components/universal/UniversalPlaceholders';
 import { AstraProvider, useAstra } from '@/lib/astras/AstraContext';
+import { AuthProvider, useAuth } from '@/lib/auth';
+import { BlingsPage } from '@/pages/BlingsPage';
+import { HandleSettingsPage } from '@/pages/HandleSettingsPage';
 import { HomePage } from '@/pages/HomePage';
+import { LoginPage } from '@/pages/LoginPage';
 import { ManualPage } from '@/pages/ManualPage';
+import { MyHexPage } from '@/pages/MyHexPage';
+import { NexusPage } from '@/pages/NexusPage';
+import { NucleusPage } from '@/pages/NucleusPage';
+import { ProfilePage } from '@/pages/ProfilePage';
+import { SurfacePage } from '@/pages/SurfacePage';
+import { WavesPage } from '@/pages/WavesPage';
+import { AtlasOraclePage } from '@/pages/dingleberry/AtlasOraclePage';
+import { CommandCenterPage } from '@/pages/dingleberry/CommandCenterPage';
+import { DingleberryLayout } from '@/pages/dingleberry/DingleberryLayout';
+import { DispatchAuthPage } from '@/pages/dingleberry/DispatchAuthPage';
+import { GoDarkMonitorPage } from '@/pages/dingleberry/GoDarkMonitorPage';
+import { InfraHealthPage } from '@/pages/dingleberry/InfraHealthPage';
+import { JusticeHandoffPage } from '@/pages/dingleberry/JusticeHandoffPage';
+import { KarmaCreditPage } from '@/pages/dingleberry/KarmaCreditPage';
+import { MemberMeshPage } from '@/pages/dingleberry/MemberMeshPage';
+import { ShillDetectionPage } from '@/pages/dingleberry/ShillDetectionPage';
+import { SourceVerificationPage } from '@/pages/dingleberry/SourceVerificationPage';
+import { ThreatInterceptionPage } from '@/pages/dingleberry/ThreatInterceptionPage';
+import { TransactionSecurityPage } from '@/pages/dingleberry/TransactionSecurityPage';
+import { BalancePage } from '@/pages/freedomblings/BalancePage';
+import { FreedomblingsLayout } from '@/pages/freedomblings/FreedomblingsLayout';
 import { IntelLayout } from '@/pages/intel/IntelLayout';
 import { IntelPage } from '@/pages/intel/IntelPage';
 import { NewThreadPage } from '@/pages/intel/NewThreadPage';
 import { ThreadPage } from '@/pages/intel/ThreadPage';
-import { DingleberryLayout } from '@/pages/dingleberry/DingleberryLayout';
-import { CommandCenterPage } from '@/pages/dingleberry/CommandCenterPage';
-import { TransactionSecurityPage } from '@/pages/dingleberry/TransactionSecurityPage';
-import { SourceVerificationPage } from '@/pages/dingleberry/SourceVerificationPage';
-import { ShillDetectionPage } from '@/pages/dingleberry/ShillDetectionPage';
-import { DispatchAuthPage } from '@/pages/dingleberry/DispatchAuthPage';
-import { AtlasOraclePage } from '@/pages/dingleberry/AtlasOraclePage';
-import { ThreatInterceptionPage } from '@/pages/dingleberry/ThreatInterceptionPage';
-import { InfraHealthPage } from '@/pages/dingleberry/InfraHealthPage';
-import { MemberMeshPage } from '@/pages/dingleberry/MemberMeshPage';
-import { KarmaCreditPage } from '@/pages/dingleberry/KarmaCreditPage';
-import { JusticeHandoffPage } from '@/pages/dingleberry/JusticeHandoffPage';
-import { GoDarkMonitorPage } from '@/pages/dingleberry/GoDarkMonitorPage';
-import { LoginPage } from '@/pages/LoginPage';
-import { ProfilePage } from '@/pages/ProfilePage';
-import { HandleSettingsPage } from '@/pages/HandleSettingsPage';
-import { SurfacePage } from '@/pages/SurfacePage';
-import { WavesPage } from '@/pages/WavesPage';
-import { BlingsPage } from '@/pages/BlingsPage';
-import { MyHexPage } from '@/pages/MyHexPage';
-import { NexusPage } from '@/pages/NexusPage';
-import { NucleusPage } from '@/pages/NucleusPage';
-import { SiteHeader } from '@/components/layout/SiteHeader';
-import { PlatformLayout } from '@/components/layout/PlatformLayout';
-import { GeoLensBar } from '@/components/geo/GeoLensBar';
-import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
-import {
-  ManualGroupsPlaceholder,
-  CommsPlaceholder,
-  NotificationCenter,
-  CartPlaceholder,
-  OpenAPIDocs,
-  StatusPage,
-} from '@/components/universal/UniversalPlaceholders';
-import { HQControlRoom } from '@/components/hq/HQControlRoom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 export default function App() {
   return (
@@ -133,6 +135,14 @@ function AppContent() {
             <Route path="godark" element={<GoDarkMonitorPage />} />
             <Route path="oracle" element={<AtlasOraclePage />} />
             <Route path="justice" element={<JusticeHandoffPage />} />
+          </Route>
+
+          {/* FreedomBLiNGS — The Sovereign Ledger (Currency). Staged port; Slice 1
+              ships the LIVE Balance surface. Registered before /:slug so the
+              explicit tree wins over the generic SurfacePage, exactly like
+              /dingleberry. */}
+          <Route path="/freedomblings" element={<FreedomblingsLayout />}>
+            <Route index element={<BalancePage />} />
           </Route>
 
           {/* Waves surface — Mini Waves V76 embedded via iframe */}
