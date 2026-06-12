@@ -5,36 +5,9 @@
    fixed bar widths) are NOT shipped — every figure here is read from prod (README
    rule 2). Genesis truth: no lots → 0.000000, rendered with dignity. Writes
    (GIVE/GET/OFFER) are deferred ("money last") — the action row is inert. */
+import { LedgerRow } from '@/components/freedomblings/LedgerRow';
 import { BMark, HeroMark } from '@/components/freedomblings/marks';
-import { type MovementRow, useFreedomblingsBalance } from '@/lib/freedomblings/ledger';
-
-const TAG_LABEL: Record<string, string> = {
-  freed: 'FREEd',
-  got: 'GOT',
-  given: 'GAVE',
-  offer: 'OFFER',
-};
-
-function LedgerRow({ r }: { r: MovementRow }) {
-  return (
-    <div className="lrow">
-      <div className={`l-ico${r.dir === 'pos' ? ' in' : ''}`}>
-        <BMark fill={r.dir === 'pos'} />
-      </div>
-      <div className="l-main">
-        <div className="l-desc">{r.desc}</div>
-        <div className="l-meta">
-          <span className={`l-tag ${r.kind}`}>{TAG_LABEL[r.kind]}</span>
-          {r.who && <span className="who">{r.who}</span>}
-        </div>
-      </div>
-      <div className="l-amt">
-        <div className={`amt ${r.dir}`}>{r.amt}</div>
-        {r.when && <div className="run num">{r.when}</div>}
-      </div>
-    </div>
-  );
-}
+import { useFreedomblingsBalance } from '@/lib/freedomblings/ledger';
 
 export function BalancePage() {
   const fb = useFreedomblingsBalance();
@@ -189,7 +162,10 @@ export function BalancePage() {
         {fb.recent.length > 0 ? (
           <div className="ledger-list">
             {fb.recent.map((r) => (
-              <LedgerRow key={r.id} r={r} />
+              <LedgerRow
+                key={r.id}
+                r={{ kind: r.kind, dir: r.dir, desc: r.desc, who: r.who, amt: r.amt, sub: r.when }}
+              />
             ))}
           </div>
         ) : (

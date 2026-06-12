@@ -93,6 +93,19 @@ function metaFor(type: string): TypeMeta {
   return TYPE_META[type] ?? { kind: 'got', dir: 'pos', label: type };
 }
 
+/** magnitude (absolute) of a decimal string in micro-units. */
+function absMicros(amount: string | number): bigint {
+  const m = toMicros(amount);
+  return m < 0n ? -m : m;
+}
+
+export const TAG_LABEL: Record<string, string> = {
+  freed: 'FREEd',
+  got: 'GOT',
+  given: 'GAVE',
+  offer: 'OFFER',
+};
+
 /* ---- shapes -------------------------------------------------------------- */
 export interface MovementRow {
   id: string;
@@ -234,6 +247,331 @@ export function useFreedomblingsBalance(): FbBalance {
       alive = false;
     };
   }, [authLoading, user]);
+
+  return state;
+}
+
+/* ============================================================================
+   THE LEDGER (Slice 2) — grouped-by-day own history + running balance.
+   ============================================================================ */
+const MONTHS_FULL = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+/** Raw own-tx fields a Provenance trace needs. */
+export interface ProvTx {
+  id: string;
+  type: string;
+  amount: string; // raw numeric string
+  counterparty: string | null;
+  memo: string | null;
+  created_at: string;
+}
+
+export interface LedgerTx {
+  id: string;
+  kind: 'freed' | 'got' | 'given' | 'offer';
+  dir: 'pos' | 'neg';
+  desc: string;
+  who: string;
+  amt: string; // formatted magnitude
+  run: string; // formatted running balance AFTER this tx
+  tx: ProvTx;
+}
+
+export interface LedgerDay {
+  day: string;
+  sum: string; // signed net for the day, e.g. '+ 370' / '− 90'
+  rows: LedgerTx[];
+}
+
+export interface LedgerState {
+  status: 'loading' | 'signed-out' | 'live' | 'unavailable';
+  groups: LedgerDay[];
+  balance: string;
+  weekDelta: string; // signed, last 7 days
+}
+
+const LEDGER_INITIAL: LedgerState = {
+  status: 'loading',
+  groups: [],
+  balance: ZERO,
+  weekDelta: '+ 0.000000',
+};
+
+function signedFmt(micros: bigint): string {
+  const neg = micros < 0n;
+  const body = fmtMicros(neg ? -micros : micros);
+  return `${neg ? '−' : '+'} ${body}`;
+}
+
+function dayLabel(iso: string, todayKey: string, yesterdayKey: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  const tail = `${d.getUTCDate()} ${MONTHS_FULL[d.getUTCMonth()]}`;
+  const key = iso.slice(0, 10);
+  if (key === todayKey) return `Today · ${tail}`;
+  if (key === yesterdayKey) return `Yesterday · ${tail}`;
+  return tail;
+}
+
+export function useFreedomblingsLedger(): LedgerState {
+  const { user, loading: authLoading } = useAuth();
+  const [state, setState] = useState<LedgerState>(LEDGER_INITIAL);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user || !supabase) {
+      setState({ ...LEDGER_INITIAL, status: 'signed-out' });
+      return;
+    }
+    let alive = true;
+    const client = supabase;
+    async function load() {
+      const [lotsRes, txRes] = await Promise.all([
+        client
+          .from('bling_lots')
+          .select('amount_remaining')
+          .eq('bee_id', user!.id)
+          .eq('status', 'active'),
+        client
+          .from('bling_transactions')
+          .select('id, type, amount, counterparty, memo, created_at, balance_after')
+          .eq('bee_id', user!.id)
+          .order('created_at', { ascending: false })
+          .limit(200),
+      ]);
+      if (!alive) return;
+      if (lotsRes.error || txRes.error) {
+        setState({ ...LEDGER_INITIAL, status: 'unavailable' });
+        return;
+      }
+      // biome-ignore lint/suspicious/noExplicitAny: untyped DB rows → narrowed below
+      const lots = (lotsRes.data ?? []) as any[];
+      // biome-ignore lint/suspicious/noExplicitAny: untyped DB rows → narrowed below
+      const txs = (txRes.data ?? []) as any[];
+
+      const balMicros = sumMagnitudes(lots.map((l) => String(l.amount_remaining)));
+
+      // Running balance: prefer the authoritative per-row balance_after column
+      // (populated by the write paths — exact). Fall back to backward
+      // reconstruction (from the live total through signed deltas) only for rows
+      // whose balance_after is still null; an authoritative row re-anchors the
+      // reconstruction for the older rows below it.
+      let runningAfter = balMicros;
+      const rows: LedgerTx[] = txs.map((t) => {
+        const m = metaFor(t.type);
+        const mag = absMicros(t.amount);
+        const delta = m.dir === 'pos' ? mag : -mag;
+        const ba = t.balance_after;
+        const hasBA = ba !== null && ba !== undefined && String(ba).trim() !== '';
+        const runMicros = hasBA ? toMicros(String(ba)) : runningAfter;
+        // anchor for the next (older) row = this row's before-balance
+        runningAfter = runMicros - delta;
+        return {
+          id: String(t.id),
+          kind: m.kind,
+          dir: m.dir,
+          desc: t.memo || m.label,
+          who: t.counterparty || (m.kind === 'freed' ? 'Productive action' : ''),
+          amt: fmtMicros(mag),
+          run: fmtMicros(runMicros),
+          tx: {
+            id: String(t.id),
+            type: t.type,
+            amount: String(t.amount),
+            counterparty: t.counterparty ?? null,
+            memo: t.memo ?? null,
+            created_at: String(t.created_at),
+          },
+        };
+      });
+
+      // group by UTC day (newest first; oldest last within a group)
+      const now = new Date();
+      const todayKey = now.toISOString().slice(0, 10);
+      const yesterdayKey = new Date(now.getTime() - 86_400_000).toISOString().slice(0, 10);
+      const weekAgoIso = new Date(now.getTime() - 7 * 86_400_000).toISOString();
+
+      const groups: LedgerDay[] = [];
+      let weekMicros = 0n;
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        const t = txs[i];
+        const delta = r.dir === 'pos' ? absMicros(t.amount) : -absMicros(t.amount);
+        if (t.created_at >= weekAgoIso) weekMicros += delta;
+        const label = dayLabel(String(t.created_at), todayKey, yesterdayKey);
+        let g = groups[groups.length - 1];
+        if (!g || g.day !== label) {
+          g = { day: label, sum: '+ 0.000000', rows: [] };
+          groups.push(g);
+        }
+        g.rows.push(r);
+      }
+      // day sums (signed net per group)
+      for (const g of groups) {
+        let net = 0n;
+        for (const r of g.rows) net += r.dir === 'pos' ? toMicros(r.amt) : -toMicros(r.amt);
+        g.sum = signedFmt(net);
+      }
+
+      setState({
+        status: 'live',
+        groups,
+        balance: fmtMicros(balMicros),
+        weekDelta: signedFmt(weekMicros),
+      });
+    }
+    load();
+    return () => {
+      alive = false;
+    };
+  }, [authLoading, user]);
+
+  return state;
+}
+
+/* ============================================================================
+   PROVENANCE (Slice 2) — LIVE-HONEST. Renders only what the Bee's OWN records
+   prove. Issuance resolves to the well (+ the originating own-lot when it can be
+   tightly matched — there is no tx↔lot FK, so we match on amount + a ±2-min
+   freed_at window and only claim a lot on a UNIQUE hit). Cross-member hops are
+   RLS-blocked by design (privacy); we say so honestly rather than fabricate.
+   ============================================================================ */
+export interface ProvNode {
+  kind: 'origin' | 'now' | 'beyond';
+  tag?: string;
+  when?: string;
+  amt?: string;
+  desc: string;
+  who?: string;
+}
+
+export interface ResolvedLot {
+  origin: string;
+  vintage: string;
+  dnaCode: string;
+  sealed: boolean;
+}
+
+export interface ProvState {
+  status: 'loading' | 'ready';
+  nodes: ProvNode[];
+  lot: ResolvedLot | null;
+  isIssuance: boolean;
+}
+
+function fullWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getUTCDate()} ${MONTHS_FULL[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+export function useProvenance(tx: ProvTx): ProvState {
+  const { user } = useAuth();
+  const [state, setState] = useState<ProvState>({
+    status: 'loading',
+    nodes: [],
+    lot: null,
+    isIssuance: false,
+  });
+
+  useEffect(() => {
+    const meta = metaFor(tx.type);
+    const isIssuance = FREED_TYPES.has(tx.type);
+    const amtFmt = fmtMicros(absMicros(tx.amount));
+    const when = fullWhen(tx.created_at);
+    const who = tx.counterparty || (isIssuance ? 'The HoneyComb · the well' : '');
+    const desc = tx.memo || meta.label;
+
+    // the "now" node — always present: what rests in the Bee's own ledger today.
+    const nowNode: ProvNode = {
+      kind: 'now',
+      desc: meta.dir === 'neg' ? `${desc} — it now rests in another member's ledger` : desc,
+      who: tx.counterparty || undefined,
+      amt: amtFmt,
+      when: 'now',
+    };
+
+    const nodes: ProvNode[] = [];
+    if (isIssuance) {
+      nodes.push({
+        kind: 'origin',
+        tag: 'FREEd',
+        desc: meta.label,
+        who,
+        amt: amtFmt,
+        when,
+      });
+      nodes.push(nowNode);
+    } else if (meta.dir === 'pos') {
+      // GOT from a member / escrow — upstream is another's private record.
+      nodes.push({
+        kind: 'beyond',
+        desc: 'Trail continues beyond your ledger — this BLiNG! reached you from another member. Their upstream lineage is private; disclosure arrives with the consent model.',
+      });
+      nodes.push(nowNode);
+    } else {
+      // GAVE / placed — it now lives in the counterparty's private ledger.
+      nodes.push(nowNode);
+      nodes.push({
+        kind: 'beyond',
+        desc: 'Trail continues beyond your ledger — the onward lineage is the recipient’s to disclose, under the consent model.',
+      });
+    }
+
+    if (!isIssuance || !user || !supabase) {
+      setState({ status: 'ready', nodes, lot: null, isIssuance });
+      return;
+    }
+
+    let alive = true;
+    const client = supabase;
+    async function resolveLot() {
+      // Tight, honest match: same amount, born within ±2 min of the tx. Only
+      // claim a lot on a UNIQUE hit (no tx↔lot FK yet).
+      const created = new Date(tx.created_at).getTime();
+      const lo = new Date(created - 120_000).toISOString();
+      const hi = new Date(created + 120_000).toISOString();
+      const { data, error } = await client
+        .from('bling_lots')
+        .select('origin, vintage, dna, sealed_multiplier, sealed_revealed, amount_original')
+        .eq('bee_id', user!.id)
+        .eq('amount_original', tx.amount)
+        .gte('freed_at', lo)
+        .lte('freed_at', hi);
+      if (!alive) return;
+      // biome-ignore lint/suspicious/noExplicitAny: untyped DB rows
+      const matches = (error ? [] : (data ?? [])) as any[];
+      let lot: ResolvedLot | null = null;
+      if (matches.length === 1) {
+        const l = matches[0];
+        const named = l.dna?.naming?.display as string | undefined;
+        lot = {
+          origin: String(l.origin),
+          vintage: String(l.vintage),
+          dnaCode: named || `DROP·${l.vintage}·${String(l.origin).toUpperCase()}`,
+          sealed: l.sealed_revealed === false && l.sealed_multiplier != null,
+        };
+      }
+      setState({ status: 'ready', nodes, lot, isIssuance });
+    }
+    resolveLot();
+    return () => {
+      alive = false;
+    };
+  }, [tx, user]);
 
   return state;
 }

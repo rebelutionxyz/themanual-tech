@@ -9,7 +9,7 @@ import { Outlet } from 'react-router-dom';
 
 export function FreedomblingsLayout() {
   return (
-    <div data-surface="freedomblings" className="flex h-full overflow-hidden">
+    <div data-surface="freedomblings" className="relative flex h-full overflow-hidden">
       <FreedomblingsSidebar />
       <Outlet />
     </div>

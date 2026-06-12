@@ -39,6 +39,7 @@ import { ThreatInterceptionPage } from '@/pages/dingleberry/ThreatInterceptionPa
 import { TransactionSecurityPage } from '@/pages/dingleberry/TransactionSecurityPage';
 import { BalancePage } from '@/pages/freedomblings/BalancePage';
 import { FreedomblingsLayout } from '@/pages/freedomblings/FreedomblingsLayout';
+import { LedgerPage } from '@/pages/freedomblings/LedgerPage';
 import { IntelLayout } from '@/pages/intel/IntelLayout';
 import { IntelPage } from '@/pages/intel/IntelPage';
 import { NewThreadPage } from '@/pages/intel/NewThreadPage';
@@ -143,6 +144,7 @@ function AppContent() {
               /dingleberry. */}
           <Route path="/freedomblings" element={<FreedomblingsLayout />}>
             <Route index element={<BalancePage />} />
+            <Route path="ledger" element={<LedgerPage />} />
           </Route>
 
           {/* Waves surface — Mini Waves V76 embedded via iframe */}
