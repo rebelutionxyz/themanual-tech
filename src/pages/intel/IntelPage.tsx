@@ -195,7 +195,7 @@ export function IntelPage() {
             realmId: selectedRealmId,
             l2: selectedL2,
           }}
-          onSubmit={async ({ title, body, atomIds, categoryPaths, realmId, l2 }) => {
+          onSubmit={async ({ title, body, atomIds, categoryPaths, realmId, l2, realmPath }) => {
             if (!bee || !title) return false;
             try {
               const newId = await createThread(
@@ -204,6 +204,7 @@ export function IntelPage() {
                   body,
                   primaryRealm: realmId,
                   primaryL2: l2,
+                  realmPath,
                   atomIds,
                   categoryPaths,
                 },

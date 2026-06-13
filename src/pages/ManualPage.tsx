@@ -62,8 +62,9 @@ export function ManualPage() {
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Left: Realm Sidebar (13 realms — inside the MANUAL surface) */}
-      <aside className="hidden w-16 flex-shrink-0 md:block">
+      {/* Left: Realm Sidebar (14 realms). Default-open icon rail on tablet +
+          desktop; now also a sticky hover/touch rail on mobile (dispatch B). */}
+      <aside className="w-16 flex-shrink-0">
         <RealmSidebar />
       </aside>
 

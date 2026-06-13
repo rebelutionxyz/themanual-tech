@@ -39,7 +39,11 @@ const NAV: NavItem[] = [
 export function DingleberrySidebar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const [pinned, setPinned] = useState(false);
+  // Open by default on tablet + desktop (dispatch B); mobile (<768px) starts
+  // collapsed as a hover/touch sticky rail.
+  const [pinned, setPinned] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 768,
+  );
   const [hovered, setHovered] = useState(false);
   const expanded = pinned || hovered;
 
