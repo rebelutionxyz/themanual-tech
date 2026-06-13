@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { REALM_NAMES } from '@/lib/constants';
 import type { RealmId } from '@/types/manual';
 
 // ═════════════════════════════════════════════════════════════════════
@@ -59,6 +60,8 @@ export interface CreateThreadInput {
   categoryPaths?: string[];
   primaryRealm?: RealmId | null;
   primaryL2?: string | null;
+  /** Full taxonomy path (display names). Falls back to [realmName, l2]. */
+  realmPath?: string[] | null;
   parentSurface?: string | null;
   parentId?: string | null;
 }
@@ -223,6 +226,44 @@ export async function listThreads(
 }
 
 /**
+ * Cross-Astra realm lens feed (dispatch Part B — full-depth narrowing).
+ *
+ * forum_threads narrowed by PREFIX on realm_path (display-name path_parts),
+ * unioned across ALL parent_surface. Given the drilled path P (length N), a
+ * thread matches when realm_path[1:N] = P — i.e. it lives at P or anywhere
+ * below it. Every drill level narrows the feed. `source` filters to one
+ * parent_surface on top ('all' = full cross-Astra feed).
+ *
+ * Postgres slice-equality isn't a PostgREST operator, so we pre-filter with the
+ * GIN-indexed array-contains (@>) then apply the exact ordered-prefix check
+ * client-side. Existing threads with realm_path = NULL won't match (per spec).
+ */
+export async function listRealmFeed(
+  path: string[],
+  source = 'all',
+  limit = 40,
+): Promise<ForumThread[]> {
+  if (!supabase || path.length === 0) return [];
+  let q = supabase
+    .from('forum_threads')
+    .select('*')
+    .contains('realm_path', path)
+    .order('last_activity_at', { ascending: false })
+    .limit(limit);
+  if (source && source !== 'all') q = q.eq('parent_surface', source);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+
+  // Exact ordered-prefix: realm_path[1:N] === P (contains is unordered).
+  const key = path.join('');
+  const rows = (data ?? []).filter((r) => {
+    const rp = (r as { realm_path?: unknown }).realm_path;
+    return Array.isArray(rp) && rp.slice(0, path.length).join('') === key;
+  });
+  return enrichWithAuthors(rows);
+}
+
+/**
  * Fetch thread IDs authored by a specific Bee.
  * @param sortMode 'newest' = by created_at (default). 'active' = by last_activity_at.
  */
@@ -322,6 +363,17 @@ export async function createThread(
 ): Promise<string> {
   if (!supabase) throw new Error('Supabase not configured');
 
+  // realm_path = the thread's category (mirrors atoms.path_parts, display names).
+  // Prefer an explicit full path; else derive from realm/L2 for back-compat.
+  const realmPath =
+    input.realmPath && input.realmPath.length > 0
+      ? input.realmPath
+      : input.primaryRealm
+        ? [REALM_NAMES[input.primaryRealm], input.primaryL2].filter(
+            (s): s is string => Boolean(s),
+          )
+        : null;
+
   const { data: thread, error } = await supabase
     .from('forum_threads')
     .insert({
@@ -330,6 +382,7 @@ export async function createThread(
       created_by: authorBeeId,
       primary_realm: input.primaryRealm ?? null,
       primary_l2: input.primaryL2 ?? null,
+      realm_path: realmPath,
       parent_surface: input.parentSurface ?? null,
       parent_id: input.parentId ?? null,
     })

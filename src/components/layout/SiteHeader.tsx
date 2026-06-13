@@ -1,20 +1,18 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { useAstra, useCopy } from '@/lib/astras/AstraContext';
 import { ManualLogo } from '@/components/ui/ManualLogo';
-import { HoneyDrop } from '@/components/ui/HoneyDrop';
 import { UtilityChrome } from './UtilityChrome';
 
 export function SiteHeader() {
   const { configured } = useAuth();
   const astra = useAstra();
-  const wordmark = astra?.wordmark ?? 'The Manual';
+  const wordmark = astra?.wordmark ?? 'TheMANUAL.tech';
   // wordmarkShort: explicit value from config, or derive from full wordmark via toUpperCase().
   // Fallback ensures AtlasINTEL.fyi (no wordmarkShort set) produces 'ATLASINTEL'.
   const wordmarkShort = astra
     ? (astra.wordmarkShort ?? astra.wordmark.toUpperCase())
-    : 'The Manual';
+    : 'TheMANUAL.tech';
   const accentColor = astra?.accent;
 
   /* data-bees-label is a verification artifact for Component B's useCopy()
@@ -23,23 +21,6 @@ export function SiteHeader() {
      The attribute is intentionally non-rendering — full lexicon swap sweep
      is queued as a separate Component B follow-up. */
   const beesLabel = useCopy('Bees');
-
-  // BLiNG! drop hop animation. Listens for `bling-hop` events dispatched by
-  // PlatformRail when the rail expands on a astra host (Read C clarification).
-  // Drop is always visible; animation gated upstream by astra presence.
-  const [hopping, setHopping] = useState(false);
-  useEffect(() => {
-    const onHop = () => {
-      setHopping(false);
-      // Re-enable on next frame so the same event re-triggers the keyframe.
-      requestAnimationFrame(() => requestAnimationFrame(() => setHopping(true)));
-      // Animation duration is 0.9s — clear flag a touch after to allow re-arm.
-      const t = setTimeout(() => setHopping(false), 1000);
-      return () => clearTimeout(t);
-    };
-    window.addEventListener('bling-hop', onHop);
-    return () => window.removeEventListener('bling-hop', onHop);
-  }, []);
 
   return (
     <header
@@ -70,8 +51,6 @@ export function SiteHeader() {
           <span className="font-display text-sm font-semibold tracking-widest text-text-silver-bright sm:hidden">
             {wordmarkShort}
           </span>
-          {/* BLiNG! drop — brand identity (always present), astra-ID motion when rail opens */}
-          <HoneyDrop size={14} hopping={hopping} className="ml-0.5" />
         </Link>
 
         <div className="flex-1" />
