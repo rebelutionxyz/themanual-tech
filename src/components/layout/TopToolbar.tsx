@@ -65,13 +65,14 @@ interface ControlDef {
 }
 
 // lucide stand-ins for the ti-* set (swappable placeholders).
+// Locked left→right order: Search · Realm · Location · Time · Astra · Addon.
 const CONTROLS: ControlDef[] = [
   { id: 'search', label: 'Search', icon: Search, primary: true },
   { id: 'realms', label: 'Realm', icon: Rabbit },
   { id: 'location', label: 'Location', icon: MapPin },
+  { id: 'time', label: 'Time', icon: Clock },
   { id: 'astras', label: 'Astra', icon: LayoutGrid },
   { id: 'addons', label: 'Addon', icon: Puzzle },
-  { id: 'time', label: 'Time', icon: Clock },
 ];
 
 /**
@@ -162,8 +163,9 @@ export function TopToolbar() {
     setOpenId(id);
   }
 
-  // Realms pick → set the platform lens (full drilled path) + route to the
-  // cross-Astra realm feed. Every drill level narrows the feed by realm_path prefix.
+  // Realms pick → set the platform lens (full drilled path) IN PLACE. The realm
+  // selector is a cross-Astra lens: it re-filters whatever surface you're on
+  // (which keeps its own sidebar) — it does NOT navigate to a generic feed.
   function pickAtLevel(level: number, node: TreeNode) {
     const next = drill.slice(0, level).concat(node);
     setDrill(next);
@@ -173,7 +175,6 @@ export function TopToolbar() {
       // Default the Source chip to the surface the realm was picked from.
       const surf = surfaceFromPath(location.pathname);
       setSource(surf && PARENT_SURFACES.has(surf) ? surf : 'all');
-      navigate(`/realm/${rid}`);
     }
   }
 
@@ -181,7 +182,6 @@ export function TopToolbar() {
     setDrill([]);
     setLens(null, []);
     setSource('all');
-    if (location.pathname.startsWith('/realm/')) navigate('/intel');
   }
 
   const activeRealmId = (drill[0]?.realmId ?? realmId) as RealmId | null;
@@ -244,10 +244,7 @@ export function TopToolbar() {
         currentName={currentName}
         onClear={clearRealms}
         onRealm={() => {
-          if (realmId) {
-            setLens(realmId, [REALM_NAMES[realmId]]);
-            navigate(`/realm/${realmId}`);
-          }
+          if (realmId) setLens(realmId, [REALM_NAMES[realmId]]);
         }}
         onL2={() => realmId && l2 && setLens(realmId, [REALM_NAMES[realmId], l2])}
       />
