@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { IntelSidebar, type IntelView } from '@/components/intel/IntelSidebar';
 import { useIntelStore } from '@/stores/useIntelStore';
+import { useLensStore } from '@/stores/useLensStore';
 import type { RealmId } from '@/types/manual';
 
 /**
@@ -46,6 +47,19 @@ export function IntelLayout() {
       }
     }
   }, [location.pathname]);
+
+  // The realm lens (global toolbar) re-filters Intel IN PLACE — IntelSidebar
+  // stays mounted, no navigation. Mirror the lens realm/L2/L3 into the Intel
+  // store so ThreadList re-queries (approved bridge, not direct-read).
+  const lensRealmId = useLensStore((s) => s.realmId);
+  const lensL2 = useLensStore((s) => s.l2);
+  const lensL3 = useLensStore((s) => s.l3);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: store setters are stable; re-sync only when the lens path changes
+  useEffect(() => {
+    setRealmId(lensRealmId);
+    if (lensL2) setL2(lensL2);
+    if (lensL3) setL3(lensL3);
+  }, [lensRealmId, lensL2, lensL3]);
 
 
   function handleSidebarSelect(view: IntelView) {
