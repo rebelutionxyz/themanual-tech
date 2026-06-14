@@ -11,7 +11,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { REALM_ORDER, REALM_NAMES } from '@/lib/constants';
+import { REALM_NAMES } from '@/lib/constants';
 import { SURFACE_BY_SLUG } from '@/lib/surfaces';
 import { useManualData } from '@/lib/useManualData';
 import { useIntelStore, type TimeWindow } from '@/stores/useIntelStore';
@@ -89,7 +89,7 @@ export function TopToolbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const astra = useAstra();
-  const { tree } = useManualData();
+  const { tree, realmOrder } = useManualData();
   const registry = useAstraRegistry();
 
   const { realmId, l2, l3, setLens, setSource } = useLensStore();
@@ -254,6 +254,7 @@ export function TopToolbar() {
         <Popup full anchorLeft={anchorLeft} containerW={containerW} title="Realm" onClose={() => setOpenId(null)}>
           <RealmsPanel
             tree={tree}
+            realmOrder={realmOrder}
             drill={drill}
             activeRealmId={activeRealmId}
             realmAstra={realmAstra}
@@ -355,6 +356,7 @@ function Popup({
 
 function RealmsPanel({
   tree,
+  realmOrder,
   drill,
   activeRealmId,
   realmAstra,
@@ -364,6 +366,7 @@ function RealmsPanel({
   onJump,
 }: {
   tree: TreeNode;
+  realmOrder: RealmId[];
   drill: TreeNode[];
   activeRealmId: RealmId | null;
   realmAstra: AstraRow | null;
@@ -372,7 +375,7 @@ function RealmsPanel({
   onClear: () => void;
   onJump: () => void;
 }) {
-  const realmNodes = REALM_ORDER.map((id) => tree.children.find((c) => c.realmId === id)).filter(
+  const realmNodes = realmOrder.map((id) => tree.children.find((c) => c.realmId === id)).filter(
     (n): n is TreeNode => Boolean(n),
   );
 

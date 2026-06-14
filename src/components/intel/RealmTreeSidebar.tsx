@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, ChevronDown, ArrowLeft } from 'lucide-react';
 import { useManualData } from '@/lib/useManualData';
 import { useLensStore } from '@/stores/useLensStore';
-import { REALM_ORDER, REALM_NAMES, REALM_COLORS } from '@/lib/constants';
+import { REALM_NAMES, REALM_COLORS } from '@/lib/constants';
 import { cn, formatCount } from '@/lib/utils';
 import type { RealmId, TreeNode } from '@/types/manual';
 
@@ -27,7 +27,7 @@ interface RealmTreeSidebarProps {
  * children capped per node.
  */
 export function RealmTreeSidebar({ realmId, onSwitchRealm }: RealmTreeSidebarProps) {
-  const { tree } = useManualData();
+  const { tree, realmOrder } = useManualData();
   const lensRealmId = useLensStore((s) => s.realmId);
   const lensPath = useLensStore((s) => s.path);
   const setLens = useLensStore((s) => s.setLens);
@@ -107,7 +107,7 @@ export function RealmTreeSidebar({ realmId, onSwitchRealm }: RealmTreeSidebarPro
             {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop scrim; dropdown items are keyboard-reachable, Esc not required for a click-away */}
             <div className="fixed inset-0 z-40" onClick={() => setSwitchOpen(false)} aria-hidden="true" />
             <div className="absolute left-2 right-2 z-50 mt-1 max-h-[60vh] overflow-y-auto rounded-md border border-border bg-bg-elevated shadow-xl">
-              {REALM_ORDER.map((rid) => (
+              {realmOrder.map((rid) => (
                 <button
                   key={rid}
                   type="button"

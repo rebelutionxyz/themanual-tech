@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { REALM_ORDER, REALM_NAMES, REALM_ID_BY_NAME } from '@/lib/constants';
+import { REALM_NAMES, REALM_ID_BY_NAME } from '@/lib/constants';
 import { useManualData } from '@/lib/useManualData';
 import { cn } from '@/lib/utils';
 import type { RealmId, TreeNode } from '@/types/manual';
@@ -30,7 +30,7 @@ export function RealmPathPicker({
   required,
   error,
 }: RealmPathPickerProps) {
-  const { tree } = useManualData();
+  const { tree, realmOrder } = useManualData();
 
   // Resolve the chain of tree nodes for the current path (for child rows).
   const drillNodes = useMemo(() => {
@@ -53,10 +53,10 @@ export function RealmPathPicker({
 
   const realmNodes = useMemo(
     () =>
-      REALM_ORDER.map((id) => tree.children.find((c) => c.realmId === id)).filter(
+      realmOrder.map((id) => tree.children.find((c) => c.realmId === id)).filter(
         (n): n is TreeNode => Boolean(n),
       ),
-    [tree],
+    [tree, realmOrder],
   );
 
   const deeperRows: { depth: number; nodes: TreeNode[] }[] = [];
