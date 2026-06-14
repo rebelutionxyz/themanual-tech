@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { ChevronRight, MessageSquare, Clock } from 'lucide-react';
 import { listRealmFeed, relativeTime, type ForumThread } from '@/lib/intel';
 import { useLensStore } from '@/stores/useLensStore';
+import { RealmTreeSidebar } from '@/components/intel/RealmTreeSidebar';
 import { REALM_NAMES, REALM_COLORS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { RealmId } from '@/types/manual';
@@ -33,7 +34,9 @@ const SOURCE_LABEL: Record<string, string> = Object.fromEntries(
  */
 export function RealmFeedPage() {
   const { realmId } = useParams<{ realmId: string }>();
-  const { realmId: lensRealmId, path: lensPath, source, setSource } = useLensStore();
+  const navigate = useNavigate();
+  const { realmId: lensRealmId, path: lensPath, source, setSource, setLens, reset } =
+    useLensStore();
 
   const validRealm = realmId && realmId in REALM_NAMES ? (realmId as RealmId) : null;
   const realmName = validRealm ? REALM_NAMES[validRealm] : null;
@@ -89,8 +92,29 @@ export function RealmFeedPage() {
     );
   }
 
+  // Persistent realm-aware left sidebar for the realm-lens feed. Mounting it
+  // here gives the realm view the left rail that /intel and /manual have; the
+  // container stays mounted across realm switches (same route component), only
+  // the active realm + feed update.
+  function handleSelectRealm(id: RealmId | null) {
+    if (id) {
+      setLens(id, [REALM_NAMES[id]]);
+      navigate(`/realm/${id}`);
+    } else {
+      reset();
+      navigate('/intel');
+    }
+  }
+
   return (
-    <div className="safe-pad-x mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">
+    <div className="flex h-full overflow-hidden">
+      {/* Realm-subtree drill rail — desktop/tablet. On mobile, drill via the
+          global toolbar's Realm popup. */}
+      <aside className="hidden w-56 flex-shrink-0 md:block">
+        <RealmTreeSidebar realmId={validRealm} onSwitchRealm={handleSelectRealm} />
+      </aside>
+      <div className="min-w-0 flex-1 overflow-y-auto">
+        <div className="safe-pad-x mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">
       {/* Realm path heading */}
       <div className="mb-1 font-mono uppercase tracking-widest" style={{ fontSize: '11px', color: accent, opacity: 0.75 }} data-size="meta">
         Realm lens · cross-Astra
@@ -184,6 +208,8 @@ export function RealmFeedPage() {
           ))}
         </ul>
       )}
+        </div>
+      </div>
     </div>
   );
 }
