@@ -1,5 +1,4 @@
-import type { Atom, TreeNode } from '@/types/manual';
-import { REALM_ORDER } from './constants';
+import type { Atom, RealmId, TreeNode } from '@/types/manual';
 
 /**
  * Build a hierarchical tree from the flat atom list.
@@ -7,10 +6,12 @@ import { REALM_ORDER } from './constants';
  * and children[] (nested deeper paths).
  *
  * Sort rules:
- * - Realm roots follow REALM_ORDER (palindrome: justice → religion)
+ * - Realm roots follow `realmOrder` (DB-driven realms.display_order)
  * - Everything else alphabetical by display name
+ *
+ * @param realmOrder realm slugs in display order; roots not listed sort last.
  */
-export function buildTree(atoms: Atom[]): TreeNode {
+export function buildTree(atoms: Atom[], realmOrder: RealmId[] = []): TreeNode {
   const root: TreeNode = {
     name: 'ROOT',
     path: '',
@@ -56,17 +57,17 @@ export function buildTree(atoms: Atom[]): TreeNode {
     }
   }
 
-  sortAndCount(root);
+  const orderMap = new Map(realmOrder.map((r, i) => [r, i]));
+  sortAndCount(root, orderMap);
   return root;
 }
 
-function sortAndCount(node: TreeNode): number {
+function sortAndCount(node: TreeNode, orderMap: Map<RealmId, number>): number {
   if (node.name === 'ROOT') {
-    const orderMap = new Map(REALM_ORDER.map((r, i) => [r, i]));
     node.children.sort(
       (a, b) =>
-        (orderMap.get(a.realmId as never) ?? 999) -
-        (orderMap.get(b.realmId as never) ?? 999),
+        (orderMap.get(a.realmId as RealmId) ?? 999) -
+        (orderMap.get(b.realmId as RealmId) ?? 999),
     );
   } else {
     node.children.sort((a, b) => a.name.localeCompare(b.name));
@@ -76,7 +77,7 @@ function sortAndCount(node: TreeNode): number {
 
   let total = node.atoms.length;
   for (const child of node.children) {
-    total += sortAndCount(child);
+    total += sortAndCount(child, orderMap);
   }
   node.atomCount = total;
   return total;
