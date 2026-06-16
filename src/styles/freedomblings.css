@@ -1641,3 +1641,274 @@
   border-radius: 3px;
   border: 1.5px solid var(--ink-ghost);
 }
+
+/* ---- Give · Get · Offer composer (move-value slice) ---------------------- */
+[data-surface="freedomblings"] .move-h1 {
+  font-size: 30px;
+  margin-top: 6px;
+}
+[data-surface="freedomblings"] .move-sub {
+  color: var(--ink-faint);
+  font-size: 13.5px;
+  margin-top: 6px;
+  max-width: 52ch;
+}
+[data-surface="freedomblings"] .move-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0 16px;
+}
+[data-surface="freedomblings"] .move-tab {
+  appearance: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 9px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+  background: var(--paper);
+}
+[data-surface="freedomblings"] .move-tab:hover {
+  color: var(--ink);
+  border-color: var(--ink-ghost);
+}
+[data-surface="freedomblings"] .move-tab.active {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+[data-surface="freedomblings"] .composer {
+  max-width: 520px;
+  padding: calc(24px * var(--sp)) calc(26px * var(--sp));
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+[data-surface="freedomblings"] .comp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+[data-surface="freedomblings"] .comp-label {
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 600;
+}
+[data-surface="freedomblings"] .comp-opt {
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ink-ghost);
+  font-weight: 500;
+}
+[data-surface="freedomblings"] .comp-input {
+  appearance: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  padding: 11px 13px;
+  border-radius: 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  width: 100%;
+}
+[data-surface="freedomblings"] .comp-input::placeholder {
+  color: var(--ink-ghost);
+}
+[data-surface="freedomblings"] .comp-input:focus,
+[data-surface="freedomblings"] .comp-amount:focus-within {
+  outline: none;
+  border-color: var(--accent-deep);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+[data-surface="freedomblings"] .comp-amount {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+}
+[data-surface="freedomblings"] .comp-amount .bmark {
+  width: 18px;
+  height: 18px;
+}
+[data-surface="freedomblings"] .comp-amount-in {
+  appearance: none;
+  font-family: var(--font-num);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  border: 0;
+  background: transparent;
+  flex: 1;
+  min-width: 0;
+}
+[data-surface="freedomblings"] .comp-amount-in:focus {
+  outline: none;
+}
+[data-surface="freedomblings"] .comp-amount-in::placeholder {
+  color: var(--ink-ghost);
+}
+[data-surface="freedomblings"] .comp-unit {
+  font-size: 12px;
+  color: var(--ink-ghost);
+  flex: none;
+}
+[data-surface="freedomblings"] .recipient-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--paper-sunken);
+}
+[data-surface="freedomblings"] .recipient-chip .rc-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ink);
+}
+[data-surface="freedomblings"] .recipient-chip .rc-handle {
+  font-family: var(--font-num);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+[data-surface="freedomblings"] .recipient-chip .rc-warn {
+  margin-left: auto;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--accent-deep);
+}
+[data-surface="freedomblings"] .comp-hint {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+[data-surface="freedomblings"] .comp-hint.err {
+  color: var(--accent-deep);
+}
+[data-surface="freedomblings"] .comp-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 15px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--line-strong);
+  background: var(--paper);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+[data-surface="freedomblings"] .comp-summary b {
+  color: var(--ink);
+  font-weight: 600;
+}
+[data-surface="freedomblings"] .comp-summary .bmark {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  flex: none;
+}
+[data-surface="freedomblings"] .comp-error {
+  padding: 11px 14px;
+  border-radius: 11px;
+  border: 1px solid var(--accent-deep);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+[data-surface="freedomblings"] .give-btn {
+  appearance: none;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 13px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  cursor: pointer;
+}
+[data-surface="freedomblings"] .give-btn .bmark {
+  width: 16px;
+  height: 16px;
+}
+[data-surface="freedomblings"] .give-btn[disabled] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+[data-surface="freedomblings"] .comp-success {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+[data-surface="freedomblings"] .comp-success .heromark {
+  width: 40px;
+  height: 40px;
+  margin-top: 2px;
+  flex: none;
+}
+[data-surface="freedomblings"] .comp-success h2 {
+  font-size: 20px;
+  margin-bottom: 7px;
+}
+[data-surface="freedomblings"] .comp-success p {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+[data-surface="freedomblings"] .comp-success p b {
+  color: var(--ink);
+  font-weight: 600;
+}
+[data-surface="freedomblings"] .comp-balance {
+  margin-top: 9px;
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+[data-surface="freedomblings"] .comp-success-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+[data-surface="freedomblings"] .comp-link {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-deep);
+  text-decoration: none;
+}
+[data-surface="freedomblings"] .comp-soon {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 14px;
+}
+[data-surface="freedomblings"] .comp-soon .live-dot {
+  margin-top: 6px;
+}
+[data-surface="freedomblings"] .comp-soon h2 {
+  font-size: 18px;
+  margin-bottom: 7px;
+}
+[data-surface="freedomblings"] .comp-soon p {
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  max-width: 48ch;
+}

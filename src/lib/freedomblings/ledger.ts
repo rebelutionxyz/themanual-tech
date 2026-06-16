@@ -163,11 +163,34 @@ function whenLabel(iso: string): string {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
 
+/* ---- mutation signal ----------------------------------------------------- */
+// There is no global query cache here (the read hooks own their own state), so a
+// write surface (GIVE) calls notifyLedgerChanged() after a confirmed bling_send
+// to make every mounted Balance/Ledger hook refetch immediately — the new row
+// and balance land without a manual reload.
+const ledgerListeners = new Set<() => void>();
+export function notifyLedgerChanged(): void {
+  for (const cb of ledgerListeners) cb();
+}
+function useLedgerVersion(): number {
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    const cb = () => setV((x) => x + 1);
+    ledgerListeners.add(cb);
+    return () => {
+      ledgerListeners.delete(cb);
+    };
+  }, []);
+  return v;
+}
+
 /* ---- the hook ------------------------------------------------------------ */
 export function useFreedomblingsBalance(): FbBalance {
   const { user, loading: authLoading } = useAuth();
+  const version = useLedgerVersion();
   const [state, setState] = useState<FbBalance>(EMPTY);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `version` is a deliberate refetch trigger — bumped by notifyLedgerChanged() after a write; not read in the body.
   useEffect(() => {
     if (authLoading) return;
     if (!user || !supabase) {
@@ -254,7 +277,7 @@ export function useFreedomblingsBalance(): FbBalance {
     return () => {
       alive = false;
     };
-  }, [authLoading, user]);
+  }, [authLoading, user, version]);
 
   return state;
 }
@@ -336,8 +359,10 @@ function dayLabel(iso: string, todayKey: string, yesterdayKey: string): string {
 
 export function useFreedomblingsLedger(): LedgerState {
   const { user, loading: authLoading } = useAuth();
+  const version = useLedgerVersion();
   const [state, setState] = useState<LedgerState>(LEDGER_INITIAL);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `version` is a deliberate refetch trigger — bumped by notifyLedgerChanged() after a write; not read in the body.
   useEffect(() => {
     if (authLoading) return;
     if (!user || !supabase) {
@@ -446,7 +471,7 @@ export function useFreedomblingsLedger(): LedgerState {
     return () => {
       alive = false;
     };
-  }, [authLoading, user]);
+  }, [authLoading, user, version]);
 
   return state;
 }

@@ -42,6 +42,7 @@ import { BalancePage } from '@/pages/freedomblings/BalancePage';
 import { FreedomblingsLayout } from '@/pages/freedomblings/FreedomblingsLayout';
 import { GradationsPage } from '@/pages/freedomblings/GradationsPage';
 import { LedgerPage } from '@/pages/freedomblings/LedgerPage';
+import { MovePage } from '@/pages/freedomblings/MovePage';
 import { OpenBooksPage } from '@/pages/freedomblings/OpenBooksPage';
 import { IntelLayout } from '@/pages/intel/IntelLayout';
 import { IntelPage } from '@/pages/intel/IntelPage';
@@ -157,6 +158,7 @@ function AppContent() {
             <Route index element={<BalancePage />} />
             <Route path="ledger" element={<LedgerPage />} />
             <Route path="openbooks" element={<OpenBooksPage />} />
+            <Route path="move" element={<MovePage />} />
             <Route path="gradations" element={<GradationsPage />} />
           </Route>
 

@@ -20,7 +20,7 @@ const LEDGER_NAV: NavDef[] = [
   { id: 'ledger', label: 'The Ledger', path: '/freedomblings/ledger' },
   { id: 'openbooks', label: 'The Open Books', path: '/freedomblings/openbooks' },
   { id: 'charter', label: 'The Charter' },
-  { id: 'move', label: 'Give · Get · Offer' },
+  { id: 'move', label: 'Give · Get · Offer', path: '/freedomblings/move' },
 ];
 
 const MEMBER_NAV: NavDef[] = [
@@ -69,11 +69,13 @@ export function FreedomblingsSidebar({ onLaunch }: { onLaunch?: () => void }) {
       ? 'ledger'
       : path === '/freedomblings/openbooks'
         ? 'openbooks'
-        : path === '/freedomblings/gradations'
-          ? 'gradations'
-          : path === '/freedomblings'
-            ? 'balance'
-            : '';
+        : path === '/freedomblings/move'
+          ? 'move'
+          : path === '/freedomblings/gradations'
+            ? 'gradations'
+            : path === '/freedomblings'
+              ? 'balance'
+              : '';
   const go = (p: string) => navigate(p);
 
   const handle = bee?.handle ?? null;
