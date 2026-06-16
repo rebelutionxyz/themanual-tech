@@ -3,11 +3,13 @@
    signed-in Bee's REAL ledger (bling_lots + bling_transactions) under owner-read
    RLS. The design's illustrative numbers (12,480 / 2,140 / 880 / 540 and the
    fixed bar widths) are NOT shipped — every figure here is read from prod (README
-   rule 2). Genesis truth: no lots → 0.000000, rendered with dignity. Writes
-   (GIVE/GET/OFFER) are deferred ("money last") — the action row is inert. */
+   rule 2). Genesis truth: no lots → 0.000000, rendered with dignity. GIVE is LIVE
+   — it links to the move composer (/freedomblings/move). GET/OFFER stay inert
+   until their slices land. */
 import { LedgerRow } from '@/components/freedomblings/LedgerRow';
 import { BMark, HeroMark } from '@/components/freedomblings/marks';
 import { useFreedomblingsBalance } from '@/lib/freedomblings/ledger';
+import { Link } from 'react-router-dom';
 
 export function BalancePage() {
   const fb = useFreedomblingsBalance();
@@ -76,11 +78,11 @@ export function BalancePage() {
         </div>
       </div>
 
-      {/* GIVE / GET / OFFER — writes are deferred ("money last"); inert in Slice 1 */}
+      {/* GIVE is LIVE → the move composer. GET/OFFER inert until their slices land. */}
       <div className="bal-actions">
-        <button type="button" className="bal-act primary" disabled>
+        <Link to="/freedomblings/move" className="bal-act primary">
           <BMark fill /> GIVE
-        </button>
+        </Link>
         <button type="button" className="bal-act" disabled>
           <BMark /> GET
         </button>

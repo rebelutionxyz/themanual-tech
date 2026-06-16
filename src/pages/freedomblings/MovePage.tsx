@@ -160,7 +160,7 @@ function GiveComposer() {
             type="text"
             inputMode="decimal"
             autoComplete="off"
-            placeholder="0.000000"
+            placeholder="0"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
           />

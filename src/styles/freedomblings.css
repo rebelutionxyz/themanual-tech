@@ -372,6 +372,8 @@
   border: 1px solid var(--line-strong);
   background: var(--paper-raised);
   color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
 }
 [data-surface="freedomblings"] .bal-act[disabled] {
   cursor: not-allowed;
