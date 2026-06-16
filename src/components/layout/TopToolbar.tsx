@@ -11,9 +11,9 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { REALM_NAMES } from '@/lib/constants';
+import { REALM_NAMES, REALM_ID_BY_NAME } from '@/lib/constants';
 import { SURFACE_BY_SLUG } from '@/lib/surfaces';
-import { useManualData } from '@/lib/useManualData';
+import { getAtomLevel, getRealmOrderNames, type AtomLevelRow } from '@/lib/atomLevels';
 import { useIntelStore, type TimeWindow } from '@/stores/useIntelStore';
 import { useLensStore } from '@/stores/useLensStore';
 import { useAstra } from '@/lib/astras/AstraContext';
@@ -21,7 +21,7 @@ import { useAstraRegistry, type AstraRow } from '@/lib/astras/useAstraRegistry';
 import { ScrollRow } from '@/components/ui/ScrollRow';
 import { SearchModal } from '@/components/layout/SearchModal';
 import { cn } from '@/lib/utils';
-import type { RealmId, TreeNode } from '@/types/manual';
+import type { RealmId } from '@/types/manual';
 
 const INTEL_COLOR = '#6B94C8';
 const HONEY = '#FAD15E';
@@ -89,41 +89,15 @@ export function TopToolbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const astra = useAstra();
-  const { tree, realmOrder } = useManualData();
   const registry = useAstraRegistry();
 
-  const { realmId, l2, l3, setLens, setSource } = useLensStore();
+  const { realmId, l2, l3, path: lensPath, setLens, setSource } = useLensStore();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [openId, setOpenId] = useState<ControlId | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [anchorLeft, setAnchorLeft] = useState(0);
   const [containerW, setContainerW] = useState(0);
-
-  // Full-depth drill state for the Realms popup (index 0 = realm node).
-  const [drill, setDrill] = useState<TreeNode[]>([]);
-
-  useEffect(() => {
-    if (openId !== 'realms') return;
-    const next: TreeNode[] = [];
-    if (realmId) {
-      const realmNode = tree.children.find((c) => c.realmId === realmId);
-      if (realmNode) {
-        next.push(realmNode);
-        if (l2) {
-          const l2Node = realmNode.children.find((c) => c.name === l2);
-          if (l2Node) {
-            next.push(l2Node);
-            if (l3) {
-              const l3Node = l2Node.children.find((c) => c.name === l3);
-              if (l3Node) next.push(l3Node);
-            }
-          }
-        }
-      }
-    }
-    setDrill(next);
-  }, [openId, realmId, l2, l3, tree]);
 
   useEffect(() => {
     if (!openId) return;
@@ -166,11 +140,8 @@ export function TopToolbar() {
   // Realms pick → set the platform lens (full drilled path) IN PLACE. The realm
   // selector is a cross-Astra lens: it re-filters whatever surface you're on
   // (which keeps its own sidebar) — it does NOT navigate to a generic feed.
-  function pickAtLevel(level: number, node: TreeNode) {
-    const next = drill.slice(0, level).concat(node);
-    setDrill(next);
-    const rid = (next[0]?.realmId || null) as RealmId | null;
-    setLens(rid, next.map((n) => n.name));
+  function handleSelectPath(rid: RealmId | null, pathNames: string[]) {
+    setLens(rid, pathNames);
     if (rid) {
       // Default the Source chip to the surface the realm was picked from.
       const surf = surfaceFromPath(location.pathname);
@@ -179,12 +150,11 @@ export function TopToolbar() {
   }
 
   function clearRealms() {
-    setDrill([]);
     setLens(null, []);
     setSource('all');
   }
 
-  const activeRealmId = (drill[0]?.realmId ?? realmId) as RealmId | null;
+  const activeRealmId = realmId;
   const realmAstraSlug = activeRealmId
     ? registry.realmAstraSlug[activeRealmId] ?? null
     : null;
@@ -253,13 +223,10 @@ export function TopToolbar() {
       {openId === 'realms' && (
         <Popup full anchorLeft={anchorLeft} containerW={containerW} title="Realm" onClose={() => setOpenId(null)}>
           <RealmsPanel
-            tree={tree}
-            realmOrder={realmOrder}
-            drill={drill}
-            activeRealmId={activeRealmId}
+            lensPath={lensPath}
             realmAstra={realmAstra}
             hasRealmAstra={Boolean(realmAstraSlug)}
-            onPick={pickAtLevel}
+            onSelectPath={handleSelectPath}
             onClear={clearRealms}
             onJump={jumpToAstra}
           />
@@ -355,53 +322,111 @@ function Popup({
 /* ───────────────────────── Realms panel ───────────────────────── */
 
 function RealmsPanel({
-  tree,
-  realmOrder,
-  drill,
-  activeRealmId,
+  lensPath,
   realmAstra,
   hasRealmAstra,
-  onPick,
+  onSelectPath,
   onClear,
   onJump,
 }: {
-  tree: TreeNode;
-  realmOrder: RealmId[];
-  drill: TreeNode[];
-  activeRealmId: RealmId | null;
+  /** Current lens path (display names) — seeds the drill on open. */
+  lensPath: string[];
   realmAstra: AstraRow | null;
   hasRealmAstra: boolean;
-  onPick: (level: number, node: TreeNode) => void;
+  onSelectPath: (realmId: RealmId | null, pathNames: string[]) => void;
   onClear: () => void;
   onJump: () => void;
 }) {
-  const realmNodes = realmOrder.map((id) => tree.children.find((c) => c.realmId === id)).filter(
-    (n): n is TreeNode => Boolean(n),
-  );
+  // Lazy per-level state — fed by get_atom_level (cached per path), never the
+  // full atom tree.
+  const [roots, setRoots] = useState<AtomLevelRow[]>([]);
+  const [drill, setDrill] = useState<AtomLevelRow[]>([]); // selected node per level
+  const [childrenByPath, setChildrenByPath] = useState<Map<string, AtomLevelRow[]>>(new Map());
 
-  const deeperRows: { level: number; nodes: TreeNode[] }[] = [];
-  for (let i = 0; i < drill.length; i++) {
-    const node = drill[i];
-    if (node.children.length > 0) deeperRows.push({ level: i + 1, nodes: node.children });
+  // On open: load the 13 realm roots (re-sorted to DB display_order) and walk
+  // the current lens path level-by-level to rebuild the drill.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: lensPath is the one-shot seed (joined to a stable key); stable module fns + setters intentionally omitted
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [rawRoots, orderNames] = await Promise.all([
+        getAtomLevel(null),
+        getRealmOrderNames(),
+      ]);
+      if (cancelled) return;
+      const orderIdx = new Map(orderNames.map((n, i) => [n, i]));
+      const sorted = [...rawRoots].sort(
+        (a, b) => (orderIdx.get(a.name) ?? 999) - (orderIdx.get(b.name) ?? 999),
+      );
+      setRoots(sorted);
+
+      const nextDrill: AtomLevelRow[] = [];
+      const childMap = new Map<string, AtomLevelRow[]>();
+      let levelRows = sorted;
+      for (const name of lensPath) {
+        const node = levelRows.find((r) => r.name === name);
+        if (!node) break;
+        nextDrill.push(node);
+        if (node.isLeaf) break;
+        levelRows = await getAtomLevel(node.path);
+        if (cancelled) return;
+        childMap.set(node.path, levelRows);
+      }
+      setDrill(nextDrill);
+      setChildrenByPath(childMap);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [lensPath.join(' / ')]);
+
+  async function ensureChildren(path: string) {
+    if (childrenByPath.has(path)) return;
+    const rows = await getAtomLevel(path);
+    setChildrenByPath((m) => new Map(m).set(path, rows));
   }
 
+  // Pick a node at drill index `level` → set the lens path; fetch its children
+  // (skipped on leaves — is_leaf means no expand control / no fetch).
+  function pickNode(level: number, node: AtomLevelRow) {
+    const next = drill.slice(0, level).concat(node);
+    setDrill(next);
+    const rid = REALM_ID_BY_NAME[next[0].name] ?? null;
+    onSelectPath(rid, next.map((d) => d.name));
+    if (!node.isLeaf) void ensureChildren(node.path);
+  }
+
+  function clearAll() {
+    setDrill([]);
+    onClear();
+  }
+
+  const activeRealmName = drill[0]?.name ?? null;
   const offGrid = realmAstra?.status !== 'active';
   const astraLabel = realmAstra?.displayName ?? (hasRealmAstra ? 'Astra' : null);
+
+  // Rows beyond row 0: the direct children of each drilled non-leaf node.
+  const deeperRows: { level: number; nodes: AtomLevelRow[] }[] = [];
+  for (let i = 0; i < drill.length; i++) {
+    if (drill[i].isLeaf) continue;
+    const kids = childrenByPath.get(drill[i].path);
+    if (kids && kids.length > 0) deeperRows.push({ level: i + 1, nodes: kids });
+  }
 
   // Dark depth-ramp rows on the silver box: padded so silver shows as gaps,
   // each strip rounded with a hairline so even the lightest level separates.
   return (
     <div className="space-y-1 p-1.5">
       <DepthRow level={0}>
-        <Chip level={0} label="All" active={!activeRealmId} onClick={onClear} />
+        <Chip level={0} label="All" active={drill.length === 0} onClick={clearAll} />
         <Divider />
-        {realmNodes.map((node) => (
+        {roots.map((node) => (
           <Chip
-            key={node.realmId}
+            key={node.id}
             level={0}
-            label={REALM_NAMES[node.realmId as RealmId]}
-            active={activeRealmId === node.realmId}
-            onClick={() => onPick(0, node)}
+            label={node.name}
+            active={activeRealmName === node.name}
+            onClick={() => pickNode(0, node)}
           />
         ))}
         {hasRealmAstra && astraLabel && (
@@ -445,7 +470,7 @@ function RealmsPanel({
                 level={row.level}
                 label={node.name}
                 active={activeName === node.name}
-                onClick={() => onPick(row.level, node)}
+                onClick={() => pickNode(row.level, node)}
               />
             ))}
           </DepthRow>
