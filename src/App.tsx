@@ -42,6 +42,7 @@ import { BalancePage } from '@/pages/freedomblings/BalancePage';
 import { CharterPage } from '@/pages/freedomblings/CharterPage';
 import { CirculationPage } from '@/pages/freedomblings/CirculationPage';
 import { EarningPage } from '@/pages/freedomblings/EarningPage';
+import { EscrowPage } from '@/pages/freedomblings/EscrowPage';
 import { FreedomblingsLayout } from '@/pages/freedomblings/FreedomblingsLayout';
 import { GradationsPage } from '@/pages/freedomblings/GradationsPage';
 import { LedgerPage } from '@/pages/freedomblings/LedgerPage';
@@ -164,6 +165,7 @@ function AppContent() {
             <Route path="earning" element={<EarningPage />} />
             <Route path="circulation" element={<CirculationPage />} />
             <Route path="charter" element={<CharterPage />} />
+            <Route path="escrow" element={<EscrowPage />} />
             <Route path="ledger" element={<LedgerPage />} />
             <Route path="openbooks" element={<OpenBooksPage />} />
             <Route path="move" element={<MovePage />} />

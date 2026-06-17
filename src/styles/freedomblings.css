@@ -1922,6 +1922,91 @@
   max-width: 48ch;
 }
 
+/* OFFER tab — honest description + pointers (no create form; marketplace is Entertheprize) */
+[data-surface="freedomblings"] .offer-lead {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  line-height: 1.55;
+  max-width: 52ch;
+}
+[data-surface="freedomblings"] .offer-points {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+[data-surface="freedomblings"] .offer-point {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 15px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  text-decoration: none;
+  color: inherit;
+  font: inherit;
+}
+[data-surface="freedomblings"] a.offer-point {
+  cursor: pointer;
+  transition: border-color 0.14s, background 0.14s;
+}
+[data-surface="freedomblings"] a.offer-point:hover {
+  border-color: var(--ink-ghost);
+  background: var(--paper-sunken);
+}
+[data-surface="freedomblings"] .offer-point.soon {
+  border-style: dashed;
+  opacity: 0.85;
+}
+[data-surface="freedomblings"] .op-mark {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  background: var(--accent);
+}
+[data-surface="freedomblings"] .offer-point.soon .op-mark {
+  background: var(--ink-ghost);
+}
+[data-surface="freedomblings"] .op-main {
+  min-width: 0;
+  flex: 1;
+}
+[data-surface="freedomblings"] .op-k {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+}
+[data-surface="freedomblings"] .op-d {
+  font-size: 12px;
+  color: var(--ink-faint);
+  line-height: 1.45;
+  margin-top: 3px;
+}
+[data-surface="freedomblings"] .op-go {
+  font-family: var(--font-num);
+  font-size: 16px;
+  color: var(--ink-ghost);
+  flex: none;
+}
+[data-surface="freedomblings"] a.offer-point:hover .op-go {
+  color: var(--accent-deep);
+}
+[data-surface="freedomblings"] .op-soon {
+  flex: none;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--ink-faint);
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: var(--paper-sunken);
+  border: 1px solid var(--line);
+}
+
 /* ---- Standing & identity (Slice #2) -------------------------------------- */
 [data-surface="freedomblings"] .identity {
   display: flex;
@@ -3077,5 +3162,339 @@
   [data-surface="freedomblings"] .article {
     grid-template-columns: 64px 1fr;
     gap: 14px;
+  }
+}
+
+/* ---- Escrow (Slice #7) --------------------------------------------------- */
+[data-surface="freedomblings"] .escrow-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 14px;
+  margin-top: 14px;
+  align-items: start;
+}
+[data-surface="freedomblings"] .escrow-main,
+[data-surface="freedomblings"] .escrow-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+[data-surface="freedomblings"] .escrow-card {
+  padding: calc(20px * var(--sp)) calc(22px * var(--sp));
+}
+[data-surface="freedomblings"] .ec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+[data-surface="freedomblings"] .ec-status {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 4px 11px;
+  border-radius: 999px;
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-deep);
+}
+[data-surface="freedomblings"] .ec-status.released {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent-deep);
+}
+[data-surface="freedomblings"] .ec-status.cancelled,
+[data-surface="freedomblings"] .ec-status.expired {
+  color: var(--ink-faint);
+  background: var(--paper-sunken);
+  border-color: var(--line-strong);
+}
+[data-surface="freedomblings"] .ec-status.disputed {
+  color: var(--ink);
+  background: var(--paper);
+  border-style: dashed;
+  border-color: var(--accent-deep);
+}
+[data-surface="freedomblings"] .ec-kind {
+  font-family: var(--font-num);
+  font-size: 11.5px;
+  color: var(--ink-ghost);
+}
+[data-surface="freedomblings"] .ec-parties {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+[data-surface="freedomblings"] .ec-party {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+[data-surface="freedomblings"] .ecp-n {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.2;
+}
+[data-surface="freedomblings"] .ecp-r {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 600;
+}
+[data-surface="freedomblings"] .ec-arrow {
+  width: 18px;
+  height: 8px;
+  flex: none;
+  position: relative;
+}
+[data-surface="freedomblings"] .ec-arrow::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  right: 0;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--ink-ghost);
+  border-top: 1.5px solid var(--ink-ghost);
+  transform: rotate(45deg);
+}
+[data-surface="freedomblings"] .ec-arrow::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 0;
+  right: 3px;
+  height: 1.5px;
+  background: var(--ink-ghost);
+}
+[data-surface="freedomblings"] .ec-for {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-top: 16px;
+  line-height: 1.4;
+}
+[data-surface="freedomblings"] .ec-for b {
+  color: var(--ink);
+  font-weight: 600;
+}
+[data-surface="freedomblings"] .ec-amount {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+[data-surface="freedomblings"] .ec-amount .heromark {
+  width: 28px;
+  height: 28px;
+  margin-top: 0;
+  flex: none;
+}
+[data-surface="freedomblings"] .ec-amount .num {
+  font-family: var(--font-num);
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+[data-surface="freedomblings"] .ec-u {
+  font-size: 12px;
+  color: var(--ink-faint);
+  align-self: flex-end;
+  margin-bottom: 5px;
+}
+[data-surface="freedomblings"] .ec-track {
+  display: flex;
+  align-items: flex-start;
+  margin-top: 18px;
+}
+[data-surface="freedomblings"] .ec-node {
+  flex: none;
+  width: 92px;
+  text-align: center;
+}
+[data-surface="freedomblings"] .ecn-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  margin: 0 auto 7px;
+  border: 2px solid var(--line-strong);
+  background: var(--paper-raised);
+}
+[data-surface="freedomblings"] .ec-node.done .ecn-dot {
+  background: var(--accent);
+  border-color: var(--accent-deep);
+}
+[data-surface="freedomblings"] .ec-node.cur .ecn-dot {
+  background: var(--paper-raised);
+  border-color: var(--accent-deep);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+[data-surface="freedomblings"] .ecn-k {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+[data-surface="freedomblings"] .ec-node.cur .ecn-k {
+  color: var(--accent-deep);
+}
+[data-surface="freedomblings"] .ecn-d {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+[data-surface="freedomblings"] .ec-line {
+  flex: 1;
+  height: 2px;
+  background: var(--line-strong);
+  margin-top: 6px;
+}
+[data-surface="freedomblings"] .ec-line.done {
+  background: var(--accent);
+}
+[data-surface="freedomblings"] .ec-state-line {
+  margin-top: 16px;
+  padding: 12px 15px;
+  border-radius: 11px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  background: var(--paper-sunken);
+}
+[data-surface="freedomblings"] .ec-state-line.disputed {
+  border-color: var(--accent-deep);
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+[data-surface="freedomblings"] .ec-timelock {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+[data-surface="freedomblings"] .ec-timelock .bmark {
+  width: 13px;
+  height: 13px;
+  margin-top: 2px;
+  flex: none;
+}
+[data-surface="freedomblings"] .ec-timelock b {
+  color: var(--ink);
+  font-weight: 600;
+}
+[data-surface="freedomblings"] .ec-ok {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 14px;
+  font-size: 12.5px;
+  color: var(--accent-deep);
+  font-weight: 600;
+}
+[data-surface="freedomblings"] .ec-ok .bmark {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+[data-surface="freedomblings"] .ec-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+[data-surface="freedomblings"] .ec-dispute {
+  appearance: none;
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 13px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+[data-surface="freedomblings"] .ec-dispute:hover {
+  color: var(--ink);
+  border-color: var(--ink-ghost);
+}
+[data-surface="freedomblings"] .ec-dispute[disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+[data-surface="freedomblings"] .escrow-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: calc(24px * var(--sp)) calc(26px * var(--sp));
+}
+[data-surface="freedomblings"] .escrow-empty .live-dot {
+  margin-top: 6px;
+}
+[data-surface="freedomblings"] .escrow-empty h2 {
+  font-size: 18px;
+  margin-bottom: 7px;
+}
+[data-surface="freedomblings"] .escrow-empty p {
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  max-width: 52ch;
+}
+
+/* "How escrow protects both" — numbered steps */
+[data-surface="freedomblings"] .net-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 12px;
+}
+[data-surface="freedomblings"] .net-step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+[data-surface="freedomblings"] .ns-n {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-family: var(--font-num);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-d-light);
+}
+[data-surface="freedomblings"] .ns-k {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+[data-surface="freedomblings"] .ns-d {
+  font-size: 12px;
+  color: var(--ink-faint);
+  line-height: 1.45;
+  margin-top: 3px;
+}
+@container (max-width: 720px) {
+  [data-surface="freedomblings"] .escrow-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -303,10 +303,35 @@ export function MovePage() {
       )}
 
       {mode === 'offer' && (
-        <SoonPanel
-          title="Held in escrow — opens with the Escrow slice"
-          body="OFFER places BLiNG! into escrow until both sides are satisfied — then it releases. This wires to escrow when that slice lands."
-        />
+        <div className="card composer">
+          <p className="offer-lead">
+            OFFER a good or service in the marketplace — and when a deal needs trust, BLiNG! rests
+            in escrow until it's complete.
+          </p>
+          <div className="offer-points">
+            <Link className="offer-point" to="/freedomblings/escrow">
+              <span className="op-mark" />
+              <div className="op-main">
+                <div className="op-k">Escrow</div>
+                <div className="op-d">
+                  Holds BLiNG! in trust until both sides are satisfied, then releases — whole, never
+                  a fee.
+                </div>
+              </div>
+              <span className="op-go" aria-hidden="true">
+                ›
+              </span>
+            </Link>
+            <div className="offer-point soon">
+              <span className="op-mark" />
+              <div className="op-main">
+                <div className="op-k">Entertheprize · the marketplace</div>
+                <div className="op-d">Where OFFERs live. A separate Astra — arrives at launch.</div>
+              </div>
+              <span className="op-soon">At launch</span>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );
