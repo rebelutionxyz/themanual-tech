@@ -72,9 +72,11 @@ export function BalancePage() {
             <b>BLiNG!</b> — your balance in the ledger, member-owned and capped
           </div>
         </div>
-        <div className="standing-badge">
+        <div className={`standing-badge${fb.inGoodComb ? '' : ' repair'}`}>
           <span className="sb-k">Standing</span>
-          <span className="sb-v">In good comb</span>
+          <span className="sb-v">
+            {fb.inGoodComb ? 'In good standing' : 'Standing under repair'}
+          </span>
         </div>
       </div>
 

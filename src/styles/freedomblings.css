@@ -154,12 +154,13 @@
   transition: background 0.15s, color 0.15s;
 }
 [data-surface="freedomblings"] .nav-item .ni-mark {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   flex: none;
-  transform: rotate(45deg);
-  border: 1.4px solid var(--ink-ghost);
-  border-radius: 1px;
+  /* HoneyComb hexagon — the platform decor shape (NOT a diamond; BLiNG! marks
+     stay honey drops, see marks.tsx). */
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  background: var(--ink-ghost);
 }
 [data-surface="freedomblings"] .nav-item.clickable {
   cursor: pointer;
@@ -177,7 +178,6 @@
 }
 [data-surface="freedomblings"] .nav-item.active .ni-mark {
   background: var(--accent);
-  border-color: var(--accent-deep);
 }
 [data-surface="freedomblings"] .ni-tag {
   margin-left: auto;
@@ -350,6 +350,14 @@
   font-size: 14px;
   color: var(--ink);
   white-space: nowrap;
+}
+/* Standing under repair — neutral, not the gold "good standing" treatment. */
+[data-surface="freedomblings"] .standing-badge.repair {
+  border-color: var(--line-strong);
+  background: var(--paper-sunken);
+}
+[data-surface="freedomblings"] .standing-badge.repair .sb-k {
+  color: var(--ink-faint);
 }
 
 /* GIVE / GET / OFFER — inert in Slice 1 (writes are "money last") */
@@ -1230,21 +1238,21 @@
   color: var(--ink);
 }
 [data-surface="freedomblings"] .cap-dia {
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
   flex: none;
-  transform: rotate(45deg);
-  border-radius: 2px;
-  border: 1.5px solid var(--accent-deep);
+  /* HoneyComb hexagon (was a diamond). Fill variants carry the cap-anatomy meaning. */
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  background: var(--accent-deep);
 }
 [data-surface="freedomblings"] .cap-dia.fill {
   background: var(--accent);
 }
 [data-surface="freedomblings"] .cap-dia.out {
-  background: transparent;
+  background: var(--accent-soft);
 }
 [data-surface="freedomblings"] .cap-dia.ghost {
-  border-color: var(--ink-ghost);
+  background: var(--ink-ghost);
 }
 [data-surface="freedomblings"] .cap-fig {
   font-size: 16px;
@@ -1282,12 +1290,12 @@
   padding-bottom: 0;
 }
 [data-surface="freedomblings"] .fi-mark {
-  width: 11px;
-  height: 11px;
+  width: 12px;
+  height: 12px;
   flex: none;
-  transform: rotate(45deg);
-  border-radius: 2px;
-  border: 1.5px solid var(--accent-deep);
+  /* HoneyComb hexagon (was a diamond). */
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  background: var(--accent);
   margin-top: 3px;
 }
 [data-surface="freedomblings"] .fi-k {
@@ -1467,14 +1475,13 @@
   line-height: 1.4;
 }
 [data-surface="freedomblings"] .gp-tick {
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   flex: none;
   margin-top: 4px;
-  transform: rotate(45deg);
-  border-radius: 1px;
+  /* HoneyComb hexagon (was a diamond). */
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
   background: var(--accent);
-  border: 1px solid var(--accent-deep);
 }
 [data-surface="freedomblings"] .grad-btn {
   appearance: none;
@@ -1555,13 +1562,13 @@
   gap: 9px;
 }
 [data-surface="freedomblings"] .ac-mark {
-  width: 11px;
-  height: 11px;
+  width: 12px;
+  height: 12px;
   flex: none;
-  transform: rotate(45deg);
-  border-radius: 2px;
   margin-top: 3px;
-  border: 1.5px solid var(--accent-deep);
+  /* HoneyComb hexagon (was a diamond). */
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  background: var(--accent-deep);
 }
 [data-surface="freedomblings"] .astra-card.current .ac-mark {
   background: var(--accent);
@@ -2126,9 +2133,9 @@
   display: block;
   width: 9px;
   height: 9px;
-  border-radius: 1px;
+  /* HoneyComb hexagon — matches the rest of the surface decor. */
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
   background: var(--accent);
-  border: 1px solid var(--accent-deep);
   margin-bottom: 9px;
 }
 [data-surface="freedomblings"] .facet-k {
@@ -2185,9 +2192,9 @@
 [data-surface="freedomblings"] .sovereign-note .sn-mark {
   width: 14px;
   height: 14px;
-  border-radius: 3px;
+  /* HoneyComb hexagon — matches the rest of the surface decor. */
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
   background: var(--accent);
-  border: 1px solid var(--accent-deep);
 }
 [data-surface="freedomblings"] .sovereign-note p {
   font-size: 12.5px;

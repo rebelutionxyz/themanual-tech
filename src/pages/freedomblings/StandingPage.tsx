@@ -114,7 +114,7 @@ export function StandingPage() {
         <div className="id-right">
           <div className="eyebrow">Standing</div>
           {s.inGoodComb ? (
-            <div className="id-standing">In good comb</div>
+            <div className="id-standing">In good standing</div>
           ) : (
             <div className="id-standing repair">Standing under repair</div>
           )}

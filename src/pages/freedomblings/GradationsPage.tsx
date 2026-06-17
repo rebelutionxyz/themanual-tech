@@ -1,8 +1,7 @@
 /* FreedomBLiNGS — Honey Gradations (Slice 4). Subscription tiers $0 / $3 / $8 /
    $13 (Wildflower / Clover / Manuka featured / Royal Jelly). Ported from
    gradations.jsx. Prices are canon-ratified; per-tier perks are illustrative
-   until confirmed. The fiat membrane is ONE-WAY: membership is billed in fiat
-   and NEVER converts to or from BLiNG! — no "buy BLiNG!", no fiat-out.
+   until confirmed. Membership is a monthly subscription.
 
    CTAs are INERT: the Stripe checkout-session function doesn't exist yet, so the
    paid tiers carry a "memberships open at launch" caption rather than a fake
@@ -74,13 +73,12 @@ export function GradationsPage() {
           <div className="eyebrow">Membership in the comb</div>
           <h1>Honey Gradations</h1>
           <div className="sub">
-            Choose how deep you tend the comb. Membership unlocks reach and tools — it never buys
-            BLiNG!. Money only ever flows in.
+            Choose how deep you tend the comb. Membership unlocks reach and tools.
           </div>
         </div>
         <div className="commons-tags">
           <span className="pill">
-            <BMark /> Billed in fiat · never converts to BLiNG!
+            <BMark /> Billed monthly
           </span>
         </div>
       </div>
@@ -118,15 +116,13 @@ export function GradationsPage() {
       </div>
 
       <div className="grad-caption">
-        Memberships open at launch — the checkout wires in when the fiat membrane goes live.
-        Wildflower is free, always.
+        Memberships open at launch — checkout wires in then. Wildflower is free, always.
       </div>
 
       <div className="ledger-foot">
         <span className="seal" />
-        Honey Gradations are a membership, paid in fiat at the one-way membrane — they unlock reach
-        and tools and never convert to or from BLiNG! Per-tier perks are illustrative until
-        confirmed.
+        Honey Gradations are a membership — they unlock reach and tools. Per-tier perks are
+        illustrative until confirmed.
       </div>
     </main>
   );

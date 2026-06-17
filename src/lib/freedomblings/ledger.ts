@@ -135,6 +135,7 @@ export interface FbBalance {
   gotPct: number;
   gavePct: number;
   recent: MovementRow[];
+  inGoodComb: boolean; // bling_deficit nets to zero — drives the standing badge
 }
 
 const ZERO = '0.000000';
@@ -148,6 +149,7 @@ const EMPTY: FbBalance = {
   gotPct: 0,
   gavePct: 0,
   recent: [],
+  inGoodComb: true,
 };
 
 function pctOf(v: bigint, max: bigint): number {
@@ -200,7 +202,7 @@ export function useFreedomblingsBalance(): FbBalance {
     let alive = true;
     const client = supabase;
     async function load() {
-      const [lotsRes, txRes] = await Promise.all([
+      const [lotsRes, txRes, beeRes] = await Promise.all([
         client
           .from('bling_lots')
           // ::text — numeric past 2^53 is clipped by PostgREST's JSON before String()
@@ -213,6 +215,12 @@ export function useFreedomblingsBalance(): FbBalance {
           .eq('bee_id', user!.id)
           .order('created_at', { ascending: false })
           .limit(60),
+        // Standing health for the badge — deficit can exceed 2^53, so ::text.
+        client
+          .from('bees')
+          .select('bling_deficit::text')
+          .eq('id', user!.id)
+          .maybeSingle(),
       ]);
       if (!alive) return;
       if (lotsRes.error || txRes.error) {
@@ -223,6 +231,10 @@ export function useFreedomblingsBalance(): FbBalance {
       const lots = (lotsRes.data ?? []) as any[];
       // biome-ignore lint/suspicious/noExplicitAny: untyped DB client rows → narrowed below
       const txs = (txRes.data ?? []) as any[];
+      // biome-ignore lint/suspicious/noExplicitAny: untyped DB row → narrowed below
+      const bee = (beeRes.data ?? null) as any;
+      // Default to in-good-standing if the deficit read missed — never accuse falsely.
+      const inGoodComb = beeRes.error ? true : toMicros(String(bee?.bling_deficit ?? '0')) === 0n;
 
       const balMicros = sumMagnitudes(lots.map((l) => String(l.amount_remaining)));
 
@@ -271,6 +283,7 @@ export function useFreedomblingsBalance(): FbBalance {
         gotPct: pctOf(gotMicros, maxMicros),
         gavePct: pctOf(gaveMicros, maxMicros),
         recent,
+        inGoodComb,
       });
     }
     load();
