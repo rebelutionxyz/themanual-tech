@@ -2661,3 +2661,205 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- Circulation / the melt (Slice #5) ----------------------------------- */
+[data-surface="freedomblings"] .melt-hero {
+  margin-top: 6px;
+  padding: calc(22px * var(--sp)) calc(26px * var(--sp));
+  display: flex;
+  align-items: stretch;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+[data-surface="freedomblings"] .mh-left {
+  flex: 1;
+  min-width: 240px;
+}
+[data-surface="freedomblings"] .mh-lead {
+  font-family: var(--font-head);
+  font-size: 15px;
+  color: var(--ink-soft);
+  margin-top: 8px;
+}
+[data-surface="freedomblings"] .mh-rate {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  margin-top: 6px;
+}
+[data-surface="freedomblings"] .mh-rate .num {
+  font-family: var(--font-num);
+  font-size: var(--hero);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
+  color: var(--accent-deep);
+  font-variant-numeric: tabular-nums;
+}
+[data-surface="freedomblings"] .mh-pct {
+  font-family: var(--font-num);
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--accent-deep);
+}
+[data-surface="freedomblings"] .mh-sub {
+  font-size: 13px;
+  color: var(--ink-faint);
+  line-height: 1.5;
+  margin-top: 10px;
+  max-width: 42ch;
+}
+[data-surface="freedomblings"] .mh-sub b {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+[data-surface="freedomblings"] .bank-invert {
+  flex: 1;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--line-strong);
+  background: var(--paper);
+}
+[data-surface="freedomblings"] .bank-invert p {
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+[data-surface="freedomblings"] .bank-invert b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+[data-surface="freedomblings"] .melt-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 14px;
+  margin-top: 14px;
+  align-items: start;
+}
+[data-surface="freedomblings"] .melt-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* The flat-rate statement (replaces the dead tier list) */
+[data-surface="freedomblings"] .flat-rate {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+[data-surface="freedomblings"] .fr-mark {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  background: var(--accent);
+}
+[data-surface="freedomblings"] .fr-n {
+  font-family: var(--font-num);
+  font-size: 52px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+[data-surface="freedomblings"] .fr-pct {
+  font-family: var(--font-num);
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--ink-faint);
+  align-self: flex-start;
+  margin-top: 6px;
+}
+[data-surface="freedomblings"] .flat-egal {
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin-top: 12px;
+  max-width: 50ch;
+}
+[data-surface="freedomblings"] .flat-egal b {
+  color: var(--ink);
+  font-weight: 600;
+}
+[data-surface="freedomblings"] .og-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+[data-surface="freedomblings"] .og-line .bmark {
+  width: 13px;
+  height: 13px;
+  margin-top: 2px;
+  flex: none;
+}
+[data-surface="freedomblings"] .og-line b {
+  color: var(--accent-deep);
+  font-weight: 600;
+}
+
+/* Where the melt goes — the conservation flow (vertical) */
+[data-surface="freedomblings"] .flow {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+}
+[data-surface="freedomblings"] .flow-step {
+  display: flex;
+  flex-direction: column;
+}
+[data-surface="freedomblings"] .flow-node {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 11px;
+  align-items: start;
+  padding: 11px 0;
+}
+[data-surface="freedomblings"] .fn-mark {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  margin-top: 3px;
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  background: var(--accent-deep);
+}
+[data-surface="freedomblings"] .flow-node.mid .fn-mark {
+  background: var(--accent);
+}
+[data-surface="freedomblings"] .fn-k {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+}
+[data-surface="freedomblings"] .fn-d {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+[data-surface="freedomblings"] .flow-arrow {
+  width: 2px;
+  height: 16px;
+  margin-left: 7px;
+  background: var(--line-strong);
+}
+@container (max-width: 720px) {
+  [data-surface="freedomblings"] .melt-grid {
+    grid-template-columns: 1fr;
+  }
+}

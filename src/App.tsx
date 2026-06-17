@@ -39,6 +39,7 @@ import { SourceVerificationPage } from '@/pages/dingleberry/SourceVerificationPa
 import { ThreatInterceptionPage } from '@/pages/dingleberry/ThreatInterceptionPage';
 import { TransactionSecurityPage } from '@/pages/dingleberry/TransactionSecurityPage';
 import { BalancePage } from '@/pages/freedomblings/BalancePage';
+import { CirculationPage } from '@/pages/freedomblings/CirculationPage';
 import { EarningPage } from '@/pages/freedomblings/EarningPage';
 import { FreedomblingsLayout } from '@/pages/freedomblings/FreedomblingsLayout';
 import { GradationsPage } from '@/pages/freedomblings/GradationsPage';
@@ -160,6 +161,7 @@ function AppContent() {
           <Route path="/freedomblings" element={<FreedomblingsLayout />}>
             <Route index element={<BalancePage />} />
             <Route path="earning" element={<EarningPage />} />
+            <Route path="circulation" element={<CirculationPage />} />
             <Route path="ledger" element={<LedgerPage />} />
             <Route path="openbooks" element={<OpenBooksPage />} />
             <Route path="move" element={<MovePage />} />

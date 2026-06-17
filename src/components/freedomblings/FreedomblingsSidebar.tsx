@@ -16,7 +16,7 @@ interface NavDef {
 const LEDGER_NAV: NavDef[] = [
   { id: 'balance', label: 'Balance', path: '/freedomblings' },
   { id: 'earning', label: 'Earning', path: '/freedomblings/earning' },
-  { id: 'circulation', label: 'Circulation' },
+  { id: 'circulation', label: 'Circulation', path: '/freedomblings/circulation' },
   { id: 'ledger', label: 'The Ledger', path: '/freedomblings/ledger' },
   { id: 'openbooks', label: 'The Open Books', path: '/freedomblings/openbooks' },
   { id: 'charter', label: 'The Charter' },
@@ -67,21 +67,23 @@ export function FreedomblingsSidebar({ onLaunch }: { onLaunch?: () => void }) {
   const active =
     path === '/freedomblings/earning'
       ? 'earning'
-      : path === '/freedomblings/ledger'
-        ? 'ledger'
-        : path === '/freedomblings/openbooks'
-          ? 'openbooks'
-          : path === '/freedomblings/move'
-            ? 'move'
-            : path === '/freedomblings/standing'
-              ? 'standing'
-              : path === '/freedomblings/lineage'
-                ? 'lineage'
-                : path === '/freedomblings/gradations'
-                  ? 'gradations'
-                  : path === '/freedomblings'
-                    ? 'balance'
-                    : '';
+      : path === '/freedomblings/circulation'
+        ? 'circulation'
+        : path === '/freedomblings/ledger'
+          ? 'ledger'
+          : path === '/freedomblings/openbooks'
+            ? 'openbooks'
+            : path === '/freedomblings/move'
+              ? 'move'
+              : path === '/freedomblings/standing'
+                ? 'standing'
+                : path === '/freedomblings/lineage'
+                  ? 'lineage'
+                  : path === '/freedomblings/gradations'
+                    ? 'gradations'
+                    : path === '/freedomblings'
+                      ? 'balance'
+                      : '';
   const go = (p: string) => navigate(p);
 
   const handle = bee?.handle ?? null;
