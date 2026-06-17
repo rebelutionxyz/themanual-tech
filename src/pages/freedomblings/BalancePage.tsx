@@ -80,17 +80,18 @@ export function BalancePage() {
         </div>
       </div>
 
-      {/* GIVE is LIVE → the move composer. GET/OFFER inert until their slices land. */}
+      {/* GIVE is LIVE → the move composer. GET/OFFER deferred → Sep build. */}
       <div className="bal-actions">
         <Link to="/freedomblings/move" className="bal-act primary">
           <BMark fill /> GIVE
         </Link>
+        {/* deferred → Sep build
         <button type="button" className="bal-act" disabled>
           <BMark /> GET
         </button>
         <button type="button" className="bal-act" disabled>
           <BMark /> OFFER
-        </button>
+        </button> */}
       </div>
 
       <div className="stat-grid">
