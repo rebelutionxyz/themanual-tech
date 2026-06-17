@@ -2206,3 +2206,157 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- Lineage / affiliate chain (Slice #3) -------------------------------- */
+[data-surface="freedomblings"] .commons-tags {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+[data-surface="freedomblings"] .aff-hero {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  margin-top: 6px;
+  padding: calc(20px * var(--sp)) calc(24px * var(--sp));
+}
+[data-surface="freedomblings"] .ah-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 4px 22px;
+  border-left: 1px solid var(--line);
+}
+[data-surface="freedomblings"] .ah-item:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+[data-surface="freedomblings"] .ah-k {
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.02em;
+}
+[data-surface="freedomblings"] .ah-v {
+  font-family: var(--font-num);
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+[data-surface="freedomblings"] .ah-fib {
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  color: var(--accent-deep);
+}
+[data-surface="freedomblings"] .ah-s {
+  font-size: 11px;
+  color: var(--ink-ghost);
+}
+@container (max-width: 720px) {
+  [data-surface="freedomblings"] .aff-hero {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  [data-surface="freedomblings"] .ah-item {
+    border-left: 0;
+    padding: 0;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+  }
+  [data-surface="freedomblings"] .ah-item:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+}
+
+[data-surface="freedomblings"] .chain-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+}
+[data-surface="freedomblings"] .chain-row {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 15px 2px;
+  border-bottom: 1px solid var(--line);
+}
+[data-surface="freedomblings"] .chain-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+[data-surface="freedomblings"] .chain-lvl {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-num);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-d-light);
+}
+[data-surface="freedomblings"] .chain-main {
+  min-width: 0;
+}
+[data-surface="freedomblings"] .chain-rel {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.3;
+}
+[data-surface="freedomblings"] .chain-who {
+  font-weight: 400;
+  color: var(--ink-faint);
+}
+[data-surface="freedomblings"] .chain-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--paper-sunken);
+  overflow: hidden;
+  margin-top: 8px;
+}
+[data-surface="freedomblings"] .chain-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+[data-surface="freedomblings"] .chain-via {
+  font-family: var(--font-num);
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 6px;
+}
+[data-surface="freedomblings"] .chain-end {
+  text-align: right;
+  white-space: nowrap;
+}
+[data-surface="freedomblings"] .chain-w {
+  font-family: var(--font-num);
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+[data-surface="freedomblings"] .cw-u {
+  font-size: 10px;
+  color: var(--ink-ghost);
+  margin-left: 4px;
+  font-family: var(--font-body);
+}
+[data-surface="freedomblings"] .chain-n {
+  font-family: var(--font-num);
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+}

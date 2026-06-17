@@ -42,6 +42,7 @@ import { BalancePage } from '@/pages/freedomblings/BalancePage';
 import { FreedomblingsLayout } from '@/pages/freedomblings/FreedomblingsLayout';
 import { GradationsPage } from '@/pages/freedomblings/GradationsPage';
 import { LedgerPage } from '@/pages/freedomblings/LedgerPage';
+import { LineagePage } from '@/pages/freedomblings/LineagePage';
 import { MovePage } from '@/pages/freedomblings/MovePage';
 import { OpenBooksPage } from '@/pages/freedomblings/OpenBooksPage';
 import { StandingPage } from '@/pages/freedomblings/StandingPage';
@@ -161,6 +162,7 @@ function AppContent() {
             <Route path="openbooks" element={<OpenBooksPage />} />
             <Route path="move" element={<MovePage />} />
             <Route path="standing" element={<StandingPage />} />
+            <Route path="lineage" element={<LineagePage />} />
             <Route path="gradations" element={<GradationsPage />} />
           </Route>
 
