@@ -20,17 +20,19 @@ const LEDGER_NAV: NavDef[] = [
   { id: 'ledger', label: 'The Ledger', path: '/freedomblings/ledger' },
   { id: 'openbooks', label: 'The Open Books', path: '/freedomblings/openbooks' },
   { id: 'charter', label: 'The Charter', path: '/freedomblings/charter' },
-  { id: 'move', label: 'Give · Get · Offer', path: '/freedomblings/move' },
-  { id: 'escrow', label: 'Escrow', path: '/freedomblings/escrow' },
+  { id: 'move', label: 'Give', path: '/freedomblings/move' }, // triad name restored in Sep
+  // deferred → Sep build
+  // { id: 'escrow', label: 'Escrow', path: '/freedomblings/escrow' },
 ];
 
 const MEMBER_NAV: NavDef[] = [
   { id: 'standing', label: 'Standing', path: '/freedomblings/standing' },
   { id: 'gradations', label: 'Gradations', path: '/freedomblings/gradations' },
-  { id: 'commons', label: 'Commons' },
   { id: 'lineage', label: 'Lineage', path: '/freedomblings/lineage' },
-  { id: 'legacy', label: 'Legacy' },
-  { id: 'emergency', label: 'Safety net' },
+  // deferred → Aug–Sep build (hidden from the July 4 soft-beta nav)
+  // { id: 'commons', label: 'Commons' },
+  // { id: 'legacy', label: 'Legacy' },
+  // { id: 'emergency', label: 'Safety net' },
 ];
 
 function NavItem({ n, active, onGo }: { n: NavDef; active: boolean; onGo: (p: string) => void }) {
@@ -78,17 +80,16 @@ export function FreedomblingsSidebar({ onLaunch }: { onLaunch?: () => void }) {
               ? 'charter'
               : path === '/freedomblings/move'
                 ? 'move'
-                : path === '/freedomblings/escrow'
-                  ? 'escrow'
-                  : path === '/freedomblings/standing'
-                    ? 'standing'
-                    : path === '/freedomblings/lineage'
-                      ? 'lineage'
-                      : path === '/freedomblings/gradations'
-                        ? 'gradations'
-                        : path === '/freedomblings'
-                          ? 'balance'
-                          : '';
+                : // deferred → Sep build: escrow branch removed from the resolver
+                  path === '/freedomblings/standing'
+                  ? 'standing'
+                  : path === '/freedomblings/lineage'
+                    ? 'lineage'
+                    : path === '/freedomblings/gradations'
+                      ? 'gradations'
+                      : path === '/freedomblings'
+                        ? 'balance'
+                        : '';
   const go = (p: string) => navigate(p);
 
   const handle = bee?.handle ?? null;
