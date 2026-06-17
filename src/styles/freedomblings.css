@@ -1914,3 +1914,295 @@
   line-height: 1.5;
   max-width: 48ch;
 }
+
+/* ---- Standing & identity (Slice #2) -------------------------------------- */
+[data-surface="freedomblings"] .identity {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  padding: calc(22px * var(--sp)) calc(24px * var(--sp));
+}
+[data-surface="freedomblings"] .id-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+[data-surface="freedomblings"] .avatar.lg {
+  width: 58px;
+  height: 58px;
+  font-size: 22px;
+  object-fit: cover;
+  overflow: hidden;
+}
+[data-surface="freedomblings"] .id-who {
+  min-width: 0;
+}
+[data-surface="freedomblings"] .id-name {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 21px;
+  line-height: 1.15;
+  color: var(--ink);
+}
+[data-surface="freedomblings"] .id-handle {
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+}
+[data-surface="freedomblings"] .id-since {
+  font-size: 11.5px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.04em;
+  margin-top: 6px;
+}
+[data-surface="freedomblings"] .id-bio {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  line-height: 1.45;
+  margin-top: 8px;
+  max-width: 42ch;
+}
+[data-surface="freedomblings"] .id-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  text-align: right;
+}
+[data-surface="freedomblings"] .id-standing {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--accent-deep);
+}
+[data-surface="freedomblings"] .id-standing.repair {
+  color: var(--ink-soft);
+}
+[data-surface="freedomblings"] .id-custody {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.02em;
+}
+[data-surface="freedomblings"] .id-custody .bmark {
+  width: 0.85em;
+  height: 0.85em;
+}
+
+[data-surface="freedomblings"] .commons-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 14px;
+  margin-top: 14px;
+  align-items: start;
+}
+[data-surface="freedomblings"] .standing-main,
+[data-surface="freedomblings"] .commons-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+[data-surface="freedomblings"] .aside-card {
+  padding: calc(20px * var(--sp)) calc(22px * var(--sp));
+}
+[data-surface="freedomblings"] .aside-card h3 {
+  font-family: var(--font-head);
+  font-size: 15px;
+}
+[data-surface="freedomblings"] .consent-head {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 16px;
+}
+
+/* Segmented Rank / Ring ladders */
+[data-surface="freedomblings"] .ladder {
+  margin-top: 16px;
+}
+[data-surface="freedomblings"] .ladder:first-of-type {
+  margin-top: 0;
+}
+[data-surface="freedomblings"] .ladder-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+[data-surface="freedomblings"] .ladder-k {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 600;
+}
+[data-surface="freedomblings"] .ladder-v {
+  font-family: var(--font-num);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+}
+[data-surface="freedomblings"] .ladder-of {
+  font-size: 12px;
+  color: var(--ink-ghost);
+}
+[data-surface="freedomblings"] .ladder-mult {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent-deep);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-deep);
+}
+[data-surface="freedomblings"] .ladder-track {
+  display: grid;
+  grid-template-columns: repeat(33, 1fr);
+  gap: 3px;
+}
+[data-surface="freedomblings"] .ladder-track.ring {
+  grid-template-columns: repeat(9, 1fr);
+  gap: 5px;
+}
+[data-surface="freedomblings"] .rung {
+  height: 12px;
+  border-radius: 3px;
+  background: var(--paper-sunken);
+  border: 1px solid var(--line);
+}
+[data-surface="freedomblings"] .ladder-track.ring .rung {
+  height: 16px;
+}
+[data-surface="freedomblings"] .rung.on {
+  background: var(--accent);
+  border-color: var(--accent-deep);
+}
+[data-surface="freedomblings"] .ladder-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+[data-surface="freedomblings"] .ladder-note .bmark {
+  width: 13px;
+  height: 13px;
+  margin-top: 2px;
+  flex: none;
+}
+
+/* "How standing is earned" facet grid */
+[data-surface="freedomblings"] .facet-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 14px;
+}
+[data-surface="freedomblings"] .facet {
+  padding: 14px 15px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper-sunken);
+}
+[data-surface="freedomblings"] .facet-mark {
+  display: block;
+  width: 9px;
+  height: 9px;
+  border-radius: 1px;
+  background: var(--accent);
+  border: 1px solid var(--accent-deep);
+  margin-bottom: 9px;
+}
+[data-surface="freedomblings"] .facet-k {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--ink);
+  line-height: 1.25;
+}
+[data-surface="freedomblings"] .facet-d {
+  font-size: 12px;
+  color: var(--ink-faint);
+  line-height: 1.45;
+  margin-top: 5px;
+}
+
+/* Guardians + Consent — honest "soon" stubs */
+[data-surface="freedomblings"] .stub-card {
+  border-style: dashed;
+  border-color: var(--line-strong);
+}
+[data-surface="freedomblings"] .stub-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+[data-surface="freedomblings"] .stub-soon {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--ink-faint);
+}
+[data-surface="freedomblings"] .stub-soon .live-dot {
+  width: 6px;
+  height: 6px;
+  background: transparent;
+  border: 1.4px solid var(--ink-ghost);
+  box-shadow: none;
+}
+[data-surface="freedomblings"] .sovereign-note {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--accent-d-light);
+  background: var(--accent-soft);
+}
+[data-surface="freedomblings"] .sovereign-note .sn-mark {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--accent);
+  border: 1px solid var(--accent-deep);
+}
+[data-surface="freedomblings"] .sovereign-note p {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+[data-surface="freedomblings"] .sovereign-note p b {
+  color: var(--ink);
+  font-weight: 600;
+}
+@container (max-width: 720px) {
+  [data-surface="freedomblings"] .commons-grid {
+    grid-template-columns: 1fr;
+  }
+  [data-surface="freedomblings"] .facet-grid {
+    grid-template-columns: 1fr;
+  }
+}
