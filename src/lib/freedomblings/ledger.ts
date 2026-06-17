@@ -174,7 +174,7 @@ const ledgerListeners = new Set<() => void>();
 export function notifyLedgerChanged(): void {
   for (const cb of ledgerListeners) cb();
 }
-function useLedgerVersion(): number {
+export function useLedgerVersion(): number {
   const [v, setV] = useState(0);
   useEffect(() => {
     const cb = () => setV((x) => x + 1);
