@@ -243,8 +243,7 @@ export function MovePage() {
       <div className="eyebrow">Move value · the Sovereign Ledger</div>
       <h1 className="move-h1">Give · Get · Offer</h1>
       <div className="move-sub">
-        Send BLiNG! to another member, fee-free. The whole amount moves — member to member, in the
-        open.
+        Send BLiNG! to another member, fee-free. The whole amount moves — member to member.
       </div>
 
       <div className="move-tabs" role="tablist" aria-label="Move value">

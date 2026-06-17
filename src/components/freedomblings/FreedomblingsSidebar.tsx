@@ -19,7 +19,7 @@ const LEDGER_NAV: NavDef[] = [
   { id: 'circulation', label: 'Circulation', path: '/freedomblings/circulation' },
   { id: 'ledger', label: 'The Ledger', path: '/freedomblings/ledger' },
   { id: 'openbooks', label: 'The Open Books', path: '/freedomblings/openbooks' },
-  { id: 'charter', label: 'The Charter' },
+  { id: 'charter', label: 'The Charter', path: '/freedomblings/charter' },
   { id: 'move', label: 'Give · Get · Offer', path: '/freedomblings/move' },
 ];
 
@@ -73,17 +73,19 @@ export function FreedomblingsSidebar({ onLaunch }: { onLaunch?: () => void }) {
           ? 'ledger'
           : path === '/freedomblings/openbooks'
             ? 'openbooks'
-            : path === '/freedomblings/move'
-              ? 'move'
-              : path === '/freedomblings/standing'
-                ? 'standing'
-                : path === '/freedomblings/lineage'
-                  ? 'lineage'
-                  : path === '/freedomblings/gradations'
-                    ? 'gradations'
-                    : path === '/freedomblings'
-                      ? 'balance'
-                      : '';
+            : path === '/freedomblings/charter'
+              ? 'charter'
+              : path === '/freedomblings/move'
+                ? 'move'
+                : path === '/freedomblings/standing'
+                  ? 'standing'
+                  : path === '/freedomblings/lineage'
+                    ? 'lineage'
+                    : path === '/freedomblings/gradations'
+                      ? 'gradations'
+                      : path === '/freedomblings'
+                        ? 'balance'
+                        : '';
   const go = (p: string) => navigate(p);
 
   const handle = bee?.handle ?? null;
