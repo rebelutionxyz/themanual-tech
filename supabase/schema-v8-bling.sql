@@ -1,6 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════════════
 -- TheManual.tech · Schema v8 — BLiNG! economy integration
 -- April 25, 2026
+-- Reference snapshot. Source of truth is supabase/migrations/*. May lag prod.
 --
 -- Imports the FreedomBLiNGs economy into themanual.tech's Supabase.
 -- Wipe-and-import philosophy — no data preservation needed (single test bee).
@@ -206,24 +207,35 @@ CREATE INDEX IF NOT EXISTS bling_orders_created_idx ON public.bling_orders(creat
 -- ───────────────────────────────────────────────────────────────────────
 -- 6. bling_escrows
 -- ───────────────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.bling_escrows (
-    id            BIGSERIAL PRIMARY KEY,
-    creator_id    UUID NOT NULL REFERENCES public.bees(id) ON DELETE CASCADE,
-    recipient_id  UUID NOT NULL REFERENCES public.bees(id) ON DELETE CASCADE,
-    amount        NUMERIC(20, 3) NOT NULL CHECK (amount > 0),
-    kind          TEXT NOT NULL DEFAULT 'manual' CHECK (kind IN (
-                    'waggle_gig','gate_triggered','milestone','time_locked','manual'
-                  )),
-    status        TEXT NOT NULL DEFAULT 'open' CHECK (status IN (
-                    'open','released','disputed','cancelled'
-                  )),
-    memo          TEXT,
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    resolved_at   TIMESTAMPTZ
+-- Reconciled to prod (Economy v3 + escrow cluster). Source of truth is the
+-- migration history; this block is a current-state snapshot only.
+CREATE TABLE public.bling_escrows (
+  id                  bigserial PRIMARY KEY,
+  creator_id          uuid NOT NULL REFERENCES public.bees(id),
+  recipient_id        uuid NOT NULL REFERENCES public.bees(id),
+  amount              numeric(24,6) NOT NULL CHECK (amount > 0),
+  kind                text NOT NULL CHECK (kind IN ('p2p','order_match','crowdfund','campaign','timelock')),
+  status              text NOT NULL DEFAULT 'held' CHECK (status IN ('held','released','cancelled','disputed','expired')),
+  timelock_release_at timestamptz,
+  memo                text,
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  released_at         timestamptz,
+  cancelled_at        timestamptz,
+  disputed_at         timestamptz,
+  CONSTRAINT bling_escrows_no_self_escrow CHECK (creator_id <> recipient_id),
+  CONSTRAINT bling_escrows_timelock_consistency CHECK (
+    (kind = 'timelock' AND timelock_release_at IS NOT NULL) OR
+    (kind <> 'timelock' AND timelock_release_at IS NULL)
+  )
 );
-CREATE INDEX IF NOT EXISTS bling_escrows_creator_idx   ON public.bling_escrows(creator_id);
-CREATE INDEX IF NOT EXISTS bling_escrows_recipient_idx ON public.bling_escrows(recipient_id);
-CREATE INDEX IF NOT EXISTS bling_escrows_status_idx    ON public.bling_escrows(status);
+CREATE INDEX bling_escrows_creator_idx   ON public.bling_escrows (creator_id);
+CREATE INDEX bling_escrows_recipient_idx ON public.bling_escrows (recipient_id);
+CREATE INDEX bling_escrows_status_idx    ON public.bling_escrows (status);
+CREATE INDEX bling_escrows_timelock_idx  ON public.bling_escrows (timelock_release_at)
+  WHERE (status = 'held' AND timelock_release_at IS NOT NULL);
+ALTER TABLE public.bling_escrows ENABLE ROW LEVEL SECURITY;
+CREATE POLICY bling_escrows_party_read ON public.bling_escrows
+  FOR SELECT USING (auth.uid() = creator_id OR auth.uid() = recipient_id);
 
 -- Wire deferred FKs
 ALTER TABLE public.bling_transactions

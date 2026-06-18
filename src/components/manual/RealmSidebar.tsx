@@ -19,7 +19,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { RealmId } from '@/types/manual';
 import { useManualStore } from '@/stores/useManualStore';
 import { useManualData } from '@/lib/useManualData';
-import { REALM_ORDER, REALM_NAMES } from '@/lib/constants';
+import { REALM_NAMES } from '@/lib/constants';
 import { cn, formatCount } from '@/lib/utils';
 
 const REALM_ICONS: Record<RealmId, LucideIcon> = {
@@ -40,7 +40,7 @@ const REALM_ICONS: Record<RealmId, LucideIcon> = {
 };
 
 export function RealmSidebar() {
-  const { atoms } = useManualData();
+  const { atoms, realmOrder } = useManualData();
   const selectedRealmId = useManualStore((s) => s.selectedRealmId);
   const setSelectedRealmId = useManualStore((s) => s.setSelectedRealmId);
 
@@ -68,7 +68,7 @@ export function RealmSidebar() {
       </button>
       <div className="mb-1 h-px w-6 bg-border" />
 
-      {REALM_ORDER.map((realmId) => {
+      {realmOrder.map((realmId) => {
         const Icon = REALM_ICONS[realmId];
         const name = REALM_NAMES[realmId];
         const isActive = selectedRealmId === realmId;

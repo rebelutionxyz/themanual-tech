@@ -2,11 +2,17 @@ import { useState, useRef, useEffect, useMemo, type FormEvent } from 'react';
 import { Send, X, Loader2 } from 'lucide-react';
 import { AtomPicker } from '@/components/intel/AtomPicker';
 import { CategoryPicker } from '@/components/intel/CategoryPicker';
-import { RealmPicker, type RealmSelection } from '@/components/intel/RealmPicker';
+import { RealmPathPicker } from '@/components/intel/RealmPathPicker';
 import { useManualData } from '@/lib/useManualData';
 import { cn } from '@/lib/utils';
-import { REALM_NAMES } from '@/lib/constants';
+import { REALM_NAMES, REALM_ID_BY_NAME } from '@/lib/constants';
 import type { RealmId } from '@/types/manual';
+
+/** Build a display-name path from realm + L2 (back-compat seed). */
+function buildPath(realmId: RealmId | null | undefined, l2: string | null | undefined): string[] {
+  if (!realmId) return [];
+  return [REALM_NAMES[realmId], l2].filter((s): s is string => Boolean(s));
+}
 
 export type ComposerMode = 'thread' | 'reply';
 
@@ -17,6 +23,8 @@ export interface InlineComposerPayload {
   categoryPaths: string[];
   realmId: RealmId | null;
   l2: string | null;
+  /** Full taxonomy path (display names) → forum_threads.realm_path. */
+  realmPath: string[];
 }
 
 export interface InlineComposerProps {
@@ -83,11 +91,16 @@ export function InlineComposer({
   const [body, setBody] = useState('');
   const [atomIds, setAtomIds] = useState<string[]>([]);
   const [categoryPaths, setCategoryPaths] = useState<string[]>([]);
-  const [realmSel, setRealmSel] = useState<RealmSelection>({
-    realmId: inheritedContext?.realmId ?? null,
-    l2: inheritedContext?.l2 ?? null,
-  });
+  const [realmPath, setRealmPath] = useState<string[]>(() =>
+    buildPath(inheritedContext?.realmId, inheritedContext?.l2),
+  );
   const [realmManuallyOverridden, setRealmManuallyOverridden] = useState(false);
+
+  // Back-compat scalars derived from the full path.
+  const realmId = realmPath[0]
+    ? (REALM_ID_BY_NAME[realmPath[0]] as RealmId | undefined) ?? null
+    : null;
+  const l2 = realmPath[1] ?? null;
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,31 +115,25 @@ export function InlineComposer({
     (mode === 'thread' ? 'Share your thought...' : 'Your reply...');
 
   // Auto-derive realm from first linked atom (unless user manually overrode)
-  const derivedFromAtoms = useMemo(() => {
+  const derivedPath = useMemo(() => {
     if (atomIds.length === 0) return null;
     const first = atoms.find((a) => a.id === atomIds[0]);
     if (!first) return null;
-    return {
-      realmId: first.realmId,
-      l2: null,
-    } as RealmSelection;
+    return [REALM_NAMES[first.realmId]];
   }, [atomIds, atoms]);
 
   useEffect(() => {
     if (realmManuallyOverridden) return;
-    if (!derivedFromAtoms) return;
-    setRealmSel(derivedFromAtoms);
-  }, [derivedFromAtoms, realmManuallyOverridden]);
+    if (!derivedPath) return;
+    setRealmPath(derivedPath);
+  }, [derivedPath, realmManuallyOverridden]);
 
-  // Keep realmSel in sync with inheritedContext changes (e.g., filter bar changes)
+  // Keep realmPath in sync with inheritedContext changes (e.g., filter changes)
   // but only if not manually overridden and no atoms picked yet
   useEffect(() => {
     if (realmManuallyOverridden) return;
     if (atomIds.length > 0) return;
-    setRealmSel({
-      realmId: inheritedContext?.realmId ?? null,
-      l2: inheritedContext?.l2 ?? null,
-    });
+    setRealmPath(buildPath(inheritedContext?.realmId, inheritedContext?.l2));
   }, [
     inheritedContext?.realmId,
     inheritedContext?.l2,
@@ -145,11 +152,13 @@ export function InlineComposer({
         if (parsed.body) setBody(parsed.body);
         if (parsed.atomIds) setAtomIds(parsed.atomIds);
         if (parsed.categoryPaths) setCategoryPaths(parsed.categoryPaths);
-        if (parsed.realmId || parsed.l2) {
-          setRealmSel({
-            realmId: parsed.realmId ?? null,
-            l2: parsed.l2 ?? null,
-          });
+        const savedPath: string[] | null = Array.isArray(parsed.realmPath)
+          ? parsed.realmPath
+          : parsed.realmId || parsed.l2
+            ? buildPath(parsed.realmId, parsed.l2)
+            : null;
+        if (savedPath && savedPath.length > 0) {
+          setRealmPath(savedPath);
           if (parsed.realmManuallyOverridden) setRealmManuallyOverridden(true);
         }
         // Note: do NOT auto-expand on draft presence. Composer respects
@@ -179,8 +188,7 @@ export function InlineComposer({
       body,
       atomIds,
       categoryPaths,
-      realmId: realmSel.realmId,
-      l2: realmSel.l2,
+      realmPath,
       realmManuallyOverridden,
     });
     const t = setTimeout(() => localStorage.setItem(`draft:${draftKey}`, snap), 400);
@@ -191,8 +199,7 @@ export function InlineComposer({
     body,
     atomIds,
     categoryPaths,
-    realmSel.realmId,
-    realmSel.l2,
+    realmPath,
     realmManuallyOverridden,
   ]);
 
@@ -222,8 +229,9 @@ export function InlineComposer({
         body: body.trim(),
         atomIds,
         categoryPaths,
-        realmId: realmSel.realmId,
-        l2: realmSel.l2,
+        realmId,
+        l2,
+        realmPath,
       });
       if (ok) {
         if (draftKey) localStorage.removeItem(`draft:${draftKey}`);
@@ -232,10 +240,7 @@ export function InlineComposer({
         setAtomIds([]);
         setCategoryPaths([]);
         setRealmManuallyOverridden(false);
-        setRealmSel({
-          realmId: inheritedContext?.realmId ?? null,
-          l2: inheritedContext?.l2 ?? null,
-        });
+        setRealmPath(buildPath(inheritedContext?.realmId, inheritedContext?.l2));
         if (startCollapsed) setExpanded(false);
       }
     } catch (err) {
@@ -257,10 +262,7 @@ export function InlineComposer({
         setAtomIds([]);
         setCategoryPaths([]);
         setRealmManuallyOverridden(false);
-        setRealmSel({
-          realmId: inheritedContext?.realmId ?? null,
-          l2: inheritedContext?.l2 ?? null,
-        });
+        setRealmPath(buildPath(inheritedContext?.realmId, inheritedContext?.l2));
       }
     }
     if (startCollapsed) setExpanded(false);
@@ -422,10 +424,7 @@ export function InlineComposer({
           onChange={setAtomIds}
           label="Atoms"
           max={10}
-          realmContext={{
-            realmId: realmSel.realmId,
-            l2: realmSel.l2,
-          }}
+          realmContext={{ realmId, l2 }}
           placeholder="Search atoms to tag..."
         />
       </div>
@@ -439,12 +438,12 @@ export function InlineComposer({
         />
       </div>
 
-      {/* Realm picker — always visible, editable, defaults from context */}
+      {/* Realm picker — full-tree drill, always visible, defaults from context */}
       <div className="mb-3">
-        <RealmPicker
-          value={realmSel}
+        <RealmPathPicker
+          value={realmPath}
           onChange={(next) => {
-            setRealmSel(next);
+            setRealmPath(next);
             setRealmManuallyOverridden(true);
           }}
           label="Realm"

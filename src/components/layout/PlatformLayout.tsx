@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom';
-import { PlatformRail } from './PlatformRail';
+import { SidebarPromotedSlot } from '@/components/promotions/SidebarPromotedSlot';
 import { useAstra } from '@/lib/astras/AstraContext';
 import { useManualStore } from '@/stores/useManualStore';
 import { REALM_COLORS, SILVER } from '@/lib/constants';
@@ -28,6 +28,9 @@ function RealmStrip() {
 }
 
 export function PlatformLayout() {
+  // Right PlatformRail retired platform-wide (dispatch A2) — surface-switching
+  // is the toolbar's Astras popup. The promoted slot survives as a content-area
+  // element on the right; it returns null when empty, so no column is reserved.
   return (
     <div className="flex h-[calc(100vh-56px)] overflow-hidden">
       {/* Left: realm-accent strip (closed sidebar per §15.1) */}
@@ -38,8 +41,8 @@ export function PlatformLayout() {
         <Outlet />
       </main>
 
-      {/* Right: 19-surface icon rail + hover/click popups + mobile drawer */}
-      <PlatformRail />
+      {/* Right: promoted slot (independent of the retired rail; hides when empty) */}
+      <SidebarPromotedSlot className="m-2 hidden w-64 flex-shrink-0 self-start lg:block" />
     </div>
   );
 }

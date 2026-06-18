@@ -3,7 +3,6 @@ import { ChevronRight } from 'lucide-react';
 import { ThreadList } from '@/components/intel/ThreadList';
 import { L3Refinement } from '@/components/intel/L3Refinement';
 import { InlineComposer } from '@/components/intel/InlineComposer';
-import { TimeWindowBar } from '@/components/intel/TimeWindowBar';
 import { useIntelStore } from '@/stores/useIntelStore';
 import { useAuth } from '@/lib/auth';
 import { createThread } from '@/lib/intel';
@@ -29,8 +28,6 @@ export function IntelPage() {
     setRealmId,
     setL2,
     setL3,
-    setHotWindow,
-    setBreakingWindow,
   } = useIntelStore();
 
   const sortBy: 'hot' | 'new' | 'top' =
@@ -198,7 +195,7 @@ export function IntelPage() {
             realmId: selectedRealmId,
             l2: selectedL2,
           }}
-          onSubmit={async ({ title, body, atomIds, categoryPaths, realmId, l2 }) => {
+          onSubmit={async ({ title, body, atomIds, categoryPaths, realmId, l2, realmPath }) => {
             if (!bee || !title) return false;
             try {
               const newId = await createThread(
@@ -207,6 +204,7 @@ export function IntelPage() {
                   body,
                   primaryRealm: realmId,
                   primaryL2: l2,
+                  realmPath,
                   atomIds,
                   categoryPaths,
                 },
@@ -227,7 +225,6 @@ export function IntelPage() {
         selectedRealmId={selectedRealmId}
         selectedL2={selectedL2}
         selectedL3={selectedL3}
-        onSelectL3={setL3}
         onSelectPath={(path) => {
           const parts = path.split(' / ').map((s) => s.trim()).filter(Boolean);
           if (parts.length === 0) return;
@@ -244,17 +241,8 @@ export function IntelPage() {
         }}
       />
 
-      {(activeView === 'hot' || activeView === 'new') && (
-        <TimeWindowBar
-          value={activeView === 'hot' ? hotWindow : breakingWindow}
-          onChange={(h) => {
-            if (activeView === 'hot') setHotWindow(h);
-            else setBreakingWindow(h);
-          }}
-          mode={activeView === 'hot' ? 'hot' : 'breaking'}
-        />
-      )}
-
+      {/* Recency window control folded into the toolbar's Time popup
+          (dispatch §5). hotWindow/breakingWindow still drive the list below. */}
       <ThreadList
         selectedRealmId={selectedRealmId}
         selectedL2={selectedL2}

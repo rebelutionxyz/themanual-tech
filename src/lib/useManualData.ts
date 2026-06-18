@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase';
 interface ManualData {
   atoms: Atom[];
   tree: TreeNode;
+  /** Realm slugs in display order (DB realms.display_order). */
+  realmOrder: RealmId[];
   themeIndex: Record<string, string[]>;
   pathIndexes: PathIndexes;
   loaded: boolean;
@@ -24,6 +26,11 @@ const EMPTY_TREE: TreeNode = {
   children: [],
   atomCount: 0,
 };
+
+interface RealmRow {
+  id: string;
+  display_order: number;
+}
 
 interface AtomRow {
   id: string;
@@ -93,6 +100,7 @@ export function useManualData(): ManualData {
     cache ?? {
       atoms: [],
       tree: EMPTY_TREE,
+      realmOrder: [],
       themeIndex: {},
       pathIndexes: { byId: new Map(), byPath: new Map(), childrenByPath: new Map() },
       loaded: false,
@@ -122,7 +130,27 @@ export function useManualData(): ManualData {
           if (data.length < PAGE) break;
         }
 
+        // Realm display order is DB-driven (realms.display_order) so the nav
+        // tracks live taxonomy restructuring without a hardcoded array.
+        const { data: realmRows, error: realmErr } = await supabase
+          .from('realms')
+          .select('id, display_order')
+          .order('display_order', { ascending: true });
+        if (realmErr) throw realmErr;
+        const realmOrder = ((realmRows ?? []) as RealmRow[]).map((r) => r.id as RealmId);
+
         const atoms = all.map(rowToAtom);
+        // Fallback: if the realms table is unreachable/empty, derive order from
+        // the atoms' realm roots (first-seen) so the tree still sorts sanely.
+        if (realmOrder.length === 0) {
+          const seen = new Set<RealmId>();
+          for (const a of atoms) {
+            if (!seen.has(a.realmId)) {
+              seen.add(a.realmId);
+              realmOrder.push(a.realmId);
+            }
+          }
+        }
         if (import.meta.env.DEV) {
           const bad = atoms.find((a) => a.path !== a.pathParts.join(' / '));
           if (bad) {
@@ -136,12 +164,13 @@ export function useManualData(): ManualData {
           }
         }
         const themeIndex = buildThemeIndex(atoms);
-        const tree = buildTree(atoms);
+        const tree = buildTree(atoms, realmOrder);
         const pathIndexes = buildPathIndexes(atoms);
 
         const data: ManualData = {
           atoms,
           tree,
+          realmOrder,
           themeIndex,
           pathIndexes,
           loaded: true,

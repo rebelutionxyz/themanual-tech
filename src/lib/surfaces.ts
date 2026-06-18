@@ -1,43 +1,39 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  // Knowledge
+  Book,
+  Calendar,
   // Currency
   Coins,
+  Droplet,
+  Eye,
+  Gamepad2,
+  GraduationCap,
+  HeartHandshake,
+  Megaphone,
+  MessageCircle,
   // Social
   MessagesSquare,
-  Users,
-  Calendar,
-  MessageCircle,
-  Video,
-  HeartHandshake,
   Radio,
+  Scale,
+  // Safety
+  Shield,
+  ShieldAlert,
   // Commerce
   ShoppingBag,
   Store,
-  Gamepad2,
-  Megaphone,
-  // Knowledge
-  Book,
-  // Safety
-  Shield,
-  Eye,
-  // Services
-  Wrench,
-  GraduationCap,
+  Users,
+  Video,
   Vote,
-  Scale,
   // Flow
   Waves,
+  // Services
+  Wrench,
 } from 'lucide-react';
 
 export type SurfaceTier = 1 | 2;
 
-export type SurfaceGroup =
-  | 'Currency'
-  | 'Social'
-  | 'Commerce'
-  | 'Knowledge'
-  | 'Safety'
-  | 'Services';
+export type SurfaceGroup = 'Currency' | 'Social' | 'Commerce' | 'Knowledge' | 'Safety' | 'Services';
 
 export interface SurfaceDef {
   /** URL slug: /s/bling, /s/intel, etc. */
@@ -63,7 +59,7 @@ export interface SurfaceDef {
 }
 
 /**
- * The 20 Surfaces of HoneyComb. Currently 20; lockable architecture but
+ * The Surfaces of HoneyComb. Currently 21; lockable architecture but
  * grows when astras graduate (see MMF v2.2 §6.1 footnote).
  * Each entry pairs `name` (canonical UI label, used across both
  * constellations) with `function` (semantic category / MMF taxonomy term).
@@ -85,6 +81,19 @@ export const SURFACES: SurfaceDef[] = [
     group: 'Currency',
     tier: 1,
     special: 'bling',
+  },
+  {
+    slug: 'freedomblings',
+    name: 'FreedomBLiNGS',
+    function: 'The Sovereign Ledger',
+    description:
+      'The economic heart of the HoneyComb — where your BLiNG! lives, is FREEd, and moves.',
+    purpose:
+      'See your balance, read your ledger in the open, and trace any BLiNG! to its origin. Member-owned, capped, transparent — never bought or sold.',
+    icon: Droplet,
+    color: '#FAD15E',
+    group: 'Currency',
+    tier: 1,
   },
 
   // ═══ SOCIAL ═══
@@ -191,8 +200,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'BRAND',
     function: 'Rebelution Storefront',
     description: 'Official Rebelution merchandise and branded goods.',
-    purpose:
-      'Platform-verified products. Every GET supports the movement. Curated storefronts.',
+    purpose: 'Platform-verified products. Every GET supports the movement. Curated storefronts.',
     icon: Store,
     color: '#C88A6B',
     group: 'Commerce',
@@ -203,8 +211,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'PRIZE',
     function: 'Private Gaming',
     description: 'Skill games, raffles, bracketed competitions.',
-    purpose:
-      'Bees play for BLiNG!. Private. Entertainment that rewards.',
+    purpose: 'Bees play for BLiNG!. Private. Entertainment that rewards.',
     icon: Gamepad2,
     color: '#9B7FC8',
     group: 'Commerce',
@@ -215,8 +222,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'PROMOTION',
     function: 'Advertising',
     description: 'Bee-funded promotion. Transparent. Opt-in.',
-    purpose:
-      'Bees and businesses promote listings, events, causes. Bees choose what they see.',
+    purpose: 'Bees and businesses promote listings, events, causes. Bees choose what they see.',
     icon: Megaphone,
     color: '#E8A838',
     group: 'Commerce',
@@ -240,6 +246,18 @@ export const SURFACES: SurfaceDef[] = [
 
   // ═══ SAFETY ═══
   {
+    slug: 'dingleberry',
+    name: 'DingleBERRY',
+    function: 'Security Command',
+    description: "The comb's immune system. Posture at a glance across six security surfaces.",
+    purpose:
+      'DingleBERRY watches the platform: infra health, transaction integrity, source verification, shill/abuse detection, dispatch authority, and threat interception. Funded by @combtreasury.defense.',
+    icon: ShieldAlert,
+    color: '#DC2626',
+    group: 'Safety',
+    tier: 2,
+  },
+  {
     slug: 'secure',
     name: 'SECURE',
     function: 'Security',
@@ -256,8 +274,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'SAFE',
     function: 'Monitoring',
     description: 'Situational awareness. Community-sourced safety signals.',
-    purpose:
-      'Real-time alerts, threat mapping, Bee-to-Bee safety check-ins.',
+    purpose: 'Real-time alerts, threat mapping, Bee-to-Bee safety check-ins.',
     icon: Eye,
     color: '#6B94C8',
     group: 'Safety',
@@ -270,8 +287,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'PRODUCTION',
     function: 'Pros Directory',
     description: 'Sovereign Angie\u2019s List. Every trade, every service, reviewed by Bees.',
-    purpose:
-      'Find vetted professionals. Get work done. Review and build Pro reputation.',
+    purpose: 'Find vetted professionals. Get work done. Review and build Pro reputation.',
     icon: Wrench,
     color: '#8A94A0',
     group: 'Services',
@@ -294,8 +310,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'EDU',
     function: 'Education',
     description: 'Tracks, courses, quizzes. Learn the Manual. Earn certifications.',
-    purpose:
-      'Self-directed learning. Rank up. Teach what you know. Learn what you don\u2019t.',
+    purpose: 'Self-directed learning. Rank up. Teach what you know. Learn what you don\u2019t.',
     icon: GraduationCap,
     color: '#E88938',
     group: 'Services',
@@ -306,8 +321,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'VOTE',
     function: 'Elections',
     description: 'Governance votes. Rank-weighted. Transparent.',
-    purpose:
-      'Platform governance, campaign endorsements, community referenda.',
+    purpose: 'Platform governance, campaign endorsements, community referenda.',
     icon: Vote,
     color: '#FAD15E',
     group: 'Services',
@@ -318,8 +332,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'LEGAL',
     function: 'Legal Resources',
     description: 'Constitutional sheriffs, grand jury kits, rights cards, attorney directory.',
-    purpose:
-      'Know your rights. Find sovereign legal support. Documentation for action.',
+    purpose: 'Know your rights. Find sovereign legal support. Documentation for action.',
     icon: Scale,
     color: '#C94C4C',
     group: 'Services',

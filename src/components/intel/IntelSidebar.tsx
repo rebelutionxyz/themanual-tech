@@ -70,7 +70,11 @@ const INTEL_COLOR = '#6B94C8';
  *         Tap item to navigate (auto-collapse on touch devices).
  */
 export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
-  const [pinned, setPinned] = useState(false);
+  // Open by default on tablet + desktop (dispatch A2); mobile (<768px) starts
+  // collapsed as a sticky rail that opens on hover/touch.
+  const [pinned, setPinned] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 768,
+  );
   const [hovered, setHovered] = useState(false);
   const asideRef = useRef<HTMLElement>(null);
   const { bee } = useAuth();

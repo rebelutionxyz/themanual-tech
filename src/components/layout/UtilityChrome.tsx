@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Bell, MessageCircle, ShoppingCart, LayoutGrid } from 'lucide-react';
+import { Bell, MessageCircle, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { SearchModal } from './SearchModal';
+import { HoneyDrop } from '@/components/ui/HoneyDrop';
 import { cn } from '@/lib/utils';
 
 /**
@@ -27,7 +28,6 @@ export function UtilityChrome() {
   const notificationCount = 0;
   const messageCount = 0;
   const cartCount = 0;
-  const blingBalance = bee ? 0 : null;
 
   // "/" keyboard shortcut to open search
   useEffect(() => {
@@ -46,23 +46,12 @@ export function UtilityChrome() {
     return () => document.removeEventListener('keydown', onKey);
   }, [searchOpen]);
 
-  function openSurfacesRail() {
-    window.dispatchEvent(new CustomEvent('open-surfaces-drawer'));
-  }
-
   return (
     <>
       <div className="flex items-center gap-1">
-        {/* 1. Search */}
-        <button
-          type="button"
-          onClick={() => setSearchOpen(true)}
-          className="flex h-9 w-9 items-center justify-center rounded-md text-text-silver transition-colors hover:bg-bg-elevated hover:text-text"
-          aria-label="Search"
-          title="Search (/)"
-        >
-          <Search size={16} />
-        </button>
+        {/* Search relocated to the INTEL Top Top toolbar (dispatch §2). The "/"
+            shortcut + SearchModal below stay mounted so global search still
+            works platform-wide; only the header button was removed. */}
 
         {/* 3. Notifications */}
         {bee && (
@@ -100,19 +89,19 @@ export function UtilityChrome() {
           </IconButton>
         )}
 
-        {/* 6. BLiNG! balance pill */}
-        {blingBalance !== null && (
-          <Link
-            to="/bling"
-            className="ml-0.5 flex items-center gap-1.5 rounded-full border border-honey/40 bg-bg-elevated px-2.5 py-1 transition-colors hover:border-honey/70"
-            title="BLiNG! balance"
-          >
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#FAD15E' }} />
-            <span className="bling font-mono tracking-wide" style={{ fontSize: '12px' }}>
-              {blingBalance.toLocaleString()}
-            </span>
-          </Link>
-        )}
+        {/* 6. BLiNG! — gold honey-drop link to the Sovereign Ledger, sits
+            immediately left of the avatar (dispatch §3). */}
+        <Link
+          to="/freedomblings"
+          className="ml-0.5 flex items-center gap-1.5 rounded-full border border-honey/40 bg-bg-elevated px-2.5 py-1 transition-colors hover:border-honey/70 hover:bg-honey/10"
+          title="BLiNG! · Sovereign Ledger"
+          aria-label="BLiNG!"
+        >
+          <HoneyDrop size={14} />
+          <span className="bling font-mono tracking-wide" style={{ fontSize: '12px' }}>
+            BLiNG!
+          </span>
+        </Link>
 
         {/* 7. Profile-avatar: avatar on right, handle reveals on hover */}
         {bee ? (
@@ -147,16 +136,7 @@ export function UtilityChrome() {
           </Link>
         )}
 
-        {/* 8. Right-rail opener (honey gold, tablet/mobile only) */}
-        <button
-          type="button"
-          onClick={openSurfacesRail}
-          aria-label="Open surfaces menu"
-          title="Surfaces"
-          className="ml-1 flex h-9 w-9 items-center justify-center rounded-md border border-honey/40 bg-honey/10 text-honey transition-colors hover:border-honey/70 hover:bg-honey/20 md:hidden"
-        >
-          <LayoutGrid size={16} />
-        </button>
+        {/* Mobile surface menu is now the toolbar's Astras popup (dispatch A2). */}
       </div>
 
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
