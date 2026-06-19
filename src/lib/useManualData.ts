@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import type { Atom, AtomType, KettleState, RealmId, TreeNode } from '@/types/manual';
-import { buildTree } from '@/lib/tree';
-import { buildPathIndexes, type PathIndexes } from '@/lib/graph-neighbors';
+import { type PathIndexes, buildPathIndexes } from '@/lib/graph-neighbors';
 import { supabase } from '@/lib/supabase';
+import { buildTree } from '@/lib/tree';
+import type { Atom, AtomAlias, AtomType, KettleState, RealmId, TreeNode } from '@/types/manual';
+import { useEffect, useState } from 'react';
 
 interface ManualData {
   atoms: Atom[];
@@ -11,6 +11,8 @@ interface ManualData {
   realmOrder: RealmId[];
   themeIndex: Record<string, string[]>;
   pathIndexes: PathIndexes;
+  /** Cross-realm placements (atom_aliases), keyed by canonical atom id. */
+  aliasesByAtomId: Map<string, AtomAlias[]>;
   loaded: boolean;
   error: string | null;
 }
@@ -32,7 +34,7 @@ interface RealmRow {
   display_order: number;
 }
 
-interface AtomRow {
+export interface AtomRow {
   id: string;
   name: string;
   path: string;
@@ -54,7 +56,16 @@ interface AtomRow {
   updated_at?: string;
 }
 
-function rowToAtom(r: AtomRow): Atom {
+interface AtomAliasRow {
+  id: string;
+  atom_id: string;
+  alias_path: string;
+  alias_realm_id: string;
+  alias_realm_name: string | null;
+  note: string | null;
+}
+
+export function rowToAtom(r: AtomRow): Atom {
   return {
     id: r.id,
     name: r.name,
@@ -75,6 +86,17 @@ function rowToAtom(r: AtomRow): Atom {
     meta: r.meta ?? {},
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+  };
+}
+
+function rowToAlias(r: AtomAliasRow): AtomAlias {
+  return {
+    id: r.id,
+    atomId: r.atom_id,
+    aliasPath: r.alias_path,
+    aliasRealmId: r.alias_realm_id as RealmId,
+    aliasRealmName: r.alias_realm_name,
+    note: r.note,
   };
 }
 
@@ -103,6 +125,7 @@ export function useManualData(): ManualData {
       realmOrder: [],
       themeIndex: {},
       pathIndexes: { byId: new Map(), byPath: new Map(), childrenByPath: new Map() },
+      aliasesByAtomId: new Map(),
       loaded: false,
       error: null,
     },
@@ -163,8 +186,39 @@ export function useManualData(): ManualData {
             );
           }
         }
+        // Connector aliases (atom_aliases). The Manual core must not break if
+        // the connector tables hiccup, so a failure here degrades to no
+        // aliases rather than failing the whole load. Empty until Chat seeds.
+        let aliases: AtomAlias[] = [];
+        try {
+          const aliasRows: AtomAliasRow[] = [];
+          for (let from = 0; ; from += PAGE) {
+            const { data, error } = await supabase
+              .from('atom_aliases')
+              .select('*')
+              .order('id')
+              .range(from, from + PAGE - 1);
+            if (error) throw error;
+            if (!data || data.length === 0) break;
+            aliasRows.push(...(data as AtomAliasRow[]));
+            if (data.length < PAGE) break;
+          }
+          aliases = aliasRows.map(rowToAlias);
+        } catch (aliasErr) {
+          if (import.meta.env.DEV) {
+            console.warn('[Manual] alias load failed; rendering without aliases:', aliasErr);
+          }
+        }
+
+        const aliasesByAtomId = new Map<string, AtomAlias[]>();
+        for (const al of aliases) {
+          const arr = aliasesByAtomId.get(al.atomId);
+          if (arr) arr.push(al);
+          else aliasesByAtomId.set(al.atomId, [al]);
+        }
+
         const themeIndex = buildThemeIndex(atoms);
-        const tree = buildTree(atoms, realmOrder);
+        const tree = buildTree(atoms, realmOrder, aliases);
         const pathIndexes = buildPathIndexes(atoms);
 
         const data: ManualData = {
@@ -173,6 +227,7 @@ export function useManualData(): ManualData {
           realmOrder,
           themeIndex,
           pathIndexes,
+          aliasesByAtomId,
           loaded: true,
           error: null,
         };
@@ -195,6 +250,11 @@ export function useManualData(): ManualData {
 /** Find atom by ID from cache */
 export function getAtomById(id: string): Atom | undefined {
   return cache?.atoms.find((a) => a.id === id);
+}
+
+/** Cross-realm placements for an atom (atom_aliases), empty until seeded. */
+export function getAliasesForAtom(atomId: string): AtomAlias[] {
+  return cache?.aliasesByAtomId.get(atomId) ?? [];
 }
 
 /** Find atoms that share any theme tag with the given atom (excluding self) */

@@ -14,6 +14,8 @@ import {
 import { AstraProvider, useAstra } from '@/lib/astras/AstraContext';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { BlingsPage } from '@/pages/BlingsPage';
+import { CollectionPage } from '@/pages/CollectionPage';
+import { CollectionsIndexPage } from '@/pages/CollectionsIndexPage';
 import { HandleSettingsPage } from '@/pages/HandleSettingsPage';
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
@@ -122,6 +124,12 @@ function AppContent() {
         <Route element={<PlatformLayout />}>
           {/* Manual surface */}
           <Route path="/manual" element={<ManualPage />} />
+
+          {/* Connector collections — cross-cutting gatherings of atoms.
+              Registered before /:slug so the explicit tree wins over the
+              generic SurfacePage. */}
+          <Route path="/collections" element={<CollectionsIndexPage />} />
+          <Route path="/collection/:slug" element={<CollectionPage />} />
 
           {/* Cross-Astra realm lens feed (dispatch Part B). Picking a realm in
               the Top Top toolbar routes here; feed = forum_threads for the

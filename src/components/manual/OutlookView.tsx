@@ -1,9 +1,9 @@
-import { memo, useCallback, useMemo } from 'react';
-import { ChevronRight, Network } from 'lucide-react';
-import type { Atom, TreeNode } from '@/types/manual';
-import { useManualStore } from '@/stores/useManualStore';
-import { cn, formatCount } from '@/lib/utils';
 import { KETTLE_COLORS } from '@/lib/constants';
+import { cn, formatCount } from '@/lib/utils';
+import { useManualStore } from '@/stores/useManualStore';
+import type { Atom, TreeNode } from '@/types/manual';
+import { ChevronRight, Network } from 'lucide-react';
+import { memo, useCallback, useMemo } from 'react';
 
 interface OutlookViewProps {
   tree: TreeNode;
@@ -178,14 +178,16 @@ interface AtomRowProps {
 function AtomRow({ atom, visible }: AtomRowProps) {
   const selectAtom = useManualStore((s) => s.selectAtom);
   const selectedAtomId = useManualStore((s) => s.selectedAtomId);
-  const isSelected = selectedAtomId === atom.id;
+  // Alias ghosts resolve to the one canonical atom on click + for selection.
+  const targetId = atom.canonicalId ?? atom.id;
+  const isSelected = selectedAtomId === targetId;
 
   if (!visible) return null;
 
   return (
     <button
       type="button"
-      onClick={() => selectAtom(atom.id)}
+      onClick={() => selectAtom(targetId)}
       className={cn(
         'group flex w-full items-center gap-2 rounded px-1.5 py-1 text-left',
         'hover:bg-bg-elevated transition-colors',
@@ -198,9 +200,24 @@ function AtomRow({ atom, visible }: AtomRowProps) {
           style={{ backgroundColor: KETTLE_COLORS[atom.kettle] }}
         />
       </span>
-      <span className="truncate text-sm text-text-silver group-hover:text-text">
+      <span
+        className={cn(
+          'truncate text-sm group-hover:text-text',
+          atom.isAlias ? 'italic text-text-muted' : 'text-text-silver',
+        )}
+      >
         {atom.name}
       </span>
+      {atom.isAlias && (
+        <span
+          className="flex-shrink-0 font-mono text-text-muted"
+          style={{ fontSize: '10px' }}
+          data-size="meta"
+          title="Alias — this atom's canonical home is in another realm"
+        >
+          ↳ alias
+        </span>
+      )}
       {atom.themeTags.length > 0 && (
         <span
           className="ml-auto truncate font-mono text-text-muted"
