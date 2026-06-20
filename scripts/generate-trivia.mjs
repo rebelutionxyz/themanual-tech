@@ -1,13 +1,14 @@
-// generate-trivia.mjs — 5-tier, single-realm trivia generator (Node ESM).
+// generate-trivia.mjs — 5-tier, multi-realm trivia generator (Node ESM).
 //
 // Reads topic candidates from public.trivia_topic_candidates (safety/scope already
-// applied in the view), asks Claude for 5-tier MCQs per topic, validates, and writes
-// draft rows to trivia_questions + one run record per topic to trivia_gen_runs.
+// applied in the view), asks Claude for 5-tier MCQs per topic, validates, SHUFFLES
+// choices, and writes draft rows to trivia_questions + one run record per topic to
+// trivia_gen_runs.
 //
 // Resumable, concurrency-limited, never crashes the run on a per-topic error.
 //
 // Env (never hardcode): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY
-// Run: node scripts/generate-trivia.mjs
+// Run: node -r dotenv/config scripts/generate-trivia.mjs
 //
 // Rows land status='draft' / verified=false — review before serving.
 
@@ -16,11 +17,10 @@ import { createClient } from '@supabase/supabase-js';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const MODEL = 'claude-sonnet-4-6';
-const REALM = 'self'; // one realm per run
-const PER_TIER = { simple: 1, easy: 1, medium: 1, hard: 1, master: 1 }; // test run = 1 each (5/atom)
+const REALMS = ['self', 'human_activities', 'health', 'culture', 'science']; // full run
+const PER_TIER = { simple: 1, easy: 1, medium: 1, hard: 1, master: 1 }; // 5/atom
 const CONCURRENCY = 4;
-const MAX_ATOMS = 20; // test run cap; set null for full realm
-// For the full realm: set MAX_ATOMS = null and raise PER_TIER (e.g. 3 each = 15/atom).
+const MAX_ATOMS = null; // null = entire realm; set a number (e.g. 20) to cap per realm
 
 const TIERS = ['simple', 'easy', 'medium', 'hard', 'master'];
 const REQUESTED = Object.values(PER_TIER).reduce((a, b) => a + b, 0);
@@ -63,7 +63,7 @@ Difficulty is defined by AUDIENCE, not by trivia obscurity:
 - HARD    = advanced-degree / graduate level — specialist knowledge.
 - MASTER  = expert / master level — the deepest, most nuanced knowledge of the topic.
 Each question: self-contained (do NOT mention 'the topic' or the path), factual and verifiable,
-exactly 4 choices, exactly one correct, plausible distractors.
+exactly 4 choices, exactly one correct, plausible distractors. Vary which choice is correct.
 
 CONTENT SAFETY (strict):
 - NO questions about self-harm, suicide, eating disorders, or similar harm-sensitive subjects. If the
@@ -95,7 +95,6 @@ async function callModel(prompt) {
 
 function parseJsonArray(text) {
   let t = text.trim();
-  // Strip stray ```json ... ``` fences before JSON.parse.
   if (t.startsWith('```')) {
     t = t
       .replace(/^```(?:json)?\s*/i, '')
@@ -105,6 +104,17 @@ function parseJsonArray(text) {
   const parsed = JSON.parse(t);
   if (!Array.isArray(parsed)) throw new Error('model output is not a JSON array');
   return parsed;
+}
+
+// Fisher-Yates shuffle so the correct answer isn't always in the same slot.
+function shuffleChoices(choices, answerIndex) {
+  const correct = choices[answerIndex];
+  const arr = choices.slice();
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return { choices: arr, answer_index: arr.indexOf(correct), answer: correct };
 }
 
 // ── Per-topic processing ────────────────────────────────────────────────────
@@ -120,14 +130,16 @@ async function processTopic(topic) {
       if (!Number.isInteger(q.answer_index) || q.answer_index < 0 || q.answer_index > 3) continue;
       if (!TIERS.includes(q.difficulty)) continue;
       if (typeof q.question !== 'string' || !q.question.trim()) continue;
+
+      const s = shuffleChoices(q.choices, q.answer_index);
       rows.push({
         topic_atom_id: topic.topic_atom_id,
         topic_path: topic.topic_path,
         realm_id: topic.realm_id,
         question: q.question,
-        choices: q.choices,
-        answer_index: q.answer_index,
-        answer: q.choices[q.answer_index],
+        choices: s.choices,
+        answer_index: s.answer_index,
+        answer: s.answer,
         difficulty: q.difficulty,
         source: 'ai',
         model: MODEL,
@@ -155,8 +167,7 @@ async function processTopic(topic) {
       error: null,
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    // Record the failure and continue — never crash the run.
+    const message = e instanceof Error ? e.message : (e?.message ?? e?.code ?? JSON.stringify(e));
     const { error: runErr } = await supabase.from('trivia_gen_runs').insert({
       topic_atom_id: topic.topic_atom_id,
       topic_path: topic.topic_path,
@@ -188,14 +199,14 @@ async function loadDoneTopicIds() {
   return done;
 }
 
-async function loadCandidates() {
+async function loadCandidates(realm) {
   const all = [];
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from('trivia_topic_candidates')
       .select('topic_atom_id, topic_path, realm_id, realm_name, topic_name')
-      .eq('realm_id', REALM)
+      .eq('realm_id', realm)
       .order('topic_atom_id')
       .range(from, from + PAGE - 1);
     if (error) throw error;
@@ -206,9 +217,7 @@ async function loadCandidates() {
   return all;
 }
 
-// Sample MAX_ATOMS spread across distinct depth-2 branches (round-robin),
-// rather than taking the first N. depth-2 branch = second path segment (the L2
-// node directly under the realm).
+// Sample MAX_ATOMS spread across distinct depth-2 branches (round-robin).
 function sampleSpread(cands, max) {
   if (max == null || cands.length <= max) return cands;
   const byBranch = new Map();
@@ -244,7 +253,7 @@ async function runPool(items, concurrency, worker) {
       if (my >= total) return;
       await worker(items[my]);
       completed++;
-      if (completed % 25 === 0) console.log(`progress: ${completed}/${total} topics`);
+      if (completed % 25 === 0) console.log(`  progress: ${completed}/${total}`);
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, total) }, () => lane()));
@@ -252,22 +261,27 @@ async function runPool(items, concurrency, worker) {
 
 // ── Main ────────────────────────────────────────────────────────────────────
 const done = await loadDoneTopicIds();
-let candidates = await loadCandidates();
-const totalForRealm = candidates.length;
-candidates = candidates.filter((c) => !done.has(c.topic_atom_id));
-const remaining = candidates.length;
-candidates = sampleSpread(candidates, MAX_ATOMS);
-
 console.log(
-  `realm=${REALM} model=${MODEL} per-tier=${REQUESTED}/atom concurrency=${CONCURRENCY}\n` +
-    `candidates: ${totalForRealm} total, ${done.size} already ok, ${remaining} remaining, ` +
-    `processing ${candidates.length} this run${MAX_ATOMS == null ? '' : ` (MAX_ATOMS=${MAX_ATOMS})`}`,
+  `realms: ${REALMS.join(', ')} | model=${MODEL} | ${REQUESTED}/atom | concurrency=${CONCURRENCY}\n` +
+    `already ok (resume-skip): ${done.size} topics`,
 );
 
-if (candidates.length === 0) {
-  console.log('nothing to do.');
-  process.exit(0);
+let grandTotal = 0;
+for (const realm of REALMS) {
+  let candidates = await loadCandidates(realm);
+  const totalForRealm = candidates.length;
+  candidates = candidates.filter((c) => !done.has(c.topic_atom_id));
+  const remaining = candidates.length;
+  candidates = sampleSpread(candidates, MAX_ATOMS);
+  console.log(
+    `\n[${realm}] ${totalForRealm} total, ${totalForRealm - remaining} done, ${remaining} remaining, processing ${candidates.length}`,
+  );
+  if (candidates.length === 0) {
+    console.log(`[${realm}] nothing to do.`);
+    continue;
+  }
+  await runPool(candidates, CONCURRENCY, processTopic);
+  grandTotal += candidates.length;
+  console.log(`[${realm}] complete: ${candidates.length} topics.`);
 }
-
-await runPool(candidates, CONCURRENCY, processTopic);
-console.log(`done: processed ${candidates.length} topics.`);
+console.log(`\n=== ALL DONE: ${grandTotal} topics across ${REALMS.length} realms ===`);
