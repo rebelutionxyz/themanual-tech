@@ -93,6 +93,68 @@ export async function listEventsByGroup(groupId: string, upcomingOnly = true): P
   return (data ?? []).map(mapEvent);
 }
 
+/** Past events (starts_at < now), most recent first. */
+export async function listPastEvents(): Promise<EventItem[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .lt('starts_at', new Date().toISOString())
+    .order('starts_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapEvent);
+}
+
+/** Events the Bee RSVP'd going/maybe (the "Going" view). */
+export async function listMyGoingEvents(beeId: string): Promise<EventItem[]> {
+  if (!supabase || !beeId) return [];
+  const { data, error } = await supabase
+    .from('event_rsvps')
+    .select('status, events(*)')
+    .eq('bee_id', beeId)
+    .in('status', ['going', 'maybe']);
+  if (error) throw new Error(error.message);
+  return (data ?? [])
+    .map((r) => {
+      const e = (r as Record<string, unknown>).events;
+      const obj = Array.isArray(e) ? e[0] : e;
+      return obj ? mapEvent(obj as Record<string, unknown>) : null;
+    })
+    .filter((e): e is EventItem => e !== null)
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+/** Events the Bee created (the "Hosting" view). */
+export async function listMyHostedEvents(beeId: string): Promise<EventItem[]> {
+  if (!supabase || !beeId) return [];
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .eq('created_by', beeId)
+    .order('starts_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapEvent);
+}
+
+/** Count of upcoming events the Bee is going/maybe to — sidebar badge. */
+export async function countMyGoingUpcoming(beeId: string): Promise<number> {
+  if (!supabase || !beeId) return 0;
+  const nowIso = new Date().toISOString();
+  const { data } = await supabase
+    .from('event_rsvps')
+    .select('events(starts_at)')
+    .eq('bee_id', beeId)
+    .in('status', ['going', 'maybe']);
+  let n = 0;
+  for (const r of data ?? []) {
+    const e = (r as Record<string, unknown>).events;
+    const obj = Array.isArray(e) ? e[0] : e;
+    const starts = (obj as Record<string, unknown> | null)?.starts_at;
+    if (typeof starts === 'string' && starts >= nowIso) n++;
+  }
+  return n;
+}
+
 export async function getEvent(id: string): Promise<EventItem | null> {
   if (!supabase) return null;
   const { data } = await supabase.from('events').select('*').eq('id', id).maybeSingle();
@@ -154,7 +216,9 @@ export async function createEvent(input: CreateEventInput): Promise<string> {
     p_location_text: input.locationText ?? null,
     p_is_virtual: input.isVirtual ?? false,
     p_virtual_link: input.virtualLink ?? null,
-    p_parent_surface: 'unite',
+    // Events surface label is 'rule' (confirmed: always rule). event_create now
+    // defaults to 'rule' too, but pass it explicitly so the row is unambiguous.
+    p_parent_surface: 'rule',
     p_parent_id: input.parentId ?? null,
     p_lat: input.lat ?? null,
     p_lng: input.lng ?? null,

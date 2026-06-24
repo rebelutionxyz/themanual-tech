@@ -55,7 +55,7 @@ export function IntelPage() {
     });
   }
 
-  if (activeView === 'forme' || activeView === 'prize' || activeView === 'following') {
+  if (activeView === 'forme' || activeView === 'following') {
     return <ComingSoonView view={activeView} />;
   }
 
@@ -231,7 +231,7 @@ interface BreadcrumbSegment {
   onClick?: () => void;
 }
 
-function ComingSoonView({ view }: { view: 'forme' | 'prize' | 'following' }) {
+function ComingSoonView({ view }: { view: 'forme' | 'following' }) {
   const info = {
     forme: {
       title: 'For Me',
@@ -245,19 +245,6 @@ function ComingSoonView({ view }: { view: 'forme' | 'prize' | 'following' }) {
       ],
       cta: 'Set up preferences',
       note: 'No algorithm deciding what you see. You decide.',
-    },
-    prize: {
-      title: 'Prize',
-      description:
-        'Post bets with defined grounds. Another Bee matches your BLiNG! in escrow. Winner takes the pot when conditions resolve.',
-      bullets: [
-        'Bet on predictions (Fed decisions, election outcomes, market moves)',
-        'Bet on verifiable facts, sports outcomes, proposition trades',
-        'BLiNG! locked in escrow until resolution',
-        'Community or verifiable oracle decides outcome',
-      ],
-      cta: 'Learn more',
-      note: 'Lives at blingster.xyz · sovereign prediction market',
     },
     following: {
       title: 'Following',

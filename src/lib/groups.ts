@@ -95,6 +95,35 @@ export async function listMyGroups(beeId: string): Promise<Group[]> {
     .filter((g): g is Group => g !== null);
 }
 
+/** Groups the Bee owns or moderates (the "Moderating" view). */
+export async function listMyModeratingGroups(beeId: string): Promise<Group[]> {
+  if (!supabase || !beeId) return [];
+  const { data, error } = await supabase
+    .from('group_memberships')
+    .select('joined_at, role, groups(*)')
+    .eq('bee_id', beeId)
+    .in('role', ['owner', 'moderator'])
+    .order('joined_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? [])
+    .map((r) => {
+      const g = (r as Record<string, unknown>).groups;
+      const obj = Array.isArray(g) ? g[0] : g;
+      return obj ? mapGroup(obj as Record<string, unknown>) : null;
+    })
+    .filter((g): g is Group => g !== null);
+}
+
+/** Count of groups the Bee belongs to — sidebar badge. */
+export async function countMyGroups(beeId: string): Promise<number> {
+  if (!supabase || !beeId) return 0;
+  const { count } = await supabase
+    .from('group_memberships')
+    .select('*', { count: 'exact', head: true })
+    .eq('bee_id', beeId);
+  return count ?? 0;
+}
+
 export async function getGroupBySlug(slug: string): Promise<Group | null> {
   if (!supabase) return null;
   const { data } = await supabase.from('groups').select('*').eq('slug', slug).maybeSingle();

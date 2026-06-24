@@ -11,7 +11,6 @@ import {
   Users,
   Settings,
   Sparkles,
-  Trophy,
   ShieldAlert,
   type LucideIcon,
 } from 'lucide-react';
@@ -31,7 +30,6 @@ export type IntelView =
   | 'create'
   | 'following'
   | 'forme'
-  | 'prize'
   | 'reports';
 
 interface IntelSidebarProps {
@@ -60,7 +58,6 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'mythreads', label: 'My Threads', icon: MessageSquare, group: 'personal' },
   { id: 'following', label: 'Following', icon: Users, group: 'personal', comingSoon: true, comingSoonHint: 'Threads from Bees you follow' },
   { id: 'saved', label: 'Saved', icon: Bookmark, group: 'personal' },
-  { id: 'prize', label: 'Prize', icon: Trophy, group: 'future', comingSoon: true, comingSoonHint: 'blingster.xyz — post bets, match with BLiNG! escrow' },
 ];
 
 const INTEL_COLOR = '#6B94C8';
@@ -253,6 +250,8 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
           'relative z-20 flex h-full flex-col border-r border-border bg-bg-elevated transition-[width] duration-200 ease-out',
           expanded ? 'w-44' : 'w-12',
         )}
+        // Accent tint painted over the elevated panel — the Astra color (legible).
+        style={{ backgroundImage: `linear-gradient(${INTEL_COLOR}1F, ${INTEL_COLOR}1F)` }}
       >
       {/* Toggle */}
       <button
