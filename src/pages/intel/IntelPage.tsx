@@ -22,7 +22,7 @@ export function IntelPage() {
   const { bee } = useAuth();
   const navigate = useNavigate();
 
-  const { activeView, hotWindow, breakingWindow } = useIntelStore();
+  const { activeView, breakingWindow } = useIntelStore();
   // The realm lens is the shared prefix (display-name segments on realm_path).
   const prefix = useLensStore((s) => s.path);
   const setPrefix = useLensStore((s) => s.setPrefix);
@@ -30,8 +30,11 @@ export function IntelPage() {
   const sortBy: 'hot' | 'new' | 'top' =
     activeView === 'new' ? 'new' : 'hot';
 
+  // Trending is sourced from the ranked forum_thread_feed (no time window).
+  const feedSort = activeView === 'trending' ? ('trending' as const) : undefined;
+
   const activeWindow =
-    activeView === 'hot' ? hotWindow : activeView === 'new' ? breakingWindow : 0;
+    activeView === 'new' ? breakingWindow : 0;
 
   const selectedRealmId = prefix[0] ? (REALM_ID_BY_NAME[prefix[0]] ?? null) : null;
   const realmName = prefix[0] ?? null;
@@ -77,7 +80,7 @@ export function IntelPage() {
             data-size="meta"
           >
             INTEL {activeView === 'new' && '· Breaking'}
-            {activeView === 'hot' && '· Hot'}
+            {activeView === 'trending' && '· Trending'}
             {activeView === 'mythreads' && '· My threads'}
             {activeView === 'saved' && '· Saved'}
           </div>
@@ -216,6 +219,7 @@ export function IntelPage() {
         prefix={prefix}
         sortBy={sortBy}
         timeWindowHours={activeWindow}
+        feedSort={feedSort}
         savedMode={activeView === 'saved'}
         myThreadsMode={activeView === 'mythreads'}
       />

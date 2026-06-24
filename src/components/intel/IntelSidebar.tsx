@@ -3,7 +3,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Home,
-  Flame,
+  TrendingUp,
   Clock,
   Bookmark,
   MessageSquare,
@@ -14,16 +14,18 @@ import {
   ShieldAlert,
   type LucideIcon,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { countSavedThreads } from '@/lib/reactions';
 import { countThreadsByAuthor } from '@/lib/intel';
 import { isForumModerator } from '@/lib/forumMod';
-import { BEE_COLOR } from '@/lib/constants';
+import { listRealmCategories, type RealmCategory } from '@/lib/forumFeed';
+import { BEE_COLOR, REALM_COLORS } from '@/lib/constants';
 
 export type IntelView =
   | 'home'
-  | 'hot'
+  | 'trending'
   | 'new'
   | 'saved'
   | 'mythreads'
@@ -52,7 +54,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'forme', label: 'For Me', icon: Sparkles, group: 'primary', comingSoon: true, comingSoonHint: 'Personalized feed — pick atoms, realms, and astras to follow' },
   { id: 'home', label: 'Home', icon: Home, group: 'primary' },
-  { id: 'hot', label: 'Hot', icon: Flame, group: 'primary' },
+  { id: 'trending', label: 'Trending', icon: TrendingUp, group: 'primary' },
   { id: 'new', label: 'Breaking', icon: Clock, group: 'primary' },
   { id: 'create', label: 'Thread', icon: Plus, group: 'primary', isAction: true },
   { id: 'mythreads', label: 'My Threads', icon: MessageSquare, group: 'personal' },
@@ -85,6 +87,14 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
   const [savedCount, setSavedCount] = useState(0);
   const [myThreadsCount, setMyThreadsCount] = useState(0);
   const [isMod, setIsMod] = useState(false);
+  const [realms, setRealms] = useState<RealmCategory[]>([]);
+
+  // Top-level realm categories with posts → links to the realm pages.
+  useEffect(() => {
+    listRealmCategories()
+      .then(setRealms)
+      .catch(() => setRealms([]));
+  }, []);
 
   // Mod gate — only moderators see the Reports queue link.
   useEffect(() => {
@@ -318,6 +328,26 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
             />
           </>
         )}
+
+        {/* Realm categories (work order item 2) — top-level realms with posts,
+            each links to its realm page. Lives at the bottom of the rail. */}
+        {realms.length > 0 && (
+          <>
+            <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
+            {expanded && (
+              <div className="px-3 pb-1 font-mono uppercase tracking-wider text-text-muted" style={{ fontSize: '10px' }} data-size="meta">
+                Realms
+              </div>
+            )}
+            <ul className="space-y-0.5 px-1.5">
+              {realms.map((r) => (
+                <li key={r.segment}>
+                  <RealmLink realm={r} expanded={expanded} />
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </nav>
 
       <div className="mt-auto border-t border-border py-2">
@@ -334,6 +364,33 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
       </div>
     </aside>
     </>
+  );
+}
+
+function RealmLink({ realm, expanded }: { realm: RealmCategory; expanded: boolean }) {
+  const color = realm.realmId ? REALM_COLORS[realm.realmId] ?? INTEL_COLOR : INTEL_COLOR;
+  const to = realm.realmId ? `/realm/${realm.realmId}` : '/intel';
+  return (
+    <Link
+      to={to}
+      title={expanded ? undefined : `${realm.segment} (${realm.threadCount})`}
+      className={cn(
+        'group flex w-full items-center rounded-md text-text-dim transition-colors hover:bg-bg/40 hover:text-text-silver',
+        expanded ? 'gap-2.5 px-2 py-1.5' : 'justify-center py-1.5',
+      )}
+    >
+      <span className="block h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ background: color }} aria-hidden="true" />
+      {expanded && (
+        <span className="truncate tracking-wide" style={{ fontSize: '13px' }}>
+          {realm.segment}
+        </span>
+      )}
+      {expanded && (
+        <span className="ml-auto flex-shrink-0 font-mono tabular-nums text-text-muted" style={{ fontSize: '10px' }} data-size="meta">
+          {realm.threadCount}
+        </span>
+      )}
+    </Link>
   );
 }
 

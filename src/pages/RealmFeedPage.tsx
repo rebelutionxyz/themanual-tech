@@ -1,42 +1,27 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
-import { ChevronRight, MessageSquare, Clock } from 'lucide-react';
-import { listRealmFeed, relativeTime, type ForumThread } from '@/lib/intel';
+import { Link, useParams } from 'react-router-dom';
+import { ChevronRight, MessageSquare, Clock, ArrowLeft } from 'lucide-react';
+import { relativeTime } from '@/lib/intel';
+import { listThreadFeed, type FeedSort, type ThreadFeedItem } from '@/lib/forumFeed';
 import { useLensStore } from '@/stores/useLensStore';
-import { RealmTreeSidebar } from '@/components/intel/RealmTreeSidebar';
-import { REALM_NAMES, REALM_COLORS, REALM_ID_BY_NAME } from '@/lib/constants';
+import { REALM_NAMES, REALM_COLORS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { RealmId } from '@/types/manual';
 
-// Source chips (dispatch B3) — All + the meaningful parent_surface values.
-// Labels are singular display text only; each chip keeps its parent_surface value.
-const SOURCE_CHIPS: { value: string; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'intel', label: 'Forum' },
-  { value: 'unite', label: 'Group' },
-  { value: 'rule', label: 'Event' },
-  { value: 'comms', label: 'Comms' },
-  { value: 'give', label: 'Give' },
-  { value: 'pulse', label: 'Pulse' },
-  { value: 'chat', label: 'Chat' },
+const SORTS: { value: FeedSort; label: string }[] = [
+  { value: 'trending', label: 'Trending' },
+  { value: 'top', label: 'Top' },
+  { value: 'new', label: 'New' },
 ];
 
-const SOURCE_LABEL: Record<string, string> = Object.fromEntries(
-  SOURCE_CHIPS.filter((c) => c.value !== 'all').map((c) => [c.value, c.label]),
-);
-
 /**
- * Cross-Astra realm lens feed (dispatch Part B).
- *
- * forum_threads narrowed by realm_path prefix (the full drilled path from the
- * toolbar lens), unioned across all parent_surface. The Source chip row filters
- * to one parent_surface on top.
+ * Realm category page (work order). forum_thread_feed narrowed by the realm_path
+ * prefix (realm root, or the drilled lens path), with a Trending / Top / New
+ * sort toggle. The left rail drills realm categories.
  */
 export function RealmFeedPage() {
   const { realmId } = useParams<{ realmId: string }>();
-  const navigate = useNavigate();
-  const { realmId: lensRealmId, path: lensPath, source, setSource, setPrefix, reset } =
-    useLensStore();
+  const { realmId: lensRealmId, path: lensPath } = useLensStore();
 
   const validRealm = realmId && realmId in REALM_NAMES ? (realmId as RealmId) : null;
   const realmName = validRealm ? REALM_NAMES[validRealm] : null;
@@ -52,7 +37,8 @@ export function RealmFeedPage() {
 
   const accent = validRealm ? REALM_COLORS[validRealm] : '#6B94C8';
 
-  const [threads, setThreads] = useState<ForumThread[] | null>(null);
+  const [sort, setSort] = useState<FeedSort>('trending');
+  const [threads, setThreads] = useState<ThreadFeedItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const pathKey = path.join(' / ');
@@ -65,7 +51,7 @@ export function RealmFeedPage() {
     let cancelled = false;
     setThreads(null);
     setError(null);
-    listRealmFeed(path, source)
+    listThreadFeed(path, sort)
       .then((rows) => {
         if (!cancelled) setThreads(rows);
       })
@@ -78,8 +64,7 @@ export function RealmFeedPage() {
     return () => {
       cancelled = true;
     };
-    // pathKey + source capture the meaningful inputs.
-  }, [pathKey, source]);
+  }, [pathKey, sort]);
 
   if (!validRealm) {
     return (
@@ -92,133 +77,103 @@ export function RealmFeedPage() {
     );
   }
 
-  // Persistent realm-aware left sidebar for the realm-lens feed. Mounting it
-  // here gives the realm view the left rail that /intel and /manual have; the
-  // container stays mounted across realm switches (same route component), only
-  // the active realm + feed update. The facet rail drives the prefix; route-
-  // bound, so we keep the URL's realm slug in sync with prefix[0].
-  function handleNavigate(prefix: string[]) {
-    setPrefix(prefix);
-    if (prefix.length > 0) {
-      const rid = REALM_ID_BY_NAME[prefix[0]];
-      if (rid && rid !== realmId) navigate(`/realm/${rid}`);
-    } else {
-      reset();
-      navigate('/intel');
-    }
-  }
-
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Realm-subtree drill rail — desktop/tablet. On mobile, drill via the
-          global toolbar's Realm popup. */}
-      <aside className="hidden w-56 flex-shrink-0 md:block">
-        <RealmTreeSidebar onNavigate={handleNavigate} />
-      </aside>
-      <div className="min-w-0 flex-1 overflow-y-auto">
-        <div className="safe-pad-x mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">
-      {/* Realm path heading */}
-      <div className="mb-1 font-mono uppercase tracking-widest" style={{ fontSize: '11px', color: accent, opacity: 0.75 }} data-size="meta">
-        Realm lens · cross-Astra
-      </div>
-      <div className="mb-4 flex flex-wrap items-baseline gap-x-1.5">
-        {path.map((seg, i) => {
-          const deepest = i === path.length - 1;
-          return (
-            <span key={path.slice(0, i + 1).join('/')} className="flex items-baseline gap-x-1.5">
-              {i > 0 && <ChevronRight size={16} className="relative top-[3px] text-text-muted" />}
-              <span
-                className="font-display tracking-wide"
-                style={{
-                  fontSize: deepest ? '24px' : '18px',
-                  color: deepest ? accent : '#8A94A0',
-                  fontWeight: deepest ? 600 : 400,
-                }}
-              >
-                {seg}
-              </span>
-            </span>
-          );
-        })}
-      </div>
-
-      {/* Source selector chip row — one line on mobile (scrolls on ultra-narrow),
-          roomier on larger screens. */}
-      <div className="scrollbar-none mb-5 flex flex-nowrap items-center gap-1 overflow-x-auto sm:gap-1.5">
-        {SOURCE_CHIPS.map((chip) => {
-          const active = source === chip.value;
-          return (
-            <button
-              key={chip.value}
-              type="button"
-              onClick={() => setSource(chip.value)}
-              className={cn(
-                'flex-shrink-0 rounded-full border px-2 py-0.5 text-xs tracking-wide transition-colors sm:px-3 sm:py-1',
-                active
-                  ? 'text-bg'
-                  : 'border-border bg-bg-elevated text-text-silver hover:border-border-bright hover:text-text',
-              )}
-              style={active ? { background: accent, borderColor: accent, fontWeight: 600 } : undefined}
-            >
-              {chip.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {error && (
-        <div className="rounded-lg border border-kettle-unsourced/30 bg-bg-elevated p-6">
-          <p className="text-kettle-unsourced" style={{ fontSize: '13px' }}>
-            Failed to load feed: {error}
-          </p>
-        </div>
-      )}
-
-      {!error && threads === null && (
-        <p className="font-mono text-text-muted" style={{ fontSize: '12px' }}>
-          Loading…
-        </p>
-      )}
-
-      {!error && threads !== null && threads.length === 0 && (
-        <div
-          className="rounded-lg border-2 border-dashed p-8 text-center"
-          style={{ borderColor: `${accent}40`, background: `${accent}08` }}
-        >
-          <p className="mb-2 font-display text-text-silver-bright" style={{ fontSize: '17px', fontWeight: 500 }}>
-            No threads tagged here yet
-          </p>
-          <p className="mx-auto max-w-md text-text-dim" style={{ fontSize: '13px', lineHeight: 1.5 }}>
-            {source === 'all'
-              ? 'Nothing tagged to this path across the constellation yet. New posts that tag this branch will show here.'
-              : `No ${SOURCE_LABEL[source] ?? source} posts tagged here. Try “All”, or pick a different source.`}
-          </p>
+    <div className="h-full overflow-y-auto">
+      <div className="safe-pad-x mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">
           <Link
-            to="/intel/new"
-            className="mt-5 inline-flex items-center gap-1.5 rounded-md border-2 px-4 py-1.5 transition-colors"
-            style={{ borderColor: `${accent}60`, color: accent, fontSize: '12px', fontWeight: 600 }}
+            to="/intel"
+            className="mb-3 inline-flex items-center gap-1 font-mono uppercase tracking-wider text-text-muted transition-colors hover:text-text-silver"
+            style={{ fontSize: '10px' }}
+            data-size="meta"
           >
-            Start a thread
+            <ArrowLeft size={11} /> INTEL
           </Link>
-        </div>
-      )}
+          {/* Realm path heading */}
+          <div className="mb-1 font-mono uppercase tracking-widest" style={{ fontSize: '11px', color: accent, opacity: 0.75 }} data-size="meta">
+            Realm
+          </div>
+          <div className="mb-4 flex flex-wrap items-baseline gap-x-1.5">
+            {path.map((seg, i) => {
+              const deepest = i === path.length - 1;
+              return (
+                <span key={path.slice(0, i + 1).join('/')} className="flex items-baseline gap-x-1.5">
+                  {i > 0 && <ChevronRight size={16} className="relative top-[3px] text-text-muted" />}
+                  <span
+                    className="font-display tracking-wide"
+                    style={{ fontSize: deepest ? '24px' : '18px', color: deepest ? accent : '#8A94A0', fontWeight: deepest ? 600 : 400 }}
+                  >
+                    {seg}
+                  </span>
+                </span>
+              );
+            })}
+          </div>
 
-      {!error && threads !== null && threads.length > 0 && (
-        <ul className="space-y-2">
-          {threads.map((t) => (
-            <FeedCard key={t.id} thread={t} accent={accent} />
-          ))}
-        </ul>
-      )}
+          {/* Sort toggle — Trending / Top / New */}
+          <div className="mb-5 inline-flex rounded-md border border-border bg-bg-elevated p-0.5">
+            {SORTS.map((opt) => {
+              const active = sort === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setSort(opt.value)}
+                  className={cn('rounded-sm px-3 py-1 font-mono transition-all', !active && 'text-text-dim hover:text-text-silver')}
+                  style={{ fontSize: '12px', ...(active ? { color: accent, background: `${accent}18`, fontWeight: 600 } : {}) }}
+                  data-size="meta"
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {error && (
+            <div className="rounded-lg border border-kettle-unsourced/30 bg-bg-elevated p-6">
+              <p className="text-kettle-unsourced" style={{ fontSize: '13px' }}>
+                Failed to load feed: {error}
+              </p>
+            </div>
+          )}
+
+          {!error && threads === null && (
+            <p className="font-mono text-text-muted" style={{ fontSize: '12px' }}>
+              Loading…
+            </p>
+          )}
+
+          {!error && threads !== null && threads.length === 0 && (
+            <div className="rounded-lg border-2 border-dashed p-8 text-center" style={{ borderColor: `${accent}40`, background: `${accent}08` }}>
+              <p className="mb-2 font-display text-text-silver-bright" style={{ fontSize: '17px', fontWeight: 500 }}>
+                No threads here yet
+              </p>
+              <p className="mx-auto max-w-md text-text-dim" style={{ fontSize: '13px', lineHeight: 1.5 }}>
+                Be the first to post in this realm.
+              </p>
+              <Link
+                to="/intel/new"
+                className="mt-5 inline-flex items-center gap-1.5 rounded-md border-2 px-4 py-1.5 transition-colors"
+                style={{ borderColor: `${accent}60`, color: accent, fontSize: '12px', fontWeight: 600 }}
+              >
+                Start a thread
+              </Link>
+            </div>
+          )}
+
+          {!error && threads !== null && threads.length > 0 && (
+            <ul className="space-y-2">
+              {threads.map((t) => (
+                <FeedCard key={t.id} thread={t} accent={accent} />
+              ))}
+            </ul>
+          )}
         </div>
-      </div>
     </div>
   );
 }
 
-function FeedCard({ thread, accent }: { thread: ForumThread; accent: string }) {
+function FeedCard({ thread, accent }: { thread: ThreadFeedItem; accent: string }) {
   const realmName = thread.primaryRealm ? REALM_NAMES[thread.primaryRealm] : null;
-  const sourceLabel = thread.parentSurface ? SOURCE_LABEL[thread.parentSurface] ?? thread.parentSurface : null;
 
   return (
     <li>
@@ -228,28 +183,18 @@ function FeedCard({ thread, accent }: { thread: ForumThread; accent: string }) {
         style={{ borderLeft: `3px solid ${accent}80` }}
       >
         <div className="p-4">
-          <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-            {realmName && (
+          {realmName && (
+            <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
               <span className="rounded px-1.5 py-0.5 font-mono" style={{ fontSize: '10px', color: accent, background: `${accent}15` }} data-size="meta">
                 {realmName}
               </span>
-            )}
-            {/* Source badge — derived from parent_surface */}
-            <span
-              className="rounded px-1.5 py-0.5 font-mono uppercase tracking-wider"
-              style={{ fontSize: '9.5px', color: '#C8D1DA', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}
-              data-size="meta"
-            >
-              {sourceLabel ?? 'Forums'}
-            </span>
-          </div>
+            </div>
+          )}
 
-          <h3 className="font-display text-lg leading-tight text-text-silver-bright group-hover:text-text">
-            {thread.title}
-          </h3>
-          {thread.body && (
+          <h3 className="font-display text-lg leading-tight text-text-silver-bright group-hover:text-text">{thread.title}</h3>
+          {thread.excerpt && (
             <p className="mt-1.5 line-clamp-2 text-text-dim" style={{ fontSize: '13px', lineHeight: 1.5 }}>
-              {thread.body}
+              {thread.excerpt}
             </p>
           )}
 

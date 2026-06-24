@@ -602,13 +602,14 @@ const WINDOW_OPTIONS: { hours: TimeWindow; label: string }[] = [
 ];
 
 function TimePanel() {
-  const { activeView, hotWindow, breakingWindow, setHotWindow, setBreakingWindow } = useIntelStore();
-  const mode: 'hot' | 'breaking' | null =
-    activeView === 'hot' ? 'hot' : activeView === 'new' ? 'breaking' : null;
-  const value = mode === 'hot' ? hotWindow : mode === 'breaking' ? breakingWindow : null;
-  const setValue = (h: TimeWindow) =>
-    mode === 'hot' ? setHotWindow(h) : mode === 'breaking' ? setBreakingWindow(h) : undefined;
-  const verb = mode === 'hot' ? 'Hot' : 'Breaking';
+  const { activeView, breakingWindow, setBreakingWindow } = useIntelStore();
+  // Only Breaking uses a recency window now — Trending is ranked by the feed.
+  const mode: 'breaking' | null = activeView === 'new' ? 'breaking' : null;
+  const value = mode === 'breaking' ? breakingWindow : null;
+  const setValue = (h: TimeWindow) => {
+    if (mode === 'breaking') setBreakingWindow(h);
+  };
+  const verb = 'Breaking';
 
   return (
     <div className="p-2">

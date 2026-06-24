@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MessageSquare, Lock, Clock, Bookmark, BookmarkCheck, Share2, Check } from 'lucide-react';
 import { listThreads, listThreadsByIds, listThreadIdsByAuthor, relativeTime, type ForumThread } from '@/lib/intel';
+import { listThreadFeed, type FeedSort, type ThreadFeedItem } from '@/lib/forumFeed';
 import {
   listSavedThreadIds,
   toggleSave,
@@ -32,16 +33,41 @@ interface ThreadListProps {
   prefix: string[];
   sortBy?: 'hot' | 'new' | 'top';
   timeWindowHours?: number;
+  /**
+   * When set, the list is sourced from forum_thread_feed(prefix, feedSort)
+   * (ranked trending/top/new feed) instead of the legacy listThreads path.
+   */
+  feedSort?: FeedSort;
   /** When true, list only threads this Bee has saved. Ignores the prefix. */
   savedMode?: boolean;
   /** When true, list only threads authored by this Bee, newest first. Ignores the prefix. */
   myThreadsMode?: boolean;
 }
 
+/** forum_thread_feed row → the ForumThread shape the cards render. */
+function feedItemToThread(f: ThreadFeedItem): ForumThread {
+  return {
+    id: f.id,
+    title: f.title,
+    body: f.excerpt,
+    createdBy: f.authorBeeId,
+    parentSurface: 'intel',
+    parentId: null,
+    primaryRealm: f.primaryRealm,
+    primaryL2: f.realmPath[1] ?? null,
+    replyCount: f.replyCount,
+    lastActivityAt: f.lastActivityAt,
+    isLocked: f.isLocked,
+    createdAt: f.createdAt,
+    authorHandle: f.authorHandle ?? undefined,
+  };
+}
+
 export function ThreadList({
   prefix,
   sortBy = 'hot',
   timeWindowHours = 0,
+  feedSort,
   savedMode = false,
   myThreadsMode = false,
 }: ThreadListProps) {
@@ -143,11 +169,13 @@ export function ThreadList({
                 return listThreadsByIds(ids);
               })()
             : Promise.resolve([] as ForumThread[])
-          : listThreads({
-              prefix,
-              sortBy,
-              timeWindowHours,
-            });
+          : feedSort
+            ? listThreadFeed(prefix, feedSort).then((items) => items.map(feedItemToThread))
+            : listThreads({
+                prefix,
+                sortBy,
+                timeWindowHours,
+              });
 
     threadPromise
       .then(async (result) => {
@@ -221,7 +249,7 @@ export function ThreadList({
     return () => {
       cancelled = true;
     };
-  }, [prefixKey, sortBy, timeWindowHours, savedMode, myThreadsMode, personalSortMode, bee?.id]);
+  }, [prefixKey, sortBy, timeWindowHours, feedSort, savedMode, myThreadsMode, personalSortMode, bee?.id]);
 
   if (error) {
     return (

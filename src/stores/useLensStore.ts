@@ -29,8 +29,8 @@ interface LensState {
   /**
    * Facet-lens setter: the prefix IS `path` (display-name segments on
    * forum_threads.realm_path). realmId/l2/l3 are derived for color + breadcrumb
-   * convenience. Empty prefix = all threads. Used by the facet RealmTreeSidebar,
-   * the INTEL breadcrumb, and the realm_path-contains thread list.
+   * convenience. Empty prefix = all threads. Used by the realm pages, the INTEL
+   * breadcrumb, and the realm_path-contains thread list / feed.
    */
   setPrefix: (prefix: string[]) => void;
   setSource: (source: LensSource) => void;
