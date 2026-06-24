@@ -4,7 +4,7 @@ import { ChevronRight, MessageSquare, Clock } from 'lucide-react';
 import { listRealmFeed, relativeTime, type ForumThread } from '@/lib/intel';
 import { useLensStore } from '@/stores/useLensStore';
 import { RealmTreeSidebar } from '@/components/intel/RealmTreeSidebar';
-import { REALM_NAMES, REALM_COLORS } from '@/lib/constants';
+import { REALM_NAMES, REALM_COLORS, REALM_ID_BY_NAME } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { RealmId } from '@/types/manual';
 
@@ -35,7 +35,7 @@ const SOURCE_LABEL: Record<string, string> = Object.fromEntries(
 export function RealmFeedPage() {
   const { realmId } = useParams<{ realmId: string }>();
   const navigate = useNavigate();
-  const { realmId: lensRealmId, path: lensPath, source, setSource, setLens, reset } =
+  const { realmId: lensRealmId, path: lensPath, source, setSource, setPrefix, reset } =
     useLensStore();
 
   const validRealm = realmId && realmId in REALM_NAMES ? (realmId as RealmId) : null;
@@ -95,11 +95,13 @@ export function RealmFeedPage() {
   // Persistent realm-aware left sidebar for the realm-lens feed. Mounting it
   // here gives the realm view the left rail that /intel and /manual have; the
   // container stays mounted across realm switches (same route component), only
-  // the active realm + feed update.
-  function handleSelectRealm(id: RealmId | null) {
-    if (id) {
-      setLens(id, [REALM_NAMES[id]]);
-      navigate(`/realm/${id}`);
+  // the active realm + feed update. The facet rail drives the prefix; route-
+  // bound, so we keep the URL's realm slug in sync with prefix[0].
+  function handleNavigate(prefix: string[]) {
+    setPrefix(prefix);
+    if (prefix.length > 0) {
+      const rid = REALM_ID_BY_NAME[prefix[0]];
+      if (rid && rid !== realmId) navigate(`/realm/${rid}`);
     } else {
       reset();
       navigate('/intel');
@@ -111,7 +113,7 @@ export function RealmFeedPage() {
       {/* Realm-subtree drill rail — desktop/tablet. On mobile, drill via the
           global toolbar's Realm popup. */}
       <aside className="hidden w-56 flex-shrink-0 md:block">
-        <RealmTreeSidebar realmId={validRealm} onSwitchRealm={handleSelectRealm} />
+        <RealmTreeSidebar onNavigate={handleNavigate} />
       </aside>
       <div className="min-w-0 flex-1 overflow-y-auto">
         <div className="safe-pad-x mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">

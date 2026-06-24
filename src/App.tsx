@@ -57,6 +57,10 @@ import { IntelLayout } from '@/pages/intel/IntelLayout';
 import { IntelPage } from '@/pages/intel/IntelPage';
 import { NewThreadPage } from '@/pages/intel/NewThreadPage';
 import { ThreadPage } from '@/pages/intel/ThreadPage';
+import { GroupsPage } from '@/pages/groups/GroupsPage';
+import { GroupPage } from '@/pages/groups/GroupPage';
+import { EventsPage } from '@/pages/events/EventsPage';
+import { EventPage } from '@/pages/events/EventPage';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 export default function App() {
@@ -183,6 +187,17 @@ function AppContent() {
             <Route path="lineage" element={<LineagePage />} />
             <Route path="gradations" element={<GradationsPage />} />
           </Route>
+
+          {/* Groups surface (UNITE / AtlasNATION). Built page overrides the
+              generic /:slug shell for the 'unite' surface slug; registered
+              before the catch-all, exactly like /intel. */}
+          <Route path="/unite" element={<GroupsPage />} />
+          <Route path="/unite/:slug" element={<GroupPage />} />
+
+          {/* Events surface (RULE / AtlasUNITED). Built page overrides the
+              generic /:slug shell for the 'rule' surface slug. */}
+          <Route path="/rule" element={<EventsPage />} />
+          <Route path="/rule/:id" element={<EventPage />} />
 
           {/* Waves surface — Mini Waves V76 embedded via iframe */}
           <Route path="/waves" element={<WavesPage />} />

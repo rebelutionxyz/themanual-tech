@@ -12,7 +12,7 @@ import {
 } from '@/lib/reactions';
 import { ReactionBar } from '@/components/intel/ReactionBar';
 import { useManualData } from '@/lib/useManualData';
-import { useIntelStore } from '@/stores/useIntelStore';
+import { useLensStore } from '@/stores/useLensStore';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { FeedInlineSlot } from '@/components/promotions/FeedInlineSlot';
@@ -28,21 +28,18 @@ import { cn } from '@/lib/utils';
 import type { RealmId } from '@/types/manual';
 
 interface ThreadListProps {
-  selectedRealmId: RealmId | null;
-  selectedL2: string | null;
-  selectedL3?: string | null;
+  /** Facet-lens prefix (display-name segments on realm_path). [] = all threads. */
+  prefix: string[];
   sortBy?: 'hot' | 'new' | 'top';
   timeWindowHours?: number;
-  /** When true, list only threads this Bee has saved. Ignores realm filters. */
+  /** When true, list only threads this Bee has saved. Ignores the prefix. */
   savedMode?: boolean;
-  /** When true, list only threads authored by this Bee, newest first. Ignores realm filters. */
+  /** When true, list only threads authored by this Bee, newest first. Ignores the prefix. */
   myThreadsMode?: boolean;
 }
 
 export function ThreadList({
-  selectedRealmId,
-  selectedL2,
-  selectedL3 = null,
+  prefix,
   sortBy = 'hot',
   timeWindowHours = 0,
   savedMode = false,
@@ -50,6 +47,11 @@ export function ThreadList({
 }: ThreadListProps) {
   const { atoms } = useManualData();
   const { bee } = useAuth();
+
+  // Realm slug for promo targeting + accent color, derived from the prefix root.
+  const selectedRealmId: RealmId | null = prefix[0]
+    ? (REALM_ID_BY_NAME[prefix[0]] ?? null)
+    : null;
 
   const personalSortKey = savedMode
     ? 'intel-sort-saved'
@@ -104,22 +106,8 @@ export function ThreadList({
   const [threads, setThreads] = useState<ForumThread[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Precompute atomIds-in-realm for the atom-link filter.
-  const atomIdsInRealm = useMemo(() => {
-    if (!selectedRealmId) return undefined;
-    const matches = atoms.filter((a) => {
-      if (a.realmId !== selectedRealmId) return false;
-      if (selectedL2 && a.pathParts[1] !== selectedL2) return false;
-      if (selectedL3 && a.pathParts[2] !== selectedL3) return false;
-      return true;
-    });
-    matches.sort((a, b) => {
-      const aScore = (a.isLeaf ? 2 : 0) + (a.kettle === 'Accepted' ? 1 : 0);
-      const bScore = (b.isLeaf ? 2 : 0) + (b.kettle === 'Accepted' ? 1 : 0);
-      return bScore - aScore;
-    });
-    return matches.slice(0, 200).map((a) => a.id);
-  }, [atoms, selectedRealmId, selectedL2, selectedL3]);
+  // Stable serialization of the prefix for effect deps (segments are plain text).
+  const prefixKey = prefix.join(' ');
 
   const atomById = useMemo(() => {
     const m = new Map(atoms.map((a) => [a.id, a]));
@@ -130,6 +118,7 @@ export function ThreadList({
   const [threadCategoryLinks, setThreadCategoryLinks] = useState<Map<string, string[]>>(new Map());
   const [reactionSummaries, setReactionSummaries] = useState<Map<string, ReactionSummary>>(new Map());
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: prefixKey is the stable serialization of `prefix`; depending on the array identity would refetch every render
   useEffect(() => {
     let cancelled = false;
     setThreads(null);
@@ -154,15 +143,11 @@ export function ThreadList({
                 return listThreadsByIds(ids);
               })()
             : Promise.resolve([] as ForumThread[])
-          : listThreads(
-              {
-                realmId: selectedRealmId,
-                l2: selectedL2,
-                sortBy,
-                timeWindowHours,
-              },
-              atomIdsInRealm,
-            );
+          : listThreads({
+              prefix,
+              sortBy,
+              timeWindowHours,
+            });
 
     threadPromise
       .then(async (result) => {
@@ -236,7 +221,7 @@ export function ThreadList({
     return () => {
       cancelled = true;
     };
-  }, [selectedRealmId, selectedL2, sortBy, timeWindowHours, atomIdsInRealm, savedMode, myThreadsMode, personalSortMode, bee?.id]);
+  }, [prefixKey, sortBy, timeWindowHours, savedMode, myThreadsMode, personalSortMode, bee?.id]);
 
   if (error) {
     return (
@@ -260,8 +245,8 @@ export function ThreadList({
     return (
       <EmptyThreads
         realmId={selectedRealmId}
-        l2={selectedL2}
-        l3={selectedL3}
+        l2={prefix[1] ?? null}
+        l3={prefix[2] ?? null}
         savedMode={savedMode}
         myThreadsMode={myThreadsMode}
         signedIn={Boolean(bee?.id)}
@@ -382,7 +367,7 @@ function ThreadCard({
   onToggleSave: () => void;
   reactionSummary?: ReactionSummary;
 }) {
-  const { setRealmId, setL2, setL3 } = useIntelStore();
+  const setPrefix = useLensStore((s) => s.setPrefix);
 
   const linkedAtoms = atomIds
     .map((id) => atomById.get(id) as AtomShape | undefined)
@@ -408,23 +393,16 @@ function ThreadCard({
   function handleAtomClick(e: React.MouseEvent, atom: AtomShape) {
     e.preventDefault();
     e.stopPropagation();
-    setRealmId(atom.realmId);
-    if (atom.pathParts[1]) setL2(atom.pathParts[1]);
-    if (atom.pathParts[2]) setL3(atom.pathParts[2]);
+    // Filter to the atom's realm branch (realm › L2 › L3) — a realm_path prefix.
+    setPrefix(atom.pathParts.slice(0, 3).filter(Boolean));
   }
 
   function handleCategoryClick(e: React.MouseEvent, path: string) {
     e.preventDefault();
     e.stopPropagation();
     const parts = path.split(' / ').map((s) => s.trim()).filter(Boolean);
-    if (parts.length === 0) return;
-    const realmId = REALM_ID_BY_NAME[parts[0]];
-    if (!realmId) return;
-    setRealmId(realmId);
-    setL2(null);
-    setL3(null);
-    if (parts.length >= 2) setL2(parts[1]);
-    if (parts.length >= 3) setL3(parts[2]);
+    if (parts.length === 0 || !REALM_ID_BY_NAME[parts[0]]) return;
+    setPrefix(parts);
   }
 
   return (

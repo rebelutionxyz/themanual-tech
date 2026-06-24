@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { IntelSidebar, type IntelView } from '@/components/intel/IntelSidebar';
+import { RealmTreeSidebar } from '@/components/intel/RealmTreeSidebar';
 import { useIntelStore } from '@/stores/useIntelStore';
 import { useLensStore } from '@/stores/useLensStore';
 import type { RealmId } from '@/types/manual';
@@ -34,6 +35,7 @@ export function IntelLayout() {
     setL3,
     setActiveView,
   } = useIntelStore();
+  const setPrefix = useLensStore((s) => s.setPrefix);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: only re-syncs store on route change; including store actions/state would cause unwanted re-runs
   useEffect(() => {
@@ -44,6 +46,7 @@ export function IntelLayout() {
         setRealmId(null);
         setL2(null);
         setL3(null);
+        setPrefix([]);
       }
     }
   }, [location.pathname]);
@@ -76,22 +79,38 @@ export function IntelLayout() {
     if (location.pathname !== '/intel') {
       navigate('/intel');
     }
-    if (view === 'home') {
+    if (view === 'home' || view === 'saved') {
       setRealmId(null);
       setL2(null);
       setL3(null);
-    }
-    if (view === 'saved') {
-      setRealmId(null);
-      setL2(null);
-      setL3(null);
+      setPrefix([]);
     }
     setActiveView(view);
   }
 
+  // The facet realm-lens rail is the primary realm navigation (work order §2/§3).
+  // Shown beside the icon rail on the list routes; the thread-detail / composer
+  // routes get the full width.
+  const showRail =
+    location.pathname === '/intel' || location.pathname === '/intel/mine';
+
   return (
     <div className="flex h-full overflow-hidden">
       <IntelSidebar activeView={activeView} onSelectView={handleSidebarSelect} />
+
+      {showRail && (
+        <aside className="hidden w-56 flex-shrink-0 md:block">
+          <RealmTreeSidebar
+            onNavigate={(prefix) => {
+              // Drilling the realm lens always lands on the browse list with the
+              // prefix applied — even from Saved / My Threads (which ignore it).
+              if (location.pathname !== '/intel') navigate('/intel');
+              setActiveView('home');
+              setPrefix(prefix);
+            }}
+          />
+        </aside>
+      )}
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top Top toolbar is now global platform chrome (mounted in App.tsx). */}

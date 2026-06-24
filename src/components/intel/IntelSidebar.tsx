@@ -12,12 +12,14 @@ import {
   Settings,
   Sparkles,
   Trophy,
+  ShieldAlert,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { countSavedThreads } from '@/lib/reactions';
 import { countThreadsByAuthor } from '@/lib/intel';
+import { isForumModerator } from '@/lib/forumMod';
 import { BEE_COLOR } from '@/lib/constants';
 
 export type IntelView =
@@ -29,7 +31,8 @@ export type IntelView =
   | 'create'
   | 'following'
   | 'forme'
-  | 'prize';
+  | 'prize'
+  | 'reports';
 
 interface IntelSidebarProps {
   activeView: IntelView;
@@ -84,6 +87,22 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
   // on thread create). Silent when 0 (per UX spec B).
   const [savedCount, setSavedCount] = useState(0);
   const [myThreadsCount, setMyThreadsCount] = useState(0);
+  const [isMod, setIsMod] = useState(false);
+
+  // Mod gate — only moderators see the Reports queue link.
+  useEffect(() => {
+    let cancelled = false;
+    if (!bee?.id) {
+      setIsMod(false);
+      return;
+    }
+    isForumModerator(bee.id).then((mod) => {
+      if (!cancelled) setIsMod(mod);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [bee?.id]);
 
   useEffect(() => {
     if (!bee?.id) {
@@ -201,6 +220,9 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
   const primaryItems = NAV_ITEMS.filter((n) => n.group === 'primary');
   const personalItems = NAV_ITEMS.filter((n) => n.group === 'personal');
   const futureItems = NAV_ITEMS.filter((n) => n.group === 'future');
+  const modItems: NavItem[] = isMod
+    ? [{ id: 'reports', label: 'Reports', icon: ShieldAlert, group: 'personal' }]
+    : [];
 
   // Per-view badge counts + colors. Silent when 0 (item.id omitted from map).
   const badgeMap: Partial<Record<IntelView, { count: number; color: string }>> = {};
@@ -273,6 +295,18 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
           onSelect={handleSelect}
           badgeMap={badgeMap}
         />
+        {modItems.length > 0 && (
+          <>
+            <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
+            <SidebarGroup
+              items={modItems}
+              activeView={activeView}
+              expanded={expanded}
+              onSelect={handleSelect}
+              badgeMap={badgeMap}
+            />
+          </>
+        )}
         {futureItems.length > 0 && (
           <>
             <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />

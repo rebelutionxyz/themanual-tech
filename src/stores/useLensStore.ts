@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { REALM_ID_BY_NAME } from '@/lib/constants';
 import type { RealmId } from '@/types/manual';
 
 /**
@@ -25,6 +26,13 @@ interface LensState {
   source: LensSource;
 
   setLens: (realmId: RealmId | null, path: string[]) => void;
+  /**
+   * Facet-lens setter: the prefix IS `path` (display-name segments on
+   * forum_threads.realm_path). realmId/l2/l3 are derived for color + breadcrumb
+   * convenience. Empty prefix = all threads. Used by the facet RealmTreeSidebar,
+   * the INTEL breadcrumb, and the realm_path-contains thread list.
+   */
+  setPrefix: (prefix: string[]) => void;
   setSource: (source: LensSource) => void;
   reset: () => void;
 }
@@ -38,6 +46,13 @@ export const useLensStore = create<LensState>()((set) => ({
 
   setLens: (realmId, path) =>
     set({ realmId, path, l2: path[1] ?? null, l3: path[2] ?? null }),
+  setPrefix: (prefix) =>
+    set({
+      realmId: prefix[0] ? (REALM_ID_BY_NAME[prefix[0]] ?? null) : null,
+      path: prefix,
+      l2: prefix[1] ?? null,
+      l3: prefix[2] ?? null,
+    }),
   setSource: (source) => set({ source }),
   reset: () => set({ realmId: null, path: [], l2: null, l3: null, source: 'all' }),
 }));

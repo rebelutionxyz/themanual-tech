@@ -1,15 +1,19 @@
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { ThreadList } from '@/components/intel/ThreadList';
+import { ReportsQueue } from '@/components/intel/ReportsQueue';
 import { L3Refinement } from '@/components/intel/L3Refinement';
 import { InlineComposer } from '@/components/intel/InlineComposer';
 import { useIntelStore } from '@/stores/useIntelStore';
+import { useLensStore } from '@/stores/useLensStore';
 import { useAuth } from '@/lib/auth';
 import { createThread } from '@/lib/intel';
-import { REALM_NAMES, REALM_ID_BY_NAME } from '@/lib/constants';
+import { SURFACE_BY_SLUG } from '@/lib/surfaces';
+import { REALM_ID_BY_NAME } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 const INTEL_COLOR = '#6B94C8';
+const INTEL_NAME = SURFACE_BY_SLUG.get('intel')?.name ?? 'INTEL';
 
 /**
  * Thread list page. Sidebar + realm bar provided by IntelLayout.
@@ -18,17 +22,10 @@ export function IntelPage() {
   const { bee } = useAuth();
   const navigate = useNavigate();
 
-  const {
-    selectedRealmId,
-    selectedL2,
-    selectedL3,
-    activeView,
-    hotWindow,
-    breakingWindow,
-    setRealmId,
-    setL2,
-    setL3,
-  } = useIntelStore();
+  const { activeView, hotWindow, breakingWindow } = useIntelStore();
+  // The realm lens is the shared prefix (display-name segments on realm_path).
+  const prefix = useLensStore((s) => s.path);
+  const setPrefix = useLensStore((s) => s.setPrefix);
 
   const sortBy: 'hot' | 'new' | 'top' =
     activeView === 'new' ? 'new' : 'hot';
@@ -36,49 +33,34 @@ export function IntelPage() {
   const activeWindow =
     activeView === 'hot' ? hotWindow : activeView === 'new' ? breakingWindow : 0;
 
-  const realmName = selectedRealmId ? REALM_NAMES[selectedRealmId] : null;
+  const selectedRealmId = prefix[0] ? (REALM_ID_BY_NAME[prefix[0]] ?? null) : null;
+  const realmName = prefix[0] ?? null;
+  const selectedL2 = prefix[1] ?? null;
 
+  // Breadcrumb segments are driven straight from the active prefix (work order
+  // §1): INTEL › {realm_path joined by ›}. Each segment pops the lens to that
+  // depth; the deepest is the current position.
   const crumbs: BreadcrumbSegment[] = [];
-
-  if (!selectedRealmId) {
-    crumbs.push({
-      label: 'All Realms',
-      clickable: false,
-      isDeepest: true,
-    });
+  if (prefix.length === 0) {
+    crumbs.push({ label: 'All Realms', clickable: false, isDeepest: true });
   } else {
-    crumbs.push({
-      label: realmName ?? selectedRealmId,
-      clickable: !!(selectedL2 || selectedL3),
-      isDeepest: !selectedL2 && !selectedL3,
-      onClick: () => {
-        setL2(null);
-        setL3(null);
-      },
+    prefix.forEach((seg, i) => {
+      const deepest = i === prefix.length - 1;
+      crumbs.push({
+        label: seg,
+        clickable: !deepest,
+        isDeepest: deepest,
+        onClick: deepest ? undefined : () => setPrefix(prefix.slice(0, i + 1)),
+      });
     });
-
-    if (selectedL2) {
-      crumbs.push({
-        label: selectedL2,
-        clickable: !!selectedL3,
-        isDeepest: !selectedL3,
-        onClick: () => {
-          setL3(null);
-        },
-      });
-    }
-
-    if (selectedL3) {
-      crumbs.push({
-        label: selectedL3,
-        clickable: false,
-        isDeepest: true,
-      });
-    }
   }
 
   if (activeView === 'forme' || activeView === 'prize' || activeView === 'following') {
     return <ComingSoonView view={activeView} />;
+  }
+
+  if (activeView === 'reports') {
+    return <ReportsQueue />;
   }
 
   const subjectLabel = realmName
@@ -103,22 +85,18 @@ export function IntelPage() {
           <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 sm:gap-x-1">
             <button
               type="button"
-              onClick={() => {
-                setRealmId(null);
-                setL2(null);
-                setL3(null);
-              }}
+              onClick={() => setPrefix([])}
               title="Back to all INTEL"
               className={cn(
                 'font-display tracking-wide border-b border-dotted transition-all',
-                selectedRealmId
+                prefix.length > 0
                   ? 'border-transparent text-text-muted hover:border-current hover:text-text-silver-bright hover:brightness-125'
                   : 'cursor-default border-transparent text-text-silver-bright',
                 'text-[17px] sm:text-[22px]',
               )}
-              disabled={!selectedRealmId}
+              disabled={prefix.length === 0}
             >
-              Home
+              {INTEL_NAME}
             </button>
 
             {crumbs.map((crumb, i) => (
@@ -224,29 +202,18 @@ export function IntelPage() {
       <L3Refinement
         selectedRealmId={selectedRealmId}
         selectedL2={selectedL2}
-        selectedL3={selectedL3}
+        selectedL3={prefix[2] ?? null}
         onSelectPath={(path) => {
           const parts = path.split(' / ').map((s) => s.trim()).filter(Boolean);
-          if (parts.length === 0) return;
-
-          const realmId = REALM_ID_BY_NAME[parts[0]];
-          if (!realmId) return;
-
-          setRealmId(realmId);
-          setL2(null);
-          setL3(null);
-
-          if (parts.length >= 2) setL2(parts[1]);
-          if (parts.length >= 3) setL3(parts[2]);
+          if (parts.length === 0 || !REALM_ID_BY_NAME[parts[0]]) return;
+          setPrefix(parts);
         }}
       />
 
       {/* Recency window control folded into the toolbar's Time popup
           (dispatch §5). hotWindow/breakingWindow still drive the list below. */}
       <ThreadList
-        selectedRealmId={selectedRealmId}
-        selectedL2={selectedL2}
-        selectedL3={selectedL3}
+        prefix={prefix}
         sortBy={sortBy}
         timeWindowHours={activeWindow}
         savedMode={activeView === 'saved'}
