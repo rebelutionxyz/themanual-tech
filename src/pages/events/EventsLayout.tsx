@@ -55,8 +55,8 @@ export function EventsLayout() {
 
   return (
     <div className="flex h-full overflow-hidden">
-      <SurfaceNavRail title="RULE" accent={RULE_COLOR} items={items} activeId={view} onSelect={handleSelect} />
-      <main className="min-w-0 flex-1 overflow-y-auto">
+      <SurfaceNavRail title="RULE" accent={RULE_COLOR} neon="#00E5FF" items={items} activeId={view} onSelect={handleSelect} />
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
         <Outlet context={{ view, openCreate: () => setCreateOpen(true) } satisfies EventsOutletCtx} />
       </main>
 

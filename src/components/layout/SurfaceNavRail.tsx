@@ -16,8 +16,14 @@ export interface NavRailItem {
 interface SurfaceNavRailProps {
   /** Short uppercase surface label shown in the expanded header. */
   title: string;
-  /** Surface accent (hex) — drives active color, badges, and the rail tint. */
+  /** Surface accent (hex) — drives the rail tint + header label. */
   accent: string;
+  /**
+   * High-chroma neon (hex) for the menu labels + icons so they pop against the
+   * accent background. Resting is dimmed; hover/active is full neon. Falls back
+   * to the accent when omitted.
+   */
+  neon?: string;
   items: NavRailItem[];
   activeId: string;
   onSelect: (id: string) => void;
@@ -31,7 +37,8 @@ interface SurfaceNavRailProps {
  * parameterized by surface accent + items. No realm facet rail — that's
  * INTEL-only. The rail background is tinted with the surface accent.
  */
-export function SurfaceNavRail({ title, accent, items, activeId, onSelect, footer }: SurfaceNavRailProps) {
+export function SurfaceNavRail({ title, accent, neon, items, activeId, onSelect, footer }: SurfaceNavRailProps) {
+  const neonColor = neon ?? accent;
   const [pinned, setPinned] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768);
   const [hovered, setHovered] = useState(false);
   const asideRef = useRef<HTMLElement>(null);
@@ -138,11 +145,11 @@ export function SurfaceNavRail({ title, accent, items, activeId, onSelect, foote
         </button>
 
         <nav className="flex-1 overflow-y-auto py-2">
-          <RailGroup items={primary} activeId={activeId} expanded={expanded} accent={accent} onSelect={handleSelect} />
+          <RailGroup items={primary} activeId={activeId} expanded={expanded} neon={neonColor} onSelect={handleSelect} />
           {personal.length > 0 && (
             <>
               <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
-              <RailGroup items={personal} activeId={activeId} expanded={expanded} accent={accent} onSelect={handleSelect} />
+              <RailGroup items={personal} activeId={activeId} expanded={expanded} neon={neonColor} onSelect={handleSelect} />
             </>
           )}
         </nav>
@@ -157,20 +164,20 @@ function RailGroup({
   items,
   activeId,
   expanded,
-  accent,
+  neon,
   onSelect,
 }: {
   items: NavRailItem[];
   activeId: string;
   expanded: boolean;
-  accent: string;
+  neon: string;
   onSelect: (id: string) => void;
 }) {
   return (
     <ul className="space-y-0.5 px-1.5">
       {items.map((item) => (
         <li key={item.id}>
-          <RailItem item={item} active={activeId === item.id} expanded={expanded} accent={accent} onClick={() => onSelect(item.id)} />
+          <RailItem item={item} active={activeId === item.id} expanded={expanded} neon={neon} onClick={() => onSelect(item.id)} />
         </li>
       ))}
     </ul>
@@ -181,13 +188,13 @@ function RailItem({
   item,
   active,
   expanded,
-  accent,
+  neon,
   onClick,
 }: {
   item: NavRailItem;
   active: boolean;
   expanded: boolean;
-  accent: string;
+  neon: string;
   onClick: () => void;
 }) {
   const { icon: Icon, label, isAction, badge } = item;
@@ -195,43 +202,39 @@ function RailItem({
   const badgeText = hasBadge ? (badge > 99 ? '99+' : String(badge)) : '';
   const tooltip = expanded ? undefined : hasBadge ? `${label} (${badge})` : label;
 
+  // Neon foreground (icon + label inherit currentColor): full neon when
+  // active/hover, dimmed when resting so it stays legible on the accent bg.
   return (
     <button
       type="button"
       onClick={onClick}
       title={tooltip}
       className={cn(
-        'group flex w-full items-center rounded-md transition-colors',
+        'group flex w-full items-center rounded-md transition-colors hover:bg-bg/30 hover:[color:var(--neon)]',
         expanded ? 'gap-2.5 px-2 py-2' : 'justify-center py-2',
-        active && 'bg-bg/60 text-text',
-        !active && 'text-text-dim hover:bg-bg/40 hover:text-text-silver',
-        isAction && !active && 'text-text-silver',
+        active && 'bg-bg/40',
       )}
-      style={active ? { color: accent } : undefined}
+      style={{ ['--neon' as string]: neon, color: active ? neon : `${neon}B0` }}
     >
       <span className="relative flex-shrink-0">
-        <Icon
-          size={16}
-          className={cn('flex-shrink-0', isAction && 'text-honey', !isAction && !active && 'text-text-muted group-hover:text-text-silver')}
-          style={active ? { color: accent } : undefined}
-        />
+        <Icon size={16} className="flex-shrink-0" />
         {!expanded && hasBadge && (
           <span
             className="absolute -right-0.5 -top-0.5 block h-[6px] w-[6px] rounded-full ring-1 ring-bg-elevated"
-            style={{ background: accent }}
+            style={{ background: neon }}
             aria-hidden="true"
           />
         )}
       </span>
       {expanded && (
-        <span className={cn('truncate tracking-wide', isAction && 'font-medium')} style={{ fontSize: '13px' }}>
+        <span className={cn('truncate tracking-wide', isAction && 'font-semibold')} style={{ fontSize: '13px' }}>
           {label}
         </span>
       )}
       {expanded && hasBadge && (
         <span
           className="ml-auto flex-shrink-0 rounded px-1.5 py-0.5 font-mono tabular-nums"
-          style={{ fontSize: '10px', color: accent, background: `${accent}18`, border: `1px solid ${accent}35`, fontWeight: 600 }}
+          style={{ fontSize: '10px', color: neon, background: `${neon}1F`, border: `1px solid ${neon}45`, fontWeight: 600 }}
           data-size="meta"
           aria-label={`${badge} items`}
         >

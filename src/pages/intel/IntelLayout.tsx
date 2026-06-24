@@ -91,10 +91,10 @@ export function IntelLayout() {
     <div className="flex h-full overflow-hidden">
       <IntelSidebar activeView={activeView} onSelectView={handleSidebarSelect} />
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top Top toolbar is now global platform chrome (mounted in App.tsx). */}
         <main
-          className="min-w-0 flex-1 overflow-y-auto"
+          className="min-h-0 min-w-0 flex-1 overflow-y-auto"
           style={{
             background: 'rgba(107, 148, 200, 0.10)',
           }}

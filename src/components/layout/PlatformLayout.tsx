@@ -32,12 +32,12 @@ export function PlatformLayout() {
   // is the toolbar's Astras popup. The promoted slot survives as a content-area
   // element on the right; it returns null when empty, so no column is reserved.
   return (
-    <div className="flex h-[calc(100vh-56px)] overflow-hidden">
+    <div className="flex h-full min-h-0 overflow-hidden">
       {/* Left: realm-accent strip (closed sidebar per §15.1) */}
       <RealmStrip />
 
-      {/* Main surface area */}
-      <main className="min-w-0 flex-1 overflow-hidden">
+      {/* Main surface area — the surface layout/page owns its internal scroll. */}
+      <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
         <Outlet />
       </main>
 

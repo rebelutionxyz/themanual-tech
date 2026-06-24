@@ -84,7 +84,7 @@ function AppContent() {
   const isAdminSurface = ADMIN_SURFACE_PATHS.has(pathname);
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg text-text">
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-bg text-text">
       <SiteHeader />
       {/* Phase C Component D: top-ticker promotion slot below header.
           Hides itself when no DB match + no astra fallback (D-4).
@@ -93,6 +93,10 @@ function AppContent() {
       {/* Top Top toolbar — global platform chrome (dispatch A1). Identical on
           every surface; suppressed on admin surfaces (own their own chrome). */}
       {!isAdminSurface && <TopToolbar />}
+      {/* Single content region below the fixed header cluster. Platform surfaces
+          size to h-full and own their internal scroll (one scrollbar); tall
+          standalone pages scroll here. min-h-0 lets inner scrollers engage. */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
       <Routes>
         {/* Home — astra-aware first, then admin tier-1 redirect for signed-in
             Bees on theMANUAL.tech root, then anonymous HomePage. */}
@@ -236,6 +240,7 @@ function AppContent() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </div>
     </div>
   );
 }

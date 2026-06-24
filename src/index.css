@@ -26,6 +26,19 @@
     text-rendering: optimizeLegibility;
   }
 
+  /* Lock the shell to the viewport — one scroll owner (the content panel), no
+     page scroller. See App.tsx for the flex chain. */
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  html,
+  body {
+    overflow: hidden;
+  }
+
   body {
     font-size: 15px;
     line-height: 1.55;

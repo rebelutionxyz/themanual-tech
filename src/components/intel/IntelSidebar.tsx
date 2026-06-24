@@ -63,6 +63,8 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const INTEL_COLOR = '#6B94C8';
+// Neon menu foreground — lime pops against the INTEL-blue rail tint.
+const INTEL_NEON = '#39FF14';
 
 /**
  * Left sidebar for INTEL. Always visible on all screen sizes.
@@ -375,10 +377,12 @@ function RealmLink({ realm, expanded }: { realm: RealmCategory; expanded: boolea
       to={to}
       title={expanded ? undefined : `${realm.segment} (${realm.threadCount})`}
       className={cn(
-        'group flex w-full items-center rounded-md text-text-dim transition-colors hover:bg-bg/40 hover:text-text-silver',
+        'group flex w-full items-center rounded-md transition-colors hover:bg-bg/60 hover:[color:var(--neon)]',
         expanded ? 'gap-2.5 px-2 py-1.5' : 'justify-center py-1.5',
       )}
+      style={{ ['--neon' as string]: INTEL_NEON, color: `${INTEL_NEON}B0` }}
     >
+      {/* Dot keeps the realm's own color so realms stay visually distinct. */}
       <span className="block h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ background: color }} aria-hidden="true" />
       {expanded && (
         <span className="truncate tracking-wide" style={{ fontSize: '13px' }}>
@@ -386,7 +390,7 @@ function RealmLink({ realm, expanded }: { realm: RealmCategory; expanded: boolea
         </span>
       )}
       {expanded && (
-        <span className="ml-auto flex-shrink-0 font-mono tabular-nums text-text-muted" style={{ fontSize: '10px' }} data-size="meta">
+        <span className="ml-auto flex-shrink-0 font-mono tabular-nums" style={{ fontSize: '10px', color: `${INTEL_NEON}99` }} data-size="meta">
           {realm.threadCount}
         </span>
       )}
@@ -470,25 +474,17 @@ function SidebarItem({
       onClick={onClick}
       title={tooltip}
       className={cn(
-        'group flex w-full items-center rounded-md transition-colors',
+        'group flex w-full items-center rounded-md transition-colors hover:bg-bg/60 hover:[color:var(--neon)]',
         expanded ? 'gap-2.5 px-2 py-2' : 'justify-center py-2',
-        active && 'bg-bg text-text',
-        !active && 'text-text-dim hover:bg-bg hover:text-text-silver',
-        isAction && !active && 'text-text-silver',
+        active && 'bg-bg',
         comingSoon && 'opacity-60',
       )}
-      style={active ? { color: INTEL_COLOR } : undefined}
+      // Neon foreground: icon + label inherit currentColor (full when active/hover,
+      // dimmed resting). The Create action keeps the honey icon as its CTA accent.
+      style={{ ['--neon' as string]: INTEL_NEON, color: active ? INTEL_NEON : `${INTEL_NEON}B0` }}
     >
       <span className="relative flex-shrink-0">
-        <Icon
-          size={16}
-          className={cn(
-            'flex-shrink-0',
-            isAction && 'text-honey',
-            !isAction && !active && 'text-text-muted group-hover:text-text-silver',
-          )}
-          style={active ? { color: INTEL_COLOR } : undefined}
-        />
+        <Icon size={16} className={cn('flex-shrink-0', isAction && 'text-honey')} />
         {/* Collapsed-mode dot indicator — shows only when sidebar is collapsed
             AND this item has a count > 0. Mirrors the color of the expanded badge. */}
         {!expanded && badge && !comingSoon && (
