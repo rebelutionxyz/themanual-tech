@@ -1,1 +1,40 @@
-*.sql text eol=lf
+# Normalize all text files to LF in the repository. Git auto-detects text vs
+# binary; `eol=lf` pins the checked-out line ending so core.autocrlf can't
+# reintroduce CRLF on Windows.
+* text=auto eol=lf
+
+# Explicit text pins (defensive — covers everything in this repo)
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.cjs   text eol=lf
+*.mjs   text eol=lf
+*.json  text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.md    text eol=lf
+*.sql   text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.toml  text eol=lf
+*.svg   text eol=lf
+
+# Binary — never normalize or diff as text
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.avif  binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.eot   binary
+*.pdf   binary
+*.zip   binary
+*.gz    binary
+*.mp4   binary
+*.webm  binary
