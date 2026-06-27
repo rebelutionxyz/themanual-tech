@@ -7,6 +7,10 @@ import { IntelLayout } from '@/pages/intel/IntelLayout';
 import { IntelPage } from '@/pages/intel/IntelPage';
 import { NewThreadPage } from '@/pages/intel/NewThreadPage';
 import { ThreadPage } from '@/pages/intel/ThreadPage';
+import { PulseLayout } from '@/pages/pulse/PulseLayout';
+import { PulseHome } from '@/pages/pulse/PulseHome';
+import { WatchPage } from '@/pages/pulse/WatchPage';
+import { ChannelPage } from '@/pages/pulse/ChannelPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { SurfacePage } from '@/pages/SurfacePage';
@@ -92,6 +96,16 @@ function AppContent() {
             <Route path="mine" element={<IntelPage />} />
             <Route path="new" element={<NewThreadPage />} />
             <Route path="t/:threadId" element={<ThreadPage />} />
+          </Route>
+
+          {/* PULSE / Freedom Network surface + sub-routes share PulseLayout
+              (realm strip persists across home, watch, channel). Registered
+              before the /:slug catch-all so it wins over the generic
+              SurfacePage. */}
+          <Route path="/pulse" element={<PulseLayout />}>
+            <Route index element={<PulseHome />} />
+            <Route path="watch/:broadcastId" element={<WatchPage />} />
+            <Route path="c/:handle" element={<ChannelPage />} />
           </Route>
 
           {/* Waves surface — Mini Waves V76 embedded via iframe */}
