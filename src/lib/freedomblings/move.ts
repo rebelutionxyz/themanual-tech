@@ -83,6 +83,8 @@ export interface GiveArgs {
   recipientId: string;
   amount: string; // decimal string — passed straight through, never Number()'d
   memo?: string;
+  /** bling_send p_category (e.g. 'transfer' for the SEND module). */
+  category?: string;
 }
 
 export function useGive() {
@@ -100,7 +102,7 @@ export function useGive() {
       p_sender_id: user.id,
       p_recipient_id: args.recipientId,
       p_amount: args.amount, // STRING — preserve precision (numeric on the DB side)
-      p_category: null,
+      p_category: args.category ?? null,
       p_memo: args.memo?.trim() || null,
     });
 

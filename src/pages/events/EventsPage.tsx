@@ -1,39 +1,37 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link, useOutletContext } from 'react-router-dom';
-import { Calendar, Plus, Video, MapPin, Check, HelpCircle } from 'lucide-react';
+import { SurfaceHeader } from '@/components/shell/SurfaceHeader';
+import { SURFACE_FRIENDLY } from '@/components/shell/sidebarNav';
+import { useAuth } from '@/lib/auth';
 import {
+  type EventItem,
+  formatEventWhen,
   listEvents,
-  listPastEvents,
   listMyGoingEvents,
   listMyHostedEvents,
-  formatEventWhen,
-  type EventItem,
+  listPastEvents,
 } from '@/lib/events';
-import type { EventsOutletCtx, EventsView } from '@/pages/events/EventsLayout';
-import { useAuth } from '@/lib/auth';
 import { formatCount } from '@/lib/utils';
+import type { EventsOutletCtx, EventsView } from '@/pages/events/EventsLayout';
+import { useLensStore } from '@/stores/useLensStore';
+import { Calendar, Check, HelpCircle, MapPin, Plus, Video } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useOutletContext } from 'react-router-dom';
 
-const RULE_COLOR = '#E88938';
-
-const VIEW_META: Record<EventsView, { title: string; blurb: string }> = {
-  upcoming: { title: 'Upcoming', blurb: 'Coordinate action in physical and digital space. Show up.' },
-  past: { title: 'Past', blurb: 'Events that have already happened.' },
-  going: { title: 'Going', blurb: "Events you've said you'll attend." },
-  hosting: { title: 'Hosting', blurb: 'Events you created.' },
-};
+const RULE_COLOR = '#F97316';
 
 export function EventsPage() {
   const { bee } = useAuth();
   const { view, openCreate } = useOutletContext<EventsOutletCtx>();
   const [events, setEvents] = useState<EventItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The realm strip narrows Explore/Past (events.realm_path); going/hosting stay full.
+  const realmPath = useLensStore((s) => s.path);
 
   const load = useCallback(async () => {
     setEvents(null);
     setError(null);
     try {
-      if (view === 'upcoming') setEvents(await listEvents(true));
-      else if (view === 'past') setEvents(await listPastEvents());
+      if (view === 'upcoming') setEvents(await listEvents(true, realmPath));
+      else if (view === 'past') setEvents(await listPastEvents(realmPath));
       else if (!bee?.id) setEvents([]);
       else if (view === 'going') setEvents(await listMyGoingEvents(bee.id));
       else setEvents(await listMyHostedEvents(bee.id));
@@ -41,44 +39,38 @@ export function EventsPage() {
       setError(e instanceof Error ? e.message : 'Failed to load events');
       setEvents([]);
     }
-  }, [view, bee?.id]);
+  }, [view, bee?.id, realmPath]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const meta = VIEW_META[view];
-
   return (
-    <div className="min-h-full" style={{ background: `${RULE_COLOR}0D` }}>
+    <div className="min-h-full bg-white">
       <div className="safe-pad-x mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">
-        <div className="mb-5 flex items-start justify-between gap-4">
-          <div>
-            <div className="mb-1 font-mono uppercase tracking-widest" style={{ fontSize: '11px', color: RULE_COLOR, opacity: 0.85 }} data-size="meta">
-              RULE · Events
-            </div>
-            <h1 className="flex items-center gap-2 font-display tracking-wide text-text-silver-bright" style={{ fontSize: '24px' }}>
-              <Calendar size={22} style={{ color: RULE_COLOR }} />
-              {meta.title}
-            </h1>
-            <p className="mt-1 text-text-dim" style={{ fontSize: '13px' }}>
-              {meta.blurb}
-            </p>
-          </div>
-          {bee && (
-            <button
-              type="button"
-              onClick={openCreate}
-              className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-md px-3 py-2 font-medium text-bg transition-colors hover:brightness-110"
-              style={{ background: RULE_COLOR, fontSize: '13px' }}
-            >
-              <Plus size={15} /> Create
-            </button>
-          )}
-        </div>
+        <SurfaceHeader
+          friendly={SURFACE_FRIENDLY.rule}
+          icon={Calendar}
+          accent={RULE_COLOR}
+          action={
+            bee && (
+              <button
+                type="button"
+                onClick={openCreate}
+                className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-md px-3 py-2 font-medium text-bg transition-colors hover:brightness-110"
+                style={{ background: RULE_COLOR, fontSize: '13px' }}
+              >
+                <Plus size={15} /> Create
+              </button>
+            )
+          }
+        />
 
         {error && (
-          <div className="rounded-lg border border-kettle-unsourced/30 bg-bg-elevated p-5 text-kettle-unsourced" style={{ fontSize: '13px' }}>
+          <div
+            className="rounded-lg border border-red-200 bg-red-50 p-5 text-red-600"
+            style={{ fontSize: '13px' }}
+          >
             {error}
           </div>
         )}
@@ -106,14 +98,22 @@ export function EventCard({ event }: { event: EventItem }) {
     <li>
       <Link
         to={`/rule/${event.id}`}
-        className="group block overflow-hidden rounded-lg border border-border bg-bg-elevated p-4 transition-all hover:border-border-bright hover:bg-panel-2"
-        style={{ borderLeft: `3px solid ${RULE_COLOR}80` }}
+        className="group block overflow-hidden rounded-lg border border-zinc-200 p-4 transition-colors hover:bg-[#F973161f]"
+        style={{ borderLeft: `3px solid ${RULE_COLOR}`, background: `${RULE_COLOR}14` }}
       >
-        <div className="mb-1 font-mono uppercase tracking-wider" style={{ fontSize: '10.5px', color: RULE_COLOR }} data-size="meta">
+        <div
+          className="mb-1 font-mono uppercase tracking-wider"
+          style={{ fontSize: '10.5px', color: RULE_COLOR }}
+          data-size="meta"
+        >
           {formatEventWhen(event.startsAt, event.endsAt)}
         </div>
-        <h3 className="font-display text-lg leading-tight text-text-silver-bright group-hover:text-text">{event.title}</h3>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
+        <h3 className="font-display text-lg leading-tight text-zinc-900">{event.title}</h3>
+        <div
+          className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-zinc-500"
+          style={{ fontSize: '11px' }}
+          data-size="meta"
+        >
           <span className="inline-flex items-center gap-1">
             {event.isVirtual ? <Video size={11} /> : <MapPin size={11} />}
             {event.isVirtual ? 'Virtual' : event.locationText || 'In person'}
@@ -139,19 +139,27 @@ function EventsSkeleton() {
         <li
           // biome-ignore lint/suspicious/noArrayIndexKey: decorative loading skeleton, fixed-length static array
           key={i}
-          className="animate-pulse-slow rounded-lg border border-border bg-bg-elevated p-4"
-          style={{ borderLeft: `3px solid ${RULE_COLOR}80`, animationDelay: `${i * 100}ms` }}
+          className="animate-pulse-slow rounded-lg border border-zinc-200 p-4"
+          style={{
+            borderLeft: `3px solid ${RULE_COLOR}`,
+            background: `${RULE_COLOR}14`,
+            animationDelay: `${i * 100}ms`,
+          }}
         >
-          <div className="h-3 w-32 rounded bg-text-muted/10" />
-          <div className="mt-2 h-5 rounded bg-text-muted/15" style={{ width: `${w}%` }} />
-          <div className="mt-2 h-3 w-40 rounded bg-text-muted/10" />
+          <div className="h-3 w-32 rounded bg-zinc-100" />
+          <div className="mt-2 h-5 rounded bg-zinc-200" style={{ width: `${w}%` }} />
+          <div className="mt-2 h-3 w-40 rounded bg-zinc-100" />
         </li>
       ))}
     </ul>
   );
 }
 
-function EmptyEvents({ view, signedIn, onCreate }: { view: EventsView; signedIn: boolean; onCreate: () => void }) {
+function EmptyEvents({
+  view,
+  signedIn,
+  onCreate,
+}: { view: EventsView; signedIn: boolean; onCreate: () => void }) {
   const headline =
     view === 'upcoming'
       ? 'Nothing on the calendar yet'
@@ -173,12 +181,15 @@ function EmptyEvents({ view, signedIn, onCreate }: { view: EventsView; signedIn:
           : 'Your RSVPs are tied to your Bee account.'
         : 'Check back later.';
   return (
-    <div className="rounded-lg border-2 border-dashed p-8 text-center" style={{ borderColor: `${RULE_COLOR}40`, background: `${RULE_COLOR}08` }}>
+    <div
+      className="rounded-lg border-2 border-dashed p-8 text-center"
+      style={{ borderColor: `${RULE_COLOR}40`, background: `${RULE_COLOR}08` }}
+    >
       <Calendar size={26} className="mx-auto mb-3" style={{ color: RULE_COLOR, opacity: 0.7 }} />
-      <p className="mb-1 font-display text-text-silver-bright" style={{ fontSize: '17px', fontWeight: 500 }}>
+      <p className="mb-1 font-display text-zinc-900" style={{ fontSize: '17px', fontWeight: 500 }}>
         {headline}
       </p>
-      <p className="mx-auto max-w-md text-text-dim" style={{ fontSize: '13px', lineHeight: 1.5 }}>
+      <p className="mx-auto max-w-md text-zinc-500" style={{ fontSize: '13px', lineHeight: 1.5 }}>
         {subtext}
       </p>
       {signedIn && view !== 'past' && view !== 'going' && (
@@ -195,7 +206,12 @@ function EmptyEvents({ view, signedIn, onCreate }: { view: EventsView; signedIn:
         <Link
           to="/login"
           className="mt-5 inline-flex items-center gap-1.5 rounded-md border-2 px-4 py-1.5 transition-colors hover:brightness-110"
-          style={{ borderColor: `${RULE_COLOR}70`, color: RULE_COLOR, fontSize: '12px', fontWeight: 600 }}
+          style={{
+            borderColor: `${RULE_COLOR}70`,
+            color: RULE_COLOR,
+            fontSize: '12px',
+            fontWeight: 600,
+          }}
         >
           Sign in
         </Link>

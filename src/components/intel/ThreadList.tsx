@@ -26,6 +26,7 @@ import {
   BEE_COLOR,
 } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { REALM_COLOR_FALLBACK, useRealmColors } from '@/stores/useRealmColors';
 import type { RealmId } from '@/types/manual';
 
 interface ThreadListProps {
@@ -253,8 +254,8 @@ export function ThreadList({
 
   if (error) {
     return (
-      <div className="rounded-lg border border-kettle-unsourced/30 bg-bg-elevated p-6">
-        <p className="text-kettle-unsourced" style={{ fontSize: '13px' }}>
+      <div className="rounded-lg border border-red-200 bg-red-50 p-6">
+        <p className="text-red-600" style={{ fontSize: '13px' }}>
           Failed to load threads: {error}
         </p>
       </div>
@@ -396,16 +397,17 @@ function ThreadCard({
   reactionSummary?: ReactionSummary;
 }) {
   const setPrefix = useLensStore((s) => s.setPrefix);
+  const realmColors = useRealmColors((s) => s.colors);
 
   const linkedAtoms = atomIds
     .map((id) => atomById.get(id) as AtomShape | undefined)
     .filter((a): a is AtomShape => !!a)
     .slice(0, 4);
 
+  // Card outline + badge are the THREAD'S REALM color (realms.color, fallback
+  // map) — NOT the INTEL astra blue. So a Culture thread reads pink, etc.
   const accentColor =
-    thread.primaryRealm && REALM_COLORS[thread.primaryRealm]
-      ? REALM_COLORS[thread.primaryRealm]
-      : '#6B94C8';
+    (thread.primaryRealm && realmColors[thread.primaryRealm]) || REALM_COLOR_FALLBACK;
 
   const primaryRealmName = thread.primaryRealm ? REALM_NAMES[thread.primaryRealm] : null;
   const primarySet = new Set(
@@ -437,8 +439,13 @@ function ThreadCard({
     <li>
       <Link
         to={`/intel/t/${thread.id}`}
-        className="group block overflow-hidden rounded-lg border border-border bg-bg-elevated transition-all hover:border-border-bright hover:bg-panel-2"
-        style={{ borderLeft: `3px solid ${accentColor}80` }}
+        className="group block overflow-hidden rounded-lg border transition-shadow hover:shadow-sm"
+        style={{
+          borderColor: `${accentColor}33`,
+          borderLeftColor: accentColor,
+          borderLeftWidth: '3px',
+          background: `${accentColor}14`,
+        }}
       >
         <div className="p-4">
         <div className="flex items-start gap-3">
@@ -458,7 +465,7 @@ function ThreadCard({
                 </span>
                 {thread.primaryL2 && (
                   <span
-                    className="rounded bg-bg px-1.5 py-0.5 font-mono text-text-dim"
+                    className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-zinc-500"
                     style={{ fontSize: '10px' }}
                     data-size="meta"
                   >
@@ -470,7 +477,7 @@ function ThreadCard({
 
             <h3
               className={cn(
-                'font-display text-lg leading-tight text-text-silver-bright group-hover:text-text',
+                'font-display text-lg leading-tight text-zinc-900',
                 thread.isLocked && 'opacity-70',
               )}
             >
@@ -479,7 +486,7 @@ function ThreadCard({
 
             {thread.body && (
               <p
-                className="mt-1.5 line-clamp-2 text-text-dim"
+                className="mt-1.5 line-clamp-2 text-zinc-500"
                 style={{ fontSize: '13px', lineHeight: '1.5' }}
               >
                 {thread.body}
@@ -493,7 +500,7 @@ function ThreadCard({
                     type="button"
                     key={a.id}
                     onClick={(e) => handleAtomClick(e, a)}
-                    className="inline-flex items-center gap-1 rounded border border-transparent bg-bg/60 px-1.5 py-0.5 text-text-silver transition-colors hover:border-text-silver/30 hover:bg-bg-elevated hover:text-text"
+                    className="inline-flex items-center gap-1 rounded border border-zinc-200 bg-white/70 px-1.5 py-0.5 text-zinc-700 transition-colors hover:bg-white hover:text-zinc-900"
                     style={{ fontSize: '10.5px' }}
                     title={`Filter by ${a.realmName}${a.pathParts[1] ? ` · ${a.pathParts[1]}` : ''}${a.pathParts[2] ? ` · ${a.pathParts[2]}` : ''}`}
                   >
@@ -509,7 +516,7 @@ function ThreadCard({
                 ))}
                 {atomIds.length > 4 && (
                   <span
-                    className="font-mono text-text-muted"
+                    className="font-mono text-zinc-500"
                     style={{ fontSize: '10.5px' }}
                     data-size="meta"
                   >
@@ -528,18 +535,18 @@ function ThreadCard({
                       type="button"
                       key={path}
                       onClick={(e) => handleCategoryClick(e, path)}
-                      className="inline-flex items-center gap-1 rounded border border-border/50 bg-bg/40 px-1.5 py-0.5 text-text-dim transition-colors hover:border-border hover:bg-bg hover:text-text-silver"
+                      className="inline-flex items-center gap-1 rounded border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
                       style={{ fontSize: '10px' }}
                       title={`Filter by ${path}`}
                     >
-                      <span className="text-text-muted">#</span>
+                      <span className="text-zinc-400">#</span>
                       {leaf}
                     </button>
                   );
                 })}
                 {categoryPaths.length > categoryChips.length && (
                   <span
-                    className="font-mono text-text-muted"
+                    className="font-mono text-zinc-500"
                     style={{ fontSize: '10px' }}
                     data-size="meta"
                   >
@@ -551,7 +558,7 @@ function ThreadCard({
           </div>
           <div className="flex flex-shrink-0 items-start gap-0.5">
             {thread.isLocked && (
-              <Lock size={14} className="mt-1.5 mr-1 text-text-muted" />
+              <Lock size={14} className="mt-1.5 mr-1 text-zinc-400" />
             )}
             <CardShareButton threadId={thread.id} />
             {canSave && (
@@ -566,7 +573,7 @@ function ThreadCard({
                   'rounded-md p-1.5 transition-colors',
                   saved
                     ? 'text-honey hover:bg-honey/10'
-                    : 'text-text-muted hover:bg-bg hover:text-text-silver',
+                    : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700',
                 )}
                 title={saved ? 'Remove from Saved' : 'Save for later'}
                 aria-label={saved ? 'Remove from Saved' : 'Save for later'}
@@ -594,14 +601,14 @@ function ThreadCard({
             </div>
           )}
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-text-muted">
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-zinc-500">
           <MetaPill icon={<MessageSquare size={11} />}>
             {thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}
           </MetaPill>
           <MetaPill icon={<Clock size={11} />}>{relativeTime(thread.lastActivityAt)}</MetaPill>
           {thread.authorHandle && (
             <span
-              className="font-mono text-text-silver"
+              className="font-mono text-zinc-500"
               style={{ fontSize: '11px' }}
               data-size="meta"
             >
@@ -632,14 +639,14 @@ function PersonalSortToggle({
   return (
     <div className="mb-3 flex items-center gap-2">
       <span
-        className="font-mono uppercase tracking-widest text-text-muted"
+        className="font-mono uppercase tracking-widest text-zinc-500"
         style={{ fontSize: '10px' }}
         data-size="meta"
       >
         Sort
       </span>
       <div
-        className="inline-flex rounded-md border border-border bg-bg-elevated p-0.5"
+        className="inline-flex rounded-md border border-zinc-200 bg-zinc-50 p-0.5"
         role="radiogroup"
         aria-label="Sort order"
       >
@@ -656,7 +663,7 @@ function PersonalSortToggle({
               title={opt.hint}
               className={cn(
                 'rounded-sm px-2.5 py-0.5 font-mono transition-all',
-                !active && 'text-text-dim hover:text-text-silver',
+                !active && 'text-zinc-500 hover:text-zinc-800',
               )}
               style={{
                 fontSize: '11px',
@@ -723,8 +730,8 @@ function CardShareButton({ threadId }: { threadId: string }) {
       className={cn(
         'rounded-md p-1.5 transition-colors',
         copied
-          ? 'text-kettle-sourced hover:bg-kettle-sourced/10'
-          : 'text-text-muted hover:bg-bg hover:text-text-silver',
+          ? 'text-emerald-600 hover:bg-emerald-50'
+          : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700',
         pending && 'opacity-60',
       )}
       title={copied ? 'Link copied' : bee ? 'Share with affiliate tracking' : 'Copy share link'}
@@ -794,9 +801,9 @@ function ThreadListSkeleton({
       {cards.map((c, i) => (
         <li
           key={`skel-${c.titleW}-${c.bodyW1}-${c.atoms}`}
-          className="animate-pulse-slow overflow-hidden rounded-lg border border-border bg-bg-elevated"
+          className="animate-pulse-slow overflow-hidden rounded-lg border border-zinc-200 bg-white"
           style={{
-            borderLeft: `3px solid ${accentColor}80`,
+            borderLeft: '3px solid #1D9BF0',
             animationDelay: `${i * 120}ms`,
           }}
         >
@@ -806,21 +813,18 @@ function ThreadListSkeleton({
                 className="h-3.5 w-14 rounded"
                 style={{ background: `${accentColor}25` }}
               />
-              <span className="h-3.5 w-20 rounded bg-bg" />
+              <span className="h-3.5 w-20 rounded bg-zinc-100" />
             </div>
 
-            <div
-              className="h-5 rounded bg-text-muted/15"
-              style={{ width: `${c.titleW}%` }}
-            />
+            <div className="h-5 rounded bg-zinc-200" style={{ width: `${c.titleW}%` }} />
 
             <div className="mt-2 space-y-1.5">
               <div
-                className="h-3 rounded bg-text-muted/10"
+                className="h-3 rounded bg-zinc-100"
                 style={{ width: `${c.bodyW1}%` }}
               />
               <div
-                className="h-3 rounded bg-text-muted/10"
+                className="h-3 rounded bg-zinc-100"
                 style={{ width: `${c.bodyW2}%` }}
               />
             </div>
@@ -830,19 +834,18 @@ function ThreadListSkeleton({
                 <span
                   // biome-ignore lint/suspicious/noArrayIndexKey: decorative loading skeleton, fixed length per render, no stable identity
                   key={j}
-                  className="h-4 rounded bg-bg/60"
+                  className="h-4 rounded border border-zinc-200 bg-zinc-100"
                   style={{
                     width: `${50 + ((j * 17) % 40)}px`,
-                    border: '1px solid rgba(255,255,255,0.04)',
                   }}
                 />
               ))}
             </div>
 
             <div className="mt-3 flex items-center gap-3">
-              <span className="h-3 w-14 rounded bg-text-muted/10" />
-              <span className="h-3 w-10 rounded bg-text-muted/10" />
-              <span className="h-3 w-20 rounded bg-text-muted/10" />
+              <span className="h-3 w-14 rounded bg-zinc-100" />
+              <span className="h-3 w-10 rounded bg-zinc-100" />
+              <span className="h-3 w-20 rounded bg-zinc-100" />
             </div>
           </div>
         </li>
@@ -909,13 +912,13 @@ function EmptyThreads({
           MY THREADS
         </div>
         <p
-          className="mb-2 font-display text-text-silver-bright"
+          className="mb-2 font-display text-zinc-900"
           style={{ fontSize: '17px', fontWeight: 500 }}
         >
           {headline}
         </p>
         <p
-          className="mx-auto max-w-md text-text-dim"
+          className="mx-auto max-w-md text-zinc-500"
           style={{ fontSize: '13px', lineHeight: '1.5' }}
         >
           {subtext}
@@ -981,13 +984,13 @@ function EmptyThreads({
           SAVED
         </div>
         <p
-          className="mb-2 font-display text-text-silver-bright"
+          className="mb-2 font-display text-zinc-900"
           style={{ fontSize: '17px', fontWeight: 500 }}
         >
           {headline}
         </p>
         <p
-          className="mx-auto max-w-md text-text-dim"
+          className="mx-auto max-w-md text-zinc-500"
           style={{ fontSize: '13px', lineHeight: '1.5' }}
         >
           {subtext}
@@ -1069,14 +1072,14 @@ function EmptyThreads({
       )}
 
       <p
-        className="mb-2 font-display text-text-silver-bright"
+        className="mb-2 font-display text-zinc-900"
         style={{ fontSize: '17px', fontWeight: 500 }}
       >
         {headline}
       </p>
 
       <p
-        className="mx-auto max-w-md text-text-dim"
+        className="mx-auto max-w-md text-zinc-500"
         style={{ fontSize: '13px', lineHeight: '1.5' }}
       >
         {subtext}
@@ -1105,7 +1108,7 @@ function EmptyThreads({
 
       {realmName && (
         <p
-          className="mt-4 font-mono text-text-muted"
+          className="mt-4 font-mono text-zinc-500"
           style={{ fontSize: '10.5px' }}
           data-size="meta"
         >

@@ -62,17 +62,34 @@ function bee(row: Record<string, unknown>): { handle: string | null; name: strin
 
 export type GroupSort = 'members' | 'recent';
 
-/** Discover list — RLS returns public groups + any private/secret you belong to. */
-export async function listGroups(sort: GroupSort = 'members'): Promise<Group[]> {
+/**
+ * Discovery feed via the groups_search RPC (SECURITY INVOKER, RLS-scoped —
+ * private/secret groups stay hidden). Powers the cross-Astra right-rail UNITE
+ * card. 'members' = popularity, 'recent' = newest.
+ */
+export async function groupsSearch(sort: GroupSort = 'members', limit = 30): Promise<Group[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('groups_search', { p_sort: sort, p_limit: limit });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapGroup);
+}
+
+/**
+ * Discover list — RLS returns public groups + any private/secret you belong to.
+ * `realmPath` (the realm-strip lens) narrows by groups.realm_path when non-empty.
+ */
+export async function listGroups(
+  sort: GroupSort = 'members',
+  realmPath: string[] = [],
+): Promise<Group[]> {
   if (!supabase) return [];
   const order =
     sort === 'recent'
       ? { col: 'created_at', ascending: false }
       : { col: 'member_count', ascending: false };
-  const { data, error } = await supabase
-    .from('groups')
-    .select('*')
-    .order(order.col, { ascending: order.ascending });
+  let q = supabase.from('groups').select('*');
+  if (realmPath.length > 0) q = q.contains('realm_path', realmPath);
+  const { data, error } = await q.order(order.col, { ascending: order.ascending });
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapGroup);
 }
@@ -170,7 +187,9 @@ export async function getMyRole(groupId: string, beeId: string): Promise<GroupRo
 }
 
 /** Resolve a handle to a bee id (for owner/mod add-member). */
-export async function findBeeByHandle(handle: string): Promise<{ id: string; handle: string } | null> {
+export async function findBeeByHandle(
+  handle: string,
+): Promise<{ id: string; handle: string } | null> {
   if (!supabase) return null;
   const clean = handle.trim().replace(/^@/, '').toLowerCase();
   if (!clean) return null;
@@ -197,7 +216,9 @@ export interface CreateGroupInput {
   description?: string;
 }
 
-export async function createGroup(input: CreateGroupInput): Promise<{ id: string; slug: string; visibility: GroupVisibility }> {
+export async function createGroup(
+  input: CreateGroupInput,
+): Promise<{ id: string; slug: string; visibility: GroupVisibility }> {
   if (!supabase) throw new Error('Supabase not configured');
   const { data, error } = await supabase.rpc('group_create', {
     p_name: input.name,
@@ -207,7 +228,11 @@ export async function createGroup(input: CreateGroupInput): Promise<{ id: string
     p_description: input.description ?? null,
   });
   const r = unwrap<{ id: string; slug: string; visibility: GroupVisibility }>(data, error);
-  return { id: String(r.id), slug: String(r.slug), visibility: (r.visibility ?? input.visibility) as GroupVisibility };
+  return {
+    id: String(r.id),
+    slug: String(r.slug),
+    visibility: (r.visibility ?? input.visibility) as GroupVisibility,
+  };
 }
 
 export async function joinGroup(groupId: string): Promise<void> {
@@ -222,7 +247,11 @@ export async function leaveGroup(groupId: string): Promise<void> {
   unwrap(data, error);
 }
 
-export async function addMember(groupId: string, beeId: string, role: GroupRole = 'member'): Promise<void> {
+export async function addMember(
+  groupId: string,
+  beeId: string,
+  role: GroupRole = 'member',
+): Promise<void> {
   if (!supabase) throw new Error('Supabase not configured');
   const { data, error } = await supabase.rpc('group_add_member', {
     p_group_id: groupId,
@@ -294,7 +323,11 @@ export async function listGroupThreads(groupId: string): Promise<GroupThread[]> 
 }
 
 /** Start a group discussion thread via the forum RPC (parent_surface 'unite'). */
-export async function createGroupThread(groupId: string, title: string, body: string): Promise<string> {
+export async function createGroupThread(
+  groupId: string,
+  title: string,
+  body: string,
+): Promise<string> {
   if (!supabase) throw new Error('Supabase not configured');
   const { data, error } = await supabase.rpc('forum_create_thread', {
     p_title: title,

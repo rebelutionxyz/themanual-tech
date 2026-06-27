@@ -74,19 +74,44 @@ function bee(row: Record<string, unknown>): { handle: string | null; name: strin
 
 // ───────────────────────────── Reading ─────────────────────────────
 
-export async function listEvents(upcomingOnly = true): Promise<EventItem[]> {
+export type EventSearchSort = 'soonest' | 'newest' | 'popular';
+
+/**
+ * Discovery feed via the events_search RPC (SECURITY INVOKER, RLS-scoped).
+ * Powers the cross-Astra right-rail RULE card and the events center feed.
+ * 'popular' ranks by going_count. Returns upcoming events.
+ */
+export async function eventsSearch(
+  sort: EventSearchSort = 'soonest',
+  limit = 30,
+): Promise<EventItem[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('events_search', { p_sort: sort, p_limit: limit });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapEvent);
+}
+
+export async function listEvents(upcomingOnly = true, realmPath: string[] = []): Promise<EventItem[]> {
   if (!supabase) return [];
   let q = supabase.from('events').select('*').order('starts_at', { ascending: true });
   if (upcomingOnly) q = q.gte('starts_at', new Date().toISOString());
+  if (realmPath.length > 0) q = q.contains('realm_path', realmPath);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapEvent);
 }
 
 /** Events anchored to a group (events.parent_id = group_id). */
-export async function listEventsByGroup(groupId: string, upcomingOnly = true): Promise<EventItem[]> {
+export async function listEventsByGroup(
+  groupId: string,
+  upcomingOnly = true,
+): Promise<EventItem[]> {
   if (!supabase) return [];
-  let q = supabase.from('events').select('*').eq('parent_id', groupId).order('starts_at', { ascending: true });
+  let q = supabase
+    .from('events')
+    .select('*')
+    .eq('parent_id', groupId)
+    .order('starts_at', { ascending: true });
   if (upcomingOnly) q = q.gte('starts_at', new Date().toISOString());
   const { data, error } = await q;
   if (error) throw new Error(error.message);
@@ -94,13 +119,15 @@ export async function listEventsByGroup(groupId: string, upcomingOnly = true): P
 }
 
 /** Past events (starts_at < now), most recent first. */
-export async function listPastEvents(): Promise<EventItem[]> {
+export async function listPastEvents(realmPath: string[] = []): Promise<EventItem[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase
+  let q = supabase
     .from('events')
     .select('*')
     .lt('starts_at', new Date().toISOString())
     .order('starts_at', { ascending: false });
+  if (realmPath.length > 0) q = q.contains('realm_path', realmPath);
+  const { data, error } = await q;
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapEvent);
 }
@@ -230,7 +257,10 @@ export async function createEvent(input: CreateEventInput): Promise<string> {
 /** Upsert RSVP. not_going is the decline state (no separate un-RSVP). */
 export async function rsvp(eventId: string, status: RsvpStatus): Promise<void> {
   if (!supabase) throw new Error('Supabase not configured');
-  const { data, error } = await supabase.rpc('event_rsvp', { p_event_id: eventId, p_status: status });
+  const { data, error } = await supabase.rpc('event_rsvp', {
+    p_event_id: eventId,
+    p_status: status,
+  });
   unwrap(data, error);
 }
 
@@ -270,7 +300,11 @@ export async function listEventThreads(eventId: string): Promise<EventThread[]> 
   }));
 }
 
-export async function createEventThread(eventId: string, title: string, body: string): Promise<string> {
+export async function createEventThread(
+  eventId: string,
+  title: string,
+  body: string,
+): Promise<string> {
   if (!supabase) throw new Error('Supabase not configured');
   const { data, error } = await supabase.rpc('forum_create_thread', {
     p_title: title,

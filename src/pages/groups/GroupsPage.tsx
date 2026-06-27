@@ -1,24 +1,21 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link, useOutletContext } from 'react-router-dom';
-import { Users, Plus, Lock, EyeOff, Globe } from 'lucide-react';
+import { SurfaceHeader } from '@/components/shell/SurfaceHeader';
+import { SURFACE_FRIENDLY } from '@/components/shell/sidebarNav';
+import { useAuth } from '@/lib/auth';
 import {
+  type Group,
+  type GroupSort,
   listGroups,
   listMyGroups,
   listMyModeratingGroups,
-  type Group,
-  type GroupSort,
 } from '@/lib/groups';
-import type { GroupsOutletCtx, GroupsView } from '@/pages/groups/GroupsLayout';
-import { useAuth } from '@/lib/auth';
 import { cn, formatCount } from '@/lib/utils';
+import type { GroupsOutletCtx, GroupsView } from '@/pages/groups/GroupsLayout';
+import { useLensStore } from '@/stores/useLensStore';
+import { EyeOff, Globe, Lock, Plus, Users } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useOutletContext } from 'react-router-dom';
 
-const UNITE_COLOR = '#6FCF8F';
-
-const VIEW_META: Record<GroupsView, { title: string; blurb: string }> = {
-  discover: { title: 'Discover', blurb: 'Organize around shared purpose. Sovereign tribes of Bees.' },
-  mine: { title: 'My Groups', blurb: 'Groups you belong to.' },
-  moderating: { title: 'Moderating', blurb: 'Groups you own or moderate.' },
-};
+const UNITE_COLOR = '#7C3AED';
 
 export function GroupsPage() {
   const { bee } = useAuth();
@@ -26,12 +23,14 @@ export function GroupsPage() {
   const [sort, setSort] = useState<GroupSort>('members');
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The realm strip narrows Discover (groups.realm_path); "mine" stays unfiltered.
+  const realmPath = useLensStore((s) => s.path);
 
   const load = useCallback(async () => {
     setGroups(null);
     setError(null);
     try {
-      if (view === 'discover') setGroups(await listGroups(sort));
+      if (view === 'discover') setGroups(await listGroups(sort, realmPath));
       else if (!bee?.id) setGroups([]);
       else if (view === 'mine') setGroups(await listMyGroups(bee.id));
       else setGroups(await listMyModeratingGroups(bee.id));
@@ -39,44 +38,35 @@ export function GroupsPage() {
       setError(e instanceof Error ? e.message : 'Failed to load groups');
       setGroups([]);
     }
-  }, [view, sort, bee?.id]);
+  }, [view, sort, bee?.id, realmPath]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const meta = VIEW_META[view];
-
   return (
-    <div className="min-h-full" style={{ background: `${UNITE_COLOR}0D` }}>
+    <div className="min-h-full bg-white">
       <div className="safe-pad-x mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">
-        <div className="mb-5 flex items-start justify-between gap-4">
-          <div>
-            <div className="mb-1 font-mono uppercase tracking-widest" style={{ fontSize: '11px', color: UNITE_COLOR, opacity: 0.8 }} data-size="meta">
-              UNITE · Groups
-            </div>
-            <h1 className="flex items-center gap-2 font-display tracking-wide text-text-silver-bright" style={{ fontSize: '24px' }}>
-              <Users size={22} style={{ color: UNITE_COLOR }} />
-              {meta.title}
-            </h1>
-            <p className="mt-1 text-text-dim" style={{ fontSize: '13px' }}>
-              {meta.blurb}
-            </p>
-          </div>
-          {bee && (
-            <button
-              type="button"
-              onClick={openCreate}
-              className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-md px-3 py-2 font-medium text-bg transition-colors hover:brightness-110"
-              style={{ background: UNITE_COLOR, fontSize: '13px' }}
-            >
-              <Plus size={15} /> Create
-            </button>
-          )}
-        </div>
+        <SurfaceHeader
+          friendly={SURFACE_FRIENDLY.unite}
+          icon={Users}
+          accent={UNITE_COLOR}
+          action={
+            bee && (
+              <button
+                type="button"
+                onClick={openCreate}
+                className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-md px-3 py-2 font-medium text-bg transition-colors hover:brightness-110"
+                style={{ background: UNITE_COLOR, fontSize: '13px' }}
+              >
+                <Plus size={15} /> Create
+              </button>
+            )
+          }
+        />
 
         {view === 'discover' && (
-          <div className="mb-4 inline-flex rounded-md border border-border bg-bg-elevated p-0.5">
+          <div className="mb-4 inline-flex rounded-md border border-zinc-200 bg-zinc-50 p-0.5">
             <SortButton active={sort === 'members'} onClick={() => setSort('members')}>
               Top
             </SortButton>
@@ -87,7 +77,10 @@ export function GroupsPage() {
         )}
 
         {error && (
-          <div className="rounded-lg border border-kettle-unsourced/30 bg-bg-elevated p-5 text-kettle-unsourced" style={{ fontSize: '13px' }}>
+          <div
+            className="rounded-lg border border-red-200 bg-red-50 p-5 text-red-600"
+            style={{ fontSize: '13px' }}
+          >
             {error}
           </div>
         )}
@@ -111,18 +104,19 @@ export function GroupsPage() {
 }
 
 function GroupCard({ group }: { group: Group }) {
-  const VisIcon = group.visibility === 'public' ? Globe : group.visibility === 'private' ? Lock : EyeOff;
+  const VisIcon =
+    group.visibility === 'public' ? Globe : group.visibility === 'private' ? Lock : EyeOff;
   return (
     <li>
       <Link
         to={`/unite/${group.slug}`}
-        className="group block h-full overflow-hidden rounded-lg border border-border bg-bg-elevated p-4 transition-all hover:border-border-bright hover:bg-panel-2"
-        style={{ borderLeft: `3px solid ${UNITE_COLOR}80` }}
+        className="group block h-full overflow-hidden rounded-lg border border-zinc-200 p-4 transition-colors hover:bg-[#7C3AED1f]"
+        style={{ borderLeft: `3px solid ${UNITE_COLOR}`, background: `${UNITE_COLOR}14` }}
       >
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-display text-lg leading-tight text-text-silver-bright group-hover:text-text">{group.name}</h3>
+          <h3 className="font-display text-lg leading-tight text-zinc-900">{group.name}</h3>
           <span
-            className="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-mono uppercase tracking-wider text-text-muted"
+            className="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-mono uppercase tracking-wider text-zinc-500"
             style={{ fontSize: '9.5px' }}
             data-size="meta"
             title={group.visibility}
@@ -132,11 +126,18 @@ function GroupCard({ group }: { group: Group }) {
           </span>
         </div>
         {group.tagline && (
-          <p className="mt-1 line-clamp-2 text-text-dim" style={{ fontSize: '13px', lineHeight: 1.5 }}>
+          <p
+            className="mt-1 line-clamp-2 text-zinc-500"
+            style={{ fontSize: '13px', lineHeight: 1.5 }}
+          >
             {group.tagline}
           </p>
         )}
-        <div className="mt-3 flex items-center gap-1 font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
+        <div
+          className="mt-3 flex items-center gap-1 font-mono text-zinc-500"
+          style={{ fontSize: '11px' }}
+          data-size="meta"
+        >
           <Users size={11} />
           {formatCount(group.memberCount)} {group.memberCount === 1 ? 'member' : 'members'}
         </div>
@@ -145,13 +146,23 @@ function GroupCard({ group }: { group: Group }) {
   );
 }
 
-function SortButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function SortButton({
+  active,
+  onClick,
+  children,
+}: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn('rounded-sm px-3 py-1 font-mono transition-all', !active && 'text-text-dim hover:text-text-silver')}
-      style={{ fontSize: '12px', ...(active ? { color: UNITE_COLOR, background: `${UNITE_COLOR}18`, fontWeight: 600 } : {}) }}
+      className={cn(
+        'rounded-sm px-3 py-1 font-mono transition-all',
+        !active && 'text-zinc-500 hover:text-zinc-800',
+      )}
+      style={{
+        fontSize: '12px',
+        ...(active ? { color: UNITE_COLOR, background: `${UNITE_COLOR}18`, fontWeight: 600 } : {}),
+      }}
       data-size="meta"
     >
       {children}
@@ -161,33 +172,45 @@ function SortButton({ active, onClick, children }: { active: boolean; onClick: (
 
 function GroupsSkeleton() {
   return (
-    <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2" aria-busy="true" aria-label="Loading groups">
+    <ul
+      className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+      aria-busy="true"
+      aria-label="Loading groups"
+    >
       {[70, 55, 80, 60].map((w, i) => (
         <li
           // biome-ignore lint/suspicious/noArrayIndexKey: decorative loading skeleton, fixed-length static array
           key={i}
-          className="animate-pulse-slow rounded-lg border border-border bg-bg-elevated p-4"
-          style={{ borderLeft: `3px solid ${UNITE_COLOR}80`, animationDelay: `${i * 100}ms` }}
+          className="animate-pulse-slow rounded-lg border border-zinc-200 p-4"
+          style={{
+            borderLeft: `3px solid ${UNITE_COLOR}`,
+            background: `${UNITE_COLOR}14`,
+            animationDelay: `${i * 100}ms`,
+          }}
         >
-          <div className="h-5 rounded bg-text-muted/15" style={{ width: `${w}%` }} />
-          <div className="mt-2 h-3 rounded bg-text-muted/10" style={{ width: '90%' }} />
-          <div className="mt-3 h-3 w-20 rounded bg-text-muted/10" />
+          <div className="h-5 rounded bg-zinc-200" style={{ width: `${w}%` }} />
+          <div className="mt-2 h-3 rounded bg-zinc-100" style={{ width: '90%' }} />
+          <div className="mt-3 h-3 w-20 rounded bg-zinc-100" />
         </li>
       ))}
     </ul>
   );
 }
 
-function EmptyGroups({ view, signedIn, onCreate }: { view: GroupsView; signedIn: boolean; onCreate: () => void }) {
+function EmptyGroups({
+  view,
+  signedIn,
+  onCreate,
+}: { view: GroupsView; signedIn: boolean; onCreate: () => void }) {
   const headline =
     view === 'discover'
       ? 'No groups yet'
       : view === 'moderating'
         ? signedIn
-          ? 'You don\'t own or moderate any groups'
+          ? "You don't own or moderate any groups"
           : 'Sign in to see groups you moderate'
         : signedIn
-          ? 'You haven\'t joined a group yet'
+          ? "You haven't joined a group yet"
           : 'Sign in to see your groups';
   const subtext =
     view === 'discover'
@@ -196,12 +219,15 @@ function EmptyGroups({ view, signedIn, onCreate }: { view: GroupsView; signedIn:
         ? 'Start your own, or join one from Discover.'
         : 'Your group memberships are tied to your Bee account.';
   return (
-    <div className="rounded-lg border-2 border-dashed p-8 text-center" style={{ borderColor: `${UNITE_COLOR}40`, background: `${UNITE_COLOR}08` }}>
+    <div
+      className="rounded-lg border-2 border-dashed p-8 text-center"
+      style={{ borderColor: `${UNITE_COLOR}40`, background: `${UNITE_COLOR}08` }}
+    >
       <Users size={26} className="mx-auto mb-3" style={{ color: UNITE_COLOR, opacity: 0.7 }} />
-      <p className="mb-1 font-display text-text-silver-bright" style={{ fontSize: '17px', fontWeight: 500 }}>
+      <p className="mb-1 font-display text-zinc-900" style={{ fontSize: '17px', fontWeight: 500 }}>
         {headline}
       </p>
-      <p className="mx-auto max-w-md text-text-dim" style={{ fontSize: '13px', lineHeight: 1.5 }}>
+      <p className="mx-auto max-w-md text-zinc-500" style={{ fontSize: '13px', lineHeight: 1.5 }}>
         {subtext}
       </p>
       {signedIn ? (
@@ -217,7 +243,12 @@ function EmptyGroups({ view, signedIn, onCreate }: { view: GroupsView; signedIn:
         <Link
           to="/login"
           className="mt-5 inline-flex items-center gap-1.5 rounded-md border-2 px-4 py-1.5 transition-colors hover:brightness-110"
-          style={{ borderColor: `${UNITE_COLOR}70`, color: UNITE_COLOR, fontSize: '12px', fontWeight: 600 }}
+          style={{
+            borderColor: `${UNITE_COLOR}70`,
+            color: UNITE_COLOR,
+            fontSize: '12px',
+            fontWeight: 600,
+          }}
         >
           Sign in
         </Link>

@@ -456,6 +456,73 @@ export async function createThread(
   return String(thread.id);
 }
 
+/** A Manual atom search hit (atom_search RPC). realmName disambiguates homonyms. */
+export interface AtomHit {
+  id: string;
+  name: string;
+  realmName: string;
+  path: string;
+  pathParts: string[];
+}
+
+/** Search live atoms by name for the Rabbit tag picker (min 2 chars). */
+export async function searchAtoms(query: string, limit = 20): Promise<AtomHit[]> {
+  if (!supabase) return [];
+  const q = query.trim();
+  if (q.length < 2) return [];
+  const { data, error } = await supabase.rpc('atom_search', { p_query: q, p_limit: limit });
+  if (error) {
+    console.warn('[intel] atom_search failed:', error.message);
+    return [];
+  }
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id),
+    name: String(r.name),
+    realmName: String(r.realm_name ?? ''),
+    path: String(r.path ?? ''),
+    pathParts: Array.isArray(r.path_parts) ? (r.path_parts as string[]) : [],
+  }));
+}
+
+/**
+ * Plain "What's happening?" post (pass 15/17). A single text field → a thread
+ * via forum_create_thread. The required title is DERIVED from the text (first
+ * line, truncated) — never a separate field. Optional Rabbit-picked atoms: the
+ * first is the anchor (p_anchor_atom_id); the rest are tagged via
+ * forum_thread_tag_atom. Author is set server-side from auth.uid().
+ */
+export async function createIntelPost(text: string, atomIds: string[] = []): Promise<string | null> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const body = text.trim();
+  if (!body) throw new Error('Nothing to post');
+  const firstLine = body.split('\n')[0].trim();
+  const base = firstLine || body;
+  const title = base.length > 100 ? `${base.slice(0, 100).trimEnd()}…` : base;
+
+  const { data, error } = await supabase.rpc('forum_create_thread', {
+    p_title: title,
+    p_body: body,
+    p_parent_surface: 'intel',
+    p_anchor_atom_id: atomIds[0] ?? null,
+    p_parent_id: null,
+  });
+  if (error) throw new Error(error.message);
+  const r = (data ?? {}) as { ok?: boolean; thread_id?: string; id?: string; error?: string };
+  if (r.ok === false) throw new Error(r.error ?? 'Could not post');
+  const id = r.thread_id ?? r.id ?? null;
+  if (!id) return null;
+
+  // Additional atoms (beyond the anchor) tag the thread. Failures don't undo the post.
+  for (const atomId of atomIds.slice(1)) {
+    const { error: tagErr } = await supabase.rpc('forum_thread_tag_atom', {
+      p_thread_id: id,
+      p_atom_id: atomId,
+    });
+    if (tagErr) console.warn('[intel] forum_thread_tag_atom failed:', tagErr.message);
+  }
+  return String(id);
+}
+
 export async function createPost(
   threadId: string,
   body: string,
