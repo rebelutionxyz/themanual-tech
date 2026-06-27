@@ -129,7 +129,7 @@ export const SURFACES: SurfaceDef[] = [
     purpose:
       'Bees post claims, defend them, source them. Threads link to Manual atoms. Nothing is deleted — truth becomes a shape.',
     icon: MessagesSquare,
-    color: '#6B94C8',
+    color: '#1D9BF0',
     group: 'Social',
     tier: 1,
   },
@@ -141,7 +141,7 @@ export const SURFACES: SurfaceDef[] = [
     purpose:
       'Create or join a Group. Pin Manual atoms to your cause. Coordinate without platform interference.',
     icon: Users,
-    color: '#6FCF8F',
+    color: '#7C3AED',
     group: 'Social',
     tier: 1,
   },
@@ -153,7 +153,7 @@ export const SURFACES: SurfaceDef[] = [
     purpose:
       'Bees host Events, RSVP, show up. From rallies to study circles to livestream watches.',
     icon: Calendar,
-    color: '#E88938',
+    color: '#F97316',
     group: 'Social',
     tier: 1,
   },
@@ -165,7 +165,7 @@ export const SURFACES: SurfaceDef[] = [
     purpose:
       'Bees GIVE BLiNG! to campaigns. Zero fees on kindness. The economic opposite of extraction.',
     icon: HeartHandshake,
-    color: '#FAD15E',
+    color: '#16A34A',
     group: 'Social',
     tier: 1,
   },
@@ -177,21 +177,21 @@ export const SURFACES: SurfaceDef[] = [
     purpose:
       'Independent correspondents report what matters. Stories tag to Manual atoms for context.',
     icon: Radio,
-    color: '#C94C4C',
+    color: '#DC2626',
     group: 'Social',
     tier: 2,
   },
 
   // ═══ COMMERCE ═══
   {
-    slug: 'bazaar',
-    name: 'BAZAAR',
+    slug: 'entertheprize',
+    name: 'MARKETPLACE',
     function: 'Buy · Auction · Raffle',
     description: 'The marketplace. Offer goods, services, listings.',
     purpose:
       'Bees OFFER and GET. Physical goods, services, rentals, auctions, raffles. Honey flows.',
     icon: ShoppingBag,
-    color: '#FAD15E',
+    color: '#7F1D1D',
     group: 'Commerce',
     tier: 1,
   },
