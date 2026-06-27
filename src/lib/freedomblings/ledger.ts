@@ -174,6 +174,61 @@ const ledgerListeners = new Set<() => void>();
 export function notifyLedgerChanged(): void {
   for (const cb of ledgerListeners) cb();
 }
+
+/* ---- BLiNG! popup data (pass 17/18) -------------------------------------- */
+
+/** Canonical circulating supply, formatted like the other BLiNG! amounts. */
+export async function getCirculatingSupply(): Promise<string> {
+  if (!supabase) return ZERO;
+  const { data, error } = await supabase.rpc('bling_circulating_supply');
+  if (error) {
+    console.warn('[fb] bling_circulating_supply failed:', error.message);
+    return ZERO;
+  }
+  return fmtBling(toMicros(String(data ?? '0')));
+}
+
+export interface TxnRow {
+  id: string;
+  label: string;
+  memo: string | null;
+  /** Formatted magnitude (signed via `positive`). */
+  amount: string;
+  /** amount ≥ 0 → green, < 0 → red (the sanctioned ledger debit-red). */
+  positive: boolean;
+  when: string;
+}
+
+/**
+ * The current Bee's transactions, newest first, paged for infinite scroll
+ * (bling_transactions.bee_id, ordered id desc). Owner-read under RLS.
+ */
+export async function listMyTransactions(
+  beeId: string,
+  limit = 25,
+  offset = 0,
+): Promise<TxnRow[]> {
+  if (!supabase || !beeId) return [];
+  const { data, error } = await supabase
+    .from('bling_transactions')
+    .select('id, type, amount, memo, created_at')
+    .eq('bee_id', beeId)
+    .order('id', { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => {
+    const micros = toMicros(String(r.amount ?? '0'));
+    const mag = micros < 0n ? -micros : micros;
+    return {
+      id: String(r.id),
+      label: metaFor(String(r.type ?? '')).label,
+      memo: (r.memo as string) ?? null,
+      amount: fmtBling(mag),
+      positive: micros >= 0n,
+      when: whenLabel(String(r.created_at ?? '')),
+    };
+  });
+}
 export function useLedgerVersion(): number {
   const [v, setV] = useState(0);
   useEffect(() => {

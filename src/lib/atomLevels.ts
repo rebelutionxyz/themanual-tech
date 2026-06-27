@@ -41,9 +41,12 @@ export async function getAtomLevel(parentPath: string | null): Promise<AtomLevel
   if (cached) return cached;
   if (!supabase) return [];
 
+  // atoms carry no sort column, so order every level alphabetically by name.
+  // L1 roots get re-sorted to realms.display_order by the caller (RealmsPanel);
+  // L2+ children stay in this alpha order.
   const { data, error } = parentPath
-    ? await supabase.rpc('get_atom_level', { parent_path: parentPath })
-    : await supabase.rpc('get_atom_level');
+    ? await supabase.rpc('get_atom_level', { parent_path: parentPath }).order('name')
+    : await supabase.rpc('get_atom_level').order('name');
 
   if (error) {
     console.warn('[atomLevels] get_atom_level failed:', error.message);

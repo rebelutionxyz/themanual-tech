@@ -100,6 +100,63 @@ export async function listOpenFlags(): Promise<ForumFlag[]> {
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Personal "Reported" surface (pass 13) — two directions, both auth-scoped
+// to the current Bee by the RPCs (no params beyond paging).
+//   • forum_reports_by_me   — flags this Bee FILED (outgoing)
+//   • forum_reports_on_mine — flags on content this Bee AUTHORED (incoming);
+//     the reporter is NOT returned, by design (no retaliation surface).
+// thread_id is always the navigation target (a flagged post → its thread).
+// ─────────────────────────────────────────────────────────────────────
+
+export interface ReportRow {
+  flagId: number;
+  targetKind: 'thread' | 'post';
+  threadId: string | null;
+  postId: string | null;
+  threadTitle: string | null;
+  snippet: string;
+  reason: string;
+  status: string;
+  createdAt: string;
+}
+
+function mapReport(row: Record<string, unknown>): ReportRow {
+  return {
+    flagId: Number(row.flag_id),
+    targetKind: (row.target_kind as 'thread' | 'post') ?? 'thread',
+    threadId: row.thread_id ? String(row.thread_id) : null,
+    postId: row.post_id ? String(row.post_id) : null,
+    threadTitle: (row.thread_title as string | null) ?? null,
+    snippet: String(row.snippet ?? ''),
+    reason: String(row.reason ?? ''),
+    status: String(row.status ?? ''),
+    createdAt: String(row.created_at ?? ''),
+  };
+}
+
+/** Flags the current Bee filed (outgoing). */
+export async function forumReportsByMe(limit = 30, offset = 0): Promise<ReportRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('forum_reports_by_me', {
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Record<string, unknown>[]).map(mapReport);
+}
+
+/** Flags on content the current Bee authored (incoming; reporter anonymized). */
+export async function forumReportsOnMine(limit = 30, offset = 0): Promise<ReportRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('forum_reports_on_mine', {
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Record<string, unknown>[]).map(mapReport);
+}
+
 export type FlagResolution = 'reviewed' | 'dismissed' | 'actioned';
 
 /** Resolve a flag (mod only — enforced by the RPC). */

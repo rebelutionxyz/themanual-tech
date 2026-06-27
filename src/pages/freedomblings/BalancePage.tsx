@@ -7,11 +7,17 @@
    — it links to the move composer (/freedomblings/move). GET/OFFER stay inert
    until their slices land. */
 import { LedgerRow } from '@/components/freedomblings/LedgerRow';
+import { SendModule } from '@/components/freedomblings/SendModule';
 import { BMark, HeroMark } from '@/components/freedomblings/marks';
 import { useFreedomblingsBalance } from '@/lib/freedomblings/ledger';
 import { Link } from 'react-router-dom';
 
-export function BalancePage() {
+/**
+ * @param mode 'page' (the /freedomblings route, GIVE → move composer) or
+ *   'popup' (the bottom-toolbar BLiNG! popup, GIVE replaced by the inline
+ *   vertical SEND transfer module).
+ */
+export function BalancePage({ mode = 'page' }: { mode?: 'page' | 'popup' }) {
   const fb = useFreedomblingsBalance();
 
   if (fb.status === 'loading') {
@@ -80,19 +86,24 @@ export function BalancePage() {
         </div>
       </div>
 
-      {/* GIVE is LIVE → the move composer. GET/OFFER deferred → Sep build. */}
-      <div className="bal-actions">
-        <Link to="/freedomblings/move" className="bal-act primary">
-          <BMark fill /> GIVE
-        </Link>
-        {/* deferred → Sep build
-        <button type="button" className="bal-act" disabled>
-          <BMark /> GET
-        </button>
-        <button type="button" className="bal-act" disabled>
-          <BMark /> OFFER
-        </button> */}
-      </div>
+      {/* Popup: inline vertical SEND transfer module. Page: GIVE → move composer.
+          GET/OFFER deferred → Sep build. */}
+      {mode === 'popup' ? (
+        <SendModule />
+      ) : (
+        <div className="bal-actions">
+          <Link to="/freedomblings/move" className="bal-act primary">
+            <BMark fill /> GIVE
+          </Link>
+          {/* deferred → Sep build
+          <button type="button" className="bal-act" disabled>
+            <BMark /> GET
+          </button>
+          <button type="button" className="bal-act" disabled>
+            <BMark /> OFFER
+          </button> */}
+        </div>
+      )}
 
       <div className="stat-grid">
         <div className="card stat">
