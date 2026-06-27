@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Search, LayoutList, Network, TreePine, X, Filter } from 'lucide-react';
+import { Search, LayoutList, TreePine, X, Filter } from 'lucide-react';
 import { useManualData } from '@/lib/useManualData';
+import { useAtomCount } from '@/lib/useAtomCount';
 import { useManualStore } from '@/stores/useManualStore';
 import { RealmSidebar } from '@/components/manual/RealmSidebar';
 import { OutlookView } from '@/components/manual/OutlookView';
@@ -13,6 +14,7 @@ import type { KettleState } from '@/types/manual';
 
 export function ManualPage() {
   const { loaded, error, tree } = useManualData();
+  const atomCount = useAtomCount();
   const view = useManualStore((s) => s.view);
   const setView = useManualStore((s) => s.setView);
   const searchQuery = useManualStore((s) => s.searchQuery);
@@ -51,7 +53,7 @@ export function ManualPage() {
             style={{ fontSize: '11px' }}
             data-size="meta"
           >
-            loading 5,997 atoms...
+            {atomCount != null ? `loading ${atomCount.toLocaleString()} atoms...` : 'Loading The Manual…'}
           </p>
         </div>
       </div>
@@ -60,8 +62,9 @@ export function ManualPage() {
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Left: Realm Sidebar (13 realms — inside the MANUAL surface) */}
-      <aside className="hidden w-16 flex-shrink-0 md:block">
+      {/* Left: Realm Sidebar (14 realms). Default-open icon rail on tablet +
+          desktop; now also a sticky hover/touch rail on mobile (dispatch B). */}
+      <aside className="w-16 flex-shrink-0">
         <RealmSidebar />
       </aside>
 
@@ -184,9 +187,6 @@ function ViewToggle({
       </ViewBtn>
       <ViewBtn active={view === 'list'} onClick={() => onChange('list')} label="List">
         <LayoutList size={14} />
-      </ViewBtn>
-      <ViewBtn active={view === 'graph'} onClick={() => onChange('graph')} label="Graph">
-        <Network size={14} />
       </ViewBtn>
     </div>
   );

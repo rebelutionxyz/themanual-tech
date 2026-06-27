@@ -26,6 +26,19 @@
     text-rendering: optimizeLegibility;
   }
 
+  /* Lock the shell to the viewport — one scroll owner (the content panel), no
+     page scroller. See App.tsx for the flex chain. */
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  html,
+  body {
+    overflow: hidden;
+  }
+
   body {
     font-size: 15px;
     line-height: 1.55;
@@ -56,12 +69,14 @@
   ::-webkit-scrollbar-track {
     background: var(--bg);
   }
+  /* Thumb tints to the active surface accent when --surface-accent is set
+     (the community shell sets it per surface); falls back to the neutral border. */
   ::-webkit-scrollbar-thumb {
-    background: var(--border);
+    background: var(--surface-accent, var(--border));
     border-radius: 5px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--border-bright);
+    background: var(--surface-accent, var(--border-bright));
   }
 }
 

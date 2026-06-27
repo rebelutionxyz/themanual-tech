@@ -1,12 +1,18 @@
-import { useEffect, useState } from 'react';
-import type { Atom, AtomType, KettleState, RealmId, TreeNode } from '@/types/manual';
-import { buildTree } from '@/lib/tree';
+import { type PathIndexes, buildPathIndexes } from '@/lib/graph-neighbors';
 import { supabase } from '@/lib/supabase';
+import { buildTree } from '@/lib/tree';
+import type { Atom, AtomAlias, AtomType, KettleState, RealmId, TreeNode } from '@/types/manual';
+import { useEffect, useState } from 'react';
 
 interface ManualData {
   atoms: Atom[];
   tree: TreeNode;
+  /** Realm slugs in display order (DB realms.display_order). */
+  realmOrder: RealmId[];
   themeIndex: Record<string, string[]>;
+  pathIndexes: PathIndexes;
+  /** Cross-realm placements (atom_aliases), keyed by canonical atom id. */
+  aliasesByAtomId: Map<string, AtomAlias[]>;
   loaded: boolean;
   error: string | null;
 }
@@ -23,7 +29,12 @@ const EMPTY_TREE: TreeNode = {
   atomCount: 0,
 };
 
-interface AtomRow {
+interface RealmRow {
+  id: string;
+  display_order: number;
+}
+
+export interface AtomRow {
   id: string;
   name: string;
   path: string;
@@ -36,7 +47,7 @@ interface AtomRow {
   is_leaf: boolean;
   theme_tags: string[] | null;
   realm_tags: string[] | null;
-  pillar_tags: string[] | null;
+  astra_tags: string[] | null;
   skin_tags: string[] | null;
   geo: Record<string, unknown> | null;
   note: string | null;
@@ -45,7 +56,16 @@ interface AtomRow {
   updated_at?: string;
 }
 
-function rowToAtom(r: AtomRow): Atom {
+interface AtomAliasRow {
+  id: string;
+  atom_id: string;
+  alias_path: string;
+  alias_realm_id: string;
+  alias_realm_name: string | null;
+  note: string | null;
+}
+
+export function rowToAtom(r: AtomRow): Atom {
   return {
     id: r.id,
     name: r.name,
@@ -59,13 +79,24 @@ function rowToAtom(r: AtomRow): Atom {
     isLeaf: r.is_leaf,
     themeTags: r.theme_tags ?? [],
     realmTags: r.realm_tags ?? [],
-    pillarTags: r.pillar_tags ?? [],
+    astraTags: r.astra_tags ?? [],
     skinTags: r.skin_tags ?? [],
     geo: r.geo,
     note: r.note,
     meta: r.meta ?? {},
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+  };
+}
+
+function rowToAlias(r: AtomAliasRow): AtomAlias {
+  return {
+    id: r.id,
+    atomId: r.atom_id,
+    aliasPath: r.alias_path,
+    aliasRealmId: r.alias_realm_id as RealmId,
+    aliasRealmName: r.alias_realm_name,
+    note: r.note,
   };
 }
 
@@ -84,14 +115,17 @@ function buildThemeIndex(atoms: Atom[]): Record<string, string[]> {
  * Loads atoms from Supabase once, caches globally.
  *
  * Supabase enforces a 1000-row default limit per request — we page through
- * with .range() to pull all 4,860 atoms.
+ * with .range() to pull all atoms (count grows with Bee contributions).
  */
 export function useManualData(): ManualData {
   const [state, setState] = useState<ManualData>(
     cache ?? {
       atoms: [],
       tree: EMPTY_TREE,
+      realmOrder: [],
       themeIndex: {},
+      pathIndexes: { byId: new Map(), byPath: new Map(), childrenByPath: new Map() },
+      aliasesByAtomId: new Map(),
       loaded: false,
       error: null,
     },
@@ -119,14 +153,81 @@ export function useManualData(): ManualData {
           if (data.length < PAGE) break;
         }
 
+        // Realm display order is DB-driven (realms.display_order) so the nav
+        // tracks live taxonomy restructuring without a hardcoded array.
+        const { data: realmRows, error: realmErr } = await supabase
+          .from('realms')
+          .select('id, display_order')
+          .order('display_order', { ascending: true });
+        if (realmErr) throw realmErr;
+        const realmOrder = ((realmRows ?? []) as RealmRow[]).map((r) => r.id as RealmId);
+
         const atoms = all.map(rowToAtom);
+        // Fallback: if the realms table is unreachable/empty, derive order from
+        // the atoms' realm roots (first-seen) so the tree still sorts sanely.
+        if (realmOrder.length === 0) {
+          const seen = new Set<RealmId>();
+          for (const a of atoms) {
+            if (!seen.has(a.realmId)) {
+              seen.add(a.realmId);
+              realmOrder.push(a.realmId);
+            }
+          }
+        }
+        if (import.meta.env.DEV) {
+          const bad = atoms.find((a) => a.path !== a.pathParts.join(' / '));
+          if (bad) {
+            console.error(
+              '[Manual] path invariant violated — childrenByPath/byPath joins will silently fail:',
+              bad.id,
+              JSON.stringify(bad.path),
+              '!==',
+              JSON.stringify(bad.pathParts.join(' / ')),
+            );
+          }
+        }
+        // Connector aliases (atom_aliases). The Manual core must not break if
+        // the connector tables hiccup, so a failure here degrades to no
+        // aliases rather than failing the whole load. Empty until Chat seeds.
+        let aliases: AtomAlias[] = [];
+        try {
+          const aliasRows: AtomAliasRow[] = [];
+          for (let from = 0; ; from += PAGE) {
+            const { data, error } = await supabase
+              .from('atom_aliases')
+              .select('*')
+              .order('id')
+              .range(from, from + PAGE - 1);
+            if (error) throw error;
+            if (!data || data.length === 0) break;
+            aliasRows.push(...(data as AtomAliasRow[]));
+            if (data.length < PAGE) break;
+          }
+          aliases = aliasRows.map(rowToAlias);
+        } catch (aliasErr) {
+          if (import.meta.env.DEV) {
+            console.warn('[Manual] alias load failed; rendering without aliases:', aliasErr);
+          }
+        }
+
+        const aliasesByAtomId = new Map<string, AtomAlias[]>();
+        for (const al of aliases) {
+          const arr = aliasesByAtomId.get(al.atomId);
+          if (arr) arr.push(al);
+          else aliasesByAtomId.set(al.atomId, [al]);
+        }
+
         const themeIndex = buildThemeIndex(atoms);
-        const tree = buildTree(atoms);
+        const tree = buildTree(atoms, realmOrder, aliases);
+        const pathIndexes = buildPathIndexes(atoms);
 
         const data: ManualData = {
           atoms,
           tree,
+          realmOrder,
           themeIndex,
+          pathIndexes,
+          aliasesByAtomId,
           loaded: true,
           error: null,
         };
@@ -149,6 +250,11 @@ export function useManualData(): ManualData {
 /** Find atom by ID from cache */
 export function getAtomById(id: string): Atom | undefined {
   return cache?.atoms.find((a) => a.id === id);
+}
+
+/** Cross-realm placements for an atom (atom_aliases), empty until seeded. */
+export function getAliasesForAtom(atomId: string): AtomAlias[] {
+  return cache?.aliasesByAtomId.get(atomId) ?? [];
 }
 
 /** Find atoms that share any theme tag with the given atom (excluding self) */

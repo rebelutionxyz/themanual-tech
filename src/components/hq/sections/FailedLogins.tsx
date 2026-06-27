@@ -128,8 +128,8 @@ function RangeDropdown({ value, onChange }: { value: Range; onChange: (v: Range)
 function LoadingRows() {
   return (
     <div className="mt-4 space-y-1">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="h-6 animate-pulse-slow rounded bg-bg-elevated/40" />
+      {['sk-1', 'sk-2', 'sk-3', 'sk-4', 'sk-5'].map((k) => (
+        <div key={k} className="h-6 animate-pulse-slow rounded bg-bg-elevated/40" />
       ))}
     </div>
   );

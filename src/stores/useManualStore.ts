@@ -9,6 +9,7 @@ interface ManualState {
   selectedType: AtomType | 'all';
   selectedTags: string[];
   selectedAtomId: string | null;
+  graphCenter: { atomId?: string; path?: string } | null;
   expandedPaths: Set<string>;
 
   setView: (view: ViewMode) => void;
@@ -19,6 +20,7 @@ interface ManualState {
   toggleTag: (tag: string) => void;
   clearTags: () => void;
   selectAtom: (id: string | null) => void;
+  setGraphCenter: (c: { atomId?: string; path?: string } | null) => void;
   toggleExpanded: (path: string) => void;
   expandPath: (path: string) => void;
   collapseAll: () => void;
@@ -33,6 +35,7 @@ export const useManualStore = create<ManualState>()((set) => ({
   selectedType: 'all',
   selectedTags: [],
   selectedAtomId: null,
+  graphCenter: null,
   expandedPaths: new Set<string>(),
 
   setView: (view) => set({ view }),
@@ -48,6 +51,7 @@ export const useManualStore = create<ManualState>()((set) => ({
     })),
   clearTags: () => set({ selectedTags: [] }),
   selectAtom: (selectedAtomId) => set({ selectedAtomId }),
+  setGraphCenter: (graphCenter) => set({ graphCenter }),
   toggleExpanded: (path) =>
     set((s) => {
       const next = new Set(s.expandedPaths);

@@ -1,43 +1,39 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  // Knowledge
+  Book,
+  Calendar,
   // Currency
   Coins,
+  Droplet,
+  Eye,
+  Gamepad2,
+  GraduationCap,
+  HeartHandshake,
+  Megaphone,
+  MessageCircle,
   // Social
   MessagesSquare,
-  Users,
-  Calendar,
-  MessageCircle,
-  Video,
-  HeartHandshake,
   Radio,
+  Scale,
+  // Safety
+  Shield,
+  ShieldAlert,
   // Commerce
   ShoppingBag,
   Store,
-  Gamepad2,
-  Megaphone,
-  // Knowledge
-  Book,
-  // Safety
-  Shield,
-  Eye,
-  // Services
-  Wrench,
-  GraduationCap,
+  Users,
+  Video,
   Vote,
-  Scale,
   // Flow
   Waves,
+  // Services
+  Wrench,
 } from 'lucide-react';
 
 export type SurfaceTier = 1 | 2;
 
-export type SurfaceGroup =
-  | 'Currency'
-  | 'Social'
-  | 'Commerce'
-  | 'Knowledge'
-  | 'Safety'
-  | 'Services';
+export type SurfaceGroup = 'Currency' | 'Social' | 'Commerce' | 'Knowledge' | 'Safety' | 'Services';
 
 export interface SurfaceDef {
   /** URL slug: /s/bling, /s/intel, etc. */
@@ -63,8 +59,8 @@ export interface SurfaceDef {
 }
 
 /**
- * The 20 Surfaces of HoneyComb. Currently 20; lockable architecture but
- * grows when pillars graduate (see MMF v2.2 §6.1 footnote).
+ * The Surfaces of HoneyComb. Currently 21; lockable architecture but
+ * grows when astras graduate (see MMF v2.2 §6.1 footnote).
  * Each entry pairs `name` (canonical UI label, used across both
  * constellations) with `function` (semantic category / MMF taxonomy term).
  * Both fields are load-bearing — not alternative names.
@@ -85,6 +81,19 @@ export const SURFACES: SurfaceDef[] = [
     group: 'Currency',
     tier: 1,
     special: 'bling',
+  },
+  {
+    slug: 'freedomblings',
+    name: 'FreedomBLiNGS',
+    function: 'The Sovereign Ledger',
+    description:
+      'The economic heart of the HoneyComb — where your BLiNG! lives, is FREEd, and moves.',
+    purpose:
+      'See your balance, read your ledger in the open, and trace any BLiNG! to its origin. Member-owned, capped, transparent — never bought or sold.',
+    icon: Droplet,
+    color: '#FAD15E',
+    group: 'Currency',
+    tier: 1,
   },
 
   // ═══ SOCIAL ═══
@@ -120,7 +129,7 @@ export const SURFACES: SurfaceDef[] = [
     purpose:
       'Bees post claims, defend them, source them. Threads link to Manual atoms. Nothing is deleted — truth becomes a shape.',
     icon: MessagesSquare,
-    color: '#6B94C8',
+    color: '#1D9BF0',
     group: 'Social',
     tier: 1,
   },
@@ -132,7 +141,7 @@ export const SURFACES: SurfaceDef[] = [
     purpose:
       'Create or join a Group. Pin Manual atoms to your cause. Coordinate without platform interference.',
     icon: Users,
-    color: '#6FCF8F',
+    color: '#7C3AED',
     group: 'Social',
     tier: 1,
   },
@@ -144,7 +153,7 @@ export const SURFACES: SurfaceDef[] = [
     purpose:
       'Bees host Events, RSVP, show up. From rallies to study circles to livestream watches.',
     icon: Calendar,
-    color: '#E88938',
+    color: '#F97316',
     group: 'Social',
     tier: 1,
   },
@@ -156,7 +165,7 @@ export const SURFACES: SurfaceDef[] = [
     purpose:
       'Bees GIVE BLiNG! to campaigns. Zero fees on kindness. The economic opposite of extraction.',
     icon: HeartHandshake,
-    color: '#FAD15E',
+    color: '#16A34A',
     group: 'Social',
     tier: 1,
   },
@@ -168,21 +177,21 @@ export const SURFACES: SurfaceDef[] = [
     purpose:
       'Independent correspondents report what matters. Stories tag to Manual atoms for context.',
     icon: Radio,
-    color: '#C94C4C',
+    color: '#DC2626',
     group: 'Social',
     tier: 1,
   },
 
   // ═══ COMMERCE ═══
   {
-    slug: 'bazaar',
-    name: 'BAZAAR',
+    slug: 'entertheprize',
+    name: 'MARKETPLACE',
     function: 'Buy · Auction · Raffle',
     description: 'The marketplace. Offer goods, services, listings.',
     purpose:
       'Bees OFFER and GET. Physical goods, services, rentals, auctions, raffles. Honey flows.',
     icon: ShoppingBag,
-    color: '#FAD15E',
+    color: '#7F1D1D',
     group: 'Commerce',
     tier: 1,
   },
@@ -191,8 +200,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'BRAND',
     function: 'Rebelution Storefront',
     description: 'Official Rebelution merchandise and branded goods.',
-    purpose:
-      'Platform-verified products. Every GET supports the movement. Curated storefronts.',
+    purpose: 'Platform-verified products. Every GET supports the movement. Curated storefronts.',
     icon: Store,
     color: '#C88A6B',
     group: 'Commerce',
@@ -203,8 +211,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'PRIZE',
     function: 'Private Gaming',
     description: 'Skill games, raffles, bracketed competitions.',
-    purpose:
-      'Bees play for BLiNG!. Private. Entertainment that rewards.',
+    purpose: 'Bees play for BLiNG!. Private. Entertainment that rewards.',
     icon: Gamepad2,
     color: '#9B7FC8',
     group: 'Commerce',
@@ -215,8 +222,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'PROMOTION',
     function: 'Advertising',
     description: 'Bee-funded promotion. Transparent. Opt-in.',
-    purpose:
-      'Bees and businesses promote listings, events, causes. Bees choose what they see.',
+    purpose: 'Bees and businesses promote listings, events, causes. Bees choose what they see.',
     icon: Megaphone,
     color: '#E8A838',
     group: 'Commerce',
@@ -228,7 +234,7 @@ export const SURFACES: SurfaceDef[] = [
     slug: 'manual',
     name: 'MANUAL',
     function: 'The Manual',
-    description: '5,997 atoms · 13 realms · the sovereign record.',
+    description: '13 realms · the sovereign record.',
     purpose:
       'The knowledge backbone. Every other surface can tag atoms here. Research, verify, add sources.',
     icon: Book,
@@ -239,6 +245,18 @@ export const SURFACES: SurfaceDef[] = [
   },
 
   // ═══ SAFETY ═══
+  {
+    slug: 'dingleberry',
+    name: 'DingleBERRY',
+    function: 'Security Command',
+    description: "The comb's immune system. Posture at a glance across six security surfaces.",
+    purpose:
+      'DingleBERRY watches the platform: infra health, transaction integrity, source verification, shill/abuse detection, dispatch authority, and threat interception. Funded by @combtreasury.defense.',
+    icon: ShieldAlert,
+    color: '#DC2626',
+    group: 'Safety',
+    tier: 2,
+  },
   {
     slug: 'secure',
     name: 'SECURE',
@@ -256,8 +274,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'SAFE',
     function: 'Monitoring',
     description: 'Situational awareness. Community-sourced safety signals.',
-    purpose:
-      'Real-time alerts, threat mapping, Bee-to-Bee safety check-ins.',
+    purpose: 'Real-time alerts, threat mapping, Bee-to-Bee safety check-ins.',
     icon: Eye,
     color: '#6B94C8',
     group: 'Safety',
@@ -270,8 +287,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'PRODUCTION',
     function: 'Pros Directory',
     description: 'Sovereign Angie\u2019s List. Every trade, every service, reviewed by Bees.',
-    purpose:
-      'Find vetted professionals. Get work done. Review and build Pro reputation.',
+    purpose: 'Find vetted professionals. Get work done. Review and build Pro reputation.',
     icon: Wrench,
     color: '#8A94A0',
     group: 'Services',
@@ -281,7 +297,7 @@ export const SURFACES: SurfaceDef[] = [
     slug: 'waves',
     name: 'WAVES',
     function: 'Motion Flow',
-    description: 'Mini Waves. One Ocean at a time. Full 10-level hierarchy of motion.',
+    description: 'Mini Waves. One Ocean at a time. Full 8-level hierarchy of motion.',
     purpose:
       'Orchestrate your life by motion. Vessels, Oceans, Waves, Tides, Flows — tasks tagged by what they feel like, not where they live.',
     icon: Waves,
@@ -294,8 +310,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'EDU',
     function: 'Education',
     description: 'Tracks, courses, quizzes. Learn the Manual. Earn certifications.',
-    purpose:
-      'Self-directed learning. Rank up. Teach what you know. Learn what you don\u2019t.',
+    purpose: 'Self-directed learning. Rank up. Teach what you know. Learn what you don\u2019t.',
     icon: GraduationCap,
     color: '#E88938',
     group: 'Services',
@@ -306,8 +321,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'VOTE',
     function: 'Elections',
     description: 'Governance votes. Rank-weighted. Transparent.',
-    purpose:
-      'Platform governance, campaign endorsements, community referenda.',
+    purpose: 'Platform governance, campaign endorsements, community referenda.',
     icon: Vote,
     color: '#FAD15E',
     group: 'Services',
@@ -318,8 +332,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'LEGAL',
     function: 'Legal Resources',
     description: 'Constitutional sheriffs, grand jury kits, rights cards, attorney directory.',
-    purpose:
-      'Know your rights. Find sovereign legal support. Documentation for action.',
+    purpose: 'Know your rights. Find sovereign legal support. Documentation for action.',
     icon: Scale,
     color: '#C94C4C',
     group: 'Services',

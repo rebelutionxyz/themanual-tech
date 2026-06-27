@@ -3,7 +3,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Home,
-  Flame,
+  TrendingUp,
   Clock,
   Bookmark,
   MessageSquare,
@@ -11,25 +11,28 @@ import {
   Users,
   Settings,
   Sparkles,
-  Trophy,
+  ShieldAlert,
   type LucideIcon,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { countSavedThreads } from '@/lib/reactions';
 import { countThreadsByAuthor } from '@/lib/intel';
-import { BEE_COLOR } from '@/lib/constants';
+import { isForumModerator } from '@/lib/forumMod';
+import { listRealmCategories, type RealmCategory } from '@/lib/forumFeed';
+import { BEE_COLOR, REALM_COLORS } from '@/lib/constants';
 
 export type IntelView =
   | 'home'
-  | 'hot'
+  | 'trending'
   | 'new'
   | 'saved'
   | 'mythreads'
   | 'create'
   | 'following'
   | 'forme'
-  | 'prize';
+  | 'reports';
 
 interface IntelSidebarProps {
   activeView: IntelView;
@@ -49,18 +52,19 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'forme', label: 'For Me', icon: Sparkles, group: 'primary', comingSoon: true, comingSoonHint: 'Personalized feed — pick atoms, realms, and pillars to follow' },
+  { id: 'forme', label: 'For Me', icon: Sparkles, group: 'primary', comingSoon: true, comingSoonHint: 'Personalized feed — pick atoms, realms, and astras to follow' },
   { id: 'home', label: 'Home', icon: Home, group: 'primary' },
-  { id: 'hot', label: 'Hot', icon: Flame, group: 'primary' },
+  { id: 'trending', label: 'Trending', icon: TrendingUp, group: 'primary' },
   { id: 'new', label: 'Breaking', icon: Clock, group: 'primary' },
   { id: 'create', label: 'Thread', icon: Plus, group: 'primary', isAction: true },
   { id: 'mythreads', label: 'My Threads', icon: MessageSquare, group: 'personal' },
   { id: 'following', label: 'Following', icon: Users, group: 'personal', comingSoon: true, comingSoonHint: 'Threads from Bees you follow' },
   { id: 'saved', label: 'Saved', icon: Bookmark, group: 'personal' },
-  { id: 'prize', label: 'Prize', icon: Trophy, group: 'future', comingSoon: true, comingSoonHint: 'blingster.xyz — post bets, match with BLiNG! escrow' },
 ];
 
 const INTEL_COLOR = '#6B94C8';
+// Neon menu foreground — lime pops against the INTEL-blue rail tint.
+const INTEL_NEON = '#39FF14';
 
 /**
  * Left sidebar for INTEL. Always visible on all screen sizes.
@@ -70,7 +74,11 @@ const INTEL_COLOR = '#6B94C8';
  *         Tap item to navigate (auto-collapse on touch devices).
  */
 export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
-  const [pinned, setPinned] = useState(false);
+  // Open by default on tablet + desktop (dispatch A2); mobile (<768px) starts
+  // collapsed as a sticky rail that opens on hover/touch.
+  const [pinned, setPinned] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 768,
+  );
   const [hovered, setHovered] = useState(false);
   const asideRef = useRef<HTMLElement>(null);
   const { bee } = useAuth();
@@ -80,6 +88,30 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
   // on thread create). Silent when 0 (per UX spec B).
   const [savedCount, setSavedCount] = useState(0);
   const [myThreadsCount, setMyThreadsCount] = useState(0);
+  const [isMod, setIsMod] = useState(false);
+  const [realms, setRealms] = useState<RealmCategory[]>([]);
+
+  // Top-level realm categories with posts → links to the realm pages.
+  useEffect(() => {
+    listRealmCategories()
+      .then(setRealms)
+      .catch(() => setRealms([]));
+  }, []);
+
+  // Mod gate — only moderators see the Reports queue link.
+  useEffect(() => {
+    let cancelled = false;
+    if (!bee?.id) {
+      setIsMod(false);
+      return;
+    }
+    isForumModerator(bee.id).then((mod) => {
+      if (!cancelled) setIsMod(mod);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [bee?.id]);
 
   useEffect(() => {
     if (!bee?.id) {
@@ -197,6 +229,9 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
   const primaryItems = NAV_ITEMS.filter((n) => n.group === 'primary');
   const personalItems = NAV_ITEMS.filter((n) => n.group === 'personal');
   const futureItems = NAV_ITEMS.filter((n) => n.group === 'future');
+  const modItems: NavItem[] = isMod
+    ? [{ id: 'reports', label: 'Reports', icon: ShieldAlert, group: 'personal' }]
+    : [];
 
   // Per-view badge counts + colors. Silent when 0 (item.id omitted from map).
   const badgeMap: Partial<Record<IntelView, { count: number; color: string }>> = {};
@@ -227,6 +262,8 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
           'relative z-20 flex h-full flex-col border-r border-border bg-bg-elevated transition-[width] duration-200 ease-out',
           expanded ? 'w-44' : 'w-12',
         )}
+        // Accent tint painted over the elevated panel — the Astra color (legible).
+        style={{ backgroundImage: `linear-gradient(${INTEL_COLOR}1F, ${INTEL_COLOR}1F)` }}
       >
       {/* Toggle */}
       <button
@@ -269,6 +306,18 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
           onSelect={handleSelect}
           badgeMap={badgeMap}
         />
+        {modItems.length > 0 && (
+          <>
+            <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
+            <SidebarGroup
+              items={modItems}
+              activeView={activeView}
+              expanded={expanded}
+              onSelect={handleSelect}
+              badgeMap={badgeMap}
+            />
+          </>
+        )}
         {futureItems.length > 0 && (
           <>
             <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
@@ -279,6 +328,26 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
               onSelect={handleSelect}
               badgeMap={badgeMap}
             />
+          </>
+        )}
+
+        {/* Realm categories (work order item 2) — top-level realms with posts,
+            each links to its realm page. Lives at the bottom of the rail. */}
+        {realms.length > 0 && (
+          <>
+            <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
+            {expanded && (
+              <div className="px-3 pb-1 font-mono uppercase tracking-wider text-text-muted" style={{ fontSize: '10px' }} data-size="meta">
+                Realms
+              </div>
+            )}
+            <ul className="space-y-0.5 px-1.5">
+              {realms.map((r) => (
+                <li key={r.segment}>
+                  <RealmLink realm={r} expanded={expanded} />
+                </li>
+              ))}
+            </ul>
           </>
         )}
       </nav>
@@ -297,6 +366,35 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
       </div>
     </aside>
     </>
+  );
+}
+
+function RealmLink({ realm, expanded }: { realm: RealmCategory; expanded: boolean }) {
+  const color = realm.realmId ? REALM_COLORS[realm.realmId] ?? INTEL_COLOR : INTEL_COLOR;
+  const to = realm.realmId ? `/realm/${realm.realmId}` : '/intel';
+  return (
+    <Link
+      to={to}
+      title={expanded ? undefined : `${realm.segment} (${realm.threadCount})`}
+      className={cn(
+        'group flex w-full items-center rounded-md transition-colors hover:bg-bg/60 hover:[color:var(--neon)]',
+        expanded ? 'gap-2.5 px-2 py-1.5' : 'justify-center py-1.5',
+      )}
+      style={{ ['--neon' as string]: INTEL_NEON, color: `${INTEL_NEON}B0` }}
+    >
+      {/* Dot keeps the realm's own color so realms stay visually distinct. */}
+      <span className="block h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ background: color }} aria-hidden="true" />
+      {expanded && (
+        <span className="truncate tracking-wide" style={{ fontSize: '13px' }}>
+          {realm.segment}
+        </span>
+      )}
+      {expanded && (
+        <span className="ml-auto flex-shrink-0 font-mono tabular-nums" style={{ fontSize: '10px', color: `${INTEL_NEON}99` }} data-size="meta">
+          {realm.threadCount}
+        </span>
+      )}
+    </Link>
   );
 }
 
@@ -376,25 +474,17 @@ function SidebarItem({
       onClick={onClick}
       title={tooltip}
       className={cn(
-        'group flex w-full items-center rounded-md transition-colors',
+        'group flex w-full items-center rounded-md transition-colors hover:bg-bg/60 hover:[color:var(--neon)]',
         expanded ? 'gap-2.5 px-2 py-2' : 'justify-center py-2',
-        active && 'bg-bg text-text',
-        !active && 'text-text-dim hover:bg-bg hover:text-text-silver',
-        isAction && !active && 'text-text-silver',
+        active && 'bg-bg',
         comingSoon && 'opacity-60',
       )}
-      style={active ? { color: INTEL_COLOR } : undefined}
+      // Neon foreground: icon + label inherit currentColor (full when active/hover,
+      // dimmed resting). The Create action keeps the honey icon as its CTA accent.
+      style={{ ['--neon' as string]: INTEL_NEON, color: active ? INTEL_NEON : `${INTEL_NEON}B0` }}
     >
       <span className="relative flex-shrink-0">
-        <Icon
-          size={16}
-          className={cn(
-            'flex-shrink-0',
-            isAction && 'text-honey',
-            !isAction && !active && 'text-text-muted group-hover:text-text-silver',
-          )}
-          style={active ? { color: INTEL_COLOR } : undefined}
-        />
+        <Icon size={16} className={cn('flex-shrink-0', isAction && 'text-honey')} />
         {/* Collapsed-mode dot indicator — shows only when sidebar is collapsed
             AND this item has a count > 0. Mirrors the color of the expanded badge. */}
         {!expanded && badge && !comingSoon && (

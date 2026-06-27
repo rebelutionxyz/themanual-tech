@@ -13,7 +13,7 @@
 // wires 3 live sections (FailedLogins, PageViews, TrendingAtomsAdmin);
 // the other 6 ship as stubs that land in HQ-2 + HQ-3 dispatches.
 
-import { useEffect, useMemo, useState, type ComponentType } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   AlertOctagon, BarChart3, TrendingUp, Users, Vote,
@@ -129,10 +129,22 @@ function HQShell({ bee }: { bee: { handle: string } }) {
   const active = SECTIONS.find((s) => s.slug === activeSlug) ?? SECTIONS[0];
   const ActiveComponent = active.Component;
 
+  // Section pane scrolls internally; reset it to the top when the active
+  // section changes so the title lands just under the HQ header, not scrolled.
+  const sectionRef = useRef<HTMLElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: activeSlug is the trigger — reset the section scroll whenever the active section changes
+  useEffect(() => {
+    sectionRef.current?.scrollTo({ top: 0 });
+  }, [activeSlug]);
+
+  // Self-contained layout (matches Intel/Manual/Dingleberry): HQ fills its pane
+  // below the global chrome and scrolls internally, so the sticky SiteHeader +
+  // TopToolbar never clip its top. The HQ header is static at the top of this
+  // pane (which already sits below the global chrome) — no header-height math.
   return (
-    <div className="flex min-h-[80vh] flex-col">
-      {/* Sticky header */}
-      <header className="sticky top-14 z-30 border-b border-border bg-bg-elevated/95 px-4 py-3 backdrop-blur md:px-6">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {/* HQ header — static at the top of the self-contained pane */}
+      <header className="flex-none border-b border-border bg-bg-elevated/95 px-4 py-3 backdrop-blur md:px-6">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="font-display text-lg font-semibold text-text-silver-bright">HQ Control Room</h1>
@@ -146,9 +158,9 @@ function HQShell({ bee }: { bee: { handle: string } }) {
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col md:grid md:grid-cols-[16rem_1fr]">
+      <div className="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[16rem_1fr]">
         {/* Sidebar */}
-        <aside className="border-r border-border bg-bg-elevated/30 px-3 py-4 md:py-6">
+        <aside className="flex-none overflow-y-auto border-b border-border bg-bg-elevated/30 px-3 py-4 md:border-b-0 md:border-r md:py-6">
           <nav className="flex flex-col gap-0.5">
             {SECTIONS.map((s, i) => {
               const Icon = s.icon;
@@ -184,8 +196,8 @@ function HQShell({ bee }: { bee: { handle: string } }) {
           </nav>
         </aside>
 
-        {/* Active section */}
-        <main className="min-w-0 px-4 py-6 md:px-8 md:py-8">
+        {/* Active section — scrolls internally within the pane */}
+        <main ref={sectionRef} className="min-w-0 flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8">
           <ActiveComponent />
         </main>
       </div>

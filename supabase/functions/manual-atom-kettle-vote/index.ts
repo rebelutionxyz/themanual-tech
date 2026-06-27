@@ -1,18 +1,7 @@
-// POST /functions/v1/manual-atom-kettle-vote/:slug
-// Body: { tier: 'Sourced'|'Accepted'|'Emerging'|'Fringe'|'Unsourced', weight?: number }
-//
-// Per shared/canon/manual-spine-api-v1-amendment-1.md §2.2.
-// verify_jwt = true (Bee-auth required).
-//
-// UPSERT semantics (per OG HUMAN follow-up direction, 2026-05-27):
-// One vote per Bee per atom; latest classification wins. Bees can change
-// their tier vote as evidence develops (e.g. atom moves Emerging → Accepted).
-// Backed by UNIQUE (atom_id, bee_id) constraint from migration
-// 20260527210000_atom_kettle_votes_uniqueness.
-
 import { errorResponse, handleCors, jsonResponse } from '../_shared/cors.ts';
 import { verifyAuth } from '../_shared/auth.ts';
 import { serviceClient } from '../_shared/supabase.ts';
+import { refFor } from '../_shared/ids.ts';
 
 const FUNCTION_NAME = 'manual-atom-kettle-vote';
 const TIERS = ['Sourced', 'Accepted', 'Emerging', 'Fringe', 'Unsourced'] as const;
@@ -26,10 +15,7 @@ interface VoteBody {
 Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
-
-  if (req.method !== 'POST') {
-    return errorResponse('Method not allowed', 405);
-  }
+  if (req.method !== 'POST') return errorResponse('Method not allowed', 405);
 
   const auth = await verifyAuth(req);
   if (!auth.ok) return errorResponse(auth.error, auth.status);
@@ -62,24 +48,19 @@ Deno.serve(async (req) => {
   }
 
   const sb = serviceClient();
-
-  // Confirm atom exists.
   const { data: atom, error: atomErr } = await sb
     .from('atoms')
     .select('id')
     .eq('id', slug)
     .maybeSingle();
   if (atomErr) {
-    console.error('manual-atom-kettle-vote atom lookup failed', {
-      slug, message: atomErr.message,
-    });
+    console.error('manual-atom-kettle-vote atom lookup failed', { slug, message: atomErr.message });
     return errorResponse('Atom lookup failed', 500);
   }
   if (!atom) return errorResponse('Atom not found', 404);
 
-  // UPSERT — latest vote per (atom_id, bee_id) wins. `created_at` refreshes
-  // to now() on each vote so it represents the timestamp of the current
-  // classification, not the Bee's first-ever vote on this atom.
+  // UPSERT semantics: one vote per (atom_id, bee_id); latest wins. Backed by
+  // UNIQUE constraint from 20260527210000_atom_kettle_votes_uniqueness.
   const { data: insertRow, error: insertErr } = await sb
     .from('atom_kettle_votes')
     .upsert(
@@ -96,10 +77,32 @@ Deno.serve(async (req) => {
     .single();
   if (insertErr || !insertRow) {
     console.error('manual-atom-kettle-vote upsert failed', {
-      slug, bee_id: beeId, tier, weight,
-      message: insertErr?.message ?? 'no row',
+      slug, bee_id: beeId, tier, weight, message: insertErr?.message ?? 'no row',
     });
     return errorResponse('Vote upsert failed', 500);
+  }
+
+  // Drops — §2 governance/canonicalization vote (gov_vote, weight 1). Idempotent
+  // per (atom, bee) vote: the upsert keeps the same vote_id when a Bee re-votes,
+  // so refFor('kettle_vote', vote_id) is stable and record_drop's dedup_key earns
+  // the drop ONCE per atom·bee (changing your tier does not re-earn). Best-effort:
+  // a Drops failure is logged and never fails the vote (reward is a side-effect).
+  try {
+    const { error: dropErr } = await sb.rpc('record_drop', {
+      p_bee_id: beeId,
+      p_action: 'gov_vote',
+      p_source_ref: await refFor('kettle_vote', insertRow.id),
+    });
+    if (dropErr) {
+      console.error('manual-atom-kettle-vote record_drop(gov_vote) failed', {
+        vote_id: insertRow.id, bee_id: beeId, message: dropErr.message,
+      });
+    }
+  } catch (e) {
+    console.error('manual-atom-kettle-vote record_drop(gov_vote) threw', {
+      vote_id: insertRow.id,
+      message: e instanceof Error ? e.message : String(e),
+    });
   }
 
   // Recompute tier_vote_counts post-insert (lightweight; one query).
@@ -108,22 +111,11 @@ Deno.serve(async (req) => {
     .select('kettle')
     .eq('atom_id', slug);
   if (voteErr) {
-    console.error('manual-atom-kettle-vote post-vote count failed', {
-      slug, message: voteErr.message,
-    });
-    // Vote landed; return success with counts unavailable.
-    return jsonResponse({
-      ok: true,
-      vote_id: insertRow.id,
-      atom_slug: slug,
-      tier,
-      weight,
-    });
+    console.error('manual-atom-kettle-vote post-vote count failed', { slug, message: voteErr.message });
+    return jsonResponse({ ok: true, vote_id: insertRow.id, atom_slug: slug, tier, weight });
   }
 
-  const tierVoteCounts: Record<string, number> = Object.fromEntries(
-    TIERS.map((t) => [t, 0]),
-  );
+  const tierVoteCounts: Record<string, number> = Object.fromEntries(TIERS.map((t) => [t, 0]));
   for (const row of voteRows ?? []) {
     const k = (row as { kettle?: string }).kettle;
     if (k && k in tierVoteCounts) tierVoteCounts[k]++;

@@ -1,33 +1,18 @@
 import type { KettleState, RealmId } from '@/types/manual';
 
 /**
- * REALM_ORDER — palindrome display order locked April 25, 2026.
- *
- * Reads same forward and backward — Bees scrolling either direction
- * pass through a coherent arc. Pairings 1↔14, 2↔13, ..., 7↔8 are intentional.
+ * Realm display order is DB-driven (realms.display_order) — see
+ * useManualData().realmOrder. The old hardcoded REALM_ORDER constant was
+ * removed 2026-06-14 so the nav tracks live taxonomy restructuring without
+ * code drift. REALM_NAMES/REALM_COLORS below are display lookups only and carry
+ * no ordering.
  */
-export const REALM_ORDER: RealmId[] = [
-  'justice',           // 1
-  'reference',         // 2
-  'human_activities',  // 3
-  'self',              // 4
-  'geography',         // 5
-  'health',            // 6
-  'society',           // 7
-  'math',              // 8
-  'science',           // 9
-  'philosophy',        // 10
-  'tech',              // 11
-  'history',           // 12
-  'culture',           // 13
-  'religion',          // 14
-];
 
 /**
  * REALM_NAMES — display labels for each realm id.
  *
  * Note: "Human activities" is intentionally lowercase 'a' (matches source data
- * from the 4,860-atom canonical taxonomy).
+ * from the canonical taxonomy).
  */
 export const REALM_NAMES: Record<RealmId, string> = {
   justice: 'Justice',
@@ -73,17 +58,18 @@ export const REALM_COLORS: Record<RealmId, string> = {
 /**
  * REALM_ID_BY_NAME — reverse lookup from display name to RealmId slug.
  *
- * Used when parsing category paths (e.g. "Justice / Government / ...") back
- * to a typed RealmId. Returns undefined for non-realm names.
+ * Used when parsing category paths (e.g. "Society / Government / ...") back
+ * to a typed RealmId. Order-independent (derived from REALM_NAMES).
+ * Returns undefined for non-realm names.
  */
 export const REALM_ID_BY_NAME: Record<string, RealmId> = Object.fromEntries(
-  REALM_ORDER.map((id) => [REALM_NAMES[id], id]),
+  (Object.entries(REALM_NAMES) as [RealmId, string][]).map(([id, name]) => [name, id]),
 ) as Record<string, RealmId>;
 
 /**
  * SILVER — The Manual's canonical silver (matches text-silver token / 13-hex flower
  * logo gradient endpoint per MMF §15.5). Used as the realm-strip fallback when no
- * realm is selected and no pillar is active (themanual.tech foundation).
+ * realm is selected and no astra is active (themanual.tech foundation).
  */
 export const SILVER = '#C8D1DA';
 

@@ -5,10 +5,17 @@ import { useAuth } from '@/lib/auth';
 import { useManualData } from '@/lib/useManualData';
 import { createThread } from '@/lib/intel';
 import { AtomPicker } from '@/components/intel/AtomPicker';
-import { RealmPicker, type RealmSelection } from '@/components/intel/RealmPicker';
+import { RealmPathPicker } from '@/components/intel/RealmPathPicker';
 import { useIntelStore } from '@/stores/useIntelStore';
-import { REALM_NAMES } from '@/lib/constants';
+import { REALM_NAMES, REALM_ID_BY_NAME } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import type { RealmId } from '@/types/manual';
+
+/** Build a display-name path from realm + L2. */
+function buildPath(realmId: RealmId | null, l2: string | null): string[] {
+  if (!realmId) return [];
+  return [REALM_NAMES[realmId], l2].filter((s): s is string => Boolean(s));
+}
 
 /**
  * Thread composer — /intel/new
@@ -25,13 +32,15 @@ export function NewThreadPage() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [atomIds, setAtomIds] = useState<string[]>([]);
-  const [realmSel, setRealmSel] = useState<RealmSelection>({
-    realmId: urlRealmId,
-    l2: urlL2,
-  });
+  const [realmPath, setRealmPath] = useState<string[]>(() => buildPath(urlRealmId, urlL2));
   const [realmManuallyOverridden, setRealmManuallyOverridden] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const realmId = realmPath[0]
+    ? (REALM_ID_BY_NAME[realmPath[0]] as RealmId | undefined) ?? null
+    : null;
+  const l2 = realmPath[1] ?? null;
 
   // Hydrate draft from sessionStorage (handed off by the InlineComposer "Expand" button)
   useEffect(() => {
@@ -42,11 +51,11 @@ export function NewThreadPage() {
       if (draft.title) setTitle(draft.title);
       if (draft.body) setBody(draft.body);
       if (Array.isArray(draft.atomIds)) setAtomIds(draft.atomIds);
-      if (draft.realmId || draft.l2) {
-        setRealmSel({
-          realmId: draft.realmId ?? null,
-          l2: draft.l2 ?? null,
-        });
+      const draftPath: string[] = Array.isArray(draft.realmPath)
+        ? draft.realmPath
+        : buildPath(draft.realmId ?? null, draft.l2 ?? null);
+      if (draftPath.length > 0) {
+        setRealmPath(draftPath);
         setRealmManuallyOverridden(true);
       }
     } catch {
@@ -55,26 +64,23 @@ export function NewThreadPage() {
     sessionStorage.removeItem('composer-draft');
   }, []);
 
-  const derivedFromAtoms = useMemo(() => {
+  const derivedPath = useMemo(() => {
     if (atomIds.length === 0) return null;
     const first = atoms.find((a) => a.id === atomIds[0]);
     if (!first) return null;
-    return {
-      realmId: first.realmId,
-      l2: null,
-    } as RealmSelection;
+    return [REALM_NAMES[first.realmId]];
   }, [atomIds, atoms]);
 
   useEffect(() => {
-    if (derivedFromAtoms && !realmManuallyOverridden) {
-      setRealmSel(derivedFromAtoms);
+    if (derivedPath && !realmManuallyOverridden) {
+      setRealmPath(derivedPath);
     }
     if (atomIds.length === 0 && !realmManuallyOverridden) {
-      setRealmSel({ realmId: urlRealmId, l2: urlL2 });
+      setRealmPath(buildPath(urlRealmId, urlL2));
     }
-  }, [derivedFromAtoms, realmManuallyOverridden, atomIds.length, urlRealmId, urlL2]);
+  }, [derivedPath, realmManuallyOverridden, atomIds.length, urlRealmId, urlL2]);
 
-  const hasRealm = !!realmSel.realmId;
+  const hasRealm = realmPath.length > 0;
   const hasAtoms = atomIds.length > 0;
   const categorizationOk = hasRealm || hasAtoms;
   const canSubmit =
@@ -88,8 +94,12 @@ export function NewThreadPage() {
     e.preventDefault();
     if (!canSubmit || !bee) return;
 
-    const finalRealmId = realmSel.realmId ?? derivedFromAtoms?.realmId ?? null;
-    const finalL2 = realmSel.l2 ?? null;
+    const finalPath =
+      realmPath.length > 0
+        ? realmPath
+        : derivedPath ?? [];
+    const finalRealmId =
+      realmId ?? (derivedPath ? REALM_ID_BY_NAME[derivedPath[0]] ?? null : null);
 
     setSubmitting(true);
     setError(null);
@@ -100,7 +110,8 @@ export function NewThreadPage() {
           body,
           atomIds,
           primaryRealm: finalRealmId,
-          primaryL2: finalL2,
+          primaryL2: finalPath[1] ?? null,
+          realmPath: finalPath,
         },
         bee.id,
       );
@@ -143,7 +154,7 @@ export function NewThreadPage() {
   }
 
   const usingDerived =
-    !realmManuallyOverridden && derivedFromAtoms && hasAtoms;
+    !realmManuallyOverridden && !!derivedPath && hasAtoms;
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8 md:px-10 md:py-12">
@@ -247,15 +258,15 @@ export function NewThreadPage() {
           max={10}
           searchOnly={true}
           realmContext={{
-            realmId: realmSel.realmId ?? urlRealmId,
-            l2: realmSel.l2 ?? urlL2,
+            realmId: realmId ?? urlRealmId,
+            l2: l2 ?? urlL2,
           }}
         />
 
-        <RealmPicker
-          value={realmSel}
+        <RealmPathPicker
+          value={realmPath}
           onChange={(next) => {
-            setRealmSel(next);
+            setRealmPath(next);
             setRealmManuallyOverridden(true);
           }}
           label="Realm"

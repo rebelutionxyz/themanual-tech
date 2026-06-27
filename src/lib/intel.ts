@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { REALM_NAMES } from '@/lib/constants';
 import type { RealmId } from '@/types/manual';
 
 // ═════════════════════════════════════════════════════════════════════
@@ -39,8 +40,14 @@ export interface ForumPost {
 
 export interface ThreadListFilter {
   /**
-   * When set, only include threads whose primary_realm == this realmId
-   * OR whose linked atoms' realmId == this realmId.
+   * Facet-lens prefix (work order §2): display-name segments matched against
+   * forum_threads.realm_path via array-contains + exact ordered-prefix. Empty
+   * or omitted = all threads. This is the canonical realm filter.
+   */
+  prefix?: string[];
+  /**
+   * @deprecated superseded by `prefix`. When set, only include threads whose
+   * primary_realm == this realmId OR whose linked atoms' realmId == this realmId.
    */
   realmId?: RealmId | null;
   l2?: string | null;
@@ -59,6 +66,8 @@ export interface CreateThreadInput {
   categoryPaths?: string[];
   primaryRealm?: RealmId | null;
   primaryL2?: string | null;
+  /** Full taxonomy path (display names). Falls back to [realmName, l2]. */
+  realmPath?: string[] | null;
   parentSurface?: string | null;
   parentId?: string | null;
 }
@@ -160,6 +169,30 @@ export async function listThreads(
     return enrichWithAuthors(threads ?? []);
   }
 
+  // Facet-lens prefix filter (work order §2) — realm_path array-contains
+  // (GIN-indexed) narrowed to an exact ordered prefix client-side, since
+  // PostgREST has no slice-equality operator. This is the canonical realm
+  // filter; supersedes the legacy primary_realm/atom-link union below.
+  if (filter.prefix && filter.prefix.length > 0) {
+    const prefix = filter.prefix;
+    let q = supabase
+      .from('forum_threads')
+      .select('*')
+      .contains('realm_path', prefix)
+      .order(order.col, { ascending: order.ascending })
+      .limit(limit);
+    if (cutoffIso) q = q.gte(windowCol, cutoffIso);
+    const { data } = await q;
+    // Collision-proof exact ordered-prefix check (a plain join could collide,
+    // e.g. ['Mass media'] vs ['Mass','media']).
+    const key = JSON.stringify(prefix);
+    const rows = (data ?? []).filter((r) => {
+      const rp = (r as { realm_path?: unknown }).realm_path;
+      return Array.isArray(rp) && JSON.stringify(rp.slice(0, prefix.length)) === key;
+    });
+    return enrichWithAuthors(rows);
+  }
+
   // No realm filter — all threads
   if (!filter.realmId) {
     let q = supabase
@@ -220,6 +253,44 @@ export async function listThreads(
   if (cutoffIso) qFinal = qFinal.gte(windowCol, cutoffIso);
   const { data: threads } = await qFinal;
   return enrichWithAuthors(threads ?? []);
+}
+
+/**
+ * Cross-Astra realm lens feed (dispatch Part B — full-depth narrowing).
+ *
+ * forum_threads narrowed by PREFIX on realm_path (display-name path_parts),
+ * unioned across ALL parent_surface. Given the drilled path P (length N), a
+ * thread matches when realm_path[1:N] = P — i.e. it lives at P or anywhere
+ * below it. Every drill level narrows the feed. `source` filters to one
+ * parent_surface on top ('all' = full cross-Astra feed).
+ *
+ * Postgres slice-equality isn't a PostgREST operator, so we pre-filter with the
+ * GIN-indexed array-contains (@>) then apply the exact ordered-prefix check
+ * client-side. Existing threads with realm_path = NULL won't match (per spec).
+ */
+export async function listRealmFeed(
+  path: string[],
+  source = 'all',
+  limit = 40,
+): Promise<ForumThread[]> {
+  if (!supabase || path.length === 0) return [];
+  let q = supabase
+    .from('forum_threads')
+    .select('*')
+    .contains('realm_path', path)
+    .order('last_activity_at', { ascending: false })
+    .limit(limit);
+  if (source && source !== 'all') q = q.eq('parent_surface', source);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+
+  // Exact ordered-prefix: realm_path[1:N] === P (contains is unordered).
+  const key = path.join('');
+  const rows = (data ?? []).filter((r) => {
+    const rp = (r as { realm_path?: unknown }).realm_path;
+    return Array.isArray(rp) && rp.slice(0, path.length).join('') === key;
+  });
+  return enrichWithAuthors(rows);
 }
 
 /**
@@ -322,6 +393,17 @@ export async function createThread(
 ): Promise<string> {
   if (!supabase) throw new Error('Supabase not configured');
 
+  // realm_path = the thread's category (mirrors atoms.path_parts, display names).
+  // Prefer an explicit full path; else derive from realm/L2 for back-compat.
+  const realmPath =
+    input.realmPath && input.realmPath.length > 0
+      ? input.realmPath
+      : input.primaryRealm
+        ? [REALM_NAMES[input.primaryRealm], input.primaryL2].filter(
+            (s): s is string => Boolean(s),
+          )
+        : null;
+
   const { data: thread, error } = await supabase
     .from('forum_threads')
     .insert({
@@ -330,6 +412,7 @@ export async function createThread(
       created_by: authorBeeId,
       primary_realm: input.primaryRealm ?? null,
       primary_l2: input.primaryL2 ?? null,
+      realm_path: realmPath,
       parent_surface: input.parentSurface ?? null,
       parent_id: input.parentId ?? null,
     })
@@ -371,6 +454,73 @@ export async function createThread(
   }
 
   return String(thread.id);
+}
+
+/** A Manual atom search hit (atom_search RPC). realmName disambiguates homonyms. */
+export interface AtomHit {
+  id: string;
+  name: string;
+  realmName: string;
+  path: string;
+  pathParts: string[];
+}
+
+/** Search live atoms by name for the Rabbit tag picker (min 2 chars). */
+export async function searchAtoms(query: string, limit = 20): Promise<AtomHit[]> {
+  if (!supabase) return [];
+  const q = query.trim();
+  if (q.length < 2) return [];
+  const { data, error } = await supabase.rpc('atom_search', { p_query: q, p_limit: limit });
+  if (error) {
+    console.warn('[intel] atom_search failed:', error.message);
+    return [];
+  }
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id),
+    name: String(r.name),
+    realmName: String(r.realm_name ?? ''),
+    path: String(r.path ?? ''),
+    pathParts: Array.isArray(r.path_parts) ? (r.path_parts as string[]) : [],
+  }));
+}
+
+/**
+ * Plain "What's happening?" post (pass 15/17). A single text field → a thread
+ * via forum_create_thread. The required title is DERIVED from the text (first
+ * line, truncated) — never a separate field. Optional Rabbit-picked atoms: the
+ * first is the anchor (p_anchor_atom_id); the rest are tagged via
+ * forum_thread_tag_atom. Author is set server-side from auth.uid().
+ */
+export async function createIntelPost(text: string, atomIds: string[] = []): Promise<string | null> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const body = text.trim();
+  if (!body) throw new Error('Nothing to post');
+  const firstLine = body.split('\n')[0].trim();
+  const base = firstLine || body;
+  const title = base.length > 100 ? `${base.slice(0, 100).trimEnd()}…` : base;
+
+  const { data, error } = await supabase.rpc('forum_create_thread', {
+    p_title: title,
+    p_body: body,
+    p_parent_surface: 'intel',
+    p_anchor_atom_id: atomIds[0] ?? null,
+    p_parent_id: null,
+  });
+  if (error) throw new Error(error.message);
+  const r = (data ?? {}) as { ok?: boolean; thread_id?: string; id?: string; error?: string };
+  if (r.ok === false) throw new Error(r.error ?? 'Could not post');
+  const id = r.thread_id ?? r.id ?? null;
+  if (!id) return null;
+
+  // Additional atoms (beyond the anchor) tag the thread. Failures don't undo the post.
+  for (const atomId of atomIds.slice(1)) {
+    const { error: tagErr } = await supabase.rpc('forum_thread_tag_atom', {
+      p_thread_id: id,
+      p_atom_id: atomId,
+    });
+    if (tagErr) console.warn('[intel] forum_thread_tag_atom failed:', tagErr.message);
+  }
+  return String(id);
 }
 
 export async function createPost(

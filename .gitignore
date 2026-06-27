@@ -50,5 +50,10 @@ supabase/.temp/
 .tmp-*
 
 # local port / scratch dirs
+# DingleBERRY port package — source for the staged surface port (slices B+).
+# Kept on disk as the look/structure source of truth; not tracked.
 _dberry_port/
+
+# FreedomBLiNGS port package — design handoff (tokens, surfaces.jsx, README).
+# Authoritative look/structure source for the staged surface port; not tracked.
 _fb_port/

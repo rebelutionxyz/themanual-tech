@@ -102,8 +102,8 @@ export function EconomySnapshot() {
 
       {state === null && (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-20 animate-pulse-slow rounded-md border border-border bg-bg-elevated/40" />
+          {['sk-1', 'sk-2', 'sk-3', 'sk-4', 'sk-5', 'sk-6'].map((k) => (
+            <div key={k} className="h-20 animate-pulse-slow rounded-md border border-border bg-bg-elevated/40" />
           ))}
         </div>
       )}

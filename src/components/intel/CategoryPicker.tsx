@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Search, X, Plus, Check, Network, FolderTree } from 'lucide-react';
 import { useManualData } from '@/lib/useManualData';
-import { REALM_ORDER } from '@/lib/constants';
 import { TaxonomyTree } from '@/components/manual/TaxonomyTree';
 import type { TreeNode } from '@/types/manual';
 import { cn } from '@/lib/utils';
@@ -30,7 +29,7 @@ export function CategoryPicker({
   label = 'Categories',
   error,
 }: CategoryPickerProps) {
-  const { tree, loaded } = useManualData();
+  const { tree, loaded, realmOrder } = useManualData();
   const [query, setQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -270,7 +269,7 @@ export function CategoryPicker({
       {/* BROWSE MODE */}
       {treeMode && tree && loaded && (
         <div className="max-h-96 overflow-y-auto rounded-md border border-border bg-bg-elevated p-2">
-          {REALM_ORDER.map((realmId) => {
+          {realmOrder.map((realmId) => {
             const realmNode = tree.children.find((c) => c.realmId === realmId);
             if (!realmNode) return null;
             return (

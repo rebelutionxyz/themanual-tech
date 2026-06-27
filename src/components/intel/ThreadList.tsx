@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MessageSquare, Lock, Clock, Bookmark, BookmarkCheck, Share2, Check } from 'lucide-react';
 import { listThreads, listThreadsByIds, listThreadIdsByAuthor, relativeTime, type ForumThread } from '@/lib/intel';
+import { listThreadFeed, type FeedSort, type ThreadFeedItem } from '@/lib/forumFeed';
 import {
   listSavedThreadIds,
   toggleSave,
@@ -12,7 +13,7 @@ import {
 } from '@/lib/reactions';
 import { ReactionBar } from '@/components/intel/ReactionBar';
 import { useManualData } from '@/lib/useManualData';
-import { useIntelStore } from '@/stores/useIntelStore';
+import { useLensStore } from '@/stores/useLensStore';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { FeedInlineSlot } from '@/components/promotions/FeedInlineSlot';
@@ -25,31 +26,59 @@ import {
   BEE_COLOR,
 } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { REALM_COLOR_FALLBACK, useRealmColors } from '@/stores/useRealmColors';
 import type { RealmId } from '@/types/manual';
 
 interface ThreadListProps {
-  selectedRealmId: RealmId | null;
-  selectedL2: string | null;
-  selectedL3?: string | null;
+  /** Facet-lens prefix (display-name segments on realm_path). [] = all threads. */
+  prefix: string[];
   sortBy?: 'hot' | 'new' | 'top';
   timeWindowHours?: number;
-  /** When true, list only threads this Bee has saved. Ignores realm filters. */
+  /**
+   * When set, the list is sourced from forum_thread_feed(prefix, feedSort)
+   * (ranked trending/top/new feed) instead of the legacy listThreads path.
+   */
+  feedSort?: FeedSort;
+  /** When true, list only threads this Bee has saved. Ignores the prefix. */
   savedMode?: boolean;
-  /** When true, list only threads authored by this Bee, newest first. Ignores realm filters. */
+  /** When true, list only threads authored by this Bee, newest first. Ignores the prefix. */
   myThreadsMode?: boolean;
 }
 
+/** forum_thread_feed row → the ForumThread shape the cards render. */
+function feedItemToThread(f: ThreadFeedItem): ForumThread {
+  return {
+    id: f.id,
+    title: f.title,
+    body: f.excerpt,
+    createdBy: f.authorBeeId,
+    parentSurface: 'intel',
+    parentId: null,
+    primaryRealm: f.primaryRealm,
+    primaryL2: f.realmPath[1] ?? null,
+    replyCount: f.replyCount,
+    lastActivityAt: f.lastActivityAt,
+    isLocked: f.isLocked,
+    createdAt: f.createdAt,
+    authorHandle: f.authorHandle ?? undefined,
+  };
+}
+
 export function ThreadList({
-  selectedRealmId,
-  selectedL2,
-  selectedL3 = null,
+  prefix,
   sortBy = 'hot',
   timeWindowHours = 0,
+  feedSort,
   savedMode = false,
   myThreadsMode = false,
 }: ThreadListProps) {
   const { atoms } = useManualData();
   const { bee } = useAuth();
+
+  // Realm slug for promo targeting + accent color, derived from the prefix root.
+  const selectedRealmId: RealmId | null = prefix[0]
+    ? (REALM_ID_BY_NAME[prefix[0]] ?? null)
+    : null;
 
   const personalSortKey = savedMode
     ? 'intel-sort-saved'
@@ -104,22 +133,8 @@ export function ThreadList({
   const [threads, setThreads] = useState<ForumThread[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Precompute atomIds-in-realm for the atom-link filter.
-  const atomIdsInRealm = useMemo(() => {
-    if (!selectedRealmId) return undefined;
-    const matches = atoms.filter((a) => {
-      if (a.realmId !== selectedRealmId) return false;
-      if (selectedL2 && a.pathParts[1] !== selectedL2) return false;
-      if (selectedL3 && a.pathParts[2] !== selectedL3) return false;
-      return true;
-    });
-    matches.sort((a, b) => {
-      const aScore = (a.isLeaf ? 2 : 0) + (a.kettle === 'Accepted' ? 1 : 0);
-      const bScore = (b.isLeaf ? 2 : 0) + (b.kettle === 'Accepted' ? 1 : 0);
-      return bScore - aScore;
-    });
-    return matches.slice(0, 200).map((a) => a.id);
-  }, [atoms, selectedRealmId, selectedL2, selectedL3]);
+  // Stable serialization of the prefix for effect deps (segments are plain text).
+  const prefixKey = prefix.join(' ');
 
   const atomById = useMemo(() => {
     const m = new Map(atoms.map((a) => [a.id, a]));
@@ -130,6 +145,7 @@ export function ThreadList({
   const [threadCategoryLinks, setThreadCategoryLinks] = useState<Map<string, string[]>>(new Map());
   const [reactionSummaries, setReactionSummaries] = useState<Map<string, ReactionSummary>>(new Map());
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: prefixKey is the stable serialization of `prefix`; depending on the array identity would refetch every render
   useEffect(() => {
     let cancelled = false;
     setThreads(null);
@@ -154,15 +170,13 @@ export function ThreadList({
                 return listThreadsByIds(ids);
               })()
             : Promise.resolve([] as ForumThread[])
-          : listThreads(
-              {
-                realmId: selectedRealmId,
-                l2: selectedL2,
+          : feedSort
+            ? listThreadFeed(prefix, feedSort).then((items) => items.map(feedItemToThread))
+            : listThreads({
+                prefix,
                 sortBy,
                 timeWindowHours,
-              },
-              atomIdsInRealm,
-            );
+              });
 
     threadPromise
       .then(async (result) => {
@@ -236,12 +250,12 @@ export function ThreadList({
     return () => {
       cancelled = true;
     };
-  }, [selectedRealmId, selectedL2, sortBy, timeWindowHours, atomIdsInRealm, savedMode, myThreadsMode, personalSortMode, bee?.id]);
+  }, [prefixKey, sortBy, timeWindowHours, feedSort, savedMode, myThreadsMode, personalSortMode, bee?.id]);
 
   if (error) {
     return (
-      <div className="rounded-lg border border-kettle-unsourced/30 bg-bg-elevated p-6">
-        <p className="text-kettle-unsourced" style={{ fontSize: '13px' }}>
+      <div className="rounded-lg border border-red-200 bg-red-50 p-6">
+        <p className="text-red-600" style={{ fontSize: '13px' }}>
           Failed to load threads: {error}
         </p>
       </div>
@@ -260,8 +274,8 @@ export function ThreadList({
     return (
       <EmptyThreads
         realmId={selectedRealmId}
-        l2={selectedL2}
-        l3={selectedL3}
+        l2={prefix[1] ?? null}
+        l3={prefix[2] ?? null}
         savedMode={savedMode}
         myThreadsMode={myThreadsMode}
         signedIn={Boolean(bee?.id)}
@@ -382,17 +396,18 @@ function ThreadCard({
   onToggleSave: () => void;
   reactionSummary?: ReactionSummary;
 }) {
-  const { setRealmId, setL2, setL3 } = useIntelStore();
+  const setPrefix = useLensStore((s) => s.setPrefix);
+  const realmColors = useRealmColors((s) => s.colors);
 
   const linkedAtoms = atomIds
     .map((id) => atomById.get(id) as AtomShape | undefined)
     .filter((a): a is AtomShape => !!a)
     .slice(0, 4);
 
+  // Card outline + badge are the THREAD'S REALM color (realms.color, fallback
+  // map) — NOT the INTEL astra blue. So a Culture thread reads pink, etc.
   const accentColor =
-    thread.primaryRealm && REALM_COLORS[thread.primaryRealm]
-      ? REALM_COLORS[thread.primaryRealm]
-      : '#6B94C8';
+    (thread.primaryRealm && realmColors[thread.primaryRealm]) || REALM_COLOR_FALLBACK;
 
   const primaryRealmName = thread.primaryRealm ? REALM_NAMES[thread.primaryRealm] : null;
   const primarySet = new Set(
@@ -408,31 +423,29 @@ function ThreadCard({
   function handleAtomClick(e: React.MouseEvent, atom: AtomShape) {
     e.preventDefault();
     e.stopPropagation();
-    setRealmId(atom.realmId);
-    if (atom.pathParts[1]) setL2(atom.pathParts[1]);
-    if (atom.pathParts[2]) setL3(atom.pathParts[2]);
+    // Filter to the atom's realm branch (realm › L2 › L3) — a realm_path prefix.
+    setPrefix(atom.pathParts.slice(0, 3).filter(Boolean));
   }
 
   function handleCategoryClick(e: React.MouseEvent, path: string) {
     e.preventDefault();
     e.stopPropagation();
     const parts = path.split(' / ').map((s) => s.trim()).filter(Boolean);
-    if (parts.length === 0) return;
-    const realmId = REALM_ID_BY_NAME[parts[0]];
-    if (!realmId) return;
-    setRealmId(realmId);
-    setL2(null);
-    setL3(null);
-    if (parts.length >= 2) setL2(parts[1]);
-    if (parts.length >= 3) setL3(parts[2]);
+    if (parts.length === 0 || !REALM_ID_BY_NAME[parts[0]]) return;
+    setPrefix(parts);
   }
 
   return (
     <li>
       <Link
         to={`/intel/t/${thread.id}`}
-        className="group block overflow-hidden rounded-lg border border-border bg-bg-elevated transition-all hover:border-border-bright hover:bg-panel-2"
-        style={{ borderLeft: `3px solid ${accentColor}80` }}
+        className="group block overflow-hidden rounded-lg border transition-shadow hover:shadow-sm"
+        style={{
+          borderColor: `${accentColor}33`,
+          borderLeftColor: accentColor,
+          borderLeftWidth: '3px',
+          background: `${accentColor}14`,
+        }}
       >
         <div className="p-4">
         <div className="flex items-start gap-3">
@@ -452,7 +465,7 @@ function ThreadCard({
                 </span>
                 {thread.primaryL2 && (
                   <span
-                    className="rounded bg-bg px-1.5 py-0.5 font-mono text-text-dim"
+                    className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-zinc-500"
                     style={{ fontSize: '10px' }}
                     data-size="meta"
                   >
@@ -464,7 +477,7 @@ function ThreadCard({
 
             <h3
               className={cn(
-                'font-display text-lg leading-tight text-text-silver-bright group-hover:text-text',
+                'font-display text-lg leading-tight text-zinc-900',
                 thread.isLocked && 'opacity-70',
               )}
             >
@@ -473,7 +486,7 @@ function ThreadCard({
 
             {thread.body && (
               <p
-                className="mt-1.5 line-clamp-2 text-text-dim"
+                className="mt-1.5 line-clamp-2 text-zinc-500"
                 style={{ fontSize: '13px', lineHeight: '1.5' }}
               >
                 {thread.body}
@@ -487,7 +500,7 @@ function ThreadCard({
                     type="button"
                     key={a.id}
                     onClick={(e) => handleAtomClick(e, a)}
-                    className="inline-flex items-center gap-1 rounded border border-transparent bg-bg/60 px-1.5 py-0.5 text-text-silver transition-colors hover:border-text-silver/30 hover:bg-bg-elevated hover:text-text"
+                    className="inline-flex items-center gap-1 rounded border border-zinc-200 bg-white/70 px-1.5 py-0.5 text-zinc-700 transition-colors hover:bg-white hover:text-zinc-900"
                     style={{ fontSize: '10.5px' }}
                     title={`Filter by ${a.realmName}${a.pathParts[1] ? ` · ${a.pathParts[1]}` : ''}${a.pathParts[2] ? ` · ${a.pathParts[2]}` : ''}`}
                   >
@@ -503,7 +516,7 @@ function ThreadCard({
                 ))}
                 {atomIds.length > 4 && (
                   <span
-                    className="font-mono text-text-muted"
+                    className="font-mono text-zinc-500"
                     style={{ fontSize: '10.5px' }}
                     data-size="meta"
                   >
@@ -522,18 +535,18 @@ function ThreadCard({
                       type="button"
                       key={path}
                       onClick={(e) => handleCategoryClick(e, path)}
-                      className="inline-flex items-center gap-1 rounded border border-border/50 bg-bg/40 px-1.5 py-0.5 text-text-dim transition-colors hover:border-border hover:bg-bg hover:text-text-silver"
+                      className="inline-flex items-center gap-1 rounded border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
                       style={{ fontSize: '10px' }}
                       title={`Filter by ${path}`}
                     >
-                      <span className="text-text-muted">#</span>
+                      <span className="text-zinc-400">#</span>
                       {leaf}
                     </button>
                   );
                 })}
                 {categoryPaths.length > categoryChips.length && (
                   <span
-                    className="font-mono text-text-muted"
+                    className="font-mono text-zinc-500"
                     style={{ fontSize: '10px' }}
                     data-size="meta"
                   >
@@ -545,7 +558,7 @@ function ThreadCard({
           </div>
           <div className="flex flex-shrink-0 items-start gap-0.5">
             {thread.isLocked && (
-              <Lock size={14} className="mt-1.5 mr-1 text-text-muted" />
+              <Lock size={14} className="mt-1.5 mr-1 text-zinc-400" />
             )}
             <CardShareButton threadId={thread.id} />
             {canSave && (
@@ -560,7 +573,7 @@ function ThreadCard({
                   'rounded-md p-1.5 transition-colors',
                   saved
                     ? 'text-honey hover:bg-honey/10'
-                    : 'text-text-muted hover:bg-bg hover:text-text-silver',
+                    : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700',
                 )}
                 title={saved ? 'Remove from Saved' : 'Save for later'}
                 aria-label={saved ? 'Remove from Saved' : 'Save for later'}
@@ -588,14 +601,14 @@ function ThreadCard({
             </div>
           )}
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-text-muted">
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-zinc-500">
           <MetaPill icon={<MessageSquare size={11} />}>
             {thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}
           </MetaPill>
           <MetaPill icon={<Clock size={11} />}>{relativeTime(thread.lastActivityAt)}</MetaPill>
           {thread.authorHandle && (
             <span
-              className="font-mono text-text-silver"
+              className="font-mono text-zinc-500"
               style={{ fontSize: '11px' }}
               data-size="meta"
             >
@@ -626,14 +639,14 @@ function PersonalSortToggle({
   return (
     <div className="mb-3 flex items-center gap-2">
       <span
-        className="font-mono uppercase tracking-widest text-text-muted"
+        className="font-mono uppercase tracking-widest text-zinc-500"
         style={{ fontSize: '10px' }}
         data-size="meta"
       >
         Sort
       </span>
       <div
-        className="inline-flex rounded-md border border-border bg-bg-elevated p-0.5"
+        className="inline-flex rounded-md border border-zinc-200 bg-zinc-50 p-0.5"
         role="radiogroup"
         aria-label="Sort order"
       >
@@ -650,7 +663,7 @@ function PersonalSortToggle({
               title={opt.hint}
               className={cn(
                 'rounded-sm px-2.5 py-0.5 font-mono transition-all',
-                !active && 'text-text-dim hover:text-text-silver',
+                !active && 'text-zinc-500 hover:text-zinc-800',
               )}
               style={{
                 fontSize: '11px',
@@ -717,8 +730,8 @@ function CardShareButton({ threadId }: { threadId: string }) {
       className={cn(
         'rounded-md p-1.5 transition-colors',
         copied
-          ? 'text-kettle-sourced hover:bg-kettle-sourced/10'
-          : 'text-text-muted hover:bg-bg hover:text-text-silver',
+          ? 'text-emerald-600 hover:bg-emerald-50'
+          : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700',
         pending && 'opacity-60',
       )}
       title={copied ? 'Link copied' : bee ? 'Share with affiliate tracking' : 'Copy share link'}
@@ -788,9 +801,9 @@ function ThreadListSkeleton({
       {cards.map((c, i) => (
         <li
           key={`skel-${c.titleW}-${c.bodyW1}-${c.atoms}`}
-          className="animate-pulse-slow overflow-hidden rounded-lg border border-border bg-bg-elevated"
+          className="animate-pulse-slow overflow-hidden rounded-lg border border-zinc-200 bg-white"
           style={{
-            borderLeft: `3px solid ${accentColor}80`,
+            borderLeft: '3px solid #1D9BF0',
             animationDelay: `${i * 120}ms`,
           }}
         >
@@ -800,21 +813,18 @@ function ThreadListSkeleton({
                 className="h-3.5 w-14 rounded"
                 style={{ background: `${accentColor}25` }}
               />
-              <span className="h-3.5 w-20 rounded bg-bg" />
+              <span className="h-3.5 w-20 rounded bg-zinc-100" />
             </div>
 
-            <div
-              className="h-5 rounded bg-text-muted/15"
-              style={{ width: `${c.titleW}%` }}
-            />
+            <div className="h-5 rounded bg-zinc-200" style={{ width: `${c.titleW}%` }} />
 
             <div className="mt-2 space-y-1.5">
               <div
-                className="h-3 rounded bg-text-muted/10"
+                className="h-3 rounded bg-zinc-100"
                 style={{ width: `${c.bodyW1}%` }}
               />
               <div
-                className="h-3 rounded bg-text-muted/10"
+                className="h-3 rounded bg-zinc-100"
                 style={{ width: `${c.bodyW2}%` }}
               />
             </div>
@@ -824,19 +834,18 @@ function ThreadListSkeleton({
                 <span
                   // biome-ignore lint/suspicious/noArrayIndexKey: decorative loading skeleton, fixed length per render, no stable identity
                   key={j}
-                  className="h-4 rounded bg-bg/60"
+                  className="h-4 rounded border border-zinc-200 bg-zinc-100"
                   style={{
                     width: `${50 + ((j * 17) % 40)}px`,
-                    border: '1px solid rgba(255,255,255,0.04)',
                   }}
                 />
               ))}
             </div>
 
             <div className="mt-3 flex items-center gap-3">
-              <span className="h-3 w-14 rounded bg-text-muted/10" />
-              <span className="h-3 w-10 rounded bg-text-muted/10" />
-              <span className="h-3 w-20 rounded bg-text-muted/10" />
+              <span className="h-3 w-14 rounded bg-zinc-100" />
+              <span className="h-3 w-10 rounded bg-zinc-100" />
+              <span className="h-3 w-20 rounded bg-zinc-100" />
             </div>
           </div>
         </li>
@@ -903,13 +912,13 @@ function EmptyThreads({
           MY THREADS
         </div>
         <p
-          className="mb-2 font-display text-text-silver-bright"
+          className="mb-2 font-display text-zinc-900"
           style={{ fontSize: '17px', fontWeight: 500 }}
         >
           {headline}
         </p>
         <p
-          className="mx-auto max-w-md text-text-dim"
+          className="mx-auto max-w-md text-zinc-500"
           style={{ fontSize: '13px', lineHeight: '1.5' }}
         >
           {subtext}
@@ -975,13 +984,13 @@ function EmptyThreads({
           SAVED
         </div>
         <p
-          className="mb-2 font-display text-text-silver-bright"
+          className="mb-2 font-display text-zinc-900"
           style={{ fontSize: '17px', fontWeight: 500 }}
         >
           {headline}
         </p>
         <p
-          className="mx-auto max-w-md text-text-dim"
+          className="mx-auto max-w-md text-zinc-500"
           style={{ fontSize: '13px', lineHeight: '1.5' }}
         >
           {subtext}
@@ -1063,14 +1072,14 @@ function EmptyThreads({
       )}
 
       <p
-        className="mb-2 font-display text-text-silver-bright"
+        className="mb-2 font-display text-zinc-900"
         style={{ fontSize: '17px', fontWeight: 500 }}
       >
         {headline}
       </p>
 
       <p
-        className="mx-auto max-w-md text-text-dim"
+        className="mx-auto max-w-md text-zinc-500"
         style={{ fontSize: '13px', lineHeight: '1.5' }}
       >
         {subtext}
@@ -1099,7 +1108,7 @@ function EmptyThreads({
 
       {realmName && (
         <p
-          className="mt-4 font-mono text-text-muted"
+          className="mt-4 font-mono text-zinc-500"
           style={{ fontSize: '10.5px' }}
           data-size="meta"
         >

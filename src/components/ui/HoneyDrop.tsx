@@ -1,6 +1,8 @@
 interface HoneyDropProps {
-  size?: number;
+  size?: number | string;
   className?: string;
+  /** Passthrough so HoneyDrop can slot into LucideIcon positions (color is ignored — the drop is always gold). */
+  style?: React.CSSProperties;
   animate?: boolean;
   /**
    * When true, applies the `animate-bling-hop` motion (hop/skip/jump signature
@@ -14,7 +16,13 @@ interface HoneyDropProps {
  * Custom honey drop SVG — replaces the blue water 💧 emoji everywhere.
  * Gold, luminescent. BLiNG! signature mark.
  */
-export function HoneyDrop({ size = 14, className, animate = false, hopping = false }: HoneyDropProps) {
+export function HoneyDrop({
+  size = 14,
+  className,
+  style,
+  animate = false,
+  hopping = false,
+}: HoneyDropProps) {
   const animClass = hopping ? 'animate-bling-hop' : animate ? 'animate-honey-drop' : '';
   return (
     <svg
@@ -22,6 +30,7 @@ export function HoneyDrop({ size = 14, className, animate = false, hopping = fal
       height={size}
       viewBox="0 0 16 20"
       fill="none"
+      style={style}
       className={`inline-block ${animClass} ${className ?? ''}`}
       aria-hidden="true"
     >

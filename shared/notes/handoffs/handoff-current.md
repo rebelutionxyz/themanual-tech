@@ -1,97 +1,136 @@
-# HONEYCOMB — Handoff
+# handoff-current.md
 
-**As of:** 2026-05-19 ~21:00 PT (post-tier-1-cold-storage)
-**Resume cue:** Open this file. Run `ogo` hotkey to relaunch into next session.
-
----
-
-## Current state
-
-**Spine (TheMANUAL.tech):**
-- **4892 atoms** across 14 realms + Justice
-- **Reference reduced to 2 L2s**: `Standards` (32 atoms) + `Reference works` (15 atoms) — TARGET REACHED
-- Human Activities at 10 L2s
-- Snapshot table `atoms_backup_2026_05_19` at 5011 rows (30-day Supabase retention)
-- RLS + FK integrity verified: 0 orphans across atom_kettle_votes / atom_sources / atom_comments / entity_atom_links / promotions
-- Live site: themanual.tech (Railway — was briefly down during session due to Railway-wide edge-network outage, since recovered)
-
-**Canon docs:**
-- **MMF is STALE at v2.6** — doesn't reflect post-disposition state
-- v2.7 patch spec drafted (`mmf-v2-7-patch-spec.md`) — apply tomorrow per MASTER RULE (compress first)
-- All disposition artifacts committed and pushed: commit `956f9c4` on branch `chore/claude-md-no-cd-prefix` (TheMANUAL.tech)
-
-**Backups (4 independent layers now active):**
-1. Local disk: `~/Documents/HONEYCOMB/`
-2. GitHub: `TheMANUAL.tech` @ `956f9c4` + `honeycomb-ops` @ `82c65c1` both pushed
-3. Supabase snapshot: `atoms_backup_2026_05_19` table (30-day retention)
-4. **NEW — Physical USB cold storage:** `/c/Users/Butch/HONEYCOMB-backups/2026-05-19_205256` (50 MB, 12 files) copied to jump drive tonight. First sovereign offline backup of HONEYCOMB.
-
-**Backup scripts in place:**
-- Tier 1: `~/Documents/HONEYCOMB/honeycomb-ops/scripts/master-backup.sh` (manual; ~5–15 min due to pooler latency)
-- Tier 2: GitHub Actions cron in private `honeycomb-ops` repo
-- Tier 3: Windows scheduled task, Sundays 09:00 local
+**Session close:** 2026-06-21
+**Lane:** Claude Chat (strategy · canon · all Supabase MCP ops)
+**Project:** TheMANUAL.tech / HONEYCOMB · **Supabase ref:** `anxmqiehpyznifqgskzc`
+**Status:** all changes live on prod, verified. No DDL this session (all `execute_sql` DML on `public.atoms`).
 
 ---
 
-## What closed this session
+## Current spine state (`realms.atom_count`)
 
-1. **Lists disposition pass — fully closed.** 4896 → 4892 atoms net across all phases. Step-3 destructive gate dissolved 67 atoms; Step-5b iterative shell drain removed 21 empty Lists shells; Step-7 resolved final 3 ADJUDICATEs. Reference target of 2 L2s reached.
+| Realm | Atoms | | Realm | Atoms |
+|---|---|---|---|---|
+| Geography | 26,894 | | Tech | 524 |
+| Society | 1,651 | | Self | 264 |
+| Culture | 1,032 | | Philosophy | 225 |
+| Science | 910 | | Math | 214 |
+| History | 823 | | Human activities | 195 |
+| Health | 781 | | Reference | 84 |
+| Religion | 709 | | Justice | 0 |
 
-2. **Adjudication patterns locked as canon:**
-   - **"Deletion is not a quality tool — the kettle is."** Curiosities subnodes (bow-tie-wearers, selfie-deaths, unusual-deaths, US-presidents-facial-hair, sexually-active-popes) kept as a class.
-   - **Common misconceptions** repathed to `Society / Society concepts` — fits "Show me who got it wrong" manifesto.
-   - **DSM codes** repathed under `Health / Mental health / Diagnostic frameworks`.
+**Total ≈ 34,306 atoms · 14 realms (palindrome).**
+Spine build-out playbook (for future sections)
+Lane & target. Chat lane runs ALL public.atoms ops via Supabase MCP (ref anxmqiehpyznifqgskzc); Code does local files + git. DML → execute_sql, DDL → apply_migration.
+Atoms model (the rules that make moves safe).
 
-3. **Tier-1 backup script shipped.** Built, debugged (pg_dump pooler-latency root cause identified — ~200ms/query, ~500 queries = ~100s schema introspection), placed at `honeycomb-ops/scripts/master-backup.sh`, pushed to GitHub at commit `82c65c1`. First USB cold-storage executed tonight.
+Hierarchy lives entirely in path (delimiter " / "). Parent = path minus last segment. No parent_id/FK — moving or deleting a container does NOT cascade; handle children explicitly.
+id is a frozen slug set once at insert: lower(replace(replace(path,' / ','-'),' ','-')). It NEVER changes on rename/move. Matching is always by path; a frozen-id/path mismatch after a rename is expected and fine.
+realms.atom_count is refreshed by trigger on INSERT/DELETE only — path/depth/is_leaf UPDATEs don't change counts. realms is keyed on id (e.g. id='society').
+New-atom column template: realm_id/realm_name, depth=cardinality(path_parts), type='concept' (must override the 'event' default), kettle='Accepted', is_leaf (match reality), theme_tags='{}', realm_tags='{Realm}', pillar_tags='{MANUAL}', skin_tags='{HoneyComb}', status='live', meta='{}'::jsonb.
 
-4. **Repo consolidation.** `honeycomb-ops` moved from `~/Documents/honeycomb ops/` (with space) into `~/Documents/HONEYCOMB/honeycomb-ops/`. Legacy ops scripts (`00_dump_pre_migration.ps1`, `03_seed_atoms.cjs`) archived under `honeycomb-ops/scripts/legacy/`. Empty `TheMANUAL.tech/scripts/` removed.
+Core SQL patterns.
 
-5. **Terminal config fixed permanently.** Bracketed-paste glitches and history-expansion errors resolved via `~/.inputrc` (`set enable-bracketed-paste off`) and `~/.bashrc` (`set +H`). Multi-line pastes now work cleanly.
+Insert (auto-id):
 
-6. **Railway outage scare survived.** themanual.tech went down mid-session (Railway-wide edge-network incident, not us); DB confirmed healthy throughout via direct queries. Seeded new planned feature: **INFRA STATUS SLIDER** — make platform dependencies (Railway, GitHub, Supabase) visible in-product.
+sql  INSERT INTO atoms (id,name,path,path_parts,realm_id,realm_name,depth,type,kettle,is_leaf,theme_tags,realm_tags,pillar_tags,skin_tags,status,meta)
+  SELECT lower(replace(replace(p,' / ','-'),' ','-')), n, p, string_to_array(p,' / '),
+         '<realm>','<Realm>', cardinality(string_to_array(p,' / ')),'concept','Accepted',<bool>,
+         '{}','{<Realm>}','{MANUAL}','{HoneyComb}','live','{}'::jsonb
+  FROM (VALUES (n,p), ...) AS v(n,p);
 
-7. **Anon key was pasted in chat earlier today.** Decision: not rotated (public-by-design, embedded in client bundle, respects RLS). Service-role key + DB password remain clean.
+Leaf-move (re-home leaves into a subgroup, depth +1): UPDATE path/path_parts/depth via a VALUES(name,group) join, filtered is_leaf=true (so new folders aren't caught).
+Subtree-move (folder + its children): path = replace(path,'OLD PREFIX','NEW PREFIX'), rebuild path_parts, depth = depth + 1, WHERE path = node OR path LIKE node||' / %'.
+Leaf→folder / rename: UPDATE name/path/path_parts (+is_leaf=false); re-path children if any. id stays frozen.
+Keep batches ≤ ~70 rows (truncation risk). Escape apostrophes (''). Keep standard diacritics; drop exotic glyphs.
+
+Procedure per realm/section.
+
+Landscape — L2 counts (total / leaves / folders / max_depth).
+Baseline integrity — run the verify block before mutating.
+Skeleton — read depth 2–3 with descendant counts. Classify each branch: deep & healthy (leave it), thin/flat (build it), category-leaf (promote → folder → populate).
+Structure call — organize by type, not region (a curated regional cluster only when a tradition genuinely doesn't decompose — e.g. Mithai). One canonical home per referent. Preserve curated/contested canon untouched.
+Populate GLOBAL + NEUTRAL — ~10–15 members per bucket, non-Western represented in every bucket, no editorializing, sensitive/contested instances included neutrally.
+Insert → verify → fix dups — resolve a real dup by disambiguating-suffix rename OR dropping the redundant copy; never alter the canonical home or the Society / Accountability subtree.
+Render to confirm.
+
+Standard verify block (swap realm id + root name):
+sqlWITH h AS (SELECT * FROM atoms WHERE realm_id='<realm>')
+SELECT
+ (SELECT count(*) FROM h c WHERE c.depth>=2
+    AND array_to_string(c.path_parts[1:cardinality(c.path_parts)-1],' / ')<>'<Root>'
+    AND NOT EXISTS (SELECT 1 FROM h p WHERE p.path=array_to_string(c.path_parts[1:cardinality(c.path_parts)-1],' / '))) AS orphans,
+ (SELECT count(*) FROM (SELECT 1 FROM h GROUP BY lower(name) HAVING count(*)>1) z) AS dup_groups,
+ (SELECT count(*) FROM h) AS total,
+ (SELECT atom_count FROM realms WHERE id='<realm>') AS realm_count;
+Pass = orphans 0, every dup_group explained (accepted homonym or canon), total = realm_count.
+Conventions / gotchas.
+
+British/INN spelling. En-dashes (–) for year ranges on Wars/new branches; the Intelligence branch uses hyphens.
+Accepted structural homonyms (same name, different referent) are NOT duplicates — e.g. per-country Government / By country / * nodes, Culture's Forms/Genres. Do not dedup them.
+Excluded from all scans: Society / Accountability subtree.
+Trivia: leaf-only is the current default (folders/all atoms become eligible later).
+
+PENDING — Connectors / alias pass (run after everything is built out)
+Cross-realm same-referent atoms currently sit under single-canonical-home + alias-table-pending. Once all realms are built, run the connectors pass:
+
+Build the alias/connector mechanism in schema (not present yet).
+Reconcile cross-realm duplicate referents to one canonical atom + connectors — master-planned cities ↔ Geography capitals; Society weapon classes ↔ Tech/Military technology; companies / universities / football clubs across realms; deity/text overlaps; etc.
+Then expand trivia eligibility (folders + all atoms) across the connected graph.
+
+Realm queue
+
+Reference (84) — last realm to organize/build.
+Justice (0) — scaffold only.
+---
+
+## This session — realm build-outs (all verified 0 orphans, dups accounted for)
+
+### History — 357 → 823 (comprehensive global build-out)
+9 L2s: Historical events 255 · Military history 116 · History of fields ~129 · Historical figures 89 · Civilizations & states 87 · Wars 66 · By region 38 · Periods 27 · Historiography & method 6. Built: Genocides folder, Pandemics & epidemics folder, Civil wars, Intelligence operations (by country), Contemporary wars, Nuclear weapons & warfare branch, Historical figures (82 across 7 categories), Civilizations era-resort, plus global build-out of thin event/military/field buckets. (Detail in transcript.)
+
+### Culture — → 1,032
+- **Gastronomy:** Beverages 5→56 · Ingredients 22→137 · Dishes normalized + **148 across 12 type buckets** (Breads & flatbreads, Soups, Stews & curries, Noodle dishes, Pasta dishes, Rice dishes, Dumplings, Salads, Sandwiches & wraps, Grilled & barbecue, Seafood dishes, Desserts) · Confectionery 9→70 (incl. Mithai folder).
+- **Megaliths:** new `Culture / Visual arts / Architecture / Megalithic architecture` — 7 monument types + 14 global sites (Stonehenge, Göbekli Tepe, Carnac, Newgrange, Callanish, Ġgantija, Almendres, Menga, Nabta Playa, Nan Madol, Sacsayhuamán, Ale's Stones…).
+
+### Religion — 419 → 709 (comprehensive)
+- **Mythologies (20 traditions + 40 creatures):** 8 classical pantheons (Greek 25, Mesoamerican & Andean 22, Egyptian 19, Norse 19, Roman 17, Mesopotamian 16, Celtic 11, Slavic 11) + 12 living-religion mythologies (Hindu 18, Japanese 12, African 11, Chinese 11, Polynesian 10, Aboriginal 6, Buddhist 5, Christian 5, Islamic 5, Jewish 5, Korean 5). Deleted 9 placeholder labels.
+- **Flat-dump grouping (zero deletions):** Beings → 3 groups · Belief systems → 4 groups · Concepts → 5 groups.
+- **Religious roles → 4 function groups:** Clergy & ordained (incl. Popes 18 [Saint Peter → current **Leo XIV**], Patriarchs Pentarchy completed) · Monastics & ascetics · Prophets & spiritual exemplars (incl. Saints folder 14) · Mystics, shamans & folk. "Curiosities / Sexually active popes" preserved.
+
+### Society — 1,486 → 1,651 (deep build-out, neutral/encyclopedic)
+- **Military & security:** Intelligence agencies 21 (CIA/NSA/FBI/MI6/Mossad/FSB/GRU/MSS/RAW/ISI/BND/DGSE/ASIS/CSIS + Five/Nine/Fourteen Eyes) · Terrorist groups 16 · Secret police 12 · Weapons 13 · Armed forces 10 · Internment camps 5 · Military institutions 4.
+- **Politics:** Political ideologies 32 · Political parties 12 · Political orientation 10 · Politics by region 6 (all continents).
+- **Built environment** → 4 subgroups + Master-planned cities (14 global) + expansion. **Education** → 4 subgroups + expansion. **Speech** → info-ecosystem concepts.
+- Accountability subtree untouched (canon). Contested-narrative canon preserved throughout.
 
 ---
 
-## Open queue (prioritized for tomorrow)
-
-**Tier 1 — high signal, contained scope:**
-
-1. **MMF v2.7 sync.** Apply `mmf-v2-7-patch-spec.md` against current MMF. Per MASTER RULE: compress current MMF *before* adding new content. Patch adds: 4892 atom count, Reference 2 L2s, disposition methodology section (5-bucket classifier + tree-completeness rule + integrity-gate discipline + kettle ethos), INFRA STATUS SLIDER planned feature, tier-1 backup script ops entry, version bump v2.6 → v2.7.
-
-2. **Backup scope-limit decision.** Public-only schema test: 39s/186KB vs full schema 93s/330KB. Meaningful for GitHub Action cron (saves Action minutes). Decide whether daily backups should be scoped to `--schema=public --schema=auth` only, or keep full for safety. Recommend: scope the *cron* (frequent runs, latency matters), keep the *manual master-backup.sh* full (rare runs, completeness matters more than speed).
-
-**Tier 2 — medium scope:**
-
-3. **Drill-stack dispatch write-up.** Deep-drill UI bars, queues behind L1/L2/L3 bar dispatch — was queued behind Railway returning (now back).
-
-4. **Investigate `shared/` bulk.** The `shared.tar.gz` is 42M — 84% of last backup's total size. What lives in `~/Documents/HONEYCOMB/shared/` (separate from `TheMANUAL.tech/shared/canon/`)? Likely reference material / screenshots / docs that don't need nightly capture. Decide what to exclude.
-
-5. **Cleanup empty top-level dirs.** `~/Documents/HONEYCOMB/scripts/` (1K tarball) and `~/Documents/HONEYCOMB/docs/` (4K) are essentially empty. Delete or fill.
-
-6. **Branch housekeeping.** `chore/claude-md-no-cd-prefix` now carries the entire disposition canon (way out of scope from its name). Either rename or PR-merge to clean up.
-
-**Tier 3 — parked for bigger sessions:**
-
-7. Bonding curve step-function arbitrage concern (memory pin #30)
-8. Patchboard + Connected Accounts schema (#29)
-9. Freedom Network §23 timeslot bidding spec recovery (#23)
-10. Pillar→Astra code sweep (#3)
-11. Step-4 lens conversions on the 23 LENS atoms still in 10 surviving Lists shells (waits for §12 lens mechanism to ship)
+## Canon decisions locked this session
+1. **Mithai = first-class confection category.** Region-named confection categories are normative (Turkish delight, Baklava, Halva, Nougat, Marzipan are peers).
+2. **Religious texts vs deities:** living-religion sacred texts stay under `Major religions`; only *dead*-pantheon texts (Eddas, Theogony, Book of the Dead, Gilgamesh, Popol Vuh) live in `Mythologies`. Deities → `Mythologies` (Major religions houses no deities).
+3. **Megaliths canonical home** = `Culture / Visual arts / Architecture / Megalithic architecture`.
+4. **Society's 27 dup_groups are all legitimate** (by-country government homonyms + Accountability-canon copies + abstract-vs-instance). Do NOT dedup.
+5. **Neutral-atom principle (reaffirmed):** provide a neutral, encyclopedically-organized atom for everything under the sun — including sensitive topics (terrorist groups, secret police, weapons) — no editorializing.
+6. **Taxonomy currency:** current Pope = **Leo XIV** (Robert Prevost; elected 2025-05-08; Francis d. 2025-04-21).
 
 ---
 
-## Operational reminders
-
-- **MASTER RULE:** Compress master files BEFORE each daily spine-perfection session.
-- **Pace rule:** Butch sets pace. No suggestions about timing, energy, rest.
-- **Execution split:** Code drives execution; Butch ratifies; Chat reviews. Git push/pull/commit stay with Butch.
-- **Backup ritual after major DB change:** Run `bash ~/Documents/HONEYCOMB/honeycomb-ops/scripts/master-backup.sh`, drag latest folder to USB. Each backup is its own timestamp — don't reuse folders.
-- **pg_dump quirk pinned:** Schema-only ~1.5 min, full dump 5–15 min via pooler. Not hung when silent — just slow. Be patient.
+## Cross-realm / deferred
+- Cross-realm same-referent atoms (master-planned cities ↔ Geography capitals; Society/Weapons classes ↔ Tech/Military technology) sit under the **single-canonical-home + alias-table-pending** doctrine. Alias machinery still not in schema.
+- Trivia pipeline: leaf-only default (folders eligible later).
 
 ---
 
-## Resume cue
+## Next up
+- **Reference (84)** — the LAST realm in the palindrome; not yet organized/built. (Tartaria lives at `Reference / Contested narratives / Tartarian Empire`.)
+- **Justice (0)** — scaffold only.
+- Build the cross-realm **alias mechanism** when ready.
 
-Tomorrow's first move: read `mmf-v2-7-patch-spec.md`, run MASTER RULE compression pass on current MMF, then apply the patch in order (Phase 0 → 5).
+---
+
+## Close-out verification (sweep)
+- Culture: 0 orphans · 2 accepted dups (Forms/Genres) · 1,032 synced.
+- Religion: 0 orphans · 0 dups · 709 synced.
+- Society: 0 orphans · 27 legitimate homonyms · 1,651 synced.
+- All `realms.atom_count` synced to triggers.

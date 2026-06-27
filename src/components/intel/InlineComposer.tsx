@@ -1,12 +1,18 @@
 import { useState, useRef, useEffect, useMemo, type FormEvent } from 'react';
-import { Send, X, Loader2, Image, Video, FileText, MapPin, Link2, Tag, AtSign, DollarSign, Gift, BarChart3, Trophy } from 'lucide-react';
+import { Send, X, Loader2 } from 'lucide-react';
 import { AtomPicker } from '@/components/intel/AtomPicker';
 import { CategoryPicker } from '@/components/intel/CategoryPicker';
-import { RealmPicker, type RealmSelection } from '@/components/intel/RealmPicker';
+import { RealmPathPicker } from '@/components/intel/RealmPathPicker';
 import { useManualData } from '@/lib/useManualData';
 import { cn } from '@/lib/utils';
-import { REALM_NAMES } from '@/lib/constants';
+import { REALM_NAMES, REALM_ID_BY_NAME } from '@/lib/constants';
 import type { RealmId } from '@/types/manual';
+
+/** Build a display-name path from realm + L2 (back-compat seed). */
+function buildPath(realmId: RealmId | null | undefined, l2: string | null | undefined): string[] {
+  if (!realmId) return [];
+  return [REALM_NAMES[realmId], l2].filter((s): s is string => Boolean(s));
+}
 
 export type ComposerMode = 'thread' | 'reply';
 
@@ -17,6 +23,8 @@ export interface InlineComposerPayload {
   categoryPaths: string[];
   realmId: RealmId | null;
   l2: string | null;
+  /** Full taxonomy path (display names) → forum_threads.realm_path. */
+  realmPath: string[];
 }
 
 export interface InlineComposerProps {
@@ -83,11 +91,16 @@ export function InlineComposer({
   const [body, setBody] = useState('');
   const [atomIds, setAtomIds] = useState<string[]>([]);
   const [categoryPaths, setCategoryPaths] = useState<string[]>([]);
-  const [realmSel, setRealmSel] = useState<RealmSelection>({
-    realmId: inheritedContext?.realmId ?? null,
-    l2: inheritedContext?.l2 ?? null,
-  });
+  const [realmPath, setRealmPath] = useState<string[]>(() =>
+    buildPath(inheritedContext?.realmId, inheritedContext?.l2),
+  );
   const [realmManuallyOverridden, setRealmManuallyOverridden] = useState(false);
+
+  // Back-compat scalars derived from the full path.
+  const realmId = realmPath[0]
+    ? (REALM_ID_BY_NAME[realmPath[0]] as RealmId | undefined) ?? null
+    : null;
+  const l2 = realmPath[1] ?? null;
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,31 +115,25 @@ export function InlineComposer({
     (mode === 'thread' ? 'Share your thought...' : 'Your reply...');
 
   // Auto-derive realm from first linked atom (unless user manually overrode)
-  const derivedFromAtoms = useMemo(() => {
+  const derivedPath = useMemo(() => {
     if (atomIds.length === 0) return null;
     const first = atoms.find((a) => a.id === atomIds[0]);
     if (!first) return null;
-    return {
-      realmId: first.realmId,
-      l2: null,
-    } as RealmSelection;
+    return [REALM_NAMES[first.realmId]];
   }, [atomIds, atoms]);
 
   useEffect(() => {
     if (realmManuallyOverridden) return;
-    if (!derivedFromAtoms) return;
-    setRealmSel(derivedFromAtoms);
-  }, [derivedFromAtoms, realmManuallyOverridden]);
+    if (!derivedPath) return;
+    setRealmPath(derivedPath);
+  }, [derivedPath, realmManuallyOverridden]);
 
-  // Keep realmSel in sync with inheritedContext changes (e.g., filter bar changes)
+  // Keep realmPath in sync with inheritedContext changes (e.g., filter changes)
   // but only if not manually overridden and no atoms picked yet
   useEffect(() => {
     if (realmManuallyOverridden) return;
     if (atomIds.length > 0) return;
-    setRealmSel({
-      realmId: inheritedContext?.realmId ?? null,
-      l2: inheritedContext?.l2 ?? null,
-    });
+    setRealmPath(buildPath(inheritedContext?.realmId, inheritedContext?.l2));
   }, [
     inheritedContext?.realmId,
     inheritedContext?.l2,
@@ -145,11 +152,13 @@ export function InlineComposer({
         if (parsed.body) setBody(parsed.body);
         if (parsed.atomIds) setAtomIds(parsed.atomIds);
         if (parsed.categoryPaths) setCategoryPaths(parsed.categoryPaths);
-        if (parsed.realmId || parsed.l2) {
-          setRealmSel({
-            realmId: parsed.realmId ?? null,
-            l2: parsed.l2 ?? null,
-          });
+        const savedPath: string[] | null = Array.isArray(parsed.realmPath)
+          ? parsed.realmPath
+          : parsed.realmId || parsed.l2
+            ? buildPath(parsed.realmId, parsed.l2)
+            : null;
+        if (savedPath && savedPath.length > 0) {
+          setRealmPath(savedPath);
           if (parsed.realmManuallyOverridden) setRealmManuallyOverridden(true);
         }
         // Note: do NOT auto-expand on draft presence. Composer respects
@@ -179,8 +188,7 @@ export function InlineComposer({
       body,
       atomIds,
       categoryPaths,
-      realmId: realmSel.realmId,
-      l2: realmSel.l2,
+      realmPath,
       realmManuallyOverridden,
     });
     const t = setTimeout(() => localStorage.setItem(`draft:${draftKey}`, snap), 400);
@@ -191,8 +199,7 @@ export function InlineComposer({
     body,
     atomIds,
     categoryPaths,
-    realmSel.realmId,
-    realmSel.l2,
+    realmPath,
     realmManuallyOverridden,
   ]);
 
@@ -222,8 +229,9 @@ export function InlineComposer({
         body: body.trim(),
         atomIds,
         categoryPaths,
-        realmId: realmSel.realmId,
-        l2: realmSel.l2,
+        realmId,
+        l2,
+        realmPath,
       });
       if (ok) {
         if (draftKey) localStorage.removeItem(`draft:${draftKey}`);
@@ -232,10 +240,7 @@ export function InlineComposer({
         setAtomIds([]);
         setCategoryPaths([]);
         setRealmManuallyOverridden(false);
-        setRealmSel({
-          realmId: inheritedContext?.realmId ?? null,
-          l2: inheritedContext?.l2 ?? null,
-        });
+        setRealmPath(buildPath(inheritedContext?.realmId, inheritedContext?.l2));
         if (startCollapsed) setExpanded(false);
       }
     } catch (err) {
@@ -257,10 +262,7 @@ export function InlineComposer({
         setAtomIds([]);
         setCategoryPaths([]);
         setRealmManuallyOverridden(false);
-        setRealmSel({
-          realmId: inheritedContext?.realmId ?? null,
-          l2: inheritedContext?.l2 ?? null,
-        });
+        setRealmPath(buildPath(inheritedContext?.realmId, inheritedContext?.l2));
       }
     }
     if (startCollapsed) setExpanded(false);
@@ -283,7 +285,7 @@ export function InlineComposer({
     );
   }
 
-  // Collapsed — two-line info + action icons + inactive Post
+  // Collapsed — a clickable prompt that expands into the full composer
   if (!expanded) {
     const bodyLine =
       collapsedBodyLine ?? placeholderBodyFinal ?? 'Share your thought...';
@@ -296,42 +298,13 @@ export function InlineComposer({
       }, 50);
     };
 
-    // Icon defs — all trigger expand for now (UI only, no backend wired yet)
-    const actionIcons: { id: string; icon: typeof Image; label: string; title: string }[] = [
-      { id: 'image', icon: Image, label: 'Image', title: 'Attach image (coming soon)' },
-      { id: 'video', icon: Video, label: 'Video', title: 'Attach video (coming soon)' },
-      { id: 'doc', icon: FileText, label: 'Doc', title: 'Attach document (coming soon)' },
-      { id: 'location', icon: MapPin, label: 'Location', title: 'Add location (coming soon)' },
-      { id: 'link', icon: Link2, label: 'Link', title: 'Preview link (coming soon)' },
-      { id: 'atoms', icon: Tag, label: 'Atoms', title: 'Tag atoms from the Manual' },
-      { id: 'mention', icon: AtSign, label: 'Mention', title: 'Mention a Bee (coming soon)' },
-      { id: 'sale', icon: DollarSign, label: 'Sale', title: 'Make this a Bazaar listing (coming soon)' },
-      { id: 'give', icon: Gift, label: 'Give', title: 'Start a Give campaign (coming soon)' },
-      { id: 'poll', icon: BarChart3, label: 'Poll', title: 'Add a poll (coming soon)' },
-      { id: 'prize', icon: Trophy, label: 'Prize', title: 'Post a bet with BLiNG! escrow (coming soon)' },
-    ];
-
     return (
-      <div
-        className="group relative overflow-hidden rounded-lg border-2 bg-bg transition-all hover:shadow-xl"
-        style={{
-          borderColor: `${accentColor}80`,
-          boxShadow: `0 0 0 1px ${accentColor}25, 0 4px 14px rgba(0,0,0,0.35), 0 0 16px ${accentColor}20`,
-        }}
-      >
-        {/* Subtle inner gradient glow */}
-        <div
-          className="pointer-events-none absolute inset-0 opacity-60"
-          style={{
-            background: `radial-gradient(ellipse at 10% 0%, ${accentColor}15 0%, transparent 60%)`,
-          }}
-        />
-
-        {/* Clickable text area (top portion) */}
+      <div className="overflow-hidden rounded-md border border-border bg-bg">
+        {/* Clickable prompt — expands into the full composer */}
         <button
           type="button"
           onClick={expand}
-          className="relative block w-full px-4 py-3 text-left"
+          className="block w-full px-4 py-3 text-left transition-colors hover:bg-bg-elevated/30"
         >
           <div className="flex flex-wrap items-baseline gap-2">
             <span
@@ -358,57 +331,6 @@ export function InlineComposer({
           </div>
         </button>
 
-        {/* Divider */}
-        <div
-          className="relative h-px"
-          style={{ background: `${accentColor}25` }}
-        />
-
-        {/* Action icon row + inactive Post button */}
-        <div className="relative flex items-center justify-between gap-2 px-3 py-2">
-          <div className="flex items-center gap-0.5 sm:gap-1">
-            {actionIcons.map((action) => {
-              const Icon = action.icon;
-              return (
-                <button
-                  key={action.id}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    expand();
-                  }}
-                  title={action.title}
-                  aria-label={action.label}
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-bg-elevated hover:text-text-silver"
-                >
-                  <Icon size={15} />
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Inactive Post button — clickable, expands composer */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              expand();
-            }}
-            title="Write to enable posting"
-            className="hidden items-center gap-1.5 rounded-md border px-3 py-1 transition-colors sm:flex"
-            style={{
-              fontSize: '12px',
-              borderColor: `${accentColor}30`,
-              color: `${accentColor}80`,
-              background: 'transparent',
-              opacity: 0.7,
-              cursor: 'pointer',
-            }}
-          >
-            <Send size={11} />
-            <span>Post</span>
-          </button>
-        </div>
       </div>
     );
   }
@@ -417,11 +339,7 @@ export function InlineComposer({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-lg border-2 bg-bg-elevated p-4 shadow-lg"
-      style={{
-        borderColor: `${accentColor}60`,
-        boxShadow: `0 0 0 1px ${accentColor}15, 0 4px 12px rgba(0,0,0,0.2)`,
-      }}
+      className="rounded-md border border-border bg-bg-elevated p-4"
     >
       {/* Header */}
       {(header || subheader) && (
@@ -480,50 +398,6 @@ export function InlineComposer({
         }}
       />
 
-      {/* Attachments row — placeholder icons, show coming-soon tooltips */}
-      <div className="mb-3">
-        <div
-          className="mb-1 font-mono uppercase tracking-wider text-text-muted"
-          style={{ fontSize: '11px' }}
-          data-size="meta"
-        >
-          Attach
-        </div>
-        <div className="flex flex-wrap items-center gap-1">
-          {[
-            { id: 'image', icon: Image, label: 'Image' },
-            { id: 'video', icon: Video, label: 'Video' },
-            { id: 'doc', icon: FileText, label: 'Doc' },
-            { id: 'location', icon: MapPin, label: 'Location' },
-            { id: 'link', icon: Link2, label: 'Link' },
-            { id: 'mention', icon: AtSign, label: 'Mention' },
-            { id: 'sale', icon: DollarSign, label: 'Sale' },
-            { id: 'give', icon: Gift, label: 'Give' },
-            { id: 'poll', icon: BarChart3, label: 'Poll' },
-            { id: 'prize', icon: Trophy, label: 'Prize' },
-          ].map(({ id, icon: Icon, label }) => (
-            <button
-              key={id}
-              type="button"
-              disabled
-              title={`${label} — coming soon`}
-              className="flex items-center gap-1 rounded-md border border-border bg-bg/40 px-2 py-1 text-text-muted opacity-60"
-              style={{ fontSize: '11px', cursor: 'not-allowed' }}
-            >
-              <Icon size={12} />
-              <span className="hidden sm:inline">{label}</span>
-            </button>
-          ))}
-          <span
-            className="ml-1 font-mono text-text-dim"
-            style={{ fontSize: '10.5px' }}
-            data-size="meta"
-          >
-            Coming soon
-          </span>
-        </div>
-      </div>
-
       {/* Inherited context line (reply mode, informational) */}
       {mode === 'reply' && inheritedContext?.realmId && (
         <div
@@ -550,10 +424,7 @@ export function InlineComposer({
           onChange={setAtomIds}
           label="Atoms"
           max={10}
-          realmContext={{
-            realmId: realmSel.realmId,
-            l2: realmSel.l2,
-          }}
+          realmContext={{ realmId, l2 }}
           placeholder="Search atoms to tag..."
         />
       </div>
@@ -567,12 +438,12 @@ export function InlineComposer({
         />
       </div>
 
-      {/* Realm picker — always visible, editable, defaults from context */}
+      {/* Realm picker — full-tree drill, always visible, defaults from context */}
       <div className="mb-3">
-        <RealmPicker
-          value={realmSel}
+        <RealmPathPicker
+          value={realmPath}
           onChange={(next) => {
-            setRealmSel(next);
+            setRealmPath(next);
             setRealmManuallyOverridden(true);
           }}
           label="Realm"
