@@ -1,33 +1,21 @@
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { RealmBar } from '@/components/intel/RealmBar';
-import { usePulseStore } from '@/stores/usePulseStore';
+import { Outlet } from 'react-router-dom';
+import { RealmStrip } from '@/components/shell/RealmStrip';
 
 /**
  * Shared layout for all PULSE / Freedom Network routes.
- * Keeps the 14-realm strip (reused from INTEL) above the surface content.
- * Selecting a realm filters live-now + library; picking one from a stub
- * route bounces back to the FN home where the lists live.
+ *
+ * Mounts the platform's lens-driven realm strip above the surface content.
+ * Selecting a realm sets the shared lens (useLensStore.path = realm-name
+ * prefix), which PulseHome reads to filter live-now + library. The strip
+ * persists across the home, watch and channel routes.
  */
 export function PulseLayout() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { selectedRealmId, setRealmId } = usePulseStore();
-
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <RealmBar
-        selectedRealmId={selectedRealmId}
-        selectedL2={null}
-        onSelectRealmId={(r) => {
-          setRealmId(r);
-          if (location.pathname !== '/pulse') navigate('/pulse');
-        }}
-        onSelectL2={() => {}}
-        realmSubs={{}}
-      />
+      <RealmStrip />
       <main
         className="min-w-0 flex-1 overflow-y-auto"
-        style={{ background: 'rgba(201, 76, 76, 0.05)' }}
+        style={{ background: 'rgba(220, 38, 38, 0.04)' }}
       >
         <Outlet />
       </main>

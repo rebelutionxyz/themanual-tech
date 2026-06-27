@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Radio } from 'lucide-react';
 import { REALM_NAMES } from '@/lib/constants';
 import { useRealmColors } from '@/lib/realmColors';
-import { usePulseStore } from '@/stores/usePulseStore';
+import { useLensStore } from '@/stores/useLensStore';
 import {
   pulseLiveNow,
   pulseUpcoming,
@@ -26,10 +26,14 @@ const LIBRARY_PAGE = 24;
 const SKELETON_KEYS = ['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'];
 
 export function PulseHome() {
-  const selectedRealmId = usePulseStore((s) => s.selectedRealmId);
-  const realmName = selectedRealmId ? REALM_NAMES[selectedRealmId] : null;
-  const realmPrefix = realmName ? [realmName] : [];
-  const realmKey = realmName ?? ''; // stable effect dep
+  // Realm filter comes from the platform lens (driven by the RealmStrip in
+  // PulseLayout). `path` is the display-name prefix on realm_path — exactly
+  // what the pulse_* RPCs expect as p_realm_prefix.
+  const realmId = useLensStore((s) => s.realmId);
+  const path = useLensStore((s) => s.path);
+  const realmName = realmId ? REALM_NAMES[realmId] : null;
+  const realmPrefix = path;
+  const realmKey = path.join(' / '); // stable effect dep
   const { colorFor } = useRealmColors();
 
   return (
