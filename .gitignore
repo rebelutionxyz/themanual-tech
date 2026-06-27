@@ -48,3 +48,7 @@ supabase/.temp/
 
 # Migration scratch
 .tmp-*
+
+# local port / scratch dirs
+_dberry_port/
+_fb_port/
