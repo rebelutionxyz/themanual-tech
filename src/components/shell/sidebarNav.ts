@@ -88,7 +88,7 @@ export const ASTRA_SWITCHER: AstraSwitchItem[] = [
   { label: 'Groups', slug: 'unite', to: '/unite', icon: Users },
   { label: 'Justice', slug: 'justice', to: '/realm/justice', icon: Scale },
   { label: 'Marketplace', slug: 'entertheprize', to: '/entertheprize', icon: Store },
-  { label: 'Media', slug: 'pulse', to: '/pulse', icon: Radio },
+  { label: 'Pulse', slug: 'pulse', to: '/pulse', icon: Radio },
 ];
 
 /** Resolve an Astra/surface color on white. Astra layer (≠ realm color). */

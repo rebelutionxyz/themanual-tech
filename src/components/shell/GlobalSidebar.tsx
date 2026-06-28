@@ -126,7 +126,14 @@ export function GlobalSidebar({
         >
           <button
             type="button"
-            onClick={onToggleCollapse}
+            onClick={() => {
+              // Clear hover-peek first: the toggle lives INSIDE <aside>, so the
+              // pointer is over it on click → without this, `peeking` (collapsed
+              // && hovering) immediately re-expands the just-collapsed sidebar
+              // and the collapse never shows. Explicit toggle wins over peek.
+              setHovering(false);
+              onToggleCollapse();
+            }}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             title={collapsed ? 'Expand' : 'Collapse'}
             className="hidden h-8 w-8 flex-shrink-0 items-center justify-center rounded text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 md:flex"
