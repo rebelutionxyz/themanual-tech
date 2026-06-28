@@ -20,6 +20,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
  */
 const keyOf = (parts: string[]) => parts.join('|');
 
+/** Max child rows rendered per node before the "Show all" reveal. */
+const CHILD_CAP = 100;
+
 export function RealmTreeSlider() {
   const open = useRealmTreeStore((s) => s.open);
   const close = useRealmTreeStore((s) => s.close);
@@ -190,6 +193,10 @@ function TreeRow({
   const [children, setChildren] = useState<RealmTreeRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Cap rows per node — some branches have 1,000+ direct children (e.g. a
+  // state's cities). Render the first CAP, reveal the rest on demand. Per-node
+  // so each expanded branch caps independently.
+  const [showAll, setShowAll] = useState(false);
 
   const expandable = !row.isLeaf; // full taxonomy → is_leaf is authoritative
   const color = colorFor(row.realmId);
@@ -289,7 +296,7 @@ function TreeRow({
           )}
           {!loading &&
             !error &&
-            children?.map((child) => (
+            (showAll ? children : children?.slice(0, CHILD_CAP))?.map((child) => (
               <TreeRow
                 key={child.id}
                 row={child}
@@ -299,6 +306,16 @@ function TreeRow({
                 onToggle={onToggle}
               />
             ))}
+          {!loading && !error && !showAll && (children?.length ?? 0) > CHILD_CAP && (
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="w-full py-1.5 pr-2 text-left font-medium text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-700"
+              style={{ fontSize: '12px', paddingLeft: 12 + (depth + 1) * 14 }}
+            >
+              Show all {children?.length}
+            </button>
+          )}
         </>
       )}
     </>
