@@ -4,6 +4,7 @@ import type { IntelView } from '@/components/intel/IntelSidebar';
 import { CommunityShell } from '@/components/shell/CommunityShell';
 import { COMMON_TAIL, type SidebarItem } from '@/components/shell/sidebarNav';
 import { useAuth } from '@/lib/auth';
+import { SURFACE_BY_SLUG } from '@/lib/surfaces';
 import { countMyGoingUpcoming } from '@/lib/events';
 import { isForumModerator } from '@/lib/forumMod';
 import { countMyGroups } from '@/lib/groups';
@@ -28,13 +29,16 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
-type Surface = 'intel' | 'unite' | 'rule' | 'give';
+type Surface = 'intel' | 'unite' | 'rule' | 'give' | 'pulse';
 
 const ACCENT: Record<Surface, string> = {
   intel: '#1D9BF0',
   unite: '#7C3AED',
   rule: '#F97316',
   give: '#16A34A',
+  // PULSE / media red — sourced from the surface registry (kept in sync with
+  // the relit cards' SURFACE_BY_SLUG.get('pulse')?.color).
+  pulse: SURFACE_BY_SLUG.get('pulse')?.color ?? '#DC2626',
 };
 
 const VIEW_ROUTE_MAP: Record<string, IntelView> = { '/intel/mine': 'mythreads' };
@@ -44,6 +48,7 @@ function surfaceFromPath(pathname: string): Surface {
   if (pathname.startsWith('/unite')) return 'unite';
   if (pathname.startsWith('/rule')) return 'rule';
   if (pathname.startsWith('/give')) return 'give';
+  if (pathname.startsWith('/pulse')) return 'pulse';
   return 'intel';
 }
 
@@ -165,6 +170,11 @@ export function CommunityLayout() {
       if (location.pathname !== '/rule') navigate('/rule');
       return setRuleView(id as EventsView);
     }
+    if (surface === 'pulse') {
+      // PULSE has no center-view switcher; the only own item is Explore → home.
+      if (location.pathname !== '/pulse') navigate('/pulse');
+      return;
+    }
     // give
     if (location.pathname !== '/give') navigate('/give');
     setGiveView(id as GiveView);
@@ -179,7 +189,9 @@ export function CommunityLayout() {
         ? uniteView
         : surface === 'rule'
           ? ruleView
-          : giveView;
+          : surface === 'pulse'
+            ? 'home'
+            : giveView;
 
   const outletCtx =
     surface === 'unite'
@@ -260,6 +272,11 @@ function buildItems(surface: Surface, c: Counts): SidebarItem[] {
       { id: 'mine', label: 'My Campaigns', icon: HeartHandshake },
       ...COMMON_TAIL,
     ];
+  }
+  if (surface === 'pulse') {
+    // PULSE is self-contained (live / upcoming / library / search live on the
+    // center page), so the sidebar is just Explore + the shared utility tail.
+    return [{ id: 'home', label: 'Explore', icon: Compass }, ...COMMON_TAIL];
   }
   // intel — Explore · Following · My Posts (pass-12). The old Trending/Breaking/
   // For Me/Saved/Create views still exist in state; they're just no longer

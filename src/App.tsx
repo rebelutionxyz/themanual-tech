@@ -65,7 +65,6 @@ import { ReportedPage } from '@/pages/intel/ReportedPage';
 import { ThreadPage } from '@/pages/intel/ThreadPage';
 import { ChannelPage } from '@/pages/pulse/ChannelPage';
 import { PulseHome } from '@/pages/pulse/PulseHome';
-import { PulseLayout } from '@/pages/pulse/PulseLayout';
 import { WatchPage } from '@/pages/pulse/WatchPage';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
@@ -158,6 +157,15 @@ function AppContent() {
             <Route path="/rule" element={<EventsPage />} />
             <Route path="/rule/:id" element={<EventPage />} />
             <Route path="/give" element={<GivePage />} />
+
+            {/* PULSE — Live News Network. Mounts in the SAME community shell as
+              INTEL/UNITE/RULE/GIVE (sidebar + new header + single RealmStrip);
+              pages are flat children so the shell never unmounts. The realm
+              filter reads the shared lens (useLensStore.path) that the shell's
+              RealmStrip drives. */}
+            <Route path="/pulse" element={<PulseHome />} />
+            <Route path="/pulse/watch/:broadcastId" element={<WatchPage />} />
+            <Route path="/pulse/c/:handle" element={<ChannelPage />} />
           </Route>
 
           {/* Platform surfaces (right rail + utility chrome) */}
@@ -213,16 +221,6 @@ function AppContent() {
               <Route path="standing" element={<StandingPage />} />
               <Route path="lineage" element={<LineagePage />} />
               <Route path="gradations" element={<GradationsPage />} />
-            </Route>
-
-            {/* PULSE / Freedom Network — Live News Network (Social). The /pulse
-              subtree shares PulseLayout (realm strip persists across home, watch,
-              channel). Registered before /:slug so the explicit tree wins over the
-              generic SurfacePage, exactly like /dingleberry + /freedomblings. */}
-            <Route path="/pulse" element={<PulseLayout />}>
-              <Route index element={<PulseHome />} />
-              <Route path="watch/:broadcastId" element={<WatchPage />} />
-              <Route path="c/:handle" element={<ChannelPage />} />
             </Route>
 
             {/* Waves surface — Mini Waves V76 embedded via iframe */}

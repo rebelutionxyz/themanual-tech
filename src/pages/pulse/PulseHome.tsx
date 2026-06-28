@@ -27,21 +27,18 @@ const LIBRARY_PAGE = 24;
 const SKELETON_KEYS = ['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'];
 
 export function PulseHome() {
-  // Realm filter comes from the platform lens (driven by the RealmStrip in
-  // PulseLayout). `path` is the display-name prefix on realm_path — exactly
-  // what the pulse_* RPCs expect as p_realm_prefix.
+  // Realm filter comes from the platform lens, driven by the community shell's
+  // RealmStrip (PULSE mounts under CommunityLayout). `path` is the display-name
+  // prefix on realm_path — exactly what the pulse_* RPCs expect as p_realm_prefix.
   const realmId = useLensStore((s) => s.realmId);
   const path = useLensStore((s) => s.path);
   const realmName = realmId ? REALM_NAMES[realmId] : null;
   const realmPrefix = path;
   const realmKey = path.join(' / '); // stable effect dep
 
-  // Realm tint comes from main's canonical DB-driven realm-color store. /pulse
-  // lives outside CommunityLayout (which triggers the load), so kick it here.
+  // Realm tint comes from main's canonical DB-driven realm-color store.
+  // CommunityLayout already triggers the one-time load on mount.
   const realmColors = useRealmColors((s) => s.colors);
-  useEffect(() => {
-    void useRealmColors.getState().load();
-  }, []);
   const colorFor = useCallback(
     (raw: string | null | undefined): string => {
       if (!raw) return REALM_COLOR_FALLBACK;
