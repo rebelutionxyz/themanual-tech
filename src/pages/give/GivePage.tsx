@@ -2,6 +2,7 @@ import { SurfaceHeader } from '@/components/shell/SurfaceHeader';
 import { SURFACE_FRIENDLY } from '@/components/shell/sidebarNav';
 import { useAuth } from '@/lib/auth';
 import { type Campaign, type CampaignSort, fundedFraction, listCampaigns } from '@/lib/campaigns';
+import { CARD_INK, realmCardStyle } from '@/lib/realmCardStyle';
 import { cn, formatCount } from '@/lib/utils';
 import type { GiveOutletCtx } from '@/pages/give/GiveLayout';
 import { useLensStore } from '@/stores/useLensStore';
@@ -111,26 +112,28 @@ function CampaignCard({ campaign }: { campaign: Campaign }) {
     <li>
       {/* Detail page not built yet — non-navigating card. */}
       <div
-        className="block h-full overflow-hidden rounded-lg border border-zinc-200 bg-white p-4"
-        style={{ borderLeft: `3px solid ${GIVE_COLOR}` }}
+        className="block h-full overflow-hidden rounded-lg p-4"
+        style={realmCardStyle(GIVE_COLOR)}
       >
-        <h3 className="font-display text-lg leading-tight text-zinc-900">{campaign.title}</h3>
+        <h3 className="font-display text-lg leading-tight" style={{ color: CARD_INK.title }}>
+          {campaign.title}
+        </h3>
         {campaign.excerpt && (
           <p
-            className="mt-1 line-clamp-2 text-zinc-500"
-            style={{ fontSize: '13px', lineHeight: 1.5 }}
+            className="mt-1 line-clamp-2"
+            style={{ fontSize: '13px', lineHeight: 1.5, color: CARD_INK.body }}
           >
             {campaign.excerpt}
           </p>
         )}
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-100">
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/15">
           <div
             className="h-full rounded-full"
-            style={{ width: `${pct}%`, background: GIVE_COLOR }}
+            style={{ width: `${pct}%`, background: 'rgba(255,255,255,0.9)' }}
           />
         </div>
         <div
-          className="mt-1.5 flex items-center justify-between font-mono text-zinc-500"
+          className="mt-1.5 flex items-center justify-between font-mono text-white/65"
           style={{ fontSize: '11px' }}
           data-size="meta"
         >
@@ -138,7 +141,7 @@ function CampaignCard({ campaign }: { campaign: Campaign }) {
             {formatCount(Math.round(campaign.raisedCents / 100))} /{' '}
             {formatCount(Math.round(campaign.goalCents / 100))} {campaign.currency}
           </span>
-          <span style={{ color: '#B8932F' }}>{pct}% funded</span>
+          <span style={{ color: CARD_INK.title }}>{pct}% funded</span>
         </div>
       </div>
     </li>

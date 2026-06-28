@@ -7,6 +7,13 @@ import { RightRail } from '@/components/shell/RightRail';
 import type { SidebarItem } from '@/components/shell/sidebarNav';
 import { type CSSProperties, type ReactNode, useState } from 'react';
 
+/**
+ * Right "Overview" rail toggle. Hidden this pass across ALL community surfaces;
+ * the center column reflows to fill the freed width. Reversible — flip to true
+ * to restore the rail (RightRail import is retained on purpose).
+ */
+const SHOW_RIGHT_RAIL = false;
+
 interface CommunityShellProps {
   /** Active surface slug (intel / unite / rule / give) — drives nav + dropdown. */
   activeSurface: string;
@@ -76,7 +83,7 @@ export function CommunityShell({
             </main>
           </div>
           {/* Cross-Astra Overview rail — hidden on mobile, side column at md+. */}
-          <RightRail />
+          {SHOW_RIGHT_RAIL && <RightRail />}
         </div>
       </div>
       {/* Bottom utility toolbar — full-width accent band, flush to both edges. */}

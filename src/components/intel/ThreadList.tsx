@@ -26,6 +26,7 @@ import {
   BEE_COLOR,
 } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { CARD_INK, cardChipStyle, realmCardStyle } from '@/lib/realmCardStyle';
 import { REALM_COLOR_FALLBACK, useRealmColors } from '@/stores/useRealmColors';
 import type { RealmId } from '@/types/manual';
 
@@ -439,13 +440,8 @@ function ThreadCard({
     <li>
       <Link
         to={`/intel/t/${thread.id}`}
-        className="group block overflow-hidden rounded-lg border transition-shadow hover:shadow-sm"
-        style={{
-          borderColor: `${accentColor}33`,
-          borderLeftColor: accentColor,
-          borderLeftWidth: '3px',
-          background: `${accentColor}14`,
-        }}
+        className="group block overflow-hidden rounded-lg transition-shadow hover:shadow-md"
+        style={realmCardStyle(accentColor)}
       >
         <div className="p-4">
         <div className="flex items-start gap-3">
@@ -454,19 +450,15 @@ function ThreadCard({
               <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                 <span
                   className="rounded px-1.5 py-0.5 font-mono"
-                  style={{
-                    fontSize: '10px',
-                    color: accentColor,
-                    background: `${accentColor}15`,
-                  }}
+                  style={{ fontSize: '10px', ...cardChipStyle }}
                   data-size="meta"
                 >
                   {primaryRealmName}
                 </span>
                 {thread.primaryL2 && (
                   <span
-                    className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-zinc-500"
-                    style={{ fontSize: '10px' }}
+                    className="rounded px-1.5 py-0.5 font-mono"
+                    style={{ fontSize: '10px', ...cardChipStyle }}
                     data-size="meta"
                   >
                     {thread.primaryL2}
@@ -476,18 +468,16 @@ function ThreadCard({
             )}
 
             <h3
-              className={cn(
-                'font-display text-lg leading-tight text-zinc-900',
-                thread.isLocked && 'opacity-70',
-              )}
+              className={cn('font-display text-lg leading-tight', thread.isLocked && 'opacity-70')}
+              style={{ color: CARD_INK.title }}
             >
               {thread.title}
             </h3>
 
             {thread.body && (
               <p
-                className="mt-1.5 line-clamp-2 text-zinc-500"
-                style={{ fontSize: '13px', lineHeight: '1.5' }}
+                className="mt-1.5 line-clamp-2"
+                style={{ fontSize: '13px', lineHeight: '1.5', color: CARD_INK.body }}
               >
                 {thread.body}
               </p>
@@ -500,7 +490,7 @@ function ThreadCard({
                     type="button"
                     key={a.id}
                     onClick={(e) => handleAtomClick(e, a)}
-                    className="inline-flex items-center gap-1 rounded border border-zinc-200 bg-white/70 px-1.5 py-0.5 text-zinc-700 transition-colors hover:bg-white hover:text-zinc-900"
+                    className="inline-flex items-center gap-1 rounded border border-white/20 bg-white/10 px-1.5 py-0.5 text-white/85 transition-colors hover:bg-white/20 hover:text-white"
                     style={{ fontSize: '10.5px' }}
                     title={`Filter by ${a.realmName}${a.pathParts[1] ? ` · ${a.pathParts[1]}` : ''}${a.pathParts[2] ? ` · ${a.pathParts[2]}` : ''}`}
                   >
@@ -516,7 +506,7 @@ function ThreadCard({
                 ))}
                 {atomIds.length > 4 && (
                   <span
-                    className="font-mono text-zinc-500"
+                    className="font-mono text-white/60"
                     style={{ fontSize: '10.5px' }}
                     data-size="meta"
                   >
@@ -535,18 +525,18 @@ function ThreadCard({
                       type="button"
                       key={path}
                       onClick={(e) => handleCategoryClick(e, path)}
-                      className="inline-flex items-center gap-1 rounded border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+                      className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/[0.06] px-1.5 py-0.5 text-white/70 transition-colors hover:bg-white/15 hover:text-white"
                       style={{ fontSize: '10px' }}
                       title={`Filter by ${path}`}
                     >
-                      <span className="text-zinc-400">#</span>
+                      <span className="text-white/45">#</span>
                       {leaf}
                     </button>
                   );
                 })}
                 {categoryPaths.length > categoryChips.length && (
                   <span
-                    className="font-mono text-zinc-500"
+                    className="font-mono text-white/60"
                     style={{ fontSize: '10px' }}
                     data-size="meta"
                   >
@@ -558,7 +548,7 @@ function ThreadCard({
           </div>
           <div className="flex flex-shrink-0 items-start gap-0.5">
             {thread.isLocked && (
-              <Lock size={14} className="mt-1.5 mr-1 text-zinc-400" />
+              <Lock size={14} className="mt-1.5 mr-1 text-white/55" />
             )}
             <CardShareButton threadId={thread.id} />
             {canSave && (
@@ -573,7 +563,7 @@ function ThreadCard({
                   'rounded-md p-1.5 transition-colors',
                   saved
                     ? 'text-honey hover:bg-honey/10'
-                    : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700',
+                    : 'text-white/60 hover:bg-white/10 hover:text-white',
                 )}
                 title={saved ? 'Remove from Saved' : 'Save for later'}
                 aria-label={saved ? 'Remove from Saved' : 'Save for later'}
@@ -601,14 +591,14 @@ function ThreadCard({
             </div>
           )}
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-zinc-500">
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-white/65">
           <MetaPill icon={<MessageSquare size={11} />}>
             {thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}
           </MetaPill>
           <MetaPill icon={<Clock size={11} />}>{relativeTime(thread.lastActivityAt)}</MetaPill>
           {thread.authorHandle && (
             <span
-              className="font-mono text-zinc-500"
+              className="font-mono text-white/65"
               style={{ fontSize: '11px' }}
               data-size="meta"
             >
@@ -730,8 +720,8 @@ function CardShareButton({ threadId }: { threadId: string }) {
       className={cn(
         'rounded-md p-1.5 transition-colors',
         copied
-          ? 'text-emerald-600 hover:bg-emerald-50'
-          : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700',
+          ? 'text-emerald-300 hover:bg-emerald-300/10'
+          : 'text-white/60 hover:bg-white/10 hover:text-white',
         pending && 'opacity-60',
       )}
       title={copied ? 'Link copied' : bee ? 'Share with affiliate tracking' : 'Copy share link'}

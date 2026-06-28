@@ -1,6 +1,7 @@
 import { SurfaceHeader } from '@/components/shell/SurfaceHeader';
 import { SURFACE_FRIENDLY } from '@/components/shell/sidebarNav';
 import { useAuth } from '@/lib/auth';
+import { CARD_INK, realmCardStyle } from '@/lib/realmCardStyle';
 import {
   type EventItem,
   formatEventWhen,
@@ -98,19 +99,21 @@ export function EventCard({ event }: { event: EventItem }) {
     <li>
       <Link
         to={`/rule/${event.id}`}
-        className="group block overflow-hidden rounded-lg border border-zinc-200 p-4 transition-colors hover:bg-[#F973161f]"
-        style={{ borderLeft: `3px solid ${RULE_COLOR}`, background: `${RULE_COLOR}14` }}
+        className="group block overflow-hidden rounded-lg p-4 transition-shadow hover:shadow-md"
+        style={realmCardStyle(RULE_COLOR)}
       >
         <div
           className="mb-1 font-mono uppercase tracking-wider"
-          style={{ fontSize: '10.5px', color: RULE_COLOR }}
+          style={{ fontSize: '10.5px', color: CARD_INK.body }}
           data-size="meta"
         >
           {formatEventWhen(event.startsAt, event.endsAt)}
         </div>
-        <h3 className="font-display text-lg leading-tight text-zinc-900">{event.title}</h3>
+        <h3 className="font-display text-lg leading-tight" style={{ color: CARD_INK.title }}>
+          {event.title}
+        </h3>
         <div
-          className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-zinc-500"
+          className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-white/65"
           style={{ fontSize: '11px' }}
           data-size="meta"
         >
@@ -119,7 +122,8 @@ export function EventCard({ event }: { event: EventItem }) {
             {event.isVirtual ? 'Virtual' : event.locationText || 'In person'}
           </span>
           <span className="inline-flex items-center gap-1">
-            <Check size={11} style={{ color: RULE_COLOR }} /> {formatCount(event.goingCount)} going
+            <Check size={11} style={{ color: 'rgba(255,255,255,0.8)' }} />{' '}
+            {formatCount(event.goingCount)} going
           </span>
           {event.maybeCount > 0 && (
             <span className="inline-flex items-center gap-1">

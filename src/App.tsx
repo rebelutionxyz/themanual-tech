@@ -83,7 +83,7 @@ const ADMIN_SURFACE_PATHS = new Set(['/myhex', '/nexus', '/nucleus']);
 // Community surfaces own the white X-style shell (logo + lens controls live in
 // the GlobalSidebar), so the global SiteHeader / ticker / toolbar are suppressed
 // here — the shell renders its own ticker. Other surfaces keep the legacy chrome.
-const COMMUNITY_PREFIXES = ['/intel', '/unite', '/rule', '/give'];
+const COMMUNITY_PREFIXES = ['/intel', '/unite', '/rule', '/give', '/pulse'];
 
 function AppContent() {
   const activeAstra = useAstra();

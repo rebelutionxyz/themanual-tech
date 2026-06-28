@@ -9,6 +9,7 @@ import {
   type PulseLibraryItem,
   type PulseChannelRef,
 } from '@/lib/pulse';
+import { CARD_INK, cardChipStyle, realmCardStyle } from '@/lib/realmCardStyle';
 import { SURFACE_BY_SLUG } from '@/lib/surfaces';
 import { cn, formatCount } from '@/lib/utils';
 
@@ -40,14 +41,15 @@ function Thumb({
   return (
     <div
       className={cn(
-        'relative flex aspect-video w-full items-center justify-center overflow-hidden bg-zinc-100',
+        'relative flex aspect-video w-full items-center justify-center overflow-hidden',
         className,
       )}
       style={{
-        backgroundImage: `linear-gradient(135deg, ${accent}29 0%, ${accent}0F 100%)`,
+        backgroundColor: '#18181B',
+        backgroundImage: `linear-gradient(135deg, ${accent}59 0%, rgba(0,0,0,0.45) 100%)`,
       }}
     >
-      <Radio size={28} style={{ color: `${accent}B3` }} aria-hidden="true" />
+      <Radio size={28} style={{ color: 'rgba(255,255,255,0.5)' }} aria-hidden="true" />
       {children}
     </div>
   );
@@ -65,7 +67,7 @@ function LiveBadge({ viewers }: { viewers: number }) {
         Live
       </span>
       <span
-        className="rounded bg-zinc-900/65 px-1.5 py-0.5 font-mono text-white"
+        className="rounded bg-black/55 px-1.5 py-0.5 font-mono text-white"
         style={{ fontSize: '10px' }}
         data-size="meta"
       >
@@ -78,8 +80,8 @@ function LiveBadge({ viewers }: { viewers: number }) {
 function PremiumBadge() {
   return (
     <span
-      className="rounded bg-amber-100 px-1.5 py-0.5 font-mono uppercase tracking-wider text-amber-700"
-      style={{ fontSize: '9px' }}
+      className="rounded px-1.5 py-0.5 font-mono uppercase tracking-wider"
+      style={{ fontSize: '9px', color: '#FCD34D', background: 'rgba(252,211,77,0.16)' }}
       data-size="meta"
     >
       Premium
@@ -87,13 +89,9 @@ function PremiumBadge() {
   );
 }
 
-function RealmTag({ realm, color }: { realm: string; color: string }) {
+function RealmTag({ realm }: { realm: string }) {
   return (
-    <span
-      className="rounded px-1.5 py-0.5 font-mono"
-      style={{ fontSize: '10px', color, background: `${color}15` }}
-      data-size="meta"
-    >
+    <span className="rounded px-1.5 py-0.5 font-mono" style={{ fontSize: '10px', ...cardChipStyle }} data-size="meta">
       {realm}
     </span>
   );
@@ -111,8 +109,8 @@ function ChannelByline({
     <div className="flex min-w-0 items-center gap-1.5">
       <Avatar channel={channel} size={dim} />
       <span
-        className="truncate text-zinc-700"
-        style={{ fontSize: size === 'sm' ? '11px' : '12px' }}
+        className="truncate"
+        style={{ fontSize: size === 'sm' ? '11px' : '12px', color: CARD_INK.body }}
       >
         {channel.name || channel.handle}
       </span>
@@ -144,7 +142,7 @@ function Avatar({ channel, size }: { channel: PulseChannelRef; size: number }) {
   const initial = (channel.name || channel.handle || '?').charAt(0).toUpperCase();
   return (
     <span
-      className="flex flex-shrink-0 items-center justify-center rounded-full bg-zinc-100 font-mono text-zinc-500"
+      className="flex flex-shrink-0 items-center justify-center rounded-full bg-white/15 font-mono text-white"
       style={{ width: size, height: size, fontSize: size * 0.5 }}
       aria-hidden="true"
     >
@@ -153,18 +151,8 @@ function Avatar({ channel, size }: { channel: PulseChannelRef; size: number }) {
   );
 }
 
-/** Shared realm-tinted card shell — tinted spine + wash, exactly like INTEL. */
-function cardStyle(accent: string): React.CSSProperties {
-  return {
-    borderColor: `${accent}33`,
-    borderLeftColor: accent,
-    borderLeftWidth: '3px',
-    background: `${accent}14`,
-  };
-}
-
 const CARD_CLASS =
-  'group block overflow-hidden rounded-lg border bg-white transition-shadow hover:shadow-sm';
+  'group block overflow-hidden rounded-lg transition-shadow hover:shadow-md';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Live now (grid card)
@@ -179,19 +167,26 @@ export function LiveNowCard({
 }) {
   const accent = colorFor(item.primaryRealm);
   return (
-    <Link to={`/pulse/watch/${item.broadcastId}`} className={CARD_CLASS} style={cardStyle(accent)}>
+    <Link
+      to={`/pulse/watch/${item.broadcastId}`}
+      className={CARD_CLASS}
+      style={realmCardStyle(accent)}
+    >
       <Thumb accent={accent}>
         <LiveBadge viewers={item.viewerCount} />
       </Thumb>
       <div className="p-3">
-        <h3 className="line-clamp-2 font-display text-base leading-tight text-zinc-900">
+        <h3
+          className="line-clamp-2 font-display text-base leading-tight"
+          style={{ color: CARD_INK.title }}
+        >
           {item.title}
         </h3>
         <div className="mt-2 flex items-center justify-between gap-2">
           <ChannelByline channel={item.channel} />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {item.primaryRealm && <RealmTag realm={item.primaryRealm} color={accent} />}
+          {item.primaryRealm && <RealmTag realm={item.primaryRealm} />}
           {item.isPremium && <PremiumBadge />}
         </div>
       </div>
@@ -215,17 +210,20 @@ export function UpcomingCard({
     <Link
       to={`/pulse/watch/${item.broadcastId}`}
       className={cn(CARD_CLASS, 'flex w-64 flex-shrink-0 flex-col')}
-      style={cardStyle(accent)}
+      style={realmCardStyle(accent)}
     >
       <div className="p-3">
         <div
           className="mb-1.5 font-mono uppercase tracking-wider"
-          style={{ fontSize: '10px', color: accent }}
+          style={{ fontSize: '10px', color: CARD_INK.meta }}
           data-size="meta"
         >
           {formatScheduled(item.scheduledAt)}
         </div>
-        <h3 className="line-clamp-2 font-display text-sm leading-tight text-zinc-900">
+        <h3
+          className="line-clamp-2 font-display text-sm leading-tight"
+          style={{ color: CARD_INK.title }}
+        >
           {item.title}
         </h3>
         <div className="mt-2">
@@ -254,11 +252,15 @@ export function LibraryCard({
 }) {
   const accent = colorFor(item.primaryRealm);
   return (
-    <Link to={`/pulse/watch/${item.broadcastId}`} className={CARD_CLASS} style={cardStyle(accent)}>
+    <Link
+      to={`/pulse/watch/${item.broadcastId}`}
+      className={CARD_CLASS}
+      style={realmCardStyle(accent)}
+    >
       <Thumb accent={accent}>
         {item.durationSec != null && (
           <span
-            className="absolute bottom-2 right-2 rounded bg-zinc-900/70 px-1.5 py-0.5 font-mono text-white"
+            className="absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 font-mono text-white"
             style={{ fontSize: '10px' }}
             data-size="meta"
           >
@@ -267,22 +269,21 @@ export function LibraryCard({
         )}
       </Thumb>
       <div className="p-3">
-        <h3 className="line-clamp-2 font-display text-base leading-tight text-zinc-900">
+        <h3
+          className="line-clamp-2 font-display text-base leading-tight"
+          style={{ color: CARD_INK.title }}
+        >
           {item.title}
         </h3>
         <div className="mt-2">
           <ChannelByline channel={item.channel} />
         </div>
-        <div
-          className="mt-1.5 font-mono text-zinc-500"
-          style={{ fontSize: '11px' }}
-          data-size="meta"
-        >
+        <div className="mt-1.5 font-mono" style={{ fontSize: '11px', color: CARD_INK.meta }} data-size="meta">
           {formatCount(item.viewCount)} views
           {item.publishedAt && <> · {relativeTime(item.publishedAt)}</>}
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {item.primaryRealm && <RealmTag realm={item.primaryRealm} color={accent} />}
+          {item.primaryRealm && <RealmTag realm={item.primaryRealm} />}
           {item.isPremium && <PremiumBadge />}
         </div>
       </div>

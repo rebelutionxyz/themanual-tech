@@ -1,6 +1,7 @@
 import { SurfaceHeader } from '@/components/shell/SurfaceHeader';
 import { SURFACE_FRIENDLY } from '@/components/shell/sidebarNav';
 import { useAuth } from '@/lib/auth';
+import { CARD_INK, realmCardStyle } from '@/lib/realmCardStyle';
 import {
   type Group,
   type GroupSort,
@@ -110,13 +111,15 @@ function GroupCard({ group }: { group: Group }) {
     <li>
       <Link
         to={`/unite/${group.slug}`}
-        className="group block h-full overflow-hidden rounded-lg border border-zinc-200 p-4 transition-colors hover:bg-[#7C3AED1f]"
-        style={{ borderLeft: `3px solid ${UNITE_COLOR}`, background: `${UNITE_COLOR}14` }}
+        className="group block h-full overflow-hidden rounded-lg p-4 transition-shadow hover:shadow-md"
+        style={realmCardStyle(UNITE_COLOR)}
       >
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-display text-lg leading-tight text-zinc-900">{group.name}</h3>
+          <h3 className="font-display text-lg leading-tight" style={{ color: CARD_INK.title }}>
+            {group.name}
+          </h3>
           <span
-            className="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-mono uppercase tracking-wider text-zinc-500"
+            className="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-mono uppercase tracking-wider text-white/65"
             style={{ fontSize: '9.5px' }}
             data-size="meta"
             title={group.visibility}
@@ -127,14 +130,14 @@ function GroupCard({ group }: { group: Group }) {
         </div>
         {group.tagline && (
           <p
-            className="mt-1 line-clamp-2 text-zinc-500"
-            style={{ fontSize: '13px', lineHeight: 1.5 }}
+            className="mt-1 line-clamp-2"
+            style={{ fontSize: '13px', lineHeight: 1.5, color: CARD_INK.body }}
           >
             {group.tagline}
           </p>
         )}
         <div
-          className="mt-3 flex items-center gap-1 font-mono text-zinc-500"
+          className="mt-3 flex items-center gap-1 font-mono text-white/65"
           style={{ fontSize: '11px' }}
           data-size="meta"
         >
