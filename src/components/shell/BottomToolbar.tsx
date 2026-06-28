@@ -118,9 +118,9 @@ export function BottomToolbar({ accent }: { accent: string }) {
     : {};
 
   return (
-    // REGION 2 of the OUTER CONTAINER (CommunityShell): `w-full` = the ~1290
-    // shell-box width, so the band spans the whole container (under the sidebar
-    // AND the content), edges meeting the container edges — NOT the viewport.
+    // REGION 2 of the OUTER CONTAINER (CommunityShell): `w-full` = the shell's
+    // full width, so the band spans the whole container (under the sidebar AND
+    // the content). The container is now full browser width.
     <div className="w-full flex-shrink-0" style={{ background: accent }}>
       {/* Horizontal touch-scroller: items stay one row and scroll when they
           overflow a narrow viewport rather than wrapping or squashing. */}

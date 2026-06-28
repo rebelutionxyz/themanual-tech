@@ -58,10 +58,9 @@ export function CommunityShell({
 
   return (
     <div
-      // OUTER CONTAINER = the shell box. The max-width + centering live HERE, so
-      // every child (ticker, the sidebar+content row, and the bottom toolbar) is
-      // a full-width child of this ~1290 box. Viewport margin sits OUTSIDE it.
-      className="mx-auto flex h-full min-h-0 w-full max-w-[1290px] flex-col bg-white text-zinc-900"
+      // OUTER CONTAINER = the shell, FULL browser width. Every child (ticker, the
+      // sidebar+content row, and the bottom toolbar) spans the full viewport.
+      className="flex h-full min-h-0 w-full flex-col bg-white text-zinc-900"
       // Tints scrollbars to the active surface accent — webkit reads
       // --surface-accent (index.css), Firefox inherits scrollbar-color.
       style={
