@@ -183,7 +183,8 @@ function LensButton({
     sidebar (multi-select), the single home for realm nav. Shows the SELECTION
     COUNT as a badge and is lit when ≥1 realm is selected. Renders WHITE (the
     white-rabbit motif) to read on the solid-accent toolbar; active = a subtle
-    white highlight (not the accent). Icon-only on mobile (label hides at <md). */
+    white highlight (not the accent). Icon-only at all breakpoints — no visible
+    label (aria-label + title keep it named). */
 function RabbitButton() {
   const open = useRealmTreeStore((s) => s.open);
   const toggle = useRealmTreeStore((s) => s.toggle);
@@ -204,8 +205,10 @@ function RabbitButton() {
       )}
       style={lit ? { background: 'rgba(255,255,255,0.22)' } : undefined}
     >
-      <Rabbit size={16} />
-      <span className="hidden md:block">Realms</span>
+      {/* Always white in every state (default / hover / active) — never the
+          accent, which makes it vanish on the toolbar. Icon-only: no visible
+          label (aria-label + title keep it named). */}
+      <Rabbit size={16} color="#ffffff" />
       {count > 0 && (
         <span className="inline-flex h-4 min-w-4 flex-shrink-0 items-center justify-center rounded-full bg-white/25 px-1 text-[10px] font-semibold leading-none text-white">
           {count}
