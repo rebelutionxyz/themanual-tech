@@ -173,15 +173,22 @@ function mapSearch(r: Row): PulseSearchResult {
 // Queries
 // ─────────────────────────────────────────────────────────────────────────
 
-/** Live broadcasts, optionally filtered by realm prefix (empty = all). */
+/**
+ * Live broadcasts, OR-filtered across realm prefixes (empty = all). Each prefix
+ * is a realm_path array; the DB ORs them. `p_query`/`p_after`/`p_before` are
+ * forwarded as null — no keyword/time state in the frontend yet (see flag).
+ */
 export async function pulseLiveNow(
-  realmPrefix: string[] = [],
+  realmPrefixes: string[][] = [],
   limit = 20,
 ): Promise<PulseLive[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.rpc('pulse_live_now', {
-    p_realm_prefix: realmPrefix,
+    p_realm_prefixes: realmPrefixes.length ? realmPrefixes : null,
     p_limit: limit,
+    p_query: null,
+    p_after: null,
+    p_before: null,
   });
   if (error) throw new Error(error.message);
   return ((data as Row[]) ?? []).map(mapLive);
@@ -197,17 +204,23 @@ export async function pulseUpcoming(limit = 12): Promise<PulseUpcoming[]> {
   return ((data as Row[]) ?? []).map(mapUpcoming);
 }
 
-/** Published VODs, optionally realm-filtered, paginated via offset. */
+/**
+ * Published VODs, OR-filtered across realm prefixes, paginated via offset.
+ * `p_query`/`p_after`/`p_before` forwarded as null — no keyword/time state yet.
+ */
 export async function pulseLibrary(
-  realmPrefix: string[] = [],
+  realmPrefixes: string[][] = [],
   limit = 24,
   offset = 0,
 ): Promise<PulseLibraryItem[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.rpc('pulse_library', {
-    p_realm_prefix: realmPrefix,
+    p_realm_prefixes: realmPrefixes.length ? realmPrefixes : null,
     p_limit: limit,
     p_offset: offset,
+    p_query: null,
+    p_after: null,
+    p_before: null,
   });
   if (error) throw new Error(error.message);
   return ((data as Row[]) ?? []).map(mapLibrary);

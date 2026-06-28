@@ -45,21 +45,29 @@ function mapFeed(row: Record<string, unknown>): ThreadFeedItem {
 }
 
 /**
- * Ranked thread feed for a realm_path prefix. Empty prefix = all threads.
- * sort: 'trending' (default), 'top' (net score), 'new' (recency).
+ * Ranked thread feed, OR-filtered across realm prefixes. Each prefix is a
+ * realm_path array (e.g. ['Society','Government']); the DB ORs them. Empty =
+ * all threads. sort: 'trending' (default), 'top' (net score), 'new' (recency).
+ *
+ * NOTE: `p_query` / `p_after` / `p_before` are forwarded as null — the frontend
+ * has no keyword-chip or time-range state to source them from yet (see the
+ * session flag). When that UI lands, pass them through here.
  */
 export async function listThreadFeed(
-  prefix: string[] = [],
+  prefixes: string[][] = [],
   sort: FeedSort = 'trending',
   limit = 20,
   offset = 0,
 ): Promise<ThreadFeedItem[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.rpc('forum_thread_feed', {
-    p_realm_prefix: prefix,
+    p_realm_prefixes: prefixes.length ? prefixes : null,
     p_sort: sort,
     p_limit: limit,
     p_offset: offset,
+    p_query: null,
+    p_after: null,
+    p_before: null,
   });
   if (error) throw new Error(error.message);
   return ((data ?? []) as Record<string, unknown>[]).map(mapFeed);

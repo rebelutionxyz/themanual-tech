@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Radio } from 'lucide-react';
-import { REALM_ID_BY_NAME, REALM_NAMES } from '@/lib/constants';
+import { REALM_ID_BY_NAME } from '@/lib/constants';
 import { useLensStore } from '@/stores/useLensStore';
 import { REALM_COLOR_FALLBACK, useRealmColors } from '@/stores/useRealmColors';
 import type { RealmId } from '@/types/manual';
@@ -27,14 +27,18 @@ const LIBRARY_PAGE = 24;
 const SKELETON_KEYS = ['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'];
 
 export function PulseHome() {
-  // Realm filter comes from the platform lens, driven by the community shell's
-  // RealmStrip (PULSE mounts under CommunityLayout). `path` is the display-name
-  // prefix on realm_path — exactly what the pulse_* RPCs expect as p_realm_prefix.
-  const realmId = useLensStore((s) => s.realmId);
-  const path = useLensStore((s) => s.path);
-  const realmName = realmId ? REALM_NAMES[realmId] : null;
-  const realmPrefix = path;
-  const realmKey = path.join(' / '); // stable effect dep
+  // Realm filter = the multi-select lens chip set (useLensStore.selectedRealms).
+  // Each entry's pathParts is a realm_path prefix; the pulse_* RPCs OR them via
+  // p_realm_prefixes. realmKey is the stable effect dep across the whole set.
+  const selectedRealms = useLensStore((s) => s.selectedRealms);
+  const realmPrefixes = selectedRealms.map((r) => r.pathParts);
+  const realmKey = selectedRealms.map((r) => r.key).join('|');
+  const realmLabel =
+    selectedRealms.length === 0
+      ? null
+      : selectedRealms.length === 1
+        ? selectedRealms[0].name
+        : `${selectedRealms.length} realms`;
 
   // Realm tint comes from main's canonical DB-driven realm-color store.
   // CommunityLayout already triggers the one-time load on mount.
@@ -55,15 +59,25 @@ export function PulseHome() {
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-7 md:px-8">
-      <PulseHeader realm={realmName} />
+      <PulseHeader realm={realmLabel} />
 
       <div className="mt-6">
         <PulseSearch />
       </div>
 
-      <LiveNowSection realmPrefix={realmPrefix} realmKey={realmKey} colorFor={colorFor} />
+      <LiveNowSection
+        realmPrefixes={realmPrefixes}
+        realmKey={realmKey}
+        realmLabel={realmLabel}
+        colorFor={colorFor}
+      />
       <UpcomingSection colorFor={colorFor} />
-      <LibrarySection realmPrefix={realmPrefix} realmKey={realmKey} colorFor={colorFor} />
+      <LibrarySection
+        realmPrefixes={realmPrefixes}
+        realmKey={realmKey}
+        realmLabel={realmLabel}
+        colorFor={colorFor}
+      />
     </div>
   );
 }
@@ -143,23 +157,25 @@ type ColorFn = (realmNameOrId: string | null | undefined) => string;
 // ─────────────────────────────────────────────────────────────────────────
 
 function LiveNowSection({
-  realmPrefix,
+  realmPrefixes,
   realmKey,
+  realmLabel,
   colorFor,
 }: {
-  realmPrefix: string[];
+  realmPrefixes: string[][];
   realmKey: string;
+  realmLabel: string | null;
   colorFor: ColorFn;
 }) {
   const [items, setItems] = useState<PulseLive[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: realmKey is the stable serialization of realmPrefix
+  // biome-ignore lint/correctness/useExhaustiveDependencies: realmKey is the stable serialization of realmPrefixes
   useEffect(() => {
     let cancelled = false;
     setItems(null);
     setError(null);
-    pulseLiveNow(realmPrefix)
+    pulseLiveNow(realmPrefixes)
       .then((res) => !cancelled && setItems(res))
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load');
@@ -180,8 +196,8 @@ function LiveNowSection({
         </div>
       ) : items.length === 0 ? (
         <StateLine>
-          {realmKey
-            ? `Nothing live in ${realmKey} right now.`
+          {realmLabel
+            ? `Nothing live in ${realmLabel} right now.`
             : 'No live broadcasts right now. Check the schedule below.'}
         </StateLine>
       ) : (
@@ -248,12 +264,14 @@ function UpcomingSection({ colorFor }: { colorFor: ColorFn }) {
 // ─────────────────────────────────────────────────────────────────────────
 
 function LibrarySection({
-  realmPrefix,
+  realmPrefixes,
   realmKey,
+  realmLabel,
   colorFor,
 }: {
-  realmPrefix: string[];
+  realmPrefixes: string[][];
   realmKey: string;
+  realmLabel: string | null;
   colorFor: ColorFn;
 }) {
   const [items, setItems] = useState<PulseLibraryItem[] | null>(null);
@@ -265,7 +283,7 @@ function LibrarySection({
     setLoadingMore(true);
     try {
       const offset = items?.length ?? 0;
-      const page = await pulseLibrary(realmPrefix, LIBRARY_PAGE, offset);
+      const page = await pulseLibrary(realmPrefixes, LIBRARY_PAGE, offset);
       setItems((prev) => [...(prev ?? []), ...page]);
       if (page.length < LIBRARY_PAGE) setExhausted(true);
     } catch (err: unknown) {
@@ -273,16 +291,16 @@ function LibrarySection({
     } finally {
       setLoadingMore(false);
     }
-    // realmPrefix is reflected via realmKey in the resetting effect below
-  }, [items, realmPrefix]);
+    // realmPrefixes is reflected via realmKey in the resetting effect below
+  }, [items, realmPrefixes]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: realmKey is the stable serialization of realmPrefix; first page only
+  // biome-ignore lint/correctness/useExhaustiveDependencies: realmKey is the stable serialization of realmPrefixes; first page only
   useEffect(() => {
     let cancelled = false;
     setItems(null);
     setError(null);
     setExhausted(false);
-    pulseLibrary(realmPrefix, LIBRARY_PAGE, 0)
+    pulseLibrary(realmPrefixes, LIBRARY_PAGE, 0)
       .then((page) => {
         if (cancelled) return;
         setItems(page);
@@ -307,8 +325,8 @@ function LibrarySection({
         </div>
       ) : items.length === 0 ? (
         <StateLine>
-          {realmKey
-            ? `No recordings in ${realmKey} yet.`
+          {realmLabel
+            ? `No recordings in ${realmLabel} yet.`
             : 'No recordings yet. The first broadcasts will land here.'}
         </StateLine>
       ) : (

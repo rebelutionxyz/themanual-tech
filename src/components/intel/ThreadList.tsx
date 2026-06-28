@@ -137,6 +137,13 @@ export function ThreadList({
   // Stable serialization of the prefix for effect deps (segments are plain text).
   const prefixKey = prefix.join(' ');
 
+  // Multi-select realm filter (the chip set) → OR-filtered feed. realmKey is the
+  // stable effect dep so the feed re-fetches when ANY selected realm changes —
+  // not just the first one (which `prefix` tracks).
+  const selectedRealms = useLensStore((s) => s.selectedRealms);
+  const realmPrefixes = selectedRealms.map((r) => r.pathParts);
+  const realmKey = selectedRealms.map((r) => r.key).join('|');
+
   const atomById = useMemo(() => {
     const m = new Map(atoms.map((a) => [a.id, a]));
     return m;
@@ -146,7 +153,7 @@ export function ThreadList({
   const [threadCategoryLinks, setThreadCategoryLinks] = useState<Map<string, string[]>>(new Map());
   const [reactionSummaries, setReactionSummaries] = useState<Map<string, ReactionSummary>>(new Map());
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: prefixKey is the stable serialization of `prefix`; depending on the array identity would refetch every render
+  // biome-ignore lint/correctness/useExhaustiveDependencies: prefixKey + realmKey are the stable serializations of `prefix` / `realmPrefixes`; depending on the array identities would refetch every render
   useEffect(() => {
     let cancelled = false;
     setThreads(null);
@@ -172,7 +179,7 @@ export function ThreadList({
               })()
             : Promise.resolve([] as ForumThread[])
           : feedSort
-            ? listThreadFeed(prefix, feedSort).then((items) => items.map(feedItemToThread))
+            ? listThreadFeed(realmPrefixes, feedSort).then((items) => items.map(feedItemToThread))
             : listThreads({
                 prefix,
                 sortBy,
@@ -251,7 +258,7 @@ export function ThreadList({
     return () => {
       cancelled = true;
     };
-  }, [prefixKey, sortBy, timeWindowHours, feedSort, savedMode, myThreadsMode, personalSortMode, bee?.id]);
+  }, [prefixKey, realmKey, sortBy, timeWindowHours, feedSort, savedMode, myThreadsMode, personalSortMode, bee?.id]);
 
   if (error) {
     return (
