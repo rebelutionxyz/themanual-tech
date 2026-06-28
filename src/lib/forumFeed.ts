@@ -73,6 +73,46 @@ export async function listThreadFeed(
   return ((data ?? []) as Record<string, unknown>[]).map(mapFeed);
 }
 
+/**
+ * Astra-LOCAL forum search — cross-realm (IGNORES the realm selection; searches
+ * the whole INTEL Astra). forum_search requires ≥2 chars. Returns ThreadFeedItem
+ * rows so the existing feed → ForumThread pipeline (feedItemToThread) renders the
+ * results unchanged.
+ *
+ * THIS IS THE PER-SURFACE SEARCH HOOK: other Astras swap in their own content
+ * search RPC behind the same `useLensStore.searchTerm` pattern (PULSE →
+ * pulse_search, GIVE → campaigns_search(term), etc.).
+ */
+export async function forumSearch(query: string, limit = 30): Promise<ThreadFeedItem[]> {
+  const q = query.trim();
+  if (!supabase || q.length < 2) return [];
+  const { data, error } = await supabase.rpc('forum_search', {
+    p_query: q,
+    p_realm_prefixes: null, // cross-realm: ignore the realm lens
+    p_limit: limit,
+  });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Record<string, unknown>[]).map(mapSearchRow);
+}
+
+function mapSearchRow(row: Record<string, unknown>): ThreadFeedItem {
+  return {
+    id: String(row.thread_id),
+    title: String(row.title),
+    excerpt: String(row.snippet ?? ''),
+    createdAt: String(row.last_activity_at ?? ''),
+    lastActivityAt: String(row.last_activity_at ?? ''),
+    replyCount: Number(row.reply_count ?? 0),
+    isLocked: false,
+    authorBeeId: String(row.created_by ?? ''),
+    authorHandle: null,
+    primaryRealm: (row.primary_realm as RealmId) ?? null,
+    realmPath: Array.isArray(row.realm_path) ? (row.realm_path as string[]) : [],
+    netScore: Number(row.score ?? 0),
+    trendingScore: 0,
+  };
+}
+
 export interface RealmCategory {
   segment: string;
   threadCount: number;

@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MessageSquare, Lock, Clock, Bookmark, BookmarkCheck, Share2, Check } from 'lucide-react';
+import { MessageSquare, Lock, Clock, Bookmark, BookmarkCheck, Share2, Check, X } from 'lucide-react';
 import { listThreads, listThreadsByIds, listThreadIdsByAuthor, relativeTime, type ForumThread } from '@/lib/intel';
-import { listThreadFeed, type FeedSort, type ThreadFeedItem } from '@/lib/forumFeed';
+import { forumSearch, listThreadFeed, type FeedSort, type ThreadFeedItem } from '@/lib/forumFeed';
 import {
   listSavedThreadIds,
   toggleSave,
@@ -144,6 +144,11 @@ export function ThreadList({
   const realmPrefixes = selectedRealms.map((r) => r.pathParts);
   const realmKey = selectedRealms.map((r) => r.key).join('|');
 
+  // Astra-local search (cross-realm). ≥2 chars → results REPLACE the feed.
+  const searchTerm = useLensStore((s) => s.searchTerm);
+  const clearSearch = useLensStore((s) => s.clearSearch);
+  const searching = searchTerm.trim().length >= 2;
+
   const atomById = useMemo(() => {
     const m = new Map(atoms.map((a) => [a.id, a]));
     return m;
@@ -163,8 +168,9 @@ export function ThreadList({
     setSavedIds(new Set());
     setReactionSummaries(new Map());
 
-    const threadPromise: Promise<ForumThread[]> =
-      savedMode
+    const threadPromise: Promise<ForumThread[]> = searching
+      ? forumSearch(searchTerm).then((items) => items.map(feedItemToThread))
+      : savedMode
         ? bee?.id
           ? (async () => {
               const ids = await listSavedThreadIds(bee.id, personalSortMode);
@@ -258,7 +264,7 @@ export function ThreadList({
     return () => {
       cancelled = true;
     };
-  }, [prefixKey, realmKey, sortBy, timeWindowHours, feedSort, savedMode, myThreadsMode, personalSortMode, bee?.id]);
+  }, [prefixKey, realmKey, searchTerm, sortBy, timeWindowHours, feedSort, savedMode, myThreadsMode, personalSortMode, bee?.id]);
 
   if (error) {
     return (
@@ -270,16 +276,33 @@ export function ThreadList({
     );
   }
 
+  const searchHeader = searching ? (
+    <SearchResultsHeader term={searchTerm.trim()} onClear={clearSearch} />
+  ) : null;
+
   if (threads === null)
     return (
-      <ThreadListSkeleton
-        realmId={selectedRealmId}
-        savedMode={savedMode}
-        myThreadsMode={myThreadsMode}
-      />
+      <>
+        {searchHeader}
+        <ThreadListSkeleton
+          realmId={selectedRealmId}
+          savedMode={savedMode}
+          myThreadsMode={myThreadsMode}
+        />
+      </>
     );
   if (threads.length === 0)
-    return (
+    return searching ? (
+      <>
+        {searchHeader}
+        <p
+          className="rounded-lg border border-dashed border-zinc-200 px-4 py-8 text-center text-zinc-500"
+          style={{ fontSize: '13px' }}
+        >
+          No results for “{searchTerm.trim()}”.
+        </p>
+      </>
+    ) : (
       <EmptyThreads
         realmId={selectedRealmId}
         l2={prefix[1] ?? null}
@@ -294,6 +317,7 @@ export function ThreadList({
 
   return (
     <>
+      {searchHeader}
       {showPersonalSortToggle && (
         <PersonalSortToggle
           mode={personalSortMode}
@@ -755,6 +779,26 @@ async function copyToClipboardFallback(text: string): Promise<void> {
   } finally {
     document.body.removeChild(ta);
   }
+}
+
+/** "Searching: term" banner shown above search results, with a clear (✕) that
+    returns the content area to the normal feed (clears useLensStore.searchTerm). */
+function SearchResultsHeader({ term, onClear }: { term: string; onClear: () => void }) {
+  return (
+    <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
+      <span className="min-w-0 truncate text-zinc-700" style={{ fontSize: '13px' }}>
+        Searching: <span className="font-semibold text-zinc-900">“{term}”</span>
+      </span>
+      <button
+        type="button"
+        onClick={onClear}
+        className="flex flex-shrink-0 items-center gap-1 rounded-md px-2 py-1 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+        style={{ fontSize: '12px' }}
+      >
+        <X size={13} /> Clear
+      </button>
+    </div>
+  );
 }
 
 function MetaPill({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
