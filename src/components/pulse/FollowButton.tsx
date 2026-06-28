@@ -3,6 +3,7 @@ import { Check, Plus } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { pulseFollow, pulseUnfollow, pulseMyChannel } from '@/lib/pulse';
 import { cn } from '@/lib/utils';
+import { PULSE_RED } from './cards';
 
 // Session-cached "my channel" lookup so every FollowButton doesn't re-query.
 let myChannelCache: { beeId: string | null; channelId: string | null } | null = null;
@@ -89,13 +90,20 @@ export function FollowButton({
       title={signedOut ? 'Sign in to follow' : undefined}
       aria-pressed={following}
       className={cn(
-        'inline-flex flex-shrink-0 items-center gap-1 rounded-md border px-2.5 py-1 font-medium tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-50',
-        following
-          ? 'border-border bg-bg text-text-silver hover:border-border-bright'
-          : 'border-[#C94C4C]/50 bg-[#C94C4C]/10 text-[#E88080] hover:bg-[#C94C4C]/20',
+        'inline-flex flex-shrink-0 items-center gap-1 rounded-md border px-2.5 py-1 font-medium tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        following && 'border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50',
         className,
       )}
-      style={{ fontSize: '12px' }}
+      style={
+        following
+          ? { fontSize: '12px' }
+          : {
+              fontSize: '12px',
+              borderColor: `${PULSE_RED}59`,
+              background: `${PULSE_RED}12`,
+              color: PULSE_RED,
+            }
+      }
     >
       {following ? <Check size={12} /> : <Plus size={12} />}
       {following ? 'Following' : 'Follow'}

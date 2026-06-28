@@ -9,11 +9,18 @@ import {
   type PulseLibraryItem,
   type PulseChannelRef,
 } from '@/lib/pulse';
-import { formatCount } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { SURFACE_BY_SLUG } from '@/lib/surfaces';
+import { cn, formatCount } from '@/lib/utils';
 
-/** FN / Media accent — the sanctioned red exception. Used for LIVE + active. */
-export const FN_RED = '#C94C4C';
+/**
+ * PULSE / media accent — the single sanctioned red, sourced from the surface
+ * registry (surfaces.ts) rather than re-hardcoded. Reserved for the PULSE
+ * accent + the LIVE badge; everything else stays neutral.
+ */
+export const PULSE_RED = SURFACE_BY_SLUG.get('pulse')?.color ?? '#DC2626';
+
+/** Conventional verified-channel blue (X-style tick). */
+const VERIFIED_BLUE = '#1D9BF0';
 
 type ColorFn = (realmNameOrId: string | null | undefined) => string;
 
@@ -33,14 +40,14 @@ function Thumb({
   return (
     <div
       className={cn(
-        'relative flex aspect-video w-full items-center justify-center overflow-hidden',
+        'relative flex aspect-video w-full items-center justify-center overflow-hidden bg-zinc-100',
         className,
       )}
       style={{
-        background: `linear-gradient(135deg, ${accent}22 0%, ${accent}0A 60%, rgba(0,0,0,0.25) 100%)`,
+        backgroundImage: `linear-gradient(135deg, ${accent}29 0%, ${accent}0F 100%)`,
       }}
     >
-      <Radio size={28} style={{ color: `${accent}99` }} aria-hidden="true" />
+      <Radio size={28} style={{ color: `${accent}B3` }} aria-hidden="true" />
       {children}
     </div>
   );
@@ -51,14 +58,14 @@ function LiveBadge({ viewers }: { viewers: number }) {
     <div className="absolute left-2 top-2 flex items-center gap-2">
       <span
         className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono font-semibold uppercase tracking-wider text-white"
-        style={{ fontSize: '10px', background: FN_RED }}
+        style={{ fontSize: '10px', background: PULSE_RED }}
         data-size="meta"
       >
         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
         Live
       </span>
       <span
-        className="rounded bg-black/55 px-1.5 py-0.5 font-mono text-white/90"
+        className="rounded bg-zinc-900/65 px-1.5 py-0.5 font-mono text-white"
         style={{ fontSize: '10px' }}
         data-size="meta"
       >
@@ -71,8 +78,8 @@ function LiveBadge({ viewers }: { viewers: number }) {
 function PremiumBadge() {
   return (
     <span
-      className="rounded px-1.5 py-0.5 font-mono uppercase tracking-wider"
-      style={{ fontSize: '9px', color: '#FAD15E', background: '#FAD15E1A' }}
+      className="rounded bg-amber-100 px-1.5 py-0.5 font-mono uppercase tracking-wider text-amber-700"
+      style={{ fontSize: '9px' }}
       data-size="meta"
     >
       Premium
@@ -104,7 +111,7 @@ function ChannelByline({
     <div className="flex min-w-0 items-center gap-1.5">
       <Avatar channel={channel} size={dim} />
       <span
-        className="truncate text-text-silver"
+        className="truncate text-zinc-700"
         style={{ fontSize: size === 'sm' ? '11px' : '12px' }}
       >
         {channel.name || channel.handle}
@@ -113,7 +120,7 @@ function ChannelByline({
         <BadgeCheck
           size={size === 'sm' ? 12 : 13}
           className="flex-shrink-0"
-          style={{ color: '#4FC3E8' }}
+          style={{ color: VERIFIED_BLUE }}
           aria-label="Verified"
         />
       )}
@@ -137,7 +144,7 @@ function Avatar({ channel, size }: { channel: PulseChannelRef; size: number }) {
   const initial = (channel.name || channel.handle || '?').charAt(0).toUpperCase();
   return (
     <span
-      className="flex flex-shrink-0 items-center justify-center rounded-full bg-bg font-mono text-text-silver"
+      className="flex flex-shrink-0 items-center justify-center rounded-full bg-zinc-100 font-mono text-zinc-500"
       style={{ width: size, height: size, fontSize: size * 0.5 }}
       aria-hidden="true"
     >
@@ -145,6 +152,19 @@ function Avatar({ channel, size }: { channel: PulseChannelRef; size: number }) {
     </span>
   );
 }
+
+/** Shared realm-tinted card shell — tinted spine + wash, exactly like INTEL. */
+function cardStyle(accent: string): React.CSSProperties {
+  return {
+    borderColor: `${accent}33`,
+    borderLeftColor: accent,
+    borderLeftWidth: '3px',
+    background: `${accent}14`,
+  };
+}
+
+const CARD_CLASS =
+  'group block overflow-hidden rounded-lg border bg-white transition-shadow hover:shadow-sm';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Live now (grid card)
@@ -159,16 +179,12 @@ export function LiveNowCard({
 }) {
   const accent = colorFor(item.primaryRealm);
   return (
-    <Link
-      to={`/pulse/watch/${item.broadcastId}`}
-      className="group block overflow-hidden rounded-lg border border-border bg-bg-elevated transition-all hover:border-border-bright hover:bg-panel-2"
-      style={{ borderLeft: `3px solid ${accent}80` }}
-    >
+    <Link to={`/pulse/watch/${item.broadcastId}`} className={CARD_CLASS} style={cardStyle(accent)}>
       <Thumb accent={accent}>
         <LiveBadge viewers={item.viewerCount} />
       </Thumb>
       <div className="p-3">
-        <h3 className="line-clamp-2 font-display text-base leading-tight text-text-silver-bright group-hover:text-text">
+        <h3 className="line-clamp-2 font-display text-base leading-tight text-zinc-900">
           {item.title}
         </h3>
         <div className="mt-2 flex items-center justify-between gap-2">
@@ -198,8 +214,8 @@ export function UpcomingCard({
   return (
     <Link
       to={`/pulse/watch/${item.broadcastId}`}
-      className="group flex w-64 flex-shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-bg-elevated transition-all hover:border-border-bright hover:bg-panel-2"
-      style={{ borderLeft: `3px solid ${accent}80` }}
+      className={cn(CARD_CLASS, 'flex w-64 flex-shrink-0 flex-col')}
+      style={cardStyle(accent)}
     >
       <div className="p-3">
         <div
@@ -209,7 +225,7 @@ export function UpcomingCard({
         >
           {formatScheduled(item.scheduledAt)}
         </div>
-        <h3 className="line-clamp-2 font-display text-sm leading-tight text-text-silver-bright group-hover:text-text">
+        <h3 className="line-clamp-2 font-display text-sm leading-tight text-zinc-900">
           {item.title}
         </h3>
         <div className="mt-2">
@@ -238,15 +254,11 @@ export function LibraryCard({
 }) {
   const accent = colorFor(item.primaryRealm);
   return (
-    <Link
-      to={`/pulse/watch/${item.broadcastId}`}
-      className="group block overflow-hidden rounded-lg border border-border bg-bg-elevated transition-all hover:border-border-bright hover:bg-panel-2"
-      style={{ borderLeft: `3px solid ${accent}80` }}
-    >
+    <Link to={`/pulse/watch/${item.broadcastId}`} className={CARD_CLASS} style={cardStyle(accent)}>
       <Thumb accent={accent}>
         {item.durationSec != null && (
           <span
-            className="absolute bottom-2 right-2 rounded bg-black/65 px-1.5 py-0.5 font-mono text-white/90"
+            className="absolute bottom-2 right-2 rounded bg-zinc-900/70 px-1.5 py-0.5 font-mono text-white"
             style={{ fontSize: '10px' }}
             data-size="meta"
           >
@@ -255,14 +267,14 @@ export function LibraryCard({
         )}
       </Thumb>
       <div className="p-3">
-        <h3 className="line-clamp-2 font-display text-base leading-tight text-text-silver-bright group-hover:text-text">
+        <h3 className="line-clamp-2 font-display text-base leading-tight text-zinc-900">
           {item.title}
         </h3>
         <div className="mt-2">
           <ChannelByline channel={item.channel} />
         </div>
         <div
-          className="mt-1.5 font-mono text-text-muted"
+          className="mt-1.5 font-mono text-zinc-500"
           style={{ fontSize: '11px' }}
           data-size="meta"
         >

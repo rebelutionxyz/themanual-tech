@@ -53,14 +53,14 @@ export function PulseSearch() {
       <div className="relative">
         <Search
           size={16}
-          className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-3 text-text-muted"
+          className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-3 text-zinc-400"
         />
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search channels & broadcasts"
-          className="w-full rounded-lg border border-border bg-bg-elevated py-2.5 pr-9 pl-9 text-text-silver-bright placeholder:text-text-muted focus:border-[#C94C4C]/50 focus:outline-none"
+          className="w-full rounded-lg border border-zinc-200 bg-white py-2.5 pr-9 pl-9 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none"
           style={{ fontSize: '14px' }}
         />
         {query && (
@@ -68,7 +68,7 @@ export function PulseSearch() {
             type="button"
             onClick={() => setQuery('')}
             aria-label="Clear search"
-            className="-translate-y-1/2 absolute top-1/2 right-3 text-text-muted hover:text-text-silver"
+            className="-translate-y-1/2 absolute top-1/2 right-3 text-zinc-400 hover:text-zinc-600"
           >
             <X size={16} />
           </button>
@@ -76,24 +76,24 @@ export function PulseSearch() {
       </div>
 
       {query.trim() && (
-        <div className="mt-2 overflow-hidden rounded-lg border border-border bg-bg-elevated/60">
+        <div className="mt-2 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
           {loading && (
-            <div className="px-4 py-3 font-mono text-text-muted" style={{ fontSize: '12px' }}>
+            <div className="px-4 py-3 font-mono text-zinc-500" style={{ fontSize: '12px' }}>
               Searching…
             </div>
           )}
           {error && !loading && (
-            <div className="px-4 py-3 font-mono text-[#E88080]" style={{ fontSize: '12px' }}>
+            <div className="px-4 py-3 font-mono text-red-600" style={{ fontSize: '12px' }}>
               {error}
             </div>
           )}
           {!loading && !error && results && results.length === 0 && (
-            <div className="px-4 py-3 font-mono text-text-muted" style={{ fontSize: '12px' }}>
+            <div className="px-4 py-3 font-mono text-zinc-500" style={{ fontSize: '12px' }}>
               No matches for “{query.trim()}”.
             </div>
           )}
           {!loading && !error && results && results.length > 0 && (
-            <ul className="divide-y divide-border">
+            <ul className="divide-y divide-zinc-100">
               {results.map((r) => (
                 <SearchRow key={`${r.kind}-${r.id}`} result={r} />
               ))}
@@ -109,20 +109,20 @@ function SearchRow({ result }: { result: PulseSearchResult }) {
   if (result.kind === 'channel') {
     return (
       <li>
-        <div className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-bg-elevated">
+        <div className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-zinc-50">
           <Link
             to={`/pulse/c/${result.handle ?? result.id}`}
             className="flex min-w-0 flex-1 items-center gap-3"
           >
-            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-bg text-text-silver">
+            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-500">
               <Tv size={15} />
             </span>
             <div className="min-w-0">
-              <div className="truncate text-text-silver-bright" style={{ fontSize: '14px' }}>
+              <div className="truncate text-zinc-900" style={{ fontSize: '14px' }}>
                 {result.channelName || result.title}
               </div>
               <div
-                className="truncate font-mono text-text-muted"
+                className="truncate font-mono text-zinc-500"
                 style={{ fontSize: '11px' }}
                 data-size="meta"
               >
@@ -141,17 +141,17 @@ function SearchRow({ result }: { result: PulseSearchResult }) {
     <li>
       <Link
         to={`/pulse/watch/${result.id}`}
-        className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-bg-elevated"
+        className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-zinc-50"
       >
-        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-bg text-text-silver">
+        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-500">
           <Radio size={15} />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-text-silver-bright" style={{ fontSize: '14px' }}>
+          <div className="truncate text-zinc-900" style={{ fontSize: '14px' }}>
             {result.title}
           </div>
           <div
-            className="truncate font-mono text-text-muted"
+            className="truncate font-mono text-zinc-500"
             style={{ fontSize: '11px' }}
             data-size="meta"
           >

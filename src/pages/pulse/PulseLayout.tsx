@@ -13,10 +13,7 @@ export function PulseLayout() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <RealmStrip />
-      <main
-        className="min-w-0 flex-1 overflow-y-auto"
-        style={{ background: 'rgba(220, 38, 38, 0.04)' }}
-      >
+      <main className="min-w-0 flex-1 overflow-y-auto bg-white">
         <Outlet />
       </main>
     </div>

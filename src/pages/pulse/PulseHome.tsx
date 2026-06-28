@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Radio } from 'lucide-react';
-import { REALM_NAMES } from '@/lib/constants';
-import { useRealmColors } from '@/lib/realmColors';
+import { REALM_ID_BY_NAME, REALM_NAMES } from '@/lib/constants';
 import { useLensStore } from '@/stores/useLensStore';
+import { REALM_COLOR_FALLBACK, useRealmColors } from '@/stores/useRealmColors';
+import type { RealmId } from '@/types/manual';
 import {
   pulseLiveNow,
   pulseUpcoming,
@@ -17,7 +18,7 @@ import {
   LiveNowCard,
   UpcomingCard,
   LibraryCard,
-  FN_RED,
+  PULSE_RED,
 } from '@/components/pulse/cards';
 
 const LIBRARY_PAGE = 24;
@@ -34,7 +35,26 @@ export function PulseHome() {
   const realmName = realmId ? REALM_NAMES[realmId] : null;
   const realmPrefix = path;
   const realmKey = path.join(' / '); // stable effect dep
-  const { colorFor } = useRealmColors();
+
+  // Realm tint comes from main's canonical DB-driven realm-color store. /pulse
+  // lives outside CommunityLayout (which triggers the load), so kick it here.
+  const realmColors = useRealmColors((s) => s.colors);
+  useEffect(() => {
+    void useRealmColors.getState().load();
+  }, []);
+  const colorFor = useCallback(
+    (raw: string | null | undefined): string => {
+      if (!raw) return REALM_COLOR_FALLBACK;
+      const name = raw.trim();
+      // pulse rows carry the realm DISPLAY name ("Society"); map → RealmId.
+      // 'Technology' is a known seed variant of the 'tech' realm.
+      const id =
+        REALM_ID_BY_NAME[name] ??
+        (name.toLowerCase() === 'technology' ? 'tech' : name.toLowerCase());
+      return realmColors[id as RealmId] ?? REALM_COLOR_FALLBACK;
+    },
+    [realmColors],
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-7 md:px-8">
@@ -60,15 +80,18 @@ function PulseHeader({ realm }: { realm: string | null }) {
     <div className="flex items-center gap-3">
       <div
         className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border-2"
-        style={{ borderColor: `${FN_RED}40`, background: `${FN_RED}0D` }}
+        style={{ borderColor: `${PULSE_RED}40`, background: `${PULSE_RED}0D` }}
       >
-        <Radio size={22} style={{ color: FN_RED }} />
+        <Radio size={22} style={{ color: PULSE_RED }} />
       </div>
       <div>
-        <h1 className="font-display text-3xl font-semibold tracking-wide" style={{ color: FN_RED }}>
+        <h1
+          className="font-display text-3xl font-semibold tracking-wide"
+          style={{ color: PULSE_RED }}
+        >
           PULSE
         </h1>
-        <p className="font-mono text-text-silver" style={{ fontSize: '12px' }}>
+        <p className="font-mono text-zinc-500" style={{ fontSize: '12px' }}>
           Live News Network{realm ? ` · ${realm}` : ''} · free to watch
         </p>
       </div>
@@ -83,8 +106,8 @@ function PulseHeader({ realm }: { realm: string | null }) {
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <div className="mb-3 flex items-center gap-2">
-      <span className="h-3.5 w-1 rounded-full" style={{ background: FN_RED }} />
-      <h2 className="font-display text-lg tracking-wide text-text-silver-bright">{children}</h2>
+      <span className="h-3.5 w-1 rounded-full" style={{ background: PULSE_RED }} />
+      <h2 className="font-display text-lg tracking-wide text-zinc-900">{children}</h2>
     </div>
   );
 }
@@ -92,10 +115,10 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function StateLine({ tone, children }: { tone?: 'error' | 'muted'; children: React.ReactNode }) {
   return (
     <div
-      className="rounded-lg border border-dashed border-border px-4 py-6 text-center font-mono"
+      className="rounded-lg border border-dashed border-zinc-200 px-4 py-6 text-center font-mono"
       style={{ fontSize: '12px' }}
     >
-      <span className={tone === 'error' ? 'text-[#E88080]' : 'text-text-muted'}>{children}</span>
+      <span className={tone === 'error' ? 'text-red-600' : 'text-zinc-500'}>{children}</span>
     </div>
   );
 }
@@ -104,14 +127,11 @@ function GridSkeleton({ count, aspect = true }: { count: number; aspect?: boolea
   return (
     <>
       {SKELETON_KEYS.slice(0, count).map((key) => (
-        <div
-          key={key}
-          className="overflow-hidden rounded-lg border border-border bg-bg-elevated/40"
-        >
-          {aspect && <div className="aspect-video w-full animate-pulse bg-bg-elevated" />}
+        <div key={key} className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+          {aspect && <div className="aspect-video w-full animate-pulse bg-zinc-100" />}
           <div className="space-y-2 p-3">
-            <div className="h-3.5 w-3/4 animate-pulse rounded bg-bg-elevated" />
-            <div className="h-3 w-1/2 animate-pulse rounded bg-bg-elevated" />
+            <div className="h-3.5 w-3/4 animate-pulse rounded bg-zinc-100" />
+            <div className="h-3 w-1/2 animate-pulse rounded bg-zinc-100" />
           </div>
         </div>
       ))}
@@ -211,7 +231,7 @@ function UpcomingSection({ colorFor }: { colorFor: ColorFn }) {
           {SKELETON_KEYS.slice(0, 3).map((key) => (
             <div
               key={key}
-              className="h-28 w-64 flex-shrink-0 animate-pulse rounded-lg border border-border bg-bg-elevated/40"
+              className="h-28 w-64 flex-shrink-0 animate-pulse rounded-lg border border-zinc-200 bg-zinc-50"
             />
           ))}
         </div>
@@ -307,7 +327,7 @@ function LibrarySection({
                 type="button"
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="rounded-md border border-border bg-bg-elevated px-5 py-2 font-medium text-text-silver transition-colors hover:border-border-bright hover:text-text disabled:opacity-50"
+                className="rounded-md border border-zinc-200 bg-white px-5 py-2 font-medium text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-50"
                 style={{ fontSize: '13px' }}
               >
                 {loadingMore ? 'Loading…' : 'Load more'}
