@@ -72,10 +72,17 @@ export function LensRow({ accent }: { accent: string }) {
       className="flex h-11 flex-shrink-0 items-center gap-1 overflow-x-auto border-b border-zinc-200 px-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       style={{ background: `${accent}14` }}
     >
+      {/* ml-auto on the first control floats the whole Search/Location/Time
+          group (and the trailing Cart) to the RIGHT edge of the row. Degrades
+          to 0 when the row overflows on narrow screens, so the touch-scroller
+          still reaches every control.
+          NOTE: there is no "Realm" control in this row — the 14-realm picker is
+          the separate persistent RealmStrip below (pass 18). Not added here. */}
       <LensButton
         icon={Search}
         label="Search"
         accent={accent}
+        className="ml-auto"
         onClick={() => setSearchOpen(true)}
       />
       <LensButton
@@ -135,12 +142,14 @@ function LensButton({
   accent,
   active,
   onClick,
+  className,
 }: {
   icon: LucideIcon;
   label: string;
   accent: string;
   active?: boolean;
   onClick: (btn: HTMLButtonElement) => void;
+  className?: string;
 }) {
   return (
     <button
@@ -151,11 +160,13 @@ function LensButton({
       className={cn(
         'flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
         active ? 'font-semibold' : 'text-zinc-600 hover:bg-zinc-100',
+        className,
       )}
       style={active ? { color: accent, background: `${accent}14` } : undefined}
     >
       <Icon size={16} style={active ? { color: accent } : undefined} />
-      <span>{label}</span>
+      {/* Desktop: icon + label. Mobile (<md): icons only. */}
+      <span className="hidden md:inline">{label}</span>
     </button>
   );
 }
@@ -170,7 +181,7 @@ function CartIcon({ accent }: { accent: string }) {
       to="/cart"
       aria-label={`Cart — ${cartCount} item${cartCount === 1 ? '' : 's'}`}
       title="Cart"
-      className="relative ml-auto flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md transition-colors hover:bg-black/5"
+      className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md transition-colors hover:bg-black/5"
       style={{ color: accent }}
     >
       <ShoppingCart size={16} />
