@@ -69,6 +69,17 @@ interface LensState {
   removeRealm: (key: string) => void;
   /** Clear the whole selection (all realms). */
   clearRealms: () => void;
+
+  /**
+   * Active/last Astra-local search term (cross-realm — ignores the realm
+   * selection). '' = no active search; ≥2 chars drives the content-area results.
+   * Persists when the lens-row input collapses (remembered for reopen); the
+   * input's ✕ clears it back to the normal feed.
+   */
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  clearSearch: () => void;
+
   setSource: (source: LensSource) => void;
   reset: () => void;
 }
@@ -80,6 +91,7 @@ export const useLensStore = create<LensState>()((set) => ({
   l3: null,
   source: 'all',
   selectedRealms: [],
+  searchTerm: '',
 
   setLens: (realmId, path) =>
     set({
@@ -106,7 +118,17 @@ export const useLensStore = create<LensState>()((set) => ({
       return { selectedRealms, ...deriveLens(selectedRealms[0]?.pathParts ?? []) };
     }),
   clearRealms: () => set({ selectedRealms: [], ...deriveLens([]) }),
+  setSearchTerm: (term) => set({ searchTerm: term }),
+  clearSearch: () => set({ searchTerm: '' }),
   setSource: (source) => set({ source }),
   reset: () =>
-    set({ realmId: null, path: [], l2: null, l3: null, source: 'all', selectedRealms: [] }),
+    set({
+      realmId: null,
+      path: [],
+      l2: null,
+      l3: null,
+      source: 'all',
+      selectedRealms: [],
+      searchTerm: '',
+    }),
 }));
