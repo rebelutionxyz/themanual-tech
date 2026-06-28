@@ -60,8 +60,10 @@ const LAUNCHERS: Launcher[] = [
   },
 ];
 
-/** Relative-luminance pick: white vs near-black ink that reads on a given bg. */
-function readableInk(hex: string): string {
+/** Relative-luminance pick: white vs near-black ink that reads on a given bg.
+    Exported so the top lens toolbar (LensRow) flips its control ink the same
+    way against the shared solid Astra accent. */
+export function readableInk(hex: string): string {
   const h = hex.replace('#', '');
   if (h.length < 6) return '#ffffff';
   const toLin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);

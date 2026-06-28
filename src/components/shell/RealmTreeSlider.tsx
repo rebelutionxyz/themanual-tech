@@ -1,9 +1,4 @@
-import {
-  type RealmTreeNode,
-  type RealmTreeRow,
-  buildRealmTree,
-  fetchRealmTree,
-} from '@/lib/realmTree';
+import { type RealmTreeRow, fetchRealmChildren } from '@/lib/realmTree';
 import { cn } from '@/lib/utils';
 import { useLensStore } from '@/stores/useLensStore';
 import { useRealmTreeStore } from '@/stores/useRealmTreeStore';
@@ -12,16 +7,16 @@ import { Check, ChevronRight, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 /**
- * White-Rabbit right-column realm navigator: the realm taxonomy as a fully
- * expandable tree at ARBITRARY depth, and the single home for realm nav.
+ * White-Rabbit right-column realm navigator: browses the FULL taxonomy ONE LEVEL
+ * AT A TIME (lazy). The root realms load on first open; each node fetches its
+ * direct children via realm_children(pathParts) when expanded. A node is
+ * expandable iff NOT isLeaf.
  *
- * MULTI-SELECT: clicking a node toggles it in/out of the lens selection
- * (useLensStore.selectedRealms). The single-prefix feed `path` is derived from
- * the FIRST selection (interim — feeds filter by one prefix until the RPCs take
- * a multi-prefix OR), and the full set shows as chips above the bottom toolbar.
- *
- * Toggled from the toolbar Realm button. Lazy-loads realm_tree() on first open.
- * Dismisses on Esc, click-outside, pointer-leave (150ms grace), or toggle again.
+ * MULTI-SELECT: clicking a node label toggles it in/out of the lens selection
+ * (useLensStore.selectedRealms); the single-prefix feed `path` derives from the
+ * FIRST selection (interim), and the full set shows as chips above the bottom
+ * toolbar. Dismisses on Esc, click-outside, pointer-leave (150ms grace), or
+ * toggle again.
  */
 const keyOf = (parts: string[]) => parts.join('|');
 
@@ -37,18 +32,18 @@ export function RealmTreeSlider() {
   const leaveTimer = useRef<number | undefined>(undefined);
   const fetchedRef = useRef(false);
 
-  const [rows, setRows] = useState<RealmTreeRow[] | null>(null);
+  const [roots, setRoots] = useState<RealmTreeRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Lazy fetch on first open.
+  // Lazy fetch the root realms on first open.
   useEffect(() => {
     if (!open || fetchedRef.current) return;
     fetchedRef.current = true;
     setLoading(true);
-    fetchRealmTree()
+    fetchRealmChildren([])
       .then((r) => {
-        setRows(r);
+        setRoots(r);
         setLoading(false);
       })
       .catch((e: unknown) => {
@@ -66,8 +61,6 @@ export function RealmTreeSlider() {
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node | null;
       if (t && panelRef.current?.contains(t)) return;
-      // Let the rabbit button's own toggle handle clicks on it (avoids a
-      // close-then-reopen race).
       if (t instanceof Element && t.closest('[data-rabbit-toggle]')) return;
       close();
     };
@@ -82,7 +75,6 @@ export function RealmTreeSlider() {
   // Clear any pending leave-timer on unmount.
   useEffect(() => () => window.clearTimeout(leaveTimer.current), []);
 
-  const tree = useMemo(() => (rows ? buildRealmTree(rows) : []), [rows]);
   const selectedKeys = useMemo(
     () => new Set(selectedRealms.map((r) => r.key)),
     [selectedRealms],
@@ -137,27 +129,19 @@ export function RealmTreeSlider() {
           All realms
         </button>
 
-        {loading && (
-          <p className="px-3 py-2 font-mono text-zinc-500" style={{ fontSize: '12px' }}>
-            Loading…
-          </p>
-        )}
+        {loading && <Note depth={0}>Loading…</Note>}
         {error && !loading && (
-          <p className="px-3 py-2 font-mono text-red-600" style={{ fontSize: '12px' }}>
+          <Note depth={0} tone="error">
             {error}
-          </p>
+          </Note>
         )}
-        {!loading && !error && tree.length === 0 && (
-          <p className="px-3 py-2 font-mono text-zinc-500" style={{ fontSize: '12px' }}>
-            No realms yet.
-          </p>
-        )}
+        {!loading && !error && roots?.length === 0 && <Note depth={0}>No realms yet.</Note>}
         {!loading &&
           !error &&
-          tree.map((node) => (
+          roots?.map((row) => (
             <TreeRow
-              key={node.id}
-              node={node}
+              key={row.id}
+              row={row}
               depth={0}
               colorFor={colorFor}
               selectedKeys={selectedKeys}
@@ -169,26 +153,68 @@ export function RealmTreeSlider() {
   );
 }
 
+function Note({
+  depth,
+  tone,
+  children,
+}: {
+  depth: number;
+  tone?: 'error';
+  children: React.ReactNode;
+}) {
+  return (
+    <p
+      className={cn('py-1.5 font-mono', tone === 'error' ? 'text-red-600' : 'text-zinc-400')}
+      style={{ fontSize: '12px', paddingLeft: 12 + depth * 14, paddingRight: 8 }}
+      data-size="meta"
+    >
+      {children}
+    </p>
+  );
+}
+
 function TreeRow({
-  node,
+  row,
   depth,
   colorFor,
   selectedKeys,
   onToggle,
 }: {
-  node: RealmTreeNode;
+  row: RealmTreeRow;
   depth: number;
   colorFor: (realmId: string) => string;
   selectedKeys: Set<string>;
   onToggle: (pathParts: string[]) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  // Expandable ONLY if children are actually present in the result (sparse below
-  // L2 today — childless nodes render plain, no arrow). From DATA, not is_leaf.
-  // Recurses to arbitrary depth.
-  const expandable = node.children.length > 0;
-  const color = colorFor(node.realmId);
-  const selected = selectedKeys.has(keyOf(node.pathParts));
+  const [children, setChildren] = useState<RealmTreeRow[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const expandable = !row.isLeaf; // full taxonomy → is_leaf is authoritative
+  const color = colorFor(row.realmId);
+  const selected = selectedKeys.has(keyOf(row.pathParts));
+
+  // Lazy-load this node's direct children once (idempotent).
+  function loadChildren() {
+    if (children !== null || loading) return;
+    setLoading(true);
+    fetchRealmChildren(row.pathParts)
+      .then((kids) => {
+        setChildren(kids);
+        setLoading(false);
+      })
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : 'Failed to load');
+        setLoading(false);
+      });
+  }
+
+  function toggleExpand() {
+    const next = !expanded;
+    setExpanded(next);
+    if (next) loadChildren();
+  }
 
   return (
     <>
@@ -202,7 +228,7 @@ function TreeRow({
         {expandable ? (
           <button
             type="button"
-            onClick={() => setExpanded((e) => !e)}
+            onClick={toggleExpand}
             aria-label={expanded ? 'Collapse' : 'Expand'}
             aria-expanded={expanded}
             className="flex flex-shrink-0 items-center justify-center py-1.5 pl-1 text-zinc-400 hover:text-zinc-700"
@@ -225,8 +251,11 @@ function TreeRow({
         <button
           type="button"
           onClick={() => {
-            onToggle(node.pathParts);
-            if (expandable) setExpanded(true);
+            onToggle(row.pathParts);
+            if (expandable && !expanded) {
+              setExpanded(true);
+              loadChildren();
+            }
           }}
           className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 pr-2 pl-1.5 text-left"
           style={{ fontSize: '13px' }}
@@ -242,25 +271,36 @@ function TreeRow({
                   : 'text-zinc-600',
             )}
           >
-            {node.name}
+            {row.name}
           </span>
           {selected && (
             <Check size={13} className="flex-shrink-0" style={{ color }} aria-hidden="true" />
           )}
         </button>
       </div>
-      {expandable &&
-        expanded &&
-        node.children.map((child) => (
-          <TreeRow
-            key={child.id}
-            node={child}
-            depth={depth + 1}
-            colorFor={colorFor}
-            selectedKeys={selectedKeys}
-            onToggle={onToggle}
-          />
-        ))}
+
+      {expanded && (
+        <>
+          {loading && <Note depth={depth + 1}>Loading…</Note>}
+          {error && !loading && (
+            <Note depth={depth + 1} tone="error">
+              {error}
+            </Note>
+          )}
+          {!loading &&
+            !error &&
+            children?.map((child) => (
+              <TreeRow
+                key={child.id}
+                row={child}
+                depth={depth + 1}
+                colorFor={colorFor}
+                selectedKeys={selectedKeys}
+                onToggle={onToggle}
+              />
+            ))}
+        </>
+      )}
     </>
   );
 }

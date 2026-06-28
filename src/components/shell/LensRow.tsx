@@ -1,5 +1,6 @@
 import { SearchModal } from '@/components/layout/SearchModal';
 import { Popup, StubPanel, TimePanel } from '@/components/layout/lensPanels';
+import { readableInk } from '@/components/shell/BottomToolbar';
 import { cn } from '@/lib/utils';
 import { useCartStore } from '@/stores/useCartStore';
 import { useLensStore } from '@/stores/useLensStore';
@@ -66,13 +67,18 @@ export function LensRow({ accent }: { accent: string }) {
       }
     : {};
 
+  // Contrast-aware ink against the SOLID accent bar — the SAME helper the bottom
+  // toolbar uses, so the two bars flip ink identically per accent.
+  const ink = readableInk(accent);
+  const onDark = ink === '#ffffff';
+
   return (
-    // Spans only the center content column. Horizontal touch-scroller so the
-    // labelled lenses never clip on a narrow viewport. Background is a pale wash
-    // of the Astra accent — the light counterpart to the solid-accent bottom bar.
+    // Spans only the center content column. SOLID Astra accent — matches the
+    // bottom toolbar (BottomToolbar uses the same `accent`). Horizontal
+    // touch-scroller so the labelled lenses never clip on a narrow viewport.
     <div
-      className="flex h-11 flex-shrink-0 items-center gap-1 overflow-x-auto border-b border-zinc-200 px-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      style={{ background: `${accent}14` }}
+      className="flex h-11 flex-shrink-0 items-center gap-1 overflow-x-auto px-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      style={{ background: accent }}
     >
       {/* ml-auto on the first control floats the whole Search/Location/Time
           group (and the trailing Cart) to the RIGHT edge of the row. Degrades
@@ -83,21 +89,24 @@ export function LensRow({ accent }: { accent: string }) {
       <LensButton
         icon={Search}
         label="Search"
-        accent={accent}
+        ink={ink}
+        onDark={onDark}
         className="ml-auto"
         onClick={() => setSearchOpen(true)}
       />
       <LensButton
         icon={MapPin}
         label="Location"
-        accent={accent}
+        ink={ink}
+        onDark={onDark}
         active={openLens === 'location'}
         onClick={(b) => openAt('location', b)}
       />
       <LensButton
         icon={Clock}
         label="Time"
-        accent={accent}
+        ink={ink}
+        onDark={onDark}
         active={openLens === 'time'}
         onClick={(b) => openAt('time', b)}
       />
@@ -109,7 +118,7 @@ export function LensRow({ accent }: { accent: string }) {
       <RabbitButton />
 
       {/* Cart — sits at the right end of the floated group. */}
-      <CartIcon accent={accent} />
+      <CartIcon ink={ink} onDark={onDark} accent={accent} />
 
       {/* Popups are PORTALED to <body> — the lens row's backdrop-filter +
           overflow-x would otherwise become the containing block for our
@@ -147,14 +156,18 @@ export function LensRow({ accent }: { accent: string }) {
 function LensButton({
   icon: Icon,
   label,
-  accent,
+  ink,
+  onDark,
   active,
   onClick,
   className,
 }: {
   icon: LucideIcon;
   label: string;
-  accent: string;
+  /** Contrast ink for the solid accent bar (white on dark accents, near-black on light). */
+  ink: string;
+  /** True when the accent is dark (light ink) — picks the hover/active overlay. */
+  onDark: boolean;
   active?: boolean;
   onClick: (btn: HTMLButtonElement) => void;
   className?: string;
@@ -167,12 +180,16 @@ function LensButton({
       aria-label={label}
       className={cn(
         'flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
-        active ? 'font-semibold' : 'text-zinc-600 hover:bg-zinc-100',
+        active ? 'font-semibold' : onDark ? 'hover:bg-white/10' : 'hover:bg-black/10',
         className,
       )}
-      style={active ? { color: accent, background: `${accent}14` } : undefined}
+      style={
+        active
+          ? { color: ink, background: onDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)' }
+          : { color: ink, opacity: 0.85 }
+      }
     >
-      <Icon size={16} style={active ? { color: accent } : undefined} />
+      <Icon size={16} />
       {/* Desktop: icon + label. Mobile (<md): icons only. */}
       <span className="hidden md:inline">{label}</span>
     </button>
@@ -183,8 +200,8 @@ function LensButton({
     sidebar (multi-select), the single home for realm nav. Shows the SELECTION
     COUNT as a badge and is lit when ≥1 realm is selected. Renders WHITE (the
     white-rabbit motif) to read on the solid-accent toolbar; active = a subtle
-    white highlight (not the accent). Icon-only at all breakpoints — no visible
-    label (aria-label + title keep it named). */
+    white highlight (not the accent). "Realms" label shows on desktop (lg+);
+    phones + tablets are icon-only (aria-label + title keep it named). */
 function RabbitButton() {
   const open = useRealmTreeStore((s) => s.open);
   const toggle = useRealmTreeStore((s) => s.toggle);
@@ -206,9 +223,11 @@ function RabbitButton() {
       style={lit ? { background: 'rgba(255,255,255,0.22)' } : undefined}
     >
       {/* Always white in every state (default / hover / active) — never the
-          accent, which makes it vanish on the toolbar. Icon-only: no visible
-          label (aria-label + title keep it named). */}
+          accent, which makes it vanish on the toolbar. */}
       <Rabbit size={16} color="#ffffff" />
+      {/* Label on DESKTOP only (lg+); phones + tablets stay icon-only.
+          aria-label + title keep it named at every breakpoint. */}
+      <span className="hidden lg:block">Realms</span>
       {count > 0 && (
         <span className="inline-flex h-4 min-w-4 flex-shrink-0 items-center justify-center rounded-full bg-white/25 px-1 text-[10px] font-semibold leading-none text-white">
           {count}
@@ -218,9 +237,10 @@ function RabbitButton() {
   );
 }
 
-/** Cart — right-aligned in the lens row; hidden until something's in it. The
-    accent reads cleanly on the row's pale-tint background. */
-function CartIcon({ accent }: { accent: string }) {
+/** Cart — right-aligned in the lens row; hidden until something's in it. Ink
+    flips for contrast against the solid accent bar; the count badge is the ink
+    color with accent text so it reads on the bar. */
+function CartIcon({ ink, onDark, accent }: { ink: string; onDark: boolean; accent: string }) {
   const cartCount = useCartStore((s) => s.count);
   if (cartCount === 0) return null;
   return (
@@ -228,13 +248,16 @@ function CartIcon({ accent }: { accent: string }) {
       to="/cart"
       aria-label={`Cart — ${cartCount} item${cartCount === 1 ? '' : 's'}`}
       title="Cart"
-      className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md transition-colors hover:bg-black/5"
-      style={{ color: accent }}
+      className={cn(
+        'relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md transition-colors',
+        onDark ? 'hover:bg-white/10' : 'hover:bg-black/10',
+      )}
+      style={{ color: ink }}
     >
       <ShoppingCart size={16} />
       <span
-        className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-semibold leading-none text-white"
-        style={{ background: accent }}
+        className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-semibold leading-none"
+        style={{ background: ink, color: accent }}
       >
         {cartCount > 99 ? '99+' : cartCount}
       </span>

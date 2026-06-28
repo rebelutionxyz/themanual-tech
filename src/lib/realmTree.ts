@@ -1,13 +1,11 @@
 import { supabase } from './supabase';
 
 /**
- * The realm taxonomy tree behind the White Rabbit slider.
- *
- * `public.realm_tree()` returns a FLAT list of nodes (no args); we build the
- * tree client-side from `pathParts`. v1 is 3 levels: ALL L1 realms (depth 1) +
- * ALL L2 (depth 2) + only the L3 nodes (depth 3) that have content posted
- * at/below them (content-filtered — most L2s therefore have no children yet,
- * which is correct, not a bug).
+ * The realm taxonomy behind the White Rabbit slider — browsed ONE LEVEL AT A
+ * TIME (lazy). `public.realm_children(p_parent_path text[])` returns the DIRECT
+ * children of a node from the FULL taxonomy ([] / omit = the root realms). A
+ * node is expandable iff NOT `isLeaf` (full taxonomy, so is_leaf is
+ * authoritative — unlike the old content-filtered whole-tree RPC).
  */
 
 export interface RealmTreeRow {
@@ -15,15 +13,11 @@ export interface RealmTreeRow {
   name: string;
   depth: number;
   path: string;
-  /** Display-name segments, root-first. A node's parent has pathParts minus the last. */
+  /** Display-name segments, root-first. Pass these as the parent path to drill. */
   pathParts: string[];
   realmId: string;
   realmName: string;
   isLeaf: boolean;
-}
-
-export interface RealmTreeNode extends RealmTreeRow {
-  children: RealmTreeNode[];
 }
 
 type Row = Record<string, unknown>;
@@ -41,36 +35,12 @@ function mapRow(r: Row): RealmTreeRow {
   };
 }
 
-/** Fetch the flat node list from the RPC. */
-export async function fetchRealmTree(): Promise<RealmTreeRow[]> {
+/** Fetch the DIRECT children of a node (one level). `[]` / omit = root realms. */
+export async function fetchRealmChildren(parentPathParts: string[] = []): Promise<RealmTreeRow[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase.rpc('realm_tree');
+  const { data, error } = await supabase.rpc('realm_children', {
+    p_parent_path: parentPathParts,
+  });
   if (error) throw new Error(error.message);
   return ((data as Row[]) ?? []).map(mapRow);
-}
-
-const keyOf = (parts: string[]) => JSON.stringify(parts);
-
-/**
- * Build the nested tree from the flat rows. Parent = the node whose pathParts
- * equals this node's pathParts minus its last element; roots = depth 1. A node
- * is expandable iff `children.length > 0` (i.e. children are actually PRESENT in
- * the result) — computed from the data, never from `is_leaf`.
- */
-export function buildRealmTree(rows: RealmTreeRow[]): RealmTreeNode[] {
-  const nodes: RealmTreeNode[] = rows.map((r) => ({ ...r, children: [] }));
-  const byKey = new Map<string, RealmTreeNode>();
-  for (const n of nodes) byKey.set(keyOf(n.pathParts), n);
-
-  const roots: RealmTreeNode[] = [];
-  for (const n of nodes) {
-    if (n.depth <= 1) {
-      roots.push(n);
-      continue;
-    }
-    const parent = byKey.get(keyOf(n.pathParts.slice(0, -1)));
-    if (parent) parent.children.push(n);
-    else roots.push(n); // orphan fallback (shouldn't happen for a well-formed tree)
-  }
-  return roots;
 }
