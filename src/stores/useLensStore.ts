@@ -17,6 +17,29 @@ import type { RealmId } from '@/types/manual';
  */
 export type LensSource = 'all' | string;
 
+/** One selected realm node in the multi-select set. key = pathParts.join('|'). */
+export interface SelectedRealm {
+  key: string;
+  pathParts: string[];
+  name: string;
+}
+
+const realmKey = (pathParts: string[]) => pathParts.join('|');
+
+function toSelected(pathParts: string[]): SelectedRealm {
+  return { key: realmKey(pathParts), pathParts, name: pathParts[pathParts.length - 1] ?? '' };
+}
+
+/** Derive the single-prefix lens fields (path/realmId/l2/l3) from a prefix. */
+function deriveLens(prefix: string[]) {
+  return {
+    path: prefix,
+    realmId: prefix[0] ? (REALM_ID_BY_NAME[prefix[0]] ?? null) : null,
+    l2: prefix[1] ?? null,
+    l3: prefix[2] ?? null,
+  };
+}
+
 interface LensState {
   realmId: RealmId | null;
   /** Full drilled path of display names; path[0] = realm display name. */
@@ -24,15 +47,28 @@ interface LensState {
   l2: string | null;
   l3: string | null;
   source: LensSource;
+  /**
+   * Multi-select realm set (the chip bar). The single-prefix `path` above is
+   * ALWAYS derived from the FIRST entry here (or [] when empty) so existing feed
+   * consumers keep filtering by the primary selection — interim until the feed
+   * RPCs accept a multi-prefix OR.
+   */
+  selectedRealms: SelectedRealm[];
 
   setLens: (realmId: RealmId | null, path: string[]) => void;
   /**
    * Facet-lens setter: the prefix IS `path` (display-name segments on
    * forum_threads.realm_path). realmId/l2/l3 are derived for color + breadcrumb
-   * convenience. Empty prefix = all threads. Used by the realm pages, the INTEL
-   * breadcrumb, and the realm_path-contains thread list / feed.
+   * convenience. Empty prefix = all threads. SINGLE-select — replaces the
+   * selection with this one node (used by atom clicks, breadcrumb, realm pages).
    */
   setPrefix: (prefix: string[]) => void;
+  /** Toggle a node in/out of the multi-select set; derives `path` from the new first. */
+  toggleRealm: (pathParts: string[]) => void;
+  /** Remove one selected realm by key; derives `path` from the new first. */
+  removeRealm: (key: string) => void;
+  /** Clear the whole selection (all realms). */
+  clearRealms: () => void;
   setSource: (source: LensSource) => void;
   reset: () => void;
 }
@@ -43,16 +79,34 @@ export const useLensStore = create<LensState>()((set) => ({
   l2: null,
   l3: null,
   source: 'all',
+  selectedRealms: [],
 
   setLens: (realmId, path) =>
-    set({ realmId, path, l2: path[1] ?? null, l3: path[2] ?? null }),
-  setPrefix: (prefix) =>
     set({
-      realmId: prefix[0] ? (REALM_ID_BY_NAME[prefix[0]] ?? null) : null,
-      path: prefix,
-      l2: prefix[1] ?? null,
-      l3: prefix[2] ?? null,
+      realmId,
+      path,
+      l2: path[1] ?? null,
+      l3: path[2] ?? null,
+      selectedRealms: path.length ? [toSelected(path)] : [],
     }),
+  setPrefix: (prefix) =>
+    set({ ...deriveLens(prefix), selectedRealms: prefix.length ? [toSelected(prefix)] : [] }),
+  toggleRealm: (pathParts) =>
+    set((s) => {
+      const key = realmKey(pathParts);
+      const exists = s.selectedRealms.some((r) => r.key === key);
+      const selectedRealms = exists
+        ? s.selectedRealms.filter((r) => r.key !== key)
+        : [...s.selectedRealms, toSelected(pathParts)];
+      return { selectedRealms, ...deriveLens(selectedRealms[0]?.pathParts ?? []) };
+    }),
+  removeRealm: (key) =>
+    set((s) => {
+      const selectedRealms = s.selectedRealms.filter((r) => r.key !== key);
+      return { selectedRealms, ...deriveLens(selectedRealms[0]?.pathParts ?? []) };
+    }),
+  clearRealms: () => set({ selectedRealms: [], ...deriveLens([]) }),
   setSource: (source) => set({ source }),
-  reset: () => set({ realmId: null, path: [], l2: null, l3: null, source: 'all' }),
+  reset: () =>
+    set({ realmId: null, path: [], l2: null, l3: null, source: 'all', selectedRealms: [] }),
 }));

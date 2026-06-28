@@ -2,7 +2,9 @@ import { SearchModal } from '@/components/layout/SearchModal';
 import { Popup, StubPanel, TimePanel } from '@/components/layout/lensPanels';
 import { cn } from '@/lib/utils';
 import { useCartStore } from '@/stores/useCartStore';
-import { Clock, type LucideIcon, MapPin, Search, ShoppingCart } from 'lucide-react';
+import { useLensStore } from '@/stores/useLensStore';
+import { useRealmTreeStore } from '@/stores/useRealmTreeStore';
+import { Clock, type LucideIcon, MapPin, Rabbit, Search, ShoppingCart } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
@@ -100,7 +102,13 @@ export function LensRow({ accent }: { accent: string }) {
         onClick={(b) => openAt('time', b)}
       />
 
-      {/* Cart — floats hard right (moved here from the old rail header). */}
+      {/* White Rabbit — toggles the right-column realm-tree slider. Reuses the
+          lucide Rabbit icon from the INTEL composer's atom picker. The
+          data-rabbit-toggle hook lets the slider's click-outside guard ignore
+          this button (no close-then-reopen race). */}
+      <RabbitButton />
+
+      {/* Cart — sits at the right end of the floated group. */}
       <CartIcon accent={accent} />
 
       {/* Popups are PORTALED to <body> — the lens row's backdrop-filter +
@@ -167,6 +175,42 @@ function LensButton({
       <Icon size={16} style={active ? { color: accent } : undefined} />
       {/* Desktop: icon + label. Mobile (<md): icons only. */}
       <span className="hidden md:inline">{label}</span>
+    </button>
+  );
+}
+
+/** The Realm control (White Rabbit motif) — toggles the right-column realm
+    sidebar (multi-select), the single home for realm nav. Shows the SELECTION
+    COUNT as a badge and is lit when ≥1 realm is selected. Renders WHITE (the
+    white-rabbit motif) to read on the solid-accent toolbar; active = a subtle
+    white highlight (not the accent). Icon-only on mobile (label hides at <md). */
+function RabbitButton() {
+  const open = useRealmTreeStore((s) => s.open);
+  const toggle = useRealmTreeStore((s) => s.toggle);
+  const count = useLensStore((s) => s.selectedRealms.length);
+  const lit = open || count > 0;
+
+  return (
+    <button
+      type="button"
+      data-rabbit-toggle
+      onClick={() => toggle()}
+      title={count > 0 ? `Realms — ${count} selected` : 'Realms'}
+      aria-label="Realms"
+      aria-pressed={open}
+      className={cn(
+        'flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[13px] text-white transition-colors',
+        lit ? 'font-semibold' : 'hover:bg-white/10',
+      )}
+      style={lit ? { background: 'rgba(255,255,255,0.22)' } : undefined}
+    >
+      <Rabbit size={16} />
+      <span className="hidden md:block">Realms</span>
+      {count > 0 && (
+        <span className="inline-flex h-4 min-w-4 flex-shrink-0 items-center justify-center rounded-full bg-white/25 px-1 text-[10px] font-semibold leading-none text-white">
+          {count}
+        </span>
+      )}
     </button>
   );
 }

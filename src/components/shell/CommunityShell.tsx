@@ -2,7 +2,9 @@ import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
 import { BottomToolbar } from '@/components/shell/BottomToolbar';
 import { GlobalSidebar } from '@/components/shell/GlobalSidebar';
 import { LensRow } from '@/components/shell/LensRow';
+import { RealmChipsBar } from '@/components/shell/RealmChipsBar';
 import { RealmStrip } from '@/components/shell/RealmStrip';
+import { RealmTreeSlider } from '@/components/shell/RealmTreeSlider';
 import { RightRail } from '@/components/shell/RightRail';
 import type { SidebarItem } from '@/components/shell/sidebarNav';
 import { type CSSProperties, type ReactNode, useState } from 'react';
@@ -13,6 +15,13 @@ import { type CSSProperties, type ReactNode, useState } from 'react';
  * to restore the rail (RightRail import is retained on purpose).
  */
 const SHOW_RIGHT_RAIL = false;
+
+/**
+ * Horizontal 14-realm strip — RETIRED. Realm navigation now lives entirely in
+ * the White-Rabbit right-column tree (RealmTreeSlider), which drives the same
+ * lens. Component file kept; flip to true to restore the strip.
+ */
+const SHOW_REALM_STRIP = false;
 
 interface CommunityShellProps {
   /** Active surface slug (intel / unite / rule / give) — drives nav + dropdown. */
@@ -73,19 +82,24 @@ export function CommunityShell({
           collapsed={collapsed}
           onToggleCollapse={() => setCollapsed((v) => !v)}
         />
-        <div className="flex min-h-0 min-w-0 flex-1 border-zinc-200 md:border-l">
+        <div className="relative flex min-h-0 min-w-0 flex-1 border-zinc-200 md:border-l">
           {/* Center column: lens toolbar · realm strip · feed scroller. */}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-zinc-200 md:border-r">
             <LensRow accent={accent} />
-            <RealmStrip />
-            <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+            {SHOW_REALM_STRIP && <RealmStrip />}
+            <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-white">
               <div className="min-h-0 flex-1">{children}</div>
             </main>
           </div>
           {/* Cross-Astra Overview rail — hidden on mobile, side column at md+. */}
           {SHOW_RIGHT_RAIL && <RightRail />}
+          {/* White-Rabbit realm-tree slide-over — overlays the right column when
+              toggled (independent of the hidden Overview rail). */}
+          <RealmTreeSlider />
         </div>
       </div>
+      {/* Selected-realm chips — directly above the bottom toolbar, same width. */}
+      <RealmChipsBar />
       {/* Bottom utility toolbar — full-width accent band, flush to both edges. */}
       <BottomToolbar accent={accent} />
     </div>
