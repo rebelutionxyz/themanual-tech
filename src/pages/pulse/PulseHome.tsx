@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Radio } from 'lucide-react';
 import { REALM_ID_BY_NAME } from '@/lib/constants';
+import { timeAfterISO } from '@/lib/timePresets';
 import { useLensStore } from '@/stores/useLensStore';
 import { REALM_COLOR_FALLBACK, useRealmColors } from '@/stores/useRealmColors';
 import type { RealmId } from '@/types/manual';
@@ -33,6 +34,8 @@ export function PulseHome() {
   const selectedRealms = useLensStore((s) => s.selectedRealms);
   const realmPrefixes = selectedRealms.map((r) => r.pathParts);
   const realmKey = selectedRealms.map((r) => r.key).join('|');
+  // Time-window lens → p_after (computed at fetch time in each section).
+  const timePreset = useLensStore((s) => s.timePreset);
   const realmLabel =
     selectedRealms.length === 0
       ? null
@@ -69,6 +72,7 @@ export function PulseHome() {
         realmPrefixes={realmPrefixes}
         realmKey={realmKey}
         realmLabel={realmLabel}
+        timePreset={timePreset}
         colorFor={colorFor}
       />
       <UpcomingSection colorFor={colorFor} />
@@ -76,6 +80,7 @@ export function PulseHome() {
         realmPrefixes={realmPrefixes}
         realmKey={realmKey}
         realmLabel={realmLabel}
+        timePreset={timePreset}
         colorFor={colorFor}
       />
     </div>
@@ -160,22 +165,24 @@ function LiveNowSection({
   realmPrefixes,
   realmKey,
   realmLabel,
+  timePreset,
   colorFor,
 }: {
   realmPrefixes: string[][];
   realmKey: string;
   realmLabel: string | null;
+  timePreset: string | null;
   colorFor: ColorFn;
 }) {
   const [items, setItems] = useState<PulseLive[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: realmKey is the stable serialization of realmPrefixes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: realmKey is the stable serialization of realmPrefixes; after is computed from timePreset at fetch time
   useEffect(() => {
     let cancelled = false;
     setItems(null);
     setError(null);
-    pulseLiveNow(realmPrefixes)
+    pulseLiveNow(realmPrefixes, 20, timeAfterISO(timePreset))
       .then((res) => !cancelled && setItems(res))
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load');
@@ -183,7 +190,7 @@ function LiveNowSection({
     return () => {
       cancelled = true;
     };
-  }, [realmKey]);
+  }, [realmKey, timePreset]);
 
   return (
     <section className="mt-8">
@@ -267,11 +274,13 @@ function LibrarySection({
   realmPrefixes,
   realmKey,
   realmLabel,
+  timePreset,
   colorFor,
 }: {
   realmPrefixes: string[][];
   realmKey: string;
   realmLabel: string | null;
+  timePreset: string | null;
   colorFor: ColorFn;
 }) {
   const [items, setItems] = useState<PulseLibraryItem[] | null>(null);
@@ -283,7 +292,7 @@ function LibrarySection({
     setLoadingMore(true);
     try {
       const offset = items?.length ?? 0;
-      const page = await pulseLibrary(realmPrefixes, LIBRARY_PAGE, offset);
+      const page = await pulseLibrary(realmPrefixes, LIBRARY_PAGE, offset, timeAfterISO(timePreset));
       setItems((prev) => [...(prev ?? []), ...page]);
       if (page.length < LIBRARY_PAGE) setExhausted(true);
     } catch (err: unknown) {
@@ -291,16 +300,16 @@ function LibrarySection({
     } finally {
       setLoadingMore(false);
     }
-    // realmPrefixes is reflected via realmKey in the resetting effect below
-  }, [items, realmPrefixes]);
+    // realmPrefixes/timePreset reflected via realmKey/timePreset in the reset effect
+  }, [items, realmPrefixes, timePreset]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: realmKey is the stable serialization of realmPrefixes; first page only
+  // biome-ignore lint/correctness/useExhaustiveDependencies: realmKey is the stable serialization of realmPrefixes; after is computed from timePreset at fetch time; first page only
   useEffect(() => {
     let cancelled = false;
     setItems(null);
     setError(null);
     setExhausted(false);
-    pulseLibrary(realmPrefixes, LIBRARY_PAGE, 0)
+    pulseLibrary(realmPrefixes, LIBRARY_PAGE, 0, timeAfterISO(timePreset))
       .then((page) => {
         if (cancelled) return;
         setItems(page);
@@ -312,7 +321,7 @@ function LibrarySection({
     return () => {
       cancelled = true;
     };
-  }, [realmKey]);
+  }, [realmKey, timePreset]);
 
   return (
     <section className="mt-8">

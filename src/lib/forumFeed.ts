@@ -58,6 +58,7 @@ export async function listThreadFeed(
   sort: FeedSort = 'trending',
   limit = 20,
   offset = 0,
+  after: string | null = null,
 ): Promise<ThreadFeedItem[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.rpc('forum_thread_feed', {
@@ -66,7 +67,7 @@ export async function listThreadFeed(
     p_limit: limit,
     p_offset: offset,
     p_query: null,
-    p_after: null,
+    p_after: after,
     p_before: null,
   });
   if (error) throw new Error(error.message);
@@ -83,13 +84,19 @@ export async function listThreadFeed(
  * search RPC behind the same `useLensStore.searchTerm` pattern (PULSE →
  * pulse_search, GIVE → campaigns_search(term), etc.).
  */
-export async function forumSearch(query: string, limit = 30): Promise<ThreadFeedItem[]> {
+export async function forumSearch(
+  query: string,
+  limit = 30,
+  after: string | null = null,
+): Promise<ThreadFeedItem[]> {
   const q = query.trim();
   if (!supabase || q.length < 2) return [];
   const { data, error } = await supabase.rpc('forum_search', {
     p_query: q,
     p_realm_prefixes: null, // cross-realm: ignore the realm lens
     p_limit: limit,
+    p_after: after,
+    p_before: null,
   });
   if (error) throw new Error(error.message);
   return ((data ?? []) as Record<string, unknown>[]).map(mapSearchRow);

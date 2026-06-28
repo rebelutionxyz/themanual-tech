@@ -181,13 +181,14 @@ function mapSearch(r: Row): PulseSearchResult {
 export async function pulseLiveNow(
   realmPrefixes: string[][] = [],
   limit = 20,
+  after: string | null = null,
 ): Promise<PulseLive[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.rpc('pulse_live_now', {
     p_realm_prefixes: realmPrefixes.length ? realmPrefixes : null,
     p_limit: limit,
     p_query: null,
-    p_after: null,
+    p_after: after,
     p_before: null,
   });
   if (error) throw new Error(error.message);
@@ -212,6 +213,7 @@ export async function pulseLibrary(
   realmPrefixes: string[][] = [],
   limit = 24,
   offset = 0,
+  after: string | null = null,
 ): Promise<PulseLibraryItem[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.rpc('pulse_library', {
@@ -219,7 +221,7 @@ export async function pulseLibrary(
     p_limit: limit,
     p_offset: offset,
     p_query: null,
-    p_after: null,
+    p_after: after,
     p_before: null,
   });
   if (error) throw new Error(error.message);

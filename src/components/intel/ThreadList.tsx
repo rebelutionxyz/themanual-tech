@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { MessageSquare, Lock, Clock, Bookmark, BookmarkCheck, Share2, Check, X } from 'lucide-react';
 import { listThreads, listThreadsByIds, listThreadIdsByAuthor, relativeTime, type ForumThread } from '@/lib/intel';
 import { forumSearch, listThreadFeed, type FeedSort, type ThreadFeedItem } from '@/lib/forumFeed';
+import { timeAfterISO } from '@/lib/timePresets';
 import {
   listSavedThreadIds,
   toggleSave,
@@ -149,6 +150,9 @@ export function ThreadList({
   const clearSearch = useLensStore((s) => s.clearSearch);
   const searching = searchTerm.trim().length >= 2;
 
+  // Time-window lens → p_after (computed at fetch time inside the effect).
+  const timePreset = useLensStore((s) => s.timePreset);
+
   const atomById = useMemo(() => {
     const m = new Map(atoms.map((a) => [a.id, a]));
     return m;
@@ -168,8 +172,9 @@ export function ThreadList({
     setSavedIds(new Set());
     setReactionSummaries(new Map());
 
+    const after = timeAfterISO(timePreset);
     const threadPromise: Promise<ForumThread[]> = searching
-      ? forumSearch(searchTerm).then((items) => items.map(feedItemToThread))
+      ? forumSearch(searchTerm, 30, after).then((items) => items.map(feedItemToThread))
       : savedMode
         ? bee?.id
           ? (async () => {
@@ -185,7 +190,9 @@ export function ThreadList({
               })()
             : Promise.resolve([] as ForumThread[])
           : feedSort
-            ? listThreadFeed(realmPrefixes, feedSort).then((items) => items.map(feedItemToThread))
+            ? listThreadFeed(realmPrefixes, feedSort, 20, 0, after).then((items) =>
+                items.map(feedItemToThread),
+              )
             : listThreads({
                 prefix,
                 sortBy,
@@ -264,7 +271,7 @@ export function ThreadList({
     return () => {
       cancelled = true;
     };
-  }, [prefixKey, realmKey, searchTerm, sortBy, timeWindowHours, feedSort, savedMode, myThreadsMode, personalSortMode, bee?.id]);
+  }, [prefixKey, realmKey, searchTerm, timePreset, sortBy, timeWindowHours, feedSort, savedMode, myThreadsMode, personalSortMode, bee?.id]);
 
   if (error) {
     return (

@@ -1,5 +1,6 @@
-import { Popup, StubPanel, TimePanel } from '@/components/layout/lensPanels';
+import { Popup, StubPanel, TimePresetPanel } from '@/components/layout/lensPanels';
 import { readableInk } from '@/components/shell/BottomToolbar';
+import { timePresetLabel } from '@/lib/timePresets';
 import { cn } from '@/lib/utils';
 import { useCartStore } from '@/stores/useCartStore';
 import { useLensStore } from '@/stores/useLensStore';
@@ -70,6 +71,10 @@ export function LensRow({ accent }: { accent: string }) {
   const ink = readableInk(accent);
   const onDark = ink === '#ffffff';
 
+  // Time lens — selected preset shows inline after the clock; null = "Time".
+  const timePreset = useLensStore((s) => s.timePreset);
+  const timeLabel = timePresetLabel(timePreset) ?? 'Time';
+
   return (
     // Spans only the center content column. SOLID Astra accent — matches the
     // bottom toolbar (BottomToolbar uses the same `accent`). Horizontal
@@ -95,10 +100,10 @@ export function LensRow({ accent }: { accent: string }) {
       />
       <LensButton
         icon={Clock}
-        label="Time"
+        label={timeLabel}
         ink={ink}
         onDark={onDark}
-        active={openLens === 'time'}
+        active={openLens === 'time' || timePreset != null}
         onClick={(b) => openAt('time', b)}
       />
 
@@ -132,7 +137,7 @@ export function LensRow({ accent }: { accent: string }) {
             )}
             {openLens === 'time' && (
               <Popup title="Time" style={popStyle} onClose={() => setOpenLens(null)}>
-                <TimePanel />
+                <TimePresetPanel onClose={() => setOpenLens(null)} />
               </Popup>
             )}
           </>,
@@ -212,7 +217,9 @@ function SearchLens({
       <Search size={16} className="flex-shrink-0" style={{ color: ink }} />
       <input
         ref={inputRef}
-        type="search"
+        // type="text" (not "search") so the browser's native clear ✕ doesn't
+        // double up with our custom ✕ below.
+        type="text"
         value={term}
         onChange={(e) => setSearchTerm(e.target.value)}
         onKeyDown={(e) => {

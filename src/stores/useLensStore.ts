@@ -80,6 +80,13 @@ interface LensState {
   setSearchTerm: (term: string) => void;
   clearSearch: () => void;
 
+  /**
+   * Time-window preset key (see lib/timePresets). null = unset (no filter); the
+   * feeds convert it to `p_after` at fetch time. Single value.
+   */
+  timePreset: string | null;
+  setTimePreset: (key: string | null) => void;
+
   setSource: (source: LensSource) => void;
   reset: () => void;
 }
@@ -92,6 +99,7 @@ export const useLensStore = create<LensState>()((set) => ({
   source: 'all',
   selectedRealms: [],
   searchTerm: '',
+  timePreset: null,
 
   setLens: (realmId, path) =>
     set({
@@ -120,6 +128,7 @@ export const useLensStore = create<LensState>()((set) => ({
   clearRealms: () => set({ selectedRealms: [], ...deriveLens([]) }),
   setSearchTerm: (term) => set({ searchTerm: term }),
   clearSearch: () => set({ searchTerm: '' }),
+  setTimePreset: (key) => set({ timePreset: key }),
   setSource: (source) => set({ source }),
   reset: () =>
     set({
@@ -130,5 +139,6 @@ export const useLensStore = create<LensState>()((set) => ({
       source: 'all',
       selectedRealms: [],
       searchTerm: '',
+      timePreset: null,
     }),
 }));
