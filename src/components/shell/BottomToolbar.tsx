@@ -118,11 +118,10 @@ export function BottomToolbar({ accent }: { accent: string }) {
     : {};
 
   return (
-    // Centered band constrained to the SAME max-width as the community content
-    // row (CommunityShell's mx-auto max-w-[1290px]), so on desktop the bar aligns
-    // with the content column instead of going edge-to-edge. Narrow/mobile widths
-    // fill naturally since the content max-width ≈ viewport there.
-    <div className="mx-auto w-full max-w-[1290px] flex-shrink-0" style={{ background: accent }}>
+    // REGION 2 of the OUTER CONTAINER (CommunityShell): `w-full` = the ~1290
+    // shell-box width, so the band spans the whole container (under the sidebar
+    // AND the content), edges meeting the container edges — NOT the viewport.
+    <div className="w-full flex-shrink-0" style={{ background: accent }}>
       {/* Horizontal touch-scroller: items stay one row and scroll when they
           overflow a narrow viewport rather than wrapping or squashing. */}
       <div

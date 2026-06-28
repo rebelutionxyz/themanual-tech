@@ -3,7 +3,6 @@ import { Popup, StubPanel, TimePanel } from '@/components/layout/lensPanels';
 import { readableInk } from '@/components/shell/BottomToolbar';
 import { cn } from '@/lib/utils';
 import { useCartStore } from '@/stores/useCartStore';
-import { useLensStore } from '@/stores/useLensStore';
 import { useRealmTreeStore } from '@/stores/useRealmTreeStore';
 import { Clock, type LucideIcon, MapPin, Rabbit, Search, ShoppingCart } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -115,7 +114,7 @@ export function LensRow({ accent }: { accent: string }) {
           lucide Rabbit icon from the INTEL composer's atom picker. The
           data-rabbit-toggle hook lets the slider's click-outside guard ignore
           this button (no close-then-reopen race). */}
-      <RabbitButton />
+      <RabbitButton ink={ink} onDark={onDark} />
 
       {/* Cart — sits at the right end of the floated group. */}
       <CartIcon ink={ink} onDark={onDark} accent={accent} />
@@ -197,42 +196,35 @@ function LensButton({
 }
 
 /** The Realm control (White Rabbit motif) — toggles the right-column realm
-    sidebar (multi-select), the single home for realm nav. Shows the SELECTION
-    COUNT as a badge and is lit when ≥1 realm is selected. Renders WHITE (the
-    white-rabbit motif) to read on the solid-accent toolbar; active = a subtle
-    white highlight (not the accent). "Realms" label shows on desktop (lg+);
-    phones + tablets are icon-only (aria-label + title keep it named). */
-function RabbitButton() {
+    sidebar (multi-select). Renders IDENTICALLY to the other lens controls
+    (mirrors LensButton's classes/structure): rabbit icon + "Realm" label,
+    contrast ink, same hover, and the same active treatment when its panel (the
+    realm sidebar) is open. No badge — selected realms show as chips. Keeps
+    data-rabbit-toggle so the sidebar's outside-click dismiss ignores it. */
+function RabbitButton({ ink, onDark }: { ink: string; onDark: boolean }) {
   const open = useRealmTreeStore((s) => s.open);
   const toggle = useRealmTreeStore((s) => s.toggle);
-  const count = useLensStore((s) => s.selectedRealms.length);
-  const lit = open || count > 0;
 
   return (
     <button
       type="button"
       data-rabbit-toggle
       onClick={() => toggle()}
-      title={count > 0 ? `Realms — ${count} selected` : 'Realms'}
-      aria-label="Realms"
+      title="Realm"
+      aria-label="Realm"
       aria-pressed={open}
       className={cn(
-        'flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[13px] text-white transition-colors',
-        lit ? 'font-semibold' : 'hover:bg-white/10',
+        'flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
+        open ? 'font-semibold' : onDark ? 'hover:bg-white/10' : 'hover:bg-black/10',
       )}
-      style={lit ? { background: 'rgba(255,255,255,0.22)' } : undefined}
+      style={
+        open
+          ? { color: ink, background: onDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)' }
+          : { color: ink, opacity: 0.85 }
+      }
     >
-      {/* Always white in every state (default / hover / active) — never the
-          accent, which makes it vanish on the toolbar. */}
-      <Rabbit size={16} color="#ffffff" />
-      {/* Label on DESKTOP only (lg+); phones + tablets stay icon-only.
-          aria-label + title keep it named at every breakpoint. */}
-      <span className="hidden lg:block">Realms</span>
-      {count > 0 && (
-        <span className="inline-flex h-4 min-w-4 flex-shrink-0 items-center justify-center rounded-full bg-white/25 px-1 text-[10px] font-semibold leading-none text-white">
-          {count}
-        </span>
-      )}
+      <Rabbit size={16} />
+      <span className="hidden md:inline">Realm</span>
     </button>
   );
 }
