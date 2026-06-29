@@ -87,7 +87,7 @@ export const ASTRA_SWITCHER: AstraSwitchItem[] = [
   { label: 'Give', slug: 'give', to: '/give', icon: HeartHandshake },
   { label: 'Groups', slug: 'unite', to: '/unite', icon: Users },
   { label: 'Justice', slug: 'justice', to: '/realm/justice', icon: Scale },
-  { label: 'Marketplace', slug: 'entertheprize', to: '/entertheprize', icon: Store },
+  { label: 'Bazaar', slug: 'bazaar', to: '/bazaar', icon: Store },
   { label: 'Pulse', slug: 'pulse', to: '/pulse', icon: Radio },
 ];
 

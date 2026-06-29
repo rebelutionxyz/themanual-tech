@@ -25,6 +25,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 type ControlId = 'search' | 'realms' | 'location' | 'astras' | 'addons' | 'time';
 
@@ -249,6 +250,7 @@ function hashHue(s: string): number {
 }
 
 function AstrasPanel({ registry }: { registry: ReturnType<typeof useAstraRegistry> }) {
+  const navigate = useNavigate();
   if (!registry.loaded) return <StubPanel line="Loading Astras…" note="" />;
   if (registry.error)
     return <StubPanel line="Couldn't load the Astra registry." note={registry.error} />;
@@ -273,29 +275,35 @@ function AstrasPanel({ registry }: { registry: ReturnType<typeof useAstraRegistr
           </div>
           <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
             {astras.map((a) => {
-              const target = a.linkRedirectSlug
-                ? (registry.bySlug.get(a.linkRedirectSlug) ?? a)
-                : a;
-              const redirected = target.slug !== a.slug;
-              const offGrid = target.status !== 'active';
+              // No own domain + a link_redirect_slug ⇒ this Astra is served by a
+              // live in-app surface (Bazaar → /bazaar, Media → /pulse): route
+              // internally and stay clickable regardless of off_grid status.
+              // Anything with its own domain (Atlas*, TheHoneycomb.games) routes
+              // out there ("coming soon" until that domain is live).
+              const internalSlug = !a.domain && a.linkRedirectSlug ? a.linkRedirectSlug : null;
+              const externalDomain = !internalSlug && a.status === 'active' ? a.domain : null;
+              const disabled = !internalSlug && !externalDomain;
               const hue = hashHue(a.slug);
               return (
                 <button
                   key={a.slug}
                   type="button"
-                  disabled={offGrid}
+                  disabled={disabled}
                   onClick={() => {
-                    if (!offGrid && target.domain)
-                      window.open(`https://${target.domain}`, '_blank', 'noopener');
+                    if (internalSlug) navigate(`/${internalSlug}`);
+                    else if (externalDomain)
+                      window.open(`https://${externalDomain}`, '_blank', 'noopener');
                   }}
                   title={
-                    offGrid
-                      ? `${a.displayName}${redirected ? ` → ${target.displayName}` : ''} — coming soon`
-                      : `${a.displayName}${redirected ? ` → ${target.displayName}` : ''} — ${target.domain ?? ''}`
+                    internalSlug
+                      ? `${a.displayName} → /${internalSlug}`
+                      : externalDomain
+                        ? `${a.displayName} — ${externalDomain}`
+                        : `${a.displayName} — coming soon`
                   }
                   className={cn(
                     'flex flex-col items-center gap-1.5 rounded-md border px-1.5 py-2.5 text-center transition-colors',
-                    offGrid ? 'cursor-default' : 'hover:brightness-95',
+                    disabled ? 'cursor-default' : 'hover:brightness-95',
                   )}
                   style={{ background: '#FFFFFF', borderColor: 'rgba(0,0,0,0.10)' }}
                 >
@@ -306,14 +314,14 @@ function AstrasPanel({ registry }: { registry: ReturnType<typeof useAstraRegistr
                       color: `hsl(${hue} 55% 38%)`,
                       background: `hsl(${hue} 55% 50% / 0.14)`,
                       border: `1px solid hsl(${hue} 50% 45% / 0.30)`,
-                      opacity: offGrid ? 0.85 : 1,
+                      opacity: disabled ? 0.85 : 1,
                     }}
                   >
                     {a.defaultName.slice(0, 1).toUpperCase()}
                   </span>
                   <span
                     className="w-full truncate tracking-wide"
-                    style={{ fontSize: '10.5px', color: ON_SILVER, opacity: offGrid ? 0.85 : 1 }}
+                    style={{ fontSize: '10.5px', color: ON_SILVER, opacity: disabled ? 0.85 : 1 }}
                   >
                     {a.defaultName}
                   </span>
