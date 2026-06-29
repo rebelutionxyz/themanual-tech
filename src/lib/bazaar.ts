@@ -220,6 +220,96 @@ export async function bazaarPurchaseBling(listingId: string): Promise<BazaarPurc
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// Orders & sales
+// ─────────────────────────────────────────────────────────────────────────
+
+interface BazaarOrderBase {
+  orderId: string;
+  listingId: string;
+  status: string;
+  currency: string;
+  blingPaid: number;
+  createdAt: string;
+  shippedAt: string | null;
+  fulfilledAt: string | null;
+  listingTitle: string;
+  listingImage: string | null;
+}
+
+/** A purchase the caller made (buyer = caller). */
+export interface BazaarOrder extends BazaarOrderBase {
+  sellerBee: string;
+  sellerHandle: string;
+  sellerName: string;
+  sellerAvatar: string | null;
+}
+
+/** A sale the caller made (seller = caller). */
+export interface BazaarSale extends BazaarOrderBase {
+  buyerBee: string;
+  buyerHandle: string;
+  buyerName: string;
+  buyerAvatar: string | null;
+}
+
+function mapOrderBase(r: Row): BazaarOrderBase {
+  return {
+    orderId: str(r.order_id),
+    listingId: str(r.listing_id),
+    status: str(r.status),
+    currency: str(r.currency),
+    blingPaid: Number(r.bling_paid ?? 0),
+    createdAt: str(r.created_at),
+    shippedAt: strOrNull(r.shipped_at),
+    fulfilledAt: strOrNull(r.fulfilled_at),
+    listingTitle: str(r.listing_title),
+    listingImage: strOrNull(r.listing_image),
+  };
+}
+
+/** The caller's purchases (buyer). */
+export async function bazaarMyOrders(): Promise<BazaarOrder[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('bazaar_my_orders');
+  if (error) throw new Error(error.message);
+  return ((data as Row[]) ?? []).map((r) => ({
+    ...mapOrderBase(r),
+    sellerBee: str(r.seller_bee),
+    sellerHandle: str(r.seller_handle),
+    sellerName: str(r.seller_name),
+    sellerAvatar: strOrNull(r.seller_avatar),
+  }));
+}
+
+/** The caller's sales (seller). */
+export async function bazaarMySales(): Promise<BazaarSale[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('bazaar_my_sales');
+  if (error) throw new Error(error.message);
+  return ((data as Row[]) ?? []).map((r) => ({
+    ...mapOrderBase(r),
+    buyerBee: str(r.buyer_bee),
+    buyerHandle: str(r.buyer_handle),
+    buyerName: str(r.buyer_name),
+    buyerAvatar: strOrNull(r.buyer_avatar),
+  }));
+}
+
+/** Seller marks a paid order shipped. Raises (surfaced verbatim) on guard fail. */
+export async function bazaarMarkShipped(orderId: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.rpc('bazaar_mark_shipped', { p_order_id: orderId });
+  if (error) throw new Error(error.message);
+}
+
+/** Buyer confirms receipt (from paid or shipped). Raises (verbatim) on guard fail. */
+export async function bazaarConfirmReceived(orderId: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.rpc('bazaar_confirm_received', { p_order_id: orderId });
+  if (error) throw new Error(error.message);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Format helpers
 // ─────────────────────────────────────────────────────────────────────────
 
