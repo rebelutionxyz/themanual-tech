@@ -158,6 +158,37 @@ export async function bazaarListingGet(id: string): Promise<BazaarListing | null
   return rows.length ? mapListing(rows[0]) : null;
 }
 
+export interface BazaarCreateInput {
+  title: string;
+  description?: string | null;
+  category: string;
+  condition: string;
+  priceBling: number;
+  quantity: number;
+  imageUrls?: string[];
+}
+
+/** Create an OFFER (BLiNG!-only; fiat/split left to server defaults). Returns the
+    new listing id. Raises (surfaced verbatim): "title must be 2..200 characters",
+    "invalid category", etc. */
+export async function bazaarCreateListing(input: BazaarCreateInput): Promise<string> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { data, error } = await supabase.rpc('bazaar_create_listing', {
+    p_title: input.title,
+    p_description: input.description ?? null,
+    p_listing_type: 'offer',
+    p_category: input.category,
+    p_condition: input.condition,
+    p_price_bling: input.priceBling,
+    p_accepts_bling: true,
+    p_accepts_fiat: false,
+    p_quantity: input.quantity,
+    p_image_urls: input.imageUrls?.length ? input.imageUrls : null,
+  });
+  if (error) throw new Error(error.message);
+  return String(data);
+}
+
 export interface BazaarPurchaseResult {
   ok: boolean;
   orderId: string;

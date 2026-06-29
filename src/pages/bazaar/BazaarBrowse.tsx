@@ -1,15 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ShoppingBag } from 'lucide-react';
-import {
-  type BazaarCategory,
-  type BazaarListing,
-  type BazaarSort,
-  bazaarBrowse,
-  bazaarCategories,
-  bazaarSearch,
-} from '@/lib/bazaar';
+import { type BazaarListing, type BazaarSort, bazaarBrowse, bazaarSearch } from '@/lib/bazaar';
 import { useLensStore } from '@/stores/useLensStore';
 import { BAZAAR_ACCENT, ListingCard } from '@/components/bazaar/cards';
+import { type CategoryGroup, useCategoryGroups } from '@/components/bazaar/useCategoryGroups';
 
 const CONDITIONS = ['new', 'used', 'service', 'digital'];
 const LISTING_TYPES = ['offer']; // Phase-1: offer only
@@ -33,42 +27,10 @@ export function BazaarBrowse() {
 
   const [listings, setListings] = useState<BazaarListing[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Category options come from the spine taxonomy (bazaar_categories_list).
-  const [categories, setCategories] = useState<BazaarCategory[]>([]);
-
-  // Grouped, leaf-only options preserving the RPC's pre-sorted (first-seen)
-  // group order. Group label = department at depth 6, else bucket.
-  const categoryGroups = useMemo(() => {
-    const groups: { label: string; options: { id: string; name: string }[] }[] = [];
-    const byLabel = new Map<string, { label: string; options: { id: string; name: string }[] }>();
-    for (const c of categories) {
-      if (!c.isLeaf) continue;
-      const label = c.depth === 6 ? c.department : c.bucket;
-      let group = byLabel.get(label);
-      if (!group) {
-        group = { label, options: [] };
-        byLabel.set(label, group);
-        groups.push(group);
-      }
-      group.options.push({ id: c.id, name: c.name });
-    }
-    return groups;
-  }, [categories]);
+  // Category options come from the spine taxonomy (shared with the New form).
+  const categoryGroups = useCategoryGroups();
 
   const filterKey = `${listingType}|${condition}|${category}|${sort}`;
-
-  // Load the category taxonomy once.
-  useEffect(() => {
-    let cancelled = false;
-    bazaarCategories()
-      .then((c) => !cancelled && setCategories(c))
-      .catch(() => {
-        /* non-fatal — Category filter just shows "All categories" */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: filterKey serializes the filter state; depending on it avoids refetch churn
   useEffect(() => {
@@ -202,7 +164,7 @@ function FilterBar({
   onCondition: (v: string) => void;
   category: string;
   onCategory: (v: string) => void;
-  categoryGroups: { label: string; options: { id: string; name: string }[] }[];
+  categoryGroups: CategoryGroup[];
   sort: BazaarSort;
   onSort: (v: BazaarSort) => void;
 }) {

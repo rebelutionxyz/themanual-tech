@@ -65,6 +65,7 @@ import { ReportedPage } from '@/pages/intel/ReportedPage';
 import { ThreadPage } from '@/pages/intel/ThreadPage';
 import { BazaarBrowse } from '@/pages/bazaar/BazaarBrowse';
 import { BazaarListingDetail } from '@/pages/bazaar/BazaarListingDetail';
+import { BazaarNew } from '@/pages/bazaar/BazaarNew';
 import { ChannelPage } from '@/pages/pulse/ChannelPage';
 import { PulseHome } from '@/pages/pulse/PulseHome';
 import { WatchPage } from '@/pages/pulse/WatchPage';
@@ -172,6 +173,7 @@ function AppContent() {
             {/* BAZAAR — marketplace. Mounts in the same community shell; flat
               children. (new / orders land in later slices.) */}
             <Route path="/bazaar" element={<BazaarBrowse />} />
+            <Route path="/bazaar/new" element={<BazaarNew />} />
             <Route path="/bazaar/:id" element={<BazaarListingDetail />} />
           </Route>
 
