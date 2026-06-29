@@ -121,6 +121,34 @@ export async function bazaarSearch(query: string, limit = 30, offset = 0): Promi
   return ((data as Row[]) ?? []).map(mapListing);
 }
 
+export interface BazaarCategory {
+  id: string;
+  name: string;
+  depth: number;
+  parentId: string | null;
+  bucket: string;
+  department: string;
+  path: string;
+  isLeaf: boolean;
+}
+
+/** Spine-backed category taxonomy, pre-sorted (bucket → department → depth → name). */
+export async function bazaarCategories(): Promise<BazaarCategory[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('bazaar_categories_list');
+  if (error) throw new Error(error.message);
+  return ((data as Row[]) ?? []).map((r) => ({
+    id: str(r.id),
+    name: str(r.name),
+    depth: Number(r.depth),
+    parentId: strOrNull(r.parent_id),
+    bucket: str(r.bucket),
+    department: str(r.department),
+    path: str(r.path),
+    isLeaf: r.is_leaf === true,
+  }));
+}
+
 /** Single listing by id (any status). null when not found. */
 export async function bazaarListingGet(id: string): Promise<BazaarListing | null> {
   if (!supabase) return null;

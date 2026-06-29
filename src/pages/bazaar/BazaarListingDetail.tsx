@@ -277,18 +277,17 @@ function PurchaseModal({ listing, onClose }: { listing: BazaarListing; onClose: 
   }
 
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss; the modal's own controls are keyboard-reachable
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
+      onMouseDown={onClose}
+      // biome-ignore lint/a11y/useSemanticElements: native <dialog> needs imperative showModal(); this overlay is mounted declaratively
       role="dialog"
       aria-modal="true"
       aria-label="Confirm purchase"
     >
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: stops backdrop dismiss when clicking inside the card */}
       <div
         className="w-full max-w-sm rounded-xl bg-white p-5 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-2">
           <h2 className="font-display text-lg font-semibold text-zinc-900">

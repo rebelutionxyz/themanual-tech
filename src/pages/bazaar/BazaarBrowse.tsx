@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ShoppingBag } from 'lucide-react';
 import {
+  type BazaarCategory,
   type BazaarListing,
   type BazaarSort,
   bazaarBrowse,
+  bazaarCategories,
   bazaarSearch,
 } from '@/lib/bazaar';
 import { useLensStore } from '@/stores/useLensStore';
@@ -31,10 +33,42 @@ export function BazaarBrowse() {
 
   const [listings, setListings] = useState<BazaarListing[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Category options accumulate across fetches (no taxonomy domain yet).
-  const [catOptions, setCatOptions] = useState<string[]>([]);
+  // Category options come from the spine taxonomy (bazaar_categories_list).
+  const [categories, setCategories] = useState<BazaarCategory[]>([]);
+
+  // Grouped, leaf-only options preserving the RPC's pre-sorted (first-seen)
+  // group order. Group label = department at depth 6, else bucket.
+  const categoryGroups = useMemo(() => {
+    const groups: { label: string; options: { id: string; name: string }[] }[] = [];
+    const byLabel = new Map<string, { label: string; options: { id: string; name: string }[] }>();
+    for (const c of categories) {
+      if (!c.isLeaf) continue;
+      const label = c.depth === 6 ? c.department : c.bucket;
+      let group = byLabel.get(label);
+      if (!group) {
+        group = { label, options: [] };
+        byLabel.set(label, group);
+        groups.push(group);
+      }
+      group.options.push({ id: c.id, name: c.name });
+    }
+    return groups;
+  }, [categories]);
 
   const filterKey = `${listingType}|${condition}|${category}|${sort}`;
+
+  // Load the category taxonomy once.
+  useEffect(() => {
+    let cancelled = false;
+    bazaarCategories()
+      .then((c) => !cancelled && setCategories(c))
+      .catch(() => {
+        /* non-fatal — Category filter just shows "All categories" */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: filterKey serializes the filter state; depending on it avoids refetch churn
   useEffect(() => {
@@ -51,13 +85,7 @@ export function BazaarBrowse() {
         });
     promise
       .then((rows) => {
-        if (cancelled) return;
-        setListings(rows);
-        setCatOptions((prev) =>
-          Array.from(
-            new Set([...prev, ...rows.map((r) => r.category).filter((c): c is string => !!c)]),
-          ).sort(),
-        );
+        if (!cancelled) setListings(rows);
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load offers');
@@ -88,7 +116,7 @@ export function BazaarBrowse() {
           onCondition={setCondition}
           category={category}
           onCategory={setCategory}
-          catOptions={catOptions}
+          categoryGroups={categoryGroups}
           sort={sort}
           onSort={setSort}
         />
@@ -164,7 +192,7 @@ function FilterBar({
   onCondition,
   category,
   onCategory,
-  catOptions,
+  categoryGroups,
   sort,
   onSort,
 }: {
@@ -174,7 +202,7 @@ function FilterBar({
   onCondition: (v: string) => void;
   category: string;
   onCategory: (v: string) => void;
-  catOptions: string[];
+  categoryGroups: { label: string; options: { id: string; name: string }[] }[];
   sort: BazaarSort;
   onSort: (v: BazaarSort) => void;
 }) {
@@ -198,10 +226,14 @@ function FilterBar({
       </Select>
       <Select label="Category" value={category} onChange={onCategory}>
         <option value="">All categories</option>
-        {catOptions.map((c) => (
-          <option key={c} value={c}>
-            {c}
-          </option>
+        {categoryGroups.map((g) => (
+          <optgroup key={g.label} label={g.label}>
+            {g.options.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </optgroup>
         ))}
       </Select>
       <Select label="Sort" value={sort} onChange={(v) => onSort(v as BazaarSort)}>
