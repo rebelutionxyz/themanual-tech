@@ -1,3 +1,4 @@
+import { BAZAAR_ACCENT } from '@/components/bazaar/cards';
 import { CreateEventModal } from '@/components/events/CreateEventModal';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
 import type { IntelView } from '@/components/intel/IntelSidebar';
@@ -23,13 +24,15 @@ import {
   HeartHandshake,
   Megaphone,
   MessageSquare,
+  Package,
   Plus,
+  ShoppingBag,
   Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
-type Surface = 'intel' | 'unite' | 'rule' | 'give' | 'pulse';
+type Surface = 'intel' | 'unite' | 'rule' | 'give' | 'pulse' | 'bazaar';
 
 const ACCENT: Record<Surface, string> = {
   intel: '#1D9BF0',
@@ -39,6 +42,7 @@ const ACCENT: Record<Surface, string> = {
   // PULSE / media red — sourced from the surface registry (kept in sync with
   // the relit cards' SURFACE_BY_SLUG.get('pulse')?.color).
   pulse: SURFACE_BY_SLUG.get('pulse')?.color ?? '#DC2626',
+  bazaar: BAZAAR_ACCENT,
 };
 
 const VIEW_ROUTE_MAP: Record<string, IntelView> = { '/intel/mine': 'mythreads' };
@@ -49,6 +53,7 @@ function surfaceFromPath(pathname: string): Surface {
   if (pathname.startsWith('/rule')) return 'rule';
   if (pathname.startsWith('/give')) return 'give';
   if (pathname.startsWith('/pulse')) return 'pulse';
+  if (pathname.startsWith('/bazaar')) return 'bazaar';
   return 'intel';
 }
 
@@ -175,6 +180,10 @@ export function CommunityLayout() {
       if (location.pathname !== '/pulse') navigate('/pulse');
       return;
     }
+    if (surface === 'bazaar') {
+      // BAZAAR sidebar items are route links; this guards the give-fallthrough.
+      return;
+    }
     // give
     if (location.pathname !== '/give') navigate('/give');
     setGiveView(id as GiveView);
@@ -182,6 +191,11 @@ export function CommunityLayout() {
 
   const accent = ACCENT[surface];
   const items = buildItems(surface, { myThreads, saved, isMod, myGroups, going });
+  const bazaarItem = location.pathname.startsWith('/bazaar/new')
+    ? 'offer'
+    : location.pathname.startsWith('/bazaar/orders')
+      ? 'orders'
+      : 'browse';
   const activeItemId =
     surface === 'intel'
       ? activeView
@@ -191,7 +205,9 @@ export function CommunityLayout() {
           ? ruleView
           : surface === 'pulse'
             ? 'home'
-            : giveView;
+            : surface === 'bazaar'
+              ? bazaarItem
+              : giveView;
 
   const outletCtx =
     surface === 'unite'
@@ -277,6 +293,15 @@ function buildItems(surface: Surface, c: Counts): SidebarItem[] {
     // PULSE is self-contained (live / upcoming / library / search live on the
     // center page), so the sidebar is just Explore + the shared utility tail.
     return [{ id: 'home', label: 'Explore', icon: Compass }, ...COMMON_TAIL];
+  }
+  if (surface === 'bazaar') {
+    // BAZAAR — route-link items (Browse / OFFER / Orders) + the shared tail.
+    return [
+      { id: 'browse', label: 'Browse', icon: ShoppingBag, to: '/bazaar' },
+      { id: 'offer', label: 'New Offer', icon: Plus, to: '/bazaar/new' },
+      { id: 'orders', label: 'Orders', icon: Package, to: '/bazaar/orders' },
+      ...COMMON_TAIL,
+    ];
   }
   // intel — Explore · Following · My Posts (pass-12). The old Trending/Breaking/
   // For Me/Saved/Create views still exist in state; they're just no longer
