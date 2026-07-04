@@ -1,0 +1,625 @@
+/* ============================================================================
+   AURORA — the FUTURE of FreedomBLiNGS, on-brand
+   Black + White + BLiNG! gold. A clean, luminous, sparkling future:
+   crisp white surfaces, confident black ink, and gold-leaf shimmer as the one
+   brand accent. The diamond marks become twinkling gold gems (BLiNG = sparkle).
+
+   Activated by html[data-theme="aurora"]. Pure additive layer on top of
+   styles.css — the original Light/Dark themes are untouched.
+   ============================================================================ */
+
+html[data-theme="aurora"]{
+  /* --- crisp white + near-black --------------------------------------- */
+  --paper:        oklch(0.993 0.004 90);
+  --paper-raised: oklch(1 0 0);
+  --paper-sunken: oklch(0.966 0.006 88);
+  --ink:          oklch(0.205 0.006 70);   /* near-black */
+  --ink-soft:     oklch(0.395 0.008 70);
+  --ink-faint:    oklch(0.558 0.010 72);
+  --ink-ghost:    oklch(0.720 0.012 76);
+  --line:         oklch(0.916 0.008 86);
+  --line-strong:  oklch(0.854 0.012 82);
+
+  /* --- BLiNG! gold — the default brand color, always ------------------- */
+  --accent:       oklch(0.745 0.128 74);
+  --accent-deep:  oklch(0.565 0.118 64);
+  --accent-soft:  oklch(0.936 0.045 84);
+
+  --studio:       oklch(0.974 0.006 88);
+  --shadow:       0 2px 6px oklch(0.40 0.03 70 / .07), 0 26px 60px oklch(0.45 0.06 72 / .14);
+  --shadow-sm:    0 1px 3px oklch(0.40 0.03 70 / .06), 0 8px 24px oklch(0.45 0.06 72 / .07);
+
+  /* slightly softer, rounder future */
+  --radius:       16px;
+
+  /* gold-leaf foil — bright, metallic, for gems / bars / decorative shapes */
+  --foil: linear-gradient(118deg,
+      oklch(0.60 0.115 58) 0%,
+      oklch(0.80 0.140 80) 24%,
+      oklch(0.95 0.060 96) 44%,
+      oklch(0.78 0.140 78) 66%,
+      oklch(0.61 0.118 60) 100%);
+  /* deeper gold foil — for large gradient TEXT, holds contrast on white */
+  --foil-ink: linear-gradient(118deg,
+      oklch(0.50 0.110 56) 0%,
+      oklch(0.66 0.135 74) 30%,
+      oklch(0.80 0.135 88) 50%,
+      oklch(0.62 0.125 66) 74%,
+      oklch(0.49 0.108 56) 100%);
+  --foil-soft: linear-gradient(118deg,
+      oklch(0.90 0.060 84), oklch(0.96 0.040 92), oklch(0.88 0.070 78));
+}
+
+/* --- a clean white sky with a soft gold horizon ------------------------- */
+html[data-theme="aurora"] body{
+  background:
+    radial-gradient(120% 80% at 50% -12%, oklch(0.94 0.045 88 / .60), transparent 55%),
+    radial-gradient(100% 70% at 100% 0%,  oklch(0.95 0.040 92 / .45), transparent 50%),
+    radial-gradient(110% 80% at 0% 8%,    oklch(0.96 0.030 86 / .40), transparent 52%),
+    var(--studio);
+  background-attachment: fixed;
+}
+html[data-theme="aurora"] .board-head{ border-bottom-color: oklch(0.88 0.02 86); }
+
+/* ============================================================================
+   GLASS SURFACES — frames, phones, floating panels
+   ============================================================================ */
+html[data-theme="aurora"] .desktop-frame{
+  background: oklch(1 0 0 / .72);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  backdrop-filter: blur(22px) saturate(1.2);
+  border: 1px solid oklch(1 0 0 / .85);
+  border-radius: 24px;
+  box-shadow:
+    0 2px 6px oklch(0.4 0.03 72 / .06),
+    0 34px 80px oklch(0.45 0.06 72 / .16),
+    inset 0 1px 0 oklch(1 0 0 / .85);
+}
+html[data-theme="aurora"] .df-bar{
+  background: oklch(1 0 0 / .5);
+  border-bottom-color: oklch(0.9 0.01 86 / .8);
+}
+html[data-theme="aurora"] .df-url{
+  background: oklch(1 0 0 / .6);
+  border-color: oklch(0.9 0.012 86);
+}
+html[data-theme="aurora"] .app-side{
+  background: oklch(0.985 0.006 88 / .6);
+  border-right-color: oklch(0.9 0.01 86 / .8);
+}
+
+html[data-theme="aurora"] .phone{
+  background: oklch(1 0 0 / .62);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border: 1px solid oklch(1 0 0 / .8);
+  box-shadow:
+    0 30px 70px oklch(0.45 0.06 72 / .20),
+    0 0 0 7px oklch(0.55 0.06 72 / .07);
+}
+html[data-theme="aurora"] .phone-screen{ border-color: oklch(0.9 0.012 86); }
+
+/* floating modals read as true frosted glass */
+html[data-theme="aurora"] .constel-panel,
+html[data-theme="aurora"] .prov-panel{
+  background: oklch(1 0 0 / .84);
+  -webkit-backdrop-filter: blur(26px) saturate(1.2);
+  backdrop-filter: blur(26px) saturate(1.2);
+  border: 1px solid oklch(1 0 0 / .9);
+  border-radius: 22px;
+}
+html[data-theme="aurora"] .constel-backdrop{
+  background: oklch(0.25 0.01 70 / .42);
+}
+
+/* ============================================================================
+   CARDS — clean white + soft warm glow + sheen
+   ============================================================================ */
+html[data-theme="aurora"] .card{
+  background:
+    linear-gradient(180deg, oklch(1 0 0 / .92), oklch(1 0 0 / .68)),
+    var(--paper-raised);
+  border-color: oklch(1 0 0 / .9);
+  box-shadow:
+    0 1px 3px oklch(0.4 0.03 72 / .05),
+    0 14px 34px oklch(0.45 0.06 72 / .09),
+    inset 0 1px 0 oklch(1 0 0 / .75);
+}
+html[data-theme="aurora"] .astra-card,
+html[data-theme="aurora"] .facet,
+html[data-theme="aurora"] .grad-card,
+html[data-theme="aurora"] .tier-row,
+html[data-theme="aurora"] .chain-row,
+html[data-theme="aurora"] .limit-row,
+html[data-theme="aurora"] .net-stat,
+html[data-theme="aurora"] .flow-node{
+  border-color: oklch(0.92 0.01 86);
+  box-shadow: 0 6px 18px oklch(0.45 0.05 72 / .06);
+}
+
+/* ============================================================================
+   THE GEMS — every diamond mark becomes a twinkling gold jewel
+   ============================================================================ */
+@keyframes gemTwinkle{
+  0%, 100%{ box-shadow: 0 0 5px oklch(0.78 0.13 80 / .50); }
+  50%     { box-shadow: 0 0 12px oklch(0.86 0.14 86 / .90); }
+}
+html[data-theme="aurora"] .heromark .d.inner{
+  background: var(--foil);
+  border-radius: 2px;
+  animation: gemTwinkle 3.4s ease-in-out infinite;
+}
+html[data-theme="aurora"] .bmark.fill,
+html[data-theme="aurora"] .nav-item.active .ni-mark,
+html[data-theme="aurora"] .fc-mark,
+html[data-theme="aurora"] .gp-tick,
+html[data-theme="aurora"] .cap-dia.fill,
+html[data-theme="aurora"] .fn-mark,
+html[data-theme="aurora"] .ac-mark,
+html[data-theme="aurora"] .pt-mark,
+html[data-theme="aurora"] .pa-mark.fill,
+html[data-theme="aurora"] .pn-dot,
+html[data-theme="aurora"] .seal-mark i{
+  background: var(--foil);
+}
+html[data-theme="aurora"] .seal-mark{
+  border-color: transparent;
+  background: var(--foil-soft);
+  box-shadow: 0 0 0 1px oklch(0.82 0.06 84), 0 6px 20px oklch(0.7 0.13 78 / .25);
+}
+
+/* ============================================================================
+   HERO NUMBERS — gold-leaf foil + slow shimmer sweep
+   ============================================================================ */
+@keyframes foilSweep{ to{ background-position: 220% 0; } }
+
+html[data-theme="aurora"] .bal-amount .big,
+html[data-theme="aurora"] .recog-n,
+html[data-theme="aurora"] .ph-hero .big,
+html[data-theme="aurora"] .ch-amount .num,
+html[data-theme="aurora"] .acc-amt .num{
+  background: var(--foil-ink);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: foilSweep 7s linear infinite;
+}
+html[data-theme="aurora"] .recog-plus{ color: var(--accent-deep); }
+html[data-theme="aurora"] .recog-n{ filter: drop-shadow(0 4px 14px oklch(0.7 0.13 78 / .22)); }
+
+/* BLiNG! is ALWAYS its default brand gold — solid, never recolored ------- */
+html[data-theme="aurora"] .wm-name b,
+html[data-theme="aurora"] .side-brand .nm b{
+  color: var(--accent-deep);
+  -webkit-text-fill-color: var(--accent-deep);
+}
+
+/* ============================================================================
+   STAR SPARKLES — a few tasteful gold twinkles in roomy spots
+   ============================================================================ */
+@keyframes starTwinkle{
+  0%, 100%{ transform: scale(.45) rotate(0deg);   opacity: .25; }
+  50%     { transform: scale(1)   rotate(90deg);  opacity: 1;   }
+}
+html[data-theme="aurora"] .recog::before,
+html[data-theme="aurora"] .recog::after,
+html[data-theme="aurora"] .standing-badge::after,
+html[data-theme="aurora"] .ph-standing::after{
+  content: "";
+  position: absolute;
+  width: 15px; height: 15px;
+  background: var(--foil);
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+  animation: starTwinkle 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+html[data-theme="aurora"] .recog{ position: relative; }
+html[data-theme="aurora"] .recog::before{ top: 20px; right: 30px; width: 19px; height: 19px; animation-delay: .2s; }
+html[data-theme="aurora"] .recog::after{  top: 54px; right: 64px; width: 11px; height: 11px; animation-delay: 1.4s; }
+html[data-theme="aurora"] .standing-badge{ position: relative; overflow: visible; }
+html[data-theme="aurora"] .standing-badge::after{ top: -6px; right: -6px; animation-delay: .8s; }
+html[data-theme="aurora"] .ph-standing{ position: relative; overflow: visible; }
+html[data-theme="aurora"] .ph-standing::after{ top: -5px; right: -5px; width: 12px; height: 12px; animation-delay: 1.1s; }
+
+/* ============================================================================
+   BUTTONS — confident black primary with a gold gem (black/white/gold)
+   (primary stays black via --ink; we just round + lift it)
+   ============================================================================ */
+html[data-theme="aurora"] .btn-give{
+  border-radius: 14px;
+  box-shadow: 0 8px 22px oklch(0.2 0.01 70 / .22);
+  transition: background .15s, transform .15s, box-shadow .15s;
+}
+html[data-theme="aurora"] .btn-give:hover{
+  background: var(--ink);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px oklch(0.2 0.01 70 / .28), 0 0 0 1px var(--accent) inset;
+}
+html[data-theme="aurora"] .btn-give .bmark{ border-color: var(--accent); background: var(--accent); }
+
+/* ============================================================================
+   BADGES · PILLS · CHIPS — soft luminous gold-on-white glass
+   ============================================================================ */
+html[data-theme="aurora"] .standing-badge,
+html[data-theme="aurora"] .ph-standing,
+html[data-theme="aurora"] .id-custody,
+html[data-theme="aurora"] .ec-status{
+  background: linear-gradient(180deg, oklch(0.98 0.03 86), oklch(0.95 0.045 84));
+  border-color: oklch(0.86 0.06 82);
+  box-shadow: 0 4px 14px oklch(0.7 0.12 78 / .14);
+}
+html[data-theme="aurora"] .pill,
+html[data-theme="aurora"] .phase-tag{
+  background: oklch(1 0 0 / .68);
+  border-color: oklch(0.9 0.012 86);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+html[data-theme="aurora"] .l-tag.freed,
+html[data-theme="aurora"] .dec-status.pass,
+html[data-theme="aurora"] .mult,
+html[data-theme="aurora"] .tier-here{
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+html[data-theme="aurora"] .grad-card.feature .grad-tag{
+  background: var(--foil); border-color: transparent; color: oklch(0.28 0.04 60);
+}
+/* feature card gets a gold halo */
+html[data-theme="aurora"] .grad-card.feature{
+  border-color: transparent;
+  box-shadow:
+    0 0 0 1.5px oklch(0.74 0.12 76 / .6),
+    0 20px 46px oklch(0.6 0.10 74 / .18);
+}
+
+/* ============================================================================
+   PROGRESS BARS & METERS — fills shimmer with gold foil
+   ============================================================================ */
+html[data-theme="aurora"] .stat .bar i,
+html[data-theme="aurora"] .supply-meter i,
+html[data-theme="aurora"] .bd-bar i,
+html[data-theme="aurora"] .dec-bar i,
+html[data-theme="aurora"] .chain-bar i,
+html[data-theme="aurora"] .heir-bar i,
+html[data-theme="aurora"] .tier-row.active .tier-bar i,
+html[data-theme="aurora"] .co-bar-add,
+html[data-theme="aurora"] .ladder-track .rung.on,
+html[data-theme="aurora"] .ladder-track.ring .rung.on,
+html[data-theme="aurora"] .col.cur i,
+html[data-theme="aurora"] .year.on .yr-bar{
+  background: var(--foil) !important;
+  box-shadow: 0 0 10px oklch(0.78 0.12 80 / .35);
+}
+html[data-theme="aurora"] .stat.out .bar i{ background: var(--ink-ghost) !important; box-shadow: none; }
+@keyframes livePulse{
+  0%, 100%{ box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 oklch(0.78 0.14 82 / 0); }
+  50%     { box-shadow: 0 0 0 3px var(--accent-soft), 0 0 9px oklch(0.80 0.14 84 / .7); }
+}
+html[data-theme="aurora"] .live-dot,
+html[data-theme="aurora"] .relay-dot{
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 10px oklch(0.78 0.12 80 / .6);
+  animation: livePulse 2.4s ease-in-out infinite;
+}
+
+/* ============================================================================
+   AVATARS — a soft gold bloom
+   ============================================================================ */
+html[data-theme="aurora"] .avatar{
+  background:
+    radial-gradient(125% 120% at 28% 22%, oklch(0.94 0.06 86), transparent 62%),
+    radial-gradient(125% 120% at 82% 92%, oklch(0.92 0.05 78 / .8), transparent 60%),
+    var(--paper-sunken);
+  border-color: oklch(0.88 0.04 82);
+  color: var(--accent-deep);
+}
+
+/* ============================================================================
+   SWITCHES & focal dots — gold "on"
+   ============================================================================ */
+html[data-theme="aurora"] .sw.on{ background: var(--accent); box-shadow: 0 0 12px oklch(0.78 0.12 80 / .5); }
+html[data-theme="aurora"] .ec-node.cur .ecn-dot{ box-shadow: 0 0 0 4px var(--accent-soft), 0 0 14px oklch(0.78 0.12 80 / .5); }
+
+/* ============================================================================
+   SIDEBAR — dark brown nav rail, cream text, honey BLiNGS
+   ============================================================================ */
+html[data-theme="aurora"] .app-side{
+  background: linear-gradient(180deg, oklch(0.300 0.034 56), oklch(0.248 0.030 54));
+  border-right: 1px solid oklch(0.205 0.022 54);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+/* brand: Freedom in cream, BLiNGS in bright honey */
+html[data-theme="aurora"] .app-side .side-brand .nm{ color: oklch(0.935 0.018 84); }
+html[data-theme="aurora"] .app-side .side-brand .nm b{
+  color: var(--accent);
+  -webkit-text-fill-color: var(--accent);
+}
+/* nav labels + items */
+html[data-theme="aurora"] .app-side .nav-label{ color: oklch(0.640 0.022 72); }
+html[data-theme="aurora"] .app-side .nav-item{ color: oklch(0.808 0.020 78); }
+html[data-theme="aurora"] .app-side .nav-item .ni-mark{ border-color: oklch(0.600 0.026 70); }
+html[data-theme="aurora"] .app-side .nav-item:hover{
+  background: oklch(0.348 0.036 58);
+  color: oklch(0.955 0.014 84);
+}
+html[data-theme="aurora"] .app-side .nav-item.active{
+  background: linear-gradient(180deg, oklch(0.800 0.125 80), oklch(0.735 0.128 76));
+  color: oklch(0.235 0.034 52);
+}
+html[data-theme="aurora"] .app-side .nav-item.active .ni-mark{
+  background: oklch(0.270 0.040 54);
+  border-color: oklch(0.270 0.040 54);
+}
+/* count / shortcut tags */
+html[data-theme="aurora"] .app-side .ni-tag{
+  background: oklch(0.232 0.024 54);
+  border-color: oklch(0.380 0.030 58);
+  color: oklch(0.820 0.020 78);
+}
+html[data-theme="aurora"] .app-side .nav-item.active .ni-tag{
+  background: oklch(0.260 0.040 52 / .22);
+  border-color: oklch(0.300 0.040 52 / .35);
+  color: oklch(0.260 0.040 50);
+}
+/* constellation launcher */
+html[data-theme="aurora"] .app-side .sb-launch:hover{ background: oklch(0.348 0.036 58); }
+html[data-theme="aurora"] .app-side .launch-glyph i{ border-color: oklch(0.600 0.026 70); }
+/* member chip at the foot */
+html[data-theme="aurora"] .app-side .member-chip{
+  background: oklch(0.258 0.030 55);
+  border-color: oklch(0.372 0.030 58);
+}
+html[data-theme="aurora"] .app-side .member-chip .mc-name{ color: oklch(0.945 0.016 84); }
+html[data-theme="aurora"] .app-side .member-chip .mc-role{ color: oklch(0.700 0.022 74); }
+html[data-theme="aurora"] .app-side .avatar{ border-color: oklch(0.420 0.040 60); }
+
+/* ============================================================================
+   SPARKLE BURST — gold confetti-stars on primary actions (JS-spawned)
+   ============================================================================ */
+.spark-burst{ position: fixed; width: 0; height: 0; pointer-events: none; z-index: 2147483000; }
+.spark-burst i{
+  position: absolute; left: 0; top: 0;
+  width: var(--sz, 10px); height: var(--sz, 10px); margin: calc(var(--sz, 10px) / -2);
+  background: linear-gradient(118deg,
+      oklch(0.62 0.118 60), oklch(0.82 0.140 82), oklch(0.95 0.060 96), oklch(0.78 0.140 78));
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+  animation: sparkFly .85s cubic-bezier(.2,.7,.3,1) forwards;
+}
+@keyframes sparkFly{
+  0%  { transform: translate(0,0) scale(.2) rotate(0deg);                  opacity: 0; }
+  18% { opacity: 1; }
+  100%{ transform: translate(var(--dx), var(--dy)) scale(1) rotate(var(--rot)); opacity: 0; }
+}
+
+/* ============================================================================
+   MONEY-FLOW UI — balance quick-actions, modal forms, success panel
+   (plain classes; these only render inside the aurora app shells)
+   ============================================================================ */
+.bal-actions{ display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+.bal-act{
+  appearance: none; cursor: pointer; font: inherit; font-weight: 600; font-size: 13.5px;
+  display: inline-flex; align-items: center; gap: 9px; padding: 11px 18px; border-radius: 12px;
+  border: 1px solid var(--line-strong); background: var(--paper-raised); color: var(--ink);
+  transition: transform .14s, box-shadow .14s, background .14s, border-color .14s;
+}
+.bal-act:hover{ transform: translateY(-1px); border-color: var(--ink-ghost); box-shadow: var(--shadow-sm); }
+.bal-act.primary{ background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.bal-act.primary .bmark{ border-color: var(--accent); background: var(--accent); }
+html[data-theme="aurora"] .bal-act.primary:hover{ box-shadow: 0 8px 22px oklch(0.2 0.01 70 / .26); }
+
+.mode-tab{ cursor: pointer; }
+.filters .chip{ cursor: pointer; }
+.recent-head .seeall, .assure .verify{ cursor: pointer; }
+.astra-card.steppable{ cursor: pointer; }
+.astra-card.stepping{ border-color: var(--accent-deep); background: var(--accent-soft); }
+.astra-step{ margin-top: 8px; font-size: 11.5px; font-weight: 600; color: var(--accent-deep);
+  display: flex; align-items: center; gap: 8px; }
+.r-change{ cursor: pointer; }
+.nh-optin .sw{ cursor: pointer; }
+.ec-status.disputed{ color: var(--ink-soft); background: var(--paper-sunken); border-color: var(--line-strong); }
+.ec-status{ white-space: nowrap; }
+.ecp-n{ white-space: nowrap; }
+.btn-give{ cursor: pointer; white-space: nowrap; }
+.btn-give[disabled]{ opacity: .45; cursor: not-allowed; filter: none; transform: none; }
+
+.sheet-form{ padding: 4px 0 0 !important; }
+.quickset{ display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.qpill{
+  appearance: none; cursor: pointer; font: inherit; font-family: var(--font-num); font-size: 12.5px;
+  padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line-strong);
+  background: var(--paper); color: var(--ink-soft); transition: all .14s;
+}
+.qpill:hover{ color: var(--ink); border-color: var(--accent-deep); background: var(--accent-soft); }
+
+.note-input{
+  width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 11px;
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  font: inherit; font-size: 13px; outline: none; transition: border-color .14s, box-shadow .14s;
+}
+.note-input::placeholder{ color: var(--ink-ghost); }
+.note-input:focus{ border-color: var(--accent-deep); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+.person.pick{ cursor: pointer; }
+.person.pick.on{ background: var(--accent-soft); }
+.pick-on{
+  margin-left: auto; font-size: 10.5px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--accent-deep); white-space: nowrap;
+}
+.pick-empty{ padding: 18px 6px; color: var(--ink-faint); font-size: 13px; }
+
+.give-done{
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: 9px; padding: 18px 6px 6px;
+}
+.gd-gem{ margin-bottom: 2px; }
+.gd-gem .heromark{ width: 44px; height: 44px; position: relative; display: inline-block; }
+.gd-gem .heromark .d{ position: absolute; inset: 0; border: 2.6px solid var(--accent-deep);
+  transform: rotate(45deg); border-radius: 4px; }
+.gd-gem .heromark .d.inner{ inset: 32%; border: 0; }
+.gd-lead{ font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; font-weight: 700;
+  color: var(--accent-deep); }
+.gd-amt{ font-family: var(--font-num); font-size: 40px; font-weight: 500; letter-spacing: -0.03em;
+  line-height: 1; }
+.gd-amt .gd-u{ font-size: 14px; color: var(--ink-faint); font-family: var(--font-body); }
+.gd-line{ font-size: 15px; color: var(--ink); text-wrap: pretty; }
+.gd-foot{ font-size: 12px; color: var(--ink-faint); max-width: 34ch; line-height: 1.5; }
+.gd-done-btn{ margin-top: 12px; min-width: 160px; justify-content: center; }
+.constel-x.done-x{ position: absolute; top: 16px; right: 16px; }
+
+/* gold-leaf the success figure under aurora */
+html[data-theme="aurora"] .gd-amt{
+  background: var(--foil-ink); background-size: 220% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+  animation: foilSweep 7s linear infinite;
+}
+html[data-theme="aurora"] .gd-amt .gd-u{ -webkit-text-fill-color: var(--ink-faint); }
+html[data-theme="aurora"] .gd-gem .heromark .d.inner{ background: var(--foil); }
+/* GET request tag mirrors the OFFER (dashed, quiet) styling */
+.l-tag.get{ color: var(--ink-soft); background: transparent; border: 1px dashed var(--line-strong); }
+
+/* Requests inbox rows */
+.req-list{ display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.req-row{ display: flex; align-items: center; gap: 14px; padding: 14px 16px; }
+.req-main{ flex: 1; min-width: 0; }
+.req-who{ font-size: 14px; font-weight: 600; }
+.req-handle{ font-size: 12px; color: var(--ink-faint); font-weight: 400; margin-left: 7px; }
+.req-why{ font-size: 12.5px; color: var(--ink-faint); margin-top: 2px; }
+.req-amt{ font-size: 18px; font-weight: 500; white-space: nowrap; letter-spacing: -0.02em; }
+.req-amt span{ font-size: 11px; color: var(--ink-faint); font-family: var(--font-body); margin-left: 4px; }
+.req-actions{ display: flex; gap: 8px; flex: none; }
+@container (max-width: 560px){
+  .req-row{ flex-wrap: wrap; }
+  .req-amt{ order: 2; }
+  .req-actions{ width: 100%; }
+  .req-actions .bal-act{ flex: 1; justify-content: center; }
+}
+
+/* Discover · OFFER cards */
+.offer-grid{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 4px; }
+.offer-card{ overflow: hidden; display: flex; flex-direction: column; padding: 0; }
+.offer-ph{ height: 116px; position: relative; border-bottom: 1px solid var(--line);
+  background: repeating-linear-gradient(45deg, var(--paper-sunken), var(--paper-sunken) 9px, var(--paper) 9px, var(--paper) 18px); }
+.offer-ph::after{ content: "OFFER IMAGE"; position: absolute; inset: 0; display: flex;
+  align-items: center; justify-content: center; font-family: var(--font-num); font-size: 10px;
+  letter-spacing: .14em; color: var(--ink-ghost); }
+.offer-body{ padding: 14px 16px; display: flex; flex-direction: column; gap: 7px; flex: 1; }
+.offer-tag{ align-self: flex-start; font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase;
+  font-weight: 700; color: var(--accent-deep); background: var(--accent-soft); border-radius: 5px; padding: 2px 8px; }
+.offer-title{ font-family: var(--font-head); font-weight: 600; font-size: 15px; }
+.offer-blurb{ font-size: 12.5px; color: var(--ink-faint); line-height: 1.45; flex: 1; }
+.offer-by{ display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-soft); }
+.offer-foot{ display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 4px; padding-top: 11px; border-top: 1px solid var(--line); }
+.offer-amt{ font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+.offer-amt span{ font-size: 10px; color: var(--ink-faint); font-family: var(--font-body); margin-left: 3px; }
+@container (max-width: 560px){ .offer-grid{ grid-template-columns: 1fr; } }
+
+/* ============================================================================
+   ONBOARDING WIZARD
+   ============================================================================ */
+.onb{ display: flex; flex-direction: column; gap: 14px; padding-top: 4px; }
+.onb-gem{ align-self: center; }
+.onb-gem .heromark{ width: 46px; height: 46px; position: relative; display: inline-block; }
+.onb-gem .heromark .d{ position: absolute; inset: 0; border: 2.6px solid var(--accent-deep);
+  transform: rotate(45deg); border-radius: 4px; }
+.onb-gem .heromark .d.inner{ inset: 32%; border: 0; }
+.onb-dots{ display: flex; gap: 6px; align-self: center; }
+.onb-dot{ width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); }
+.onb-dot.on{ background: var(--accent); }
+.onb-lead{ font-size: 14px; color: var(--ink-soft); text-align: center; }
+.onb-list{ display: flex; flex-direction: column; gap: 11px; padding: 4px 0; }
+.onb-li{ display: flex; align-items: center; gap: 11px; font-size: 14px; color: var(--ink); }
+.onb-id{ align-self: stretch; justify-content: center; }
+.onb-note{ font-size: 12.5px; color: var(--ink-faint); text-align: center; line-height: 1.55; max-width: 40ch;
+  margin: 0 auto; }
+.onb-people{ max-height: 290px; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 2px; }
+.onb-people .person > div{ min-width: 0; }
+.onb-people .p-name, .onb-people .p-handle{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.onb-check{ margin-left: auto; width: 22px; height: 22px; border-radius: 50%; flex: none;
+  border: 1px solid var(--line-strong); display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: var(--accent-deep); }
+.onb-check[data-on="1"]{ background: var(--accent-soft); border-color: var(--accent-deep); }
+.onb-invite{ appearance: none; cursor: pointer; font: inherit; font-size: 13px; text-align: left;
+  display: flex; align-items: center; gap: 11px; padding: 11px 13px; border-radius: 11px;
+  border: 1px dashed var(--accent-deep); background: var(--accent-soft); color: var(--ink); }
+.onb-invite:hover{ filter: brightness(0.98); }
+.onb-invite b{ font-weight: 600; }
+.onb-invite-ic{ width: 22px; height: 22px; border-radius: 50%; flex: none; display: flex;
+  align-items: center; justify-content: center; background: var(--accent-deep); color: #fff;
+  font-weight: 700; font-size: 16px; line-height: 1; }
+.onb-invited{ font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; font-weight: 700;
+  color: var(--accent-deep); background: var(--paper); border: 1px solid var(--accent-d-light);
+  border-radius: 5px; padding: 2px 7px; white-space: nowrap; }
+.onb .btn-give{ justify-content: center; }
+.onb-skip{ appearance: none; background: transparent; border: 0; cursor: pointer; font: inherit;
+  font-size: 12.5px; color: var(--ink-faint); align-self: center; padding: 2px 8px; }
+.onb-skip:hover{ color: var(--ink); }
+
+/* ============================================================================
+   OVERLAY NAVIGATION — Balance is the persistent home; sections pop up over the
+   main area while the sidebar stays live. Render-on-click, unmount-on-close.
+   ============================================================================ */
+.proto-main-wrap{ position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.proto-main-wrap > .proto-main{ flex: 1; }
+
+/* the section popup is contained to the main area (sidebar stays clickable) */
+.constel.section-modal{ position: absolute; inset: 0; padding: 26px; align-items: flex-start; }
+.section-panel{
+  position: relative; width: min(1000px, 100%); max-height: 100%;
+  display: flex; flex-direction: column; overflow: hidden; padding: 0;
+  border-radius: 20px; animation: constelPop .3s cubic-bezier(.2,.7,.3,1);
+}
+.section-head{
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 14px 12px 20px; border-bottom: 1px solid var(--line); flex: none;
+}
+.section-head .sh-title{
+  display: flex; align-items: center; gap: 9px; font-family: var(--font-head);
+  font-weight: 600; font-size: 14px; color: var(--ink-soft); letter-spacing: -.01em;
+}
+.section-head .sh-title .bmark{ width: .72em; height: .72em; }
+.section-scroll{ overflow-y: auto; overflow-x: hidden; container-type: inline-size; min-height: 0; }
+.section-scroll > .app-main{ overflow: visible; min-height: 0; }
+@media (max-width: 760px){ .constel.section-modal{ padding: 12px; } }
+
+/* Stack the prototype shell on phones. The container-query stacking rule is
+   dead (a container can't query itself), so drive it from the viewport. */
+@media (max-width: 760px){
+  .proto-stage{ flex-direction: column; }
+  .proto-stage .app-side{
+    width: 100%; height: auto; flex-direction: row; align-items: center;
+    border-right: 0; border-bottom: 1px solid oklch(0.205 0.022 54);
+    overflow-x: auto; gap: 14px; padding: 12px 16px;
+  }
+  .proto-stage .app-side .nav{ flex-direction: row; gap: 4px; }
+  .proto-stage .app-side .nav-label,
+  .proto-stage .app-side .side-foot{ display: none; }
+  .proto-stage .app-side .nav-item{ white-space: nowrap; }
+  .proto-main-wrap{ width: 100%; min-height: 0; }
+}
+
+/* ============================================================================
+   MOTION SAFETY — calm everything for reduced-motion users
+   ============================================================================ */
+@media (prefers-reduced-motion: reduce){
+  html[data-theme="aurora"] .heromark .d.inner,
+  html[data-theme="aurora"] .bal-amount .big,
+  html[data-theme="aurora"] .recog-n,
+  html[data-theme="aurora"] .ph-hero .big,
+  html[data-theme="aurora"] .ch-amount .num,
+  html[data-theme="aurora"] .acc-amt .num,
+  html[data-theme="aurora"] .gd-amt,
+  html[data-theme="aurora"] .recog::before,
+  html[data-theme="aurora"] .recog::after,
+  html[data-theme="aurora"] .standing-badge::after,
+  html[data-theme="aurora"] .ph-standing::after,
+  html[data-theme="aurora"] .live-dot,
+  html[data-theme="aurora"] .relay-dot{
+    animation: none;
+  }
+}

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FreedomBLiNGS — Front Door</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:oklch(0.971 0.013 84); --raised:oklch(0.992 0.008 86); --sunken:oklch(0.948 0.016 82);
+    --ink:oklch(0.272 0.021 64); --soft:oklch(0.455 0.022 64); --faint:oklch(0.612 0.020 66);
+    --line:oklch(0.895 0.014 80); --line2:oklch(0.842 0.018 78);
+    --accent:oklch(0.745 0.128 74); --accent-deep:oklch(0.565 0.118 64); --accent-soft:oklch(0.935 0.045 82);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;min-height:100vh;background:var(--paper);color:var(--ink);
+    font-family:"Hanken Grotesk",system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+    display:flex;align-items:center;justify-content:center;padding:48px 24px;}
+  .wrap{width:100%;max-width:760px;}
+  .head{display:flex;align-items:center;gap:14px;padding-bottom:24px;margin-bottom:36px;
+    border-bottom:1px solid var(--line);}
+  .mark{width:34px;height:34px;flex:none;}
+  .nm{font-weight:600;font-size:23px;letter-spacing:-0.01em;line-height:1;}
+  .nm b{color:var(--accent-deep);}
+  .sub{font-size:10.5px;letter-spacing:0.16em;text-transform:uppercase;color:var(--faint);margin-top:5px;}
+  .lede{font-size:15px;color:var(--soft);line-height:1.55;max-width:54ch;margin:0 0 28px;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media(max-width:620px){.grid{grid-template-columns:1fr;}}
+  a.card{display:flex;flex-direction:column;gap:10px;padding:24px;border-radius:15px;
+    border:1px solid var(--line2);background:var(--raised);text-decoration:none;color:inherit;
+    box-shadow:0 1px 2px oklch(0.4 0.03 70/.05),0 8px 28px oklch(0.4 0.03 70/.06);
+    transition:transform .15s,box-shadow .15s,border-color .15s;}
+  a.card:hover{transform:translateY(-3px);border-color:var(--accent-deep);
+    box-shadow:0 1px 2px oklch(0.4 0.03 70/.06),0 14px 36px oklch(0.4 0.03 70/.10);}
+  .card.primary{background:var(--accent-soft);border-color:var(--accent-deep);}
+  .ct{display:flex;align-items:center;gap:9px;}
+  .dia{width:11px;height:11px;flex:none;transform:rotate(45deg);border-radius:2px;
+    border:1.6px solid var(--accent-deep);}
+  .card.primary .dia{background:var(--accent);}
+  .ctk{font-weight:600;font-size:17px;white-space:nowrap;}
+  .cd{font-size:13px;color:var(--faint);line-height:1.5;}
+  .go{margin-top:4px;font-size:12.5px;font-weight:600;color:var(--accent-deep);
+    display:flex;align-items:center;gap:7px;}
+  .go .chev{width:6px;height:6px;border-right:1.5px solid var(--accent-deep);
+    border-top:1.5px solid var(--accent-deep);transform:rotate(45deg);}
+  .note{margin-top:28px;font-size:12px;color:var(--faint);font-family:"IBM Plex Mono",monospace;
+    line-height:1.6;border-top:1px solid var(--line);padding-top:20px;}
+  .note b{color:var(--soft);font-weight:500;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="head">
+      <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect x="6" y="6" width="20" height="20" rx="3" transform="rotate(45 16 16)" fill="none" stroke="var(--accent-deep)" stroke-width="2"/>
+        <rect x="11.5" y="11.5" width="9" height="9" rx="1.5" transform="rotate(45 16 16)" fill="var(--accent)"/>
+      </svg>
+      <div>
+        <div class="nm">Freedom<b>BLiNG</b>S</div>
+        <div class="sub">The Sovereign Ledger of the HoneyComb</div>
+      </div>
+    </header>
+
+    <p class="lede">Two ways in to the same design system — pick the clickable app to feel the flow, or the design board to review every surface at once.</p>
+
+    <div class="grid">
+      <a class="card primary" href="FreedomBLiNGS — Prototype.html">
+        <div class="ct"><span class="dia"></span><span class="ctk">The Prototype</span></div>
+        <div class="cd">A clickable, navigable member app — click the sidebar to move between surfaces, open the constellation launcher, and trace any BLiNG! in the ledger.</div>
+        <div class="go">Open the app<span class="chev"></span></div>
+      </a>
+      <a class="card" href="FreedomBLiNGS — Sovereign Ledger.html">
+        <div class="ct"><span class="dia"></span><span class="ctk">The Design Board</span></div>
+        <div class="cd">All 19 surfaces laid out in captioned frames for review — the full Phase-1 + Phase-2 exploration in one scroll.</div>
+        <div class="go">Open the board<span class="chev"></span></div>
+      </a>
+    </div>
+
+    <div class="note">Defaults: light · honey · compact · Grotesque — switch theme, accent, density &amp; typeface from the <b>Tweaks</b> panel.<br/>Developer handoff lives in <b>design_handoff_freedomblings/</b>.</div>
+  </div>
+</body>
+</html>
