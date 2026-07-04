@@ -179,7 +179,7 @@ export const SURFACES: SurfaceDef[] = [
     icon: Radio,
     color: '#DC2626',
     group: 'Social',
-    tier: 2,
+    tier: 1,
   },
 
   // ═══ COMMERCE ═══

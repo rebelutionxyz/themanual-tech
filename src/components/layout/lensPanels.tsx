@@ -5,6 +5,7 @@ import { type AtomLevelRow, getAtomLevel, getRealmOrderNames } from '@/lib/atomL
 import { REALM_ID_BY_NAME, REALM_NAMES } from '@/lib/constants';
 import type { FeedSort } from '@/lib/forumFeed';
 import { SURFACE_BY_SLUG } from '@/lib/surfaces';
+import { TIME_PRESETS } from '@/lib/timePresets';
 import { cn } from '@/lib/utils';
 import { useIntelStore } from '@/stores/useIntelStore';
 import { useLensStore } from '@/stores/useLensStore';
@@ -484,6 +485,55 @@ export function StubPanel({ line, note }: { line: string; note: string }) {
           {note}
         </p>
       )}
+    </div>
+  );
+}
+
+/* ───────────────────────── Time-preset panel (white) ───────────────────────── */
+
+/** Time-window presets — picks `useLensStore.timePreset` (drives the feeds'
+    p_after at fetch time). Selecting one closes the popup. */
+export function TimePresetPanel({ onClose }: { onClose: () => void }) {
+  const timePreset = useLensStore((s) => s.timePreset);
+  const setTimePreset = useLensStore((s) => s.setTimePreset);
+
+  return (
+    <div className="bg-white p-2">
+      <div
+        className="px-2 pb-1 font-mono uppercase tracking-wider text-zinc-500"
+        style={{ fontSize: '10px' }}
+        data-size="meta"
+      >
+        Time window
+      </div>
+      {TIME_PRESETS.map((p) => {
+        const active = timePreset === p.key;
+        return (
+          <button
+            key={p.key}
+            type="button"
+            onClick={() => {
+              setTimePreset(p.key);
+              onClose();
+            }}
+            className={cn(
+              'flex w-full items-center justify-between rounded-md px-3 py-1.5 text-left transition-colors',
+              active ? 'bg-zinc-100' : 'hover:bg-zinc-100',
+            )}
+          >
+            <span
+              style={{
+                fontSize: '12.5px',
+                color: active ? INTEL_COLOR : '#3f3f46',
+                fontWeight: active ? 600 : 400,
+              }}
+            >
+              {p.label}
+            </span>
+            {active && <ChevronRight size={12} style={{ color: INTEL_COLOR }} />}
+          </button>
+        );
+      })}
     </div>
   );
 }

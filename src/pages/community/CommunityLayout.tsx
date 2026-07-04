@@ -1,9 +1,11 @@
+import { BAZAAR_ACCENT } from '@/components/bazaar/cards';
 import { CreateEventModal } from '@/components/events/CreateEventModal';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
 import type { IntelView } from '@/components/intel/IntelSidebar';
 import { CommunityShell } from '@/components/shell/CommunityShell';
 import { COMMON_TAIL, type SidebarItem } from '@/components/shell/sidebarNav';
 import { useAuth } from '@/lib/auth';
+import { SURFACE_BY_SLUG } from '@/lib/surfaces';
 import { countMyGoingUpcoming } from '@/lib/events';
 import { isForumModerator } from '@/lib/forumMod';
 import { countMyGroups } from '@/lib/groups';
@@ -22,19 +24,25 @@ import {
   HeartHandshake,
   Megaphone,
   MessageSquare,
+  Package,
   Plus,
+  ShoppingBag,
   Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
-type Surface = 'intel' | 'unite' | 'rule' | 'give';
+type Surface = 'intel' | 'unite' | 'rule' | 'give' | 'pulse' | 'bazaar';
 
 const ACCENT: Record<Surface, string> = {
   intel: '#1D9BF0',
   unite: '#7C3AED',
   rule: '#F97316',
   give: '#16A34A',
+  // PULSE / media red — sourced from the surface registry (kept in sync with
+  // the relit cards' SURFACE_BY_SLUG.get('pulse')?.color).
+  pulse: SURFACE_BY_SLUG.get('pulse')?.color ?? '#DC2626',
+  bazaar: BAZAAR_ACCENT,
 };
 
 const VIEW_ROUTE_MAP: Record<string, IntelView> = { '/intel/mine': 'mythreads' };
@@ -44,6 +52,8 @@ function surfaceFromPath(pathname: string): Surface {
   if (pathname.startsWith('/unite')) return 'unite';
   if (pathname.startsWith('/rule')) return 'rule';
   if (pathname.startsWith('/give')) return 'give';
+  if (pathname.startsWith('/pulse')) return 'pulse';
+  if (pathname.startsWith('/bazaar')) return 'bazaar';
   return 'intel';
 }
 
@@ -165,6 +175,15 @@ export function CommunityLayout() {
       if (location.pathname !== '/rule') navigate('/rule');
       return setRuleView(id as EventsView);
     }
+    if (surface === 'pulse') {
+      // PULSE has no center-view switcher; the only own item is Explore → home.
+      if (location.pathname !== '/pulse') navigate('/pulse');
+      return;
+    }
+    if (surface === 'bazaar') {
+      // BAZAAR sidebar items are route links; this guards the give-fallthrough.
+      return;
+    }
     // give
     if (location.pathname !== '/give') navigate('/give');
     setGiveView(id as GiveView);
@@ -172,6 +191,11 @@ export function CommunityLayout() {
 
   const accent = ACCENT[surface];
   const items = buildItems(surface, { myThreads, saved, isMod, myGroups, going });
+  const bazaarItem = location.pathname.startsWith('/bazaar/new')
+    ? 'offer'
+    : location.pathname.startsWith('/bazaar/orders')
+      ? 'orders'
+      : 'browse';
   const activeItemId =
     surface === 'intel'
       ? activeView
@@ -179,7 +203,11 @@ export function CommunityLayout() {
         ? uniteView
         : surface === 'rule'
           ? ruleView
-          : giveView;
+          : surface === 'pulse'
+            ? 'home'
+            : surface === 'bazaar'
+              ? bazaarItem
+              : giveView;
 
   const outletCtx =
     surface === 'unite'
@@ -258,6 +286,20 @@ function buildItems(surface: Surface, c: Counts): SidebarItem[] {
       { id: 'discover', label: 'Explore', icon: Compass },
       { id: 'create', label: 'Create Campaign', icon: Plus },
       { id: 'mine', label: 'My Campaigns', icon: HeartHandshake },
+      ...COMMON_TAIL,
+    ];
+  }
+  if (surface === 'pulse') {
+    // PULSE is self-contained (live / upcoming / library / search live on the
+    // center page), so the sidebar is just Explore + the shared utility tail.
+    return [{ id: 'home', label: 'Explore', icon: Compass }, ...COMMON_TAIL];
+  }
+  if (surface === 'bazaar') {
+    // BAZAAR — route-link items (Browse / OFFER / Orders) + the shared tail.
+    return [
+      { id: 'browse', label: 'Browse', icon: ShoppingBag, to: '/bazaar' },
+      { id: 'offer', label: 'New Offer', icon: Plus, to: '/bazaar/new' },
+      { id: 'orders', label: 'Orders', icon: Package, to: '/bazaar/orders' },
       ...COMMON_TAIL,
     ];
   }

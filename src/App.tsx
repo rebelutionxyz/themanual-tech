@@ -63,6 +63,13 @@ import { IntelPage } from '@/pages/intel/IntelPage';
 import { NewThreadPage } from '@/pages/intel/NewThreadPage';
 import { ReportedPage } from '@/pages/intel/ReportedPage';
 import { ThreadPage } from '@/pages/intel/ThreadPage';
+import { BazaarBrowse } from '@/pages/bazaar/BazaarBrowse';
+import { BazaarListingDetail } from '@/pages/bazaar/BazaarListingDetail';
+import { BazaarNew } from '@/pages/bazaar/BazaarNew';
+import { BazaarOrders } from '@/pages/bazaar/BazaarOrders';
+import { ChannelPage } from '@/pages/pulse/ChannelPage';
+import { PulseHome } from '@/pages/pulse/PulseHome';
+import { WatchPage } from '@/pages/pulse/WatchPage';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 export default function App() {
@@ -80,7 +87,7 @@ const ADMIN_SURFACE_PATHS = new Set(['/myhex', '/nexus', '/nucleus']);
 // Community surfaces own the white X-style shell (logo + lens controls live in
 // the GlobalSidebar), so the global SiteHeader / ticker / toolbar are suppressed
 // here — the shell renders its own ticker. Other surfaces keep the legacy chrome.
-const COMMUNITY_PREFIXES = ['/intel', '/unite', '/rule', '/give'];
+const COMMUNITY_PREFIXES = ['/intel', '/unite', '/rule', '/give', '/pulse', '/bazaar'];
 
 function AppContent() {
   const activeAstra = useAstra();
@@ -154,6 +161,22 @@ function AppContent() {
             <Route path="/rule" element={<EventsPage />} />
             <Route path="/rule/:id" element={<EventPage />} />
             <Route path="/give" element={<GivePage />} />
+
+            {/* PULSE — Live News Network. Mounts in the SAME community shell as
+              INTEL/UNITE/RULE/GIVE (sidebar + new header + single RealmStrip);
+              pages are flat children so the shell never unmounts. The realm
+              filter reads the shared lens (useLensStore.path) that the shell's
+              RealmStrip drives. */}
+            <Route path="/pulse" element={<PulseHome />} />
+            <Route path="/pulse/watch/:broadcastId" element={<WatchPage />} />
+            <Route path="/pulse/c/:handle" element={<ChannelPage />} />
+
+            {/* BAZAAR — marketplace. Mounts in the same community shell; flat
+              children. (new / orders land in later slices.) */}
+            <Route path="/bazaar" element={<BazaarBrowse />} />
+            <Route path="/bazaar/new" element={<BazaarNew />} />
+            <Route path="/bazaar/orders" element={<BazaarOrders />} />
+            <Route path="/bazaar/:id" element={<BazaarListingDetail />} />
           </Route>
 
           {/* Platform surfaces (right rail + utility chrome) */}

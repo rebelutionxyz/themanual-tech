@@ -1,8 +1,9 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MessageSquare, Lock, Clock, Bookmark, BookmarkCheck, Share2, Check } from 'lucide-react';
+import { MessageSquare, Lock, Clock, Bookmark, BookmarkCheck, Share2, Check, X } from 'lucide-react';
 import { listThreads, listThreadsByIds, listThreadIdsByAuthor, relativeTime, type ForumThread } from '@/lib/intel';
-import { listThreadFeed, type FeedSort, type ThreadFeedItem } from '@/lib/forumFeed';
+import { forumSearch, listThreadFeed, type FeedSort, type ThreadFeedItem } from '@/lib/forumFeed';
+import { timeAfterISO } from '@/lib/timePresets';
 import {
   listSavedThreadIds,
   toggleSave,
@@ -26,6 +27,7 @@ import {
   BEE_COLOR,
 } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { CARD_INK, cardChipStyle, realmCardStyle } from '@/lib/realmCardStyle';
 import { REALM_COLOR_FALLBACK, useRealmColors } from '@/stores/useRealmColors';
 import type { RealmId } from '@/types/manual';
 
@@ -136,6 +138,21 @@ export function ThreadList({
   // Stable serialization of the prefix for effect deps (segments are plain text).
   const prefixKey = prefix.join(' ');
 
+  // Multi-select realm filter (the chip set) → OR-filtered feed. realmKey is the
+  // stable effect dep so the feed re-fetches when ANY selected realm changes —
+  // not just the first one (which `prefix` tracks).
+  const selectedRealms = useLensStore((s) => s.selectedRealms);
+  const realmPrefixes = selectedRealms.map((r) => r.pathParts);
+  const realmKey = selectedRealms.map((r) => r.key).join('|');
+
+  // Astra-local search (cross-realm). ≥2 chars → results REPLACE the feed.
+  const searchTerm = useLensStore((s) => s.searchTerm);
+  const clearSearch = useLensStore((s) => s.clearSearch);
+  const searching = searchTerm.trim().length >= 2;
+
+  // Time-window lens → p_after (computed at fetch time inside the effect).
+  const timePreset = useLensStore((s) => s.timePreset);
+
   const atomById = useMemo(() => {
     const m = new Map(atoms.map((a) => [a.id, a]));
     return m;
@@ -145,7 +162,7 @@ export function ThreadList({
   const [threadCategoryLinks, setThreadCategoryLinks] = useState<Map<string, string[]>>(new Map());
   const [reactionSummaries, setReactionSummaries] = useState<Map<string, ReactionSummary>>(new Map());
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: prefixKey is the stable serialization of `prefix`; depending on the array identity would refetch every render
+  // biome-ignore lint/correctness/useExhaustiveDependencies: prefixKey + realmKey are the stable serializations of `prefix` / `realmPrefixes`; depending on the array identities would refetch every render
   useEffect(() => {
     let cancelled = false;
     setThreads(null);
@@ -155,8 +172,10 @@ export function ThreadList({
     setSavedIds(new Set());
     setReactionSummaries(new Map());
 
-    const threadPromise: Promise<ForumThread[]> =
-      savedMode
+    const after = timeAfterISO(timePreset);
+    const threadPromise: Promise<ForumThread[]> = searching
+      ? forumSearch(searchTerm, 30, after).then((items) => items.map(feedItemToThread))
+      : savedMode
         ? bee?.id
           ? (async () => {
               const ids = await listSavedThreadIds(bee.id, personalSortMode);
@@ -171,7 +190,9 @@ export function ThreadList({
               })()
             : Promise.resolve([] as ForumThread[])
           : feedSort
-            ? listThreadFeed(prefix, feedSort).then((items) => items.map(feedItemToThread))
+            ? listThreadFeed(realmPrefixes, feedSort, 20, 0, after).then((items) =>
+                items.map(feedItemToThread),
+              )
             : listThreads({
                 prefix,
                 sortBy,
@@ -250,7 +271,7 @@ export function ThreadList({
     return () => {
       cancelled = true;
     };
-  }, [prefixKey, sortBy, timeWindowHours, feedSort, savedMode, myThreadsMode, personalSortMode, bee?.id]);
+  }, [prefixKey, realmKey, searchTerm, timePreset, sortBy, timeWindowHours, feedSort, savedMode, myThreadsMode, personalSortMode, bee?.id]);
 
   if (error) {
     return (
@@ -262,16 +283,33 @@ export function ThreadList({
     );
   }
 
+  const searchHeader = searching ? (
+    <SearchResultsHeader term={searchTerm.trim()} onClear={clearSearch} />
+  ) : null;
+
   if (threads === null)
     return (
-      <ThreadListSkeleton
-        realmId={selectedRealmId}
-        savedMode={savedMode}
-        myThreadsMode={myThreadsMode}
-      />
+      <>
+        {searchHeader}
+        <ThreadListSkeleton
+          realmId={selectedRealmId}
+          savedMode={savedMode}
+          myThreadsMode={myThreadsMode}
+        />
+      </>
     );
   if (threads.length === 0)
-    return (
+    return searching ? (
+      <>
+        {searchHeader}
+        <p
+          className="rounded-lg border border-dashed border-zinc-200 px-4 py-8 text-center text-zinc-500"
+          style={{ fontSize: '13px' }}
+        >
+          No results for “{searchTerm.trim()}”.
+        </p>
+      </>
+    ) : (
       <EmptyThreads
         realmId={selectedRealmId}
         l2={prefix[1] ?? null}
@@ -286,6 +324,7 @@ export function ThreadList({
 
   return (
     <>
+      {searchHeader}
       {showPersonalSortToggle && (
         <PersonalSortToggle
           mode={personalSortMode}
@@ -439,13 +478,8 @@ function ThreadCard({
     <li>
       <Link
         to={`/intel/t/${thread.id}`}
-        className="group block overflow-hidden rounded-lg border transition-shadow hover:shadow-sm"
-        style={{
-          borderColor: `${accentColor}33`,
-          borderLeftColor: accentColor,
-          borderLeftWidth: '3px',
-          background: `${accentColor}14`,
-        }}
+        className="group block overflow-hidden rounded-lg transition-shadow hover:shadow-md"
+        style={realmCardStyle(accentColor)}
       >
         <div className="p-4">
         <div className="flex items-start gap-3">
@@ -454,19 +488,15 @@ function ThreadCard({
               <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                 <span
                   className="rounded px-1.5 py-0.5 font-mono"
-                  style={{
-                    fontSize: '10px',
-                    color: accentColor,
-                    background: `${accentColor}15`,
-                  }}
+                  style={{ fontSize: '10px', ...cardChipStyle }}
                   data-size="meta"
                 >
                   {primaryRealmName}
                 </span>
                 {thread.primaryL2 && (
                   <span
-                    className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-zinc-500"
-                    style={{ fontSize: '10px' }}
+                    className="rounded px-1.5 py-0.5 font-mono"
+                    style={{ fontSize: '10px', ...cardChipStyle }}
                     data-size="meta"
                   >
                     {thread.primaryL2}
@@ -476,18 +506,16 @@ function ThreadCard({
             )}
 
             <h3
-              className={cn(
-                'font-display text-lg leading-tight text-zinc-900',
-                thread.isLocked && 'opacity-70',
-              )}
+              className={cn('font-display text-lg leading-tight', thread.isLocked && 'opacity-70')}
+              style={{ color: CARD_INK.title }}
             >
               {thread.title}
             </h3>
 
             {thread.body && (
               <p
-                className="mt-1.5 line-clamp-2 text-zinc-500"
-                style={{ fontSize: '13px', lineHeight: '1.5' }}
+                className="mt-1.5 line-clamp-2"
+                style={{ fontSize: '13px', lineHeight: '1.5', color: CARD_INK.body }}
               >
                 {thread.body}
               </p>
@@ -500,7 +528,7 @@ function ThreadCard({
                     type="button"
                     key={a.id}
                     onClick={(e) => handleAtomClick(e, a)}
-                    className="inline-flex items-center gap-1 rounded border border-zinc-200 bg-white/70 px-1.5 py-0.5 text-zinc-700 transition-colors hover:bg-white hover:text-zinc-900"
+                    className="inline-flex items-center gap-1 rounded border border-white/20 bg-white/10 px-1.5 py-0.5 text-white/85 transition-colors hover:bg-white/20 hover:text-white"
                     style={{ fontSize: '10.5px' }}
                     title={`Filter by ${a.realmName}${a.pathParts[1] ? ` · ${a.pathParts[1]}` : ''}${a.pathParts[2] ? ` · ${a.pathParts[2]}` : ''}`}
                   >
@@ -516,7 +544,7 @@ function ThreadCard({
                 ))}
                 {atomIds.length > 4 && (
                   <span
-                    className="font-mono text-zinc-500"
+                    className="font-mono text-white/60"
                     style={{ fontSize: '10.5px' }}
                     data-size="meta"
                   >
@@ -535,18 +563,18 @@ function ThreadCard({
                       type="button"
                       key={path}
                       onClick={(e) => handleCategoryClick(e, path)}
-                      className="inline-flex items-center gap-1 rounded border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+                      className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/[0.06] px-1.5 py-0.5 text-white/70 transition-colors hover:bg-white/15 hover:text-white"
                       style={{ fontSize: '10px' }}
                       title={`Filter by ${path}`}
                     >
-                      <span className="text-zinc-400">#</span>
+                      <span className="text-white/45">#</span>
                       {leaf}
                     </button>
                   );
                 })}
                 {categoryPaths.length > categoryChips.length && (
                   <span
-                    className="font-mono text-zinc-500"
+                    className="font-mono text-white/60"
                     style={{ fontSize: '10px' }}
                     data-size="meta"
                   >
@@ -558,7 +586,7 @@ function ThreadCard({
           </div>
           <div className="flex flex-shrink-0 items-start gap-0.5">
             {thread.isLocked && (
-              <Lock size={14} className="mt-1.5 mr-1 text-zinc-400" />
+              <Lock size={14} className="mt-1.5 mr-1 text-white/55" />
             )}
             <CardShareButton threadId={thread.id} />
             {canSave && (
@@ -573,7 +601,7 @@ function ThreadCard({
                   'rounded-md p-1.5 transition-colors',
                   saved
                     ? 'text-honey hover:bg-honey/10'
-                    : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700',
+                    : 'text-white/60 hover:bg-white/10 hover:text-white',
                 )}
                 title={saved ? 'Remove from Saved' : 'Save for later'}
                 aria-label={saved ? 'Remove from Saved' : 'Save for later'}
@@ -601,14 +629,14 @@ function ThreadCard({
             </div>
           )}
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-zinc-500">
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-white/65">
           <MetaPill icon={<MessageSquare size={11} />}>
             {thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}
           </MetaPill>
           <MetaPill icon={<Clock size={11} />}>{relativeTime(thread.lastActivityAt)}</MetaPill>
           {thread.authorHandle && (
             <span
-              className="font-mono text-zinc-500"
+              className="font-mono text-white/65"
               style={{ fontSize: '11px' }}
               data-size="meta"
             >
@@ -730,8 +758,8 @@ function CardShareButton({ threadId }: { threadId: string }) {
       className={cn(
         'rounded-md p-1.5 transition-colors',
         copied
-          ? 'text-emerald-600 hover:bg-emerald-50'
-          : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700',
+          ? 'text-emerald-300 hover:bg-emerald-300/10'
+          : 'text-white/60 hover:bg-white/10 hover:text-white',
         pending && 'opacity-60',
       )}
       title={copied ? 'Link copied' : bee ? 'Share with affiliate tracking' : 'Copy share link'}
@@ -758,6 +786,26 @@ async function copyToClipboardFallback(text: string): Promise<void> {
   } finally {
     document.body.removeChild(ta);
   }
+}
+
+/** "Searching: term" banner shown above search results, with a clear (✕) that
+    returns the content area to the normal feed (clears useLensStore.searchTerm). */
+function SearchResultsHeader({ term, onClear }: { term: string; onClear: () => void }) {
+  return (
+    <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
+      <span className="min-w-0 truncate text-zinc-700" style={{ fontSize: '13px' }}>
+        Searching: <span className="font-semibold text-zinc-900">“{term}”</span>
+      </span>
+      <button
+        type="button"
+        onClick={onClear}
+        className="flex flex-shrink-0 items-center gap-1 rounded-md px-2 py-1 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+        style={{ fontSize: '12px' }}
+      >
+        <X size={13} /> Clear
+      </button>
+    </div>
+  );
 }
 
 function MetaPill({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {

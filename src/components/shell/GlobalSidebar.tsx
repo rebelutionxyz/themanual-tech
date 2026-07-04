@@ -90,16 +90,6 @@ export function GlobalSidebar({
                 </span>
               )}
             </Link>
-            <button
-              type="button"
-              onClick={onToggleCollapse}
-              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              title={collapsed ? 'Expand' : 'Collapse'}
-              // Hidden on mobile — tap-to-open / backdrop-to-close drives it there.
-              className="hidden h-8 w-8 flex-shrink-0 items-center justify-center text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 md:flex"
-            >
-              {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-            </button>
           </div>
 
           {/* Astra dropdown */}
@@ -125,6 +115,32 @@ export function GlobalSidebar({
             />
           ))}
         </nav>
+        {/* Pinned bottom: collapse / expand toggle (md+; mobile uses tap-to-open
+            on the rail / backdrop-to-close). Moved here from the top wordmark. */}
+        <div
+          className={cn(
+            'flex flex-shrink-0 px-2 pb-3 pt-1',
+            shown ? 'justify-center' : 'justify-start',
+            lockInner,
+          )}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              // Clear hover-peek first: the toggle lives INSIDE <aside>, so the
+              // pointer is over it on click → without this, `peeking` (collapsed
+              // && hovering) immediately re-expands the just-collapsed sidebar
+              // and the collapse never shows. Explicit toggle wins over peek.
+              setHovering(false);
+              onToggleCollapse();
+            }}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand' : 'Collapse'}
+            className="hidden h-8 w-8 flex-shrink-0 items-center justify-center rounded text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 md:flex"
+          >
+            {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
+        </div>
         {/* Account lives in the bottom toolbar (pass 8) — not the sidebar. */}
       </aside>
       {/* Mobile-only close affordance: tap anywhere outside the open sidebar. */}

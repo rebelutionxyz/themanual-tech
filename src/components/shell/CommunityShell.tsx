@@ -2,10 +2,26 @@ import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
 import { BottomToolbar } from '@/components/shell/BottomToolbar';
 import { GlobalSidebar } from '@/components/shell/GlobalSidebar';
 import { LensRow } from '@/components/shell/LensRow';
+import { RealmChipsBar } from '@/components/shell/RealmChipsBar';
 import { RealmStrip } from '@/components/shell/RealmStrip';
+import { RealmTreeSlider } from '@/components/shell/RealmTreeSlider';
 import { RightRail } from '@/components/shell/RightRail';
 import type { SidebarItem } from '@/components/shell/sidebarNav';
 import { type CSSProperties, type ReactNode, useState } from 'react';
+
+/**
+ * Right "Overview" rail toggle. Hidden this pass across ALL community surfaces;
+ * the center column reflows to fill the freed width. Reversible — flip to true
+ * to restore the rail (RightRail import is retained on purpose).
+ */
+const SHOW_RIGHT_RAIL = false;
+
+/**
+ * Horizontal 14-realm strip — RETIRED. Realm navigation now lives entirely in
+ * the White-Rabbit right-column tree (RealmTreeSlider), which drives the same
+ * lens. Component file kept; flip to true to restore the strip.
+ */
+const SHOW_REALM_STRIP = false;
 
 interface CommunityShellProps {
   /** Active surface slug (intel / unite / rule / give) — drives nav + dropdown. */
@@ -42,7 +58,9 @@ export function CommunityShell({
 
   return (
     <div
-      className="flex h-full min-h-0 flex-col bg-white text-zinc-900"
+      // OUTER CONTAINER = the shell, FULL browser width. Every child (ticker, the
+      // sidebar+content row, and the bottom toolbar) spans the full viewport.
+      className="flex h-full min-h-0 w-full flex-col bg-white text-zinc-900"
       // Tints scrollbars to the active surface accent — webkit reads
       // --surface-accent (index.css), Firefox inherits scrollbar-color.
       style={
@@ -53,10 +71,15 @@ export function CommunityShell({
       }
     >
       <TopTickerSlot />
-      {/* [ left sidebar | center column | right rail ]. The lens toolbar lives
-          inside the center column; the bottom toolbar is now a full-width band
-          BELOW this row (edge to edge) — it no longer tracks the center width. */}
-      <div className="mx-auto flex min-h-0 w-full max-w-[1290px] flex-1 overflow-hidden">
+      {/* REGION 1 (flex-1) — [ left sidebar | content column ]. Fills the outer
+          container's width. The content column (right of the sidebar) is a flex
+          flex-col, top → bottom:
+            LensRow       — TOP toolbar (Search / Location / Time / Realm)
+            <main>        — flex-1 scroller (the realm slide-over overlays it)
+            LensChipsBar  — selected-realm chips
+          The sidebar runs the full height of REGION 1; REGION 2 (the bottom
+          toolbar) sits below, spanning the whole container under both. */}
+      <div className="flex min-h-0 w-full flex-1 overflow-hidden">
         <GlobalSidebar
           activeSurface={activeSurface}
           accent={accent}
@@ -66,20 +89,31 @@ export function CommunityShell({
           collapsed={collapsed}
           onToggleCollapse={() => setCollapsed((v) => !v)}
         />
-        <div className="flex min-h-0 min-w-0 flex-1 border-zinc-200 md:border-l">
-          {/* Center column: lens toolbar · realm strip · feed scroller. */}
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-zinc-200 md:border-r">
-            <LensRow accent={accent} />
-            <RealmStrip />
-            <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
-              <div className="min-h-0 flex-1">{children}</div>
-            </main>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col border-zinc-200 md:border-l">
+          {/* TOP toolbar */}
+          <LensRow accent={accent} />
+          {/* Content region (flex-1) + the realm slide-over, which overlays ONLY
+              this region — never the top/bottom toolbars or the chips. */}
+          <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+              {SHOW_REALM_STRIP && <RealmStrip />}
+              <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-white">
+                <div className="min-h-0 flex-1">{children}</div>
+              </main>
+            </div>
+            {/* Cross-Astra Overview rail — hidden on mobile, side column at md+. */}
+            {SHOW_RIGHT_RAIL && <RightRail />}
+            {/* White-Rabbit realm-tree slide-over — overlays the content region. */}
+            <RealmTreeSlider />
           </div>
-          {/* Cross-Astra Overview rail — hidden on mobile, side column at md+. */}
-          <RightRail />
+          {/* Selected-realm chips — bottom of the content column (right of the
+              sidebar), above the bottom toolbar. */}
+          <RealmChipsBar />
         </div>
       </div>
-      {/* Bottom utility toolbar — full-width accent band, flush to both edges. */}
+      {/* REGION 2 — bottom toolbar. A full-width child of the OUTER CONTAINER, so
+          it spans the whole ~1290 shell box (under the sidebar AND the content
+          column), edges meeting the container edges — NOT the viewport. */}
       <BottomToolbar accent={accent} />
     </div>
   );

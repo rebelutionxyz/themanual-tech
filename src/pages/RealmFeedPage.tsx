@@ -51,7 +51,7 @@ export function RealmFeedPage() {
     let cancelled = false;
     setThreads(null);
     setError(null);
-    listThreadFeed(path, sort)
+    listThreadFeed(path.length ? [path] : [], sort)
       .then((rows) => {
         if (!cancelled) setThreads(rows);
       })

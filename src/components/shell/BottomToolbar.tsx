@@ -60,8 +60,10 @@ const LAUNCHERS: Launcher[] = [
   },
 ];
 
-/** Relative-luminance pick: white vs near-black ink that reads on a given bg. */
-function readableInk(hex: string): string {
+/** Relative-luminance pick: white vs near-black ink that reads on a given bg.
+    Exported so the top lens toolbar (LensRow) flips its control ink the same
+    way against the shared solid Astra accent. */
+export function readableInk(hex: string): string {
   const h = hex.replace('#', '');
   if (h.length < 6) return '#ffffff';
   const toLin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
@@ -116,8 +118,9 @@ export function BottomToolbar({ accent }: { accent: string }) {
     : {};
 
   return (
-    // Its own entity: a full-width band flush to both edges, below the three-column
-    // row. Background is the Astra accent; ink flips for contrast per accent.
+    // REGION 2 of the OUTER CONTAINER (CommunityShell): `w-full` = the shell's
+    // full width, so the band spans the whole container (under the sidebar AND
+    // the content). The container is now full browser width.
     <div className="w-full flex-shrink-0" style={{ background: accent }}>
       {/* Horizontal touch-scroller: items stay one row and scroll when they
           overflow a narrow viewport rather than wrapping or squashing. */}
