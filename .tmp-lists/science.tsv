@@ -1,0 +1,90 @@
+id	depth	type	is_leaf	name	path
+science-lists	2	event	false	Lists	Science / Lists
+science-lists-astronomy-lists	3	event	false	Astronomy lists	Science / Lists / Astronomy lists
+science-lists-astronomy-lists-asteroid-groups	4	event	true	Asteroid groups	Science / Lists / Astronomy lists / Asteroid groups
+science-lists-astronomy-lists-astronomical-catalogues	4	event	true	Astronomical catalogues	Science / Lists / Astronomy lists / Astronomical catalogues
+science-lists-astronomy-lists-astronomical-objects-named-after-people	4	event	true	Astronomical objects named after people	Science / Lists / Astronomy lists / Astronomical objects named after people
+science-lists-astronomy-lists-astronomical-societies	4	event	true	Astronomical societies	Science / Lists / Astronomy lists / Astronomical societies
+science-lists-astronomy-lists-astronomical-symbols	4	event	true	Astronomical symbols	Science / Lists / Astronomy lists / Astronomical symbols
+science-lists-astronomy-lists-comets-by-type	4	event	true	Comets by type	Science / Lists / Astronomy lists / Comets by type
+science-lists-astronomy-lists-future-astronomical-events	4	event	true	Future astronomical events	Science / Lists / Astronomy lists / Future astronomical events
+science-lists-astronomy-lists-meteor-showers-list	4	event	true	Meteor showers list	Science / Lists / Astronomy lists / Meteor showers list
+science-lists-astronomy-lists-minor-planets-list	4	event	true	Minor planets list	Science / Lists / Astronomy lists / Minor planets list
+science-lists-astronomy-lists-most-distant-astronomical-objects	4	event	true	Most distant astronomical objects	Science / Lists / Astronomy lists / Most distant astronomical objects
+science-lists-astronomy-lists-possible-dwarf-planets-list	4	event	true	Possible dwarf planets list	Science / Lists / Astronomy lists / Possible dwarf planets list
+science-lists-astronomy-lists-space-telescopes	4	event	true	Space telescopes	Science / Lists / Astronomy lists / Space telescopes
+science-lists-astronomy-lists-telescopes	4	event	true	Telescopes	Science / Lists / Astronomy lists / Telescopes
+science-lists-astronomy-lists-trans-neptunian-objects	4	event	true	Trans-Neptunian objects	Science / Lists / Astronomy lists / Trans-Neptunian objects
+science-lists-biological-journals	3	event	true	Biological journals	Science / Lists / Biological journals
+science-lists-causes-of-death	3	event	true	Causes of death	Science / Lists / Causes of death
+science-lists-chemistry-lists	3	event	false	Chemistry lists	Science / Lists / Chemistry lists
+science-lists-chemistry-lists-biomolecules	4	event	true	Biomolecules	Science / Lists / Chemistry lists / Biomolecules
+science-lists-chemistry-lists-compounds-list	4	event	true	Compounds list	Science / Lists / Chemistry lists / Compounds list
+science-lists-chemistry-lists-elements-by-number	4	event	true	Elements by number	Science / Lists / Chemistry lists / Elements by number
+science-lists-chemistry-lists-elements-by-symbol	4	event	true	Elements by symbol	Science / Lists / Chemistry lists / Elements by symbol
+science-lists-chemistry-lists-enthalpy-change-of-formation	4	event	true	Enthalpy change of formation	Science / Lists / Chemistry lists / Enthalpy change of formation
+science-lists-chemistry-lists-functional-groups	4	event	true	Functional groups	Science / Lists / Chemistry lists / Functional groups
+science-lists-chemistry-lists-isotope-table	4	event	true	Isotope table	Science / Lists / Chemistry lists / Isotope table
+science-lists-chemistry-lists-stable-isotopes	4	event	true	Stable isotopes	Science / Lists / Chemistry lists / Stable isotopes
+science-lists-chemistry-lists-standard-electrode-potentials	4	event	true	Standard electrode potentials	Science / Lists / Chemistry lists / Standard electrode potentials
+science-lists-diseases-lists-botanical	3	event	false	Diseases lists (botanical)	Science / Lists / Diseases lists (botanical)
+science-lists-diseases-lists-botanical-banana-and-plantain-diseases	4	event	true	Banana and plantain diseases	Science / Lists / Diseases lists (botanical) / Banana and plantain diseases
+science-lists-diseases-lists-botanical-sweet-potato-diseases	4	event	true	Sweet potato diseases	Science / Lists / Diseases lists (botanical) / Sweet potato diseases
+science-lists-earth-sciences-lists	3	event	false	Earth sciences lists	Science / Lists / Earth sciences lists
+science-lists-earth-sciences-lists-birthstones	4	event	true	Birthstones	Science / Lists / Earth sciences lists / Birthstones
+science-lists-earth-sciences-lists-earthquakes-list	4	event	true	Earthquakes list	Science / Lists / Earth sciences lists / Earthquakes list
+science-lists-earth-sciences-lists-landforms-list	4	event	true	Landforms list	Science / Lists / Earth sciences lists / Landforms list
+science-lists-earth-sciences-lists-minerals-list	4	event	true	Minerals list	Science / Lists / Earth sciences lists / Minerals list
+science-lists-earth-sciences-lists-oil-fields	4	event	true	Oil fields	Science / Lists / Earth sciences lists / Oil fields
+science-lists-earth-sciences-lists-rocks-list	4	event	true	Rocks list	Science / Lists / Earth sciences lists / Rocks list
+science-lists-earth-sciences-lists-tectonic-plates-list	4	event	true	Tectonic plates list	Science / Lists / Earth sciences lists / Tectonic plates list
+science-lists-earth-sciences-lists-tropical-cyclone-names	4	event	true	Tropical cyclone names	Science / Lists / Earth sciences lists / Tropical cyclone names
+science-lists-earth-sciences-lists-uranium-mines	4	event	true	Uranium mines	Science / Lists / Earth sciences lists / Uranium mines
+science-lists-earth-sciences-lists-volcanoes-list	4	event	true	Volcanoes list	Science / Lists / Earth sciences lists / Volcanoes list
+science-lists-feeding-behaviours	3	event	true	Feeding behaviours	Science / Lists / Feeding behaviours
+science-lists-fish-lists	3	event	false	Fish lists	Science / Lists / Fish lists
+science-lists-fish-lists-fish-in-sweden	4	event	true	Fish in Sweden	Science / Lists / Fish lists / Fish in Sweden
+science-lists-fish-lists-fish-of-ireland	4	event	true	Fish of Ireland	Science / Lists / Fish lists / Fish of Ireland
+science-lists-fish-lists-fish-of-montana	4	event	true	Fish of Montana	Science / Lists / Fish lists / Fish of Montana
+science-lists-fish-lists-fishes-of-great-britain	4	event	true	Fishes of Great Britain	Science / Lists / Fish lists / Fishes of Great Britain
+science-lists-fish-lists-fishes-of-the-coral-sea	4	event	true	Fishes of the Coral Sea	Science / Lists / Fish lists / Fishes of the Coral Sea
+science-lists-fish-lists-fishes-of-west-virginia	4	event	true	Fishes of West Virginia	Science / Lists / Fish lists / Fishes of West Virginia
+science-lists-gene-families	3	event	true	Gene families	Science / Lists / Gene families
+science-lists-human-anatomy	3	event	true	Human anatomy	Science / Lists / Human anatomy
+science-lists-insects-lists	3	event	false	Insects lists	Science / Lists / Insects lists
+science-lists-insects-lists-insects-of-britain	4	event	true	Insects of Britain	Science / Lists / Insects lists / Insects of Britain
+science-lists-latin-and-greek-systematic-names	3	event	true	Latin and Greek systematic names	Science / Lists / Latin and Greek systematic names
+science-lists-list-of-sciences	3	event	true	List of sciences	Science / Lists / List of sciences
+science-lists-muscles	3	event	true	Muscles	Science / Lists / Muscles
+science-lists-physics-lists	3	event	false	Physics lists	Science / Lists / Physics lists
+science-lists-physics-lists-artificial-radiation-belts	4	event	true	Artificial Radiation Belts	Science / Lists / Physics lists / Artificial Radiation Belts
+science-lists-physics-lists-colors-list	4	event	true	Colors list	Science / Lists / Physics lists / Colors list
+science-lists-physics-lists-cycles-physics	4	event	true	Cycles (physics)	Science / Lists / Physics lists / Cycles (physics)
+science-lists-physics-lists-equations-in-classical-mechanics	4	event	true	Equations in classical mechanics	Science / Lists / Physics lists / Equations in classical mechanics
+science-lists-physics-lists-laws-in-science	4	event	true	Laws in science	Science / Lists / Physics lists / Laws in science
+science-lists-physics-lists-letters-used-in-mathematics-and-science	4	event	true	Letters used in mathematics and science	Science / Lists / Physics lists / Letters used in mathematics and science
+science-lists-physics-lists-noise-types	4	event	true	Noise types	Science / Lists / Physics lists / Noise types
+science-lists-physics-lists-particles-list	4	event	true	Particles list	Science / Lists / Physics lists / Particles list
+science-lists-physics-lists-quantum-field-theories	4	event	true	Quantum field theories	Science / Lists / Physics lists / Quantum field theories
+science-lists-physics-lists-relativistic-equations	4	event	true	Relativistic equations	Science / Lists / Physics lists / Relativistic equations
+science-lists-physics-lists-resistivities	4	event	true	Resistivities	Science / Lists / Physics lists / Resistivities
+science-lists-plants-lists	3	event	false	Plants lists	Science / Lists / Plants lists
+science-lists-plants-lists-acer-species-maples	4	event	true	Acer species (maples)	Science / Lists / Plants lists / Acer species (maples)
+science-lists-plants-lists-domesticated-plants	4	event	true	Domesticated plants	Science / Lists / Plants lists / Domesticated plants
+science-lists-plants-lists-edible-seeds	4	event	true	Edible seeds	Science / Lists / Plants lists / Edible seeds
+science-lists-plants-lists-famous-trees	4	event	true	Famous trees	Science / Lists / Plants lists / Famous trees
+science-lists-plants-lists-fruits-list	4	event	true	Fruits list	Science / Lists / Plants lists / Fruits list
+science-lists-plants-lists-garden-plants	4	event	true	Garden plants	Science / Lists / Plants lists / Garden plants
+science-lists-plants-lists-herbs-list	4	event	true	Herbs list	Science / Lists / Plants lists / Herbs list
+science-lists-plants-lists-palm-tree-genera	4	event	true	Palm tree genera	Science / Lists / Plants lists / Palm tree genera
+science-lists-plants-lists-sequoia-groves	4	event	true	Sequoia groves	Science / Lists / Plants lists / Sequoia groves
+science-lists-plants-lists-vegetables-list	4	event	true	Vegetables list	Science / Lists / Plants lists / Vegetables list
+science-lists-species-and-specimens	3	event	false	Species and specimens	Science / Lists / Species and specimens
+science-lists-species-and-specimens-birds-by-region	4	event	true	Birds by region	Science / Lists / Species and specimens / Birds by region
+science-lists-species-and-specimens-dinosaur-species	4	event	true	Dinosaur species	Science / Lists / Species and specimens / Dinosaur species
+science-lists-species-and-specimens-domesticated-animals	4	event	true	Domesticated animals	Science / Lists / Species and specimens / Domesticated animals
+science-lists-species-and-specimens-mammals-by-region	4	event	true	Mammals by region	Science / Lists / Species and specimens / Mammals by region
+science-lists-species-and-specimens-organisms-by-population	4	event	true	Organisms by population	Science / Lists / Species and specimens / Organisms by population
+science-lists-species-and-specimens-organisms-named-after-famous-people	4	event	true	Organisms named after famous people	Science / Lists / Species and specimens / Organisms named after famous people
+science-lists-species-and-specimens-organisms-named-after-works-of-fiction	4	event	true	Organisms named after works of fiction	Science / Lists / Species and specimens / Organisms named after works of fiction
+science-lists-species-and-specimens-world-s-25-most-endangered-primates	4	event	true	World's 25 Most Endangered Primates	Science / Lists / Species and specimens / World's 25 Most Endangered Primates

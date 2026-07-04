@@ -1,0 +1,11 @@
+id	depth	type	is_leaf	name	path
+health-lists	2	event	false	Lists	Health / Lists
+health-lists-acronyms-in-healthcare	3	event	true	Acronyms in healthcare	Health / Lists / Acronyms in healthcare
+health-lists-alternative-medicine-modalities	3	event	true	Alternative medicine modalities	Health / Lists / Alternative medicine modalities
+health-lists-dsm-iv-codes	3	event	true	DSM-IV codes	Health / Lists / DSM-IV codes
+health-lists-medical-abbreviations	3	event	true	Medical abbreviations	Health / Lists / Medical abbreviations
+health-lists-pharmaceutical-drugs-list	3	event	true	Pharmaceutical drugs list	Health / Lists / Pharmaceutical drugs list
+health-lists-psychiatric-drugs-by-condition	3	event	true	Psychiatric drugs by condition	Health / Lists / Psychiatric drugs by condition
+health-lists-psychotherapies	3	event	true	Psychotherapies	Health / Lists / Psychotherapies
+health-lists-reference-ranges-for-common-blood-tests	3	event	true	Reference ranges for common blood tests	Health / Lists / Reference ranges for common blood tests
+health-lists-surgical-procedures	3	event	true	Surgical procedures	Health / Lists / Surgical procedures

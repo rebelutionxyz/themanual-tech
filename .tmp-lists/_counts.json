@@ -1,0 +1,13 @@
+{
+  "counts": {
+    "DISSOLVE_CONTAINER": 31,
+    "INTRA_REALM": 334,
+    "IMPORT_REALIZE": 68,
+    "LENS": 35,
+    "DISSOLVE": 89,
+    "CROSS_REALM": 35,
+    "ADJUDICATE": 14
+  },
+  "unclassified": [],
+  "total": 606
+}

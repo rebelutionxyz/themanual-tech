@@ -1,0 +1,1001 @@
+{
+  "newPathCollisions": [],
+  "maxNewDepth": 8,
+  "deepest": [
+    {
+      "id": "culture-literature-lists-fiction-comics-comic-books-dc-comics-justice-league-members",
+      "bucket": "INTRA_REALM",
+      "src_path": "Culture / Literature / Lists / Fiction / Comics / Comic books / DC Comics / Justice League members",
+      "src_realm": "Culture",
+      "src_depth": 8,
+      "src_type": "event",
+      "src_is_leaf": true,
+      "new_id": "culture-literature-fiction-comics-comic-books-dc-comics-justice-league-members",
+      "new_path": "Culture / Literature / Fiction / Comics / Comic books / DC Comics / Justice League / Members",
+      "new_path_parts": [
+        "Culture",
+        "Literature",
+        "Fiction",
+        "Comics",
+        "Comic books",
+        "DC Comics",
+        "Justice League",
+        "Members"
+      ],
+      "new_realm_id": "culture",
+      "new_realm_name": "Culture",
+      "new_depth": 8,
+      "proposed_new_type": "entity_list",
+      "notes": ""
+    },
+    {
+      "id": "culture-literature-lists-fiction-comics-comic-books-dc-comics-legion-of-super-heroes-members",
+      "bucket": "INTRA_REALM",
+      "src_path": "Culture / Literature / Lists / Fiction / Comics / Comic books / DC Comics / Legion of Super-Heroes members",
+      "src_realm": "Culture",
+      "src_depth": 8,
+      "src_type": "event",
+      "src_is_leaf": true,
+      "new_id": "culture-literature-fiction-comics-comic-books-dc-comics-legion-of-super-heroes-members",
+      "new_path": "Culture / Literature / Fiction / Comics / Comic books / DC Comics / Legion of Super-Heroes / Members",
+      "new_path_parts": [
+        "Culture",
+        "Literature",
+        "Fiction",
+        "Comics",
+        "Comic books",
+        "DC Comics",
+        "Legion of Super-Heroes",
+        "Members"
+      ],
+      "new_realm_id": "culture",
+      "new_realm_name": "Culture",
+      "new_depth": 8,
+      "proposed_new_type": "entity_list",
+      "notes": ""
+    },
+    {
+      "id": "culture-literature-lists-fiction-comics-comic-books-dc-comics-superman-enemies",
+      "bucket": "INTRA_REALM",
+      "src_path": "Culture / Literature / Lists / Fiction / Comics / Comic books / DC Comics / Superman enemies",
+      "src_realm": "Culture",
+      "src_depth": 8,
+      "src_type": "event",
+      "src_is_leaf": true,
+      "new_id": "culture-literature-fiction-comics-comic-books-dc-comics-superman-enemies",
+      "new_path": "Culture / Literature / Fiction / Comics / Comic books / DC Comics / Superman / Enemies",
+      "new_path_parts": [
+        "Culture",
+        "Literature",
+        "Fiction",
+        "Comics",
+        "Comic books",
+        "DC Comics",
+        "Superman",
+        "Enemies"
+      ],
+      "new_realm_id": "culture",
+      "new_realm_name": "Culture",
+      "new_depth": 8,
+      "proposed_new_type": "entity_list",
+      "notes": ""
+    }
+  ],
+  "missingContainers": [
+    {
+      "path": "Culture / Games / Tabletop games",
+      "id": "culture-games-tabletop-games",
+      "name": "Tabletop games",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 3
+    },
+    {
+      "path": "Culture / Gastronomy / Materials",
+      "id": "culture-gastronomy-materials",
+      "name": "Materials",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 3
+    },
+    {
+      "path": "Culture / Literature / Books",
+      "id": "culture-literature-books",
+      "name": "Books",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 3
+    },
+    {
+      "path": "Culture / Literature / Electronic literature",
+      "id": "culture-literature-electronic-literature",
+      "name": "Electronic literature",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 3
+    },
+    {
+      "path": "Culture / Literature / Fiction / Comics",
+      "id": "culture-literature-fiction-comics",
+      "name": "Comics",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 4
+    },
+    {
+      "path": "Culture / Literature / Fiction / Comics / Comic books",
+      "id": "culture-literature-fiction-comics-comic-books",
+      "name": "Comic books",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 5
+    },
+    {
+      "path": "Culture / Literature / Fiction / Comics / Comic books / DC Comics",
+      "id": "culture-literature-fiction-comics-comic-books-dc-comics",
+      "name": "DC Comics",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 6
+    },
+    {
+      "path": "Culture / Literature / Fiction / Comics / Comic books / DC Comics / Justice League",
+      "id": "culture-literature-fiction-comics-comic-books-dc-comics-justice-league",
+      "name": "Justice League",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 7
+    },
+    {
+      "path": "Culture / Literature / Fiction / Comics / Comic books / DC Comics / Legion of Super-Heroes",
+      "id": "culture-literature-fiction-comics-comic-books-dc-comics-legion-of-super-heroes",
+      "name": "Legion of Super-Heroes",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 7
+    },
+    {
+      "path": "Culture / Literature / Fiction / Comics / Comic books / DC Comics / Superman",
+      "id": "culture-literature-fiction-comics-comic-books-dc-comics-superman",
+      "name": "Superman",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 7
+    },
+    {
+      "path": "Culture / Literature / Fiction / Comics / Comic books / Marvel Comics",
+      "id": "culture-literature-fiction-comics-comic-books-marvel-comics",
+      "name": "Marvel Comics",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 6
+    },
+    {
+      "path": "Culture / Literature / Fiction / Comics / Manga",
+      "id": "culture-literature-fiction-comics-manga",
+      "name": "Manga",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 5
+    },
+    {
+      "path": "Culture / Literature / Fiction / Fictional places",
+      "id": "culture-literature-fiction-fictional-places",
+      "name": "Fictional places",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 4
+    },
+    {
+      "path": "Culture / Literature / Fiction / Genres",
+      "id": "culture-literature-fiction-genres",
+      "name": "Genres",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 4
+    },
+    {
+      "path": "Culture / Literature / Fiction / Major themes",
+      "id": "culture-literature-fiction-major-themes",
+      "name": "Major themes",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 4
+    },
+    {
+      "path": "Culture / Literature / Fictional characters",
+      "id": "culture-literature-fictional-characters",
+      "name": "Fictional characters",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 3
+    },
+    {
+      "path": "Culture / Mass media / Broadcast media / Television / Programs",
+      "id": "culture-mass-media-broadcast-media-television-programs",
+      "name": "Programs",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 5
+    },
+    {
+      "path": "Culture / Mass media / Broadcast media / Television / Stations",
+      "id": "culture-mass-media-broadcast-media-television-stations",
+      "name": "Stations",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 5
+    },
+    {
+      "path": "Culture / Mass media / Film and cinema / Films",
+      "id": "culture-mass-media-film-and-cinema-films",
+      "name": "Films",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 4
+    },
+    {
+      "path": "Culture / Mass media / Film and cinema / Religious portrayals",
+      "id": "culture-mass-media-film-and-cinema-religious-portrayals",
+      "name": "Religious portrayals",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 4
+    },
+    {
+      "path": "Culture / Mass media / Print media / Magazines",
+      "id": "culture-mass-media-print-media-magazines",
+      "name": "Magazines",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 4
+    },
+    {
+      "path": "Culture / Performing arts / Music / Electronic music",
+      "id": "culture-performing-arts-music-electronic-music",
+      "name": "Electronic music",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 4
+    },
+    {
+      "path": "Culture / Performing arts / Music / Musicians and groups",
+      "id": "culture-performing-arts-music-musicians-and-groups",
+      "name": "Musicians and groups",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 4
+    },
+    {
+      "path": "Culture / Performing arts / Music / Musicians and groups / Bands",
+      "id": "culture-performing-arts-music-musicians-and-groups-bands",
+      "name": "Bands",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 5
+    },
+    {
+      "path": "Culture / Performing arts / Music / Musicians and groups / Composers",
+      "id": "culture-performing-arts-music-musicians-and-groups-composers",
+      "name": "Composers",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 5
+    },
+    {
+      "path": "Culture / Performing arts / Music / Musicians and groups / Musicians",
+      "id": "culture-performing-arts-music-musicians-and-groups-musicians",
+      "name": "Musicians",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 5
+    },
+    {
+      "path": "Culture / Performing arts / Music / Songs and compositions",
+      "id": "culture-performing-arts-music-songs-and-compositions",
+      "name": "Songs and compositions",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 4
+    },
+    {
+      "path": "Culture / Performing arts / Music / Songs and compositions / By composer",
+      "id": "culture-performing-arts-music-songs-and-compositions-by-composer",
+      "name": "By composer",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 5
+    },
+    {
+      "path": "Culture / Performing arts / Music / Video game music",
+      "id": "culture-performing-arts-music-video-game-music",
+      "name": "Video game music",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 4
+    },
+    {
+      "path": "Culture / Sports / Ball games / Association football / Clubs",
+      "id": "culture-sports-ball-games-association-football-clubs",
+      "name": "Clubs",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 5
+    },
+    {
+      "path": "Culture / Sports / Ball games / Association football / National teams",
+      "id": "culture-sports-ball-games-association-football-national-teams",
+      "name": "National teams",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 5
+    },
+    {
+      "path": "Culture / Sports / Ball games / Baseball / Awards",
+      "id": "culture-sports-ball-games-baseball-awards",
+      "name": "Awards",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 5
+    },
+    {
+      "path": "Culture / Sports / Ball games / Baseball / Awards / AL Gold Glove Winners",
+      "id": "culture-sports-ball-games-baseball-awards-al-gold-glove-winners",
+      "name": "AL Gold Glove Winners",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 6
+    },
+    {
+      "path": "Culture / Sports / Ball games / Baseball / Awards / NL Gold Glove Winners",
+      "id": "culture-sports-ball-games-baseball-awards-nl-gold-glove-winners",
+      "name": "NL Gold Glove Winners",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 6
+    },
+    {
+      "path": "Culture / Sports / Combat sports / Martial arts / Judo",
+      "id": "culture-sports-combat-sports-martial-arts-judo",
+      "name": "Judo",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 5
+    },
+    {
+      "path": "Culture / Sports / Cycling",
+      "id": "culture-sports-cycling",
+      "name": "Cycling",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 3
+    },
+    {
+      "path": "Culture / Sports / Notable athletes",
+      "id": "culture-sports-notable-athletes",
+      "name": "Notable athletes",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 3
+    },
+    {
+      "path": "Culture / Sports / Sports leagues",
+      "id": "culture-sports-sports-leagues",
+      "name": "Sports leagues",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 3
+    },
+    {
+      "path": "Culture / Sports / Winter sports",
+      "id": "culture-sports-winter-sports",
+      "name": "Winter sports",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 3
+    },
+    {
+      "path": "Culture / Sports / Winter sports / Skiing",
+      "id": "culture-sports-winter-sports-skiing",
+      "name": "Skiing",
+      "realm_name": "Culture",
+      "realm_id": "culture",
+      "depth": 4
+    },
+    {
+      "path": "Health / Substances / Psychiatric drugs",
+      "id": "health-substances-psychiatric-drugs",
+      "name": "Psychiatric drugs",
+      "realm_name": "Health",
+      "realm_id": "health",
+      "depth": 3
+    },
+    {
+      "path": "History / Ancient civilizations / Roman",
+      "id": "history-ancient-civilizations-roman",
+      "name": "Roman",
+      "realm_name": "History",
+      "realm_id": "history",
+      "depth": 3
+    },
+    {
+      "path": "History / Ancient civilizations / Roman / Britain",
+      "id": "history-ancient-civilizations-roman-britain",
+      "name": "Britain",
+      "realm_name": "History",
+      "realm_id": "history",
+      "depth": 4
+    },
+    {
+      "path": "History / Historians",
+      "id": "history-historians",
+      "name": "Historians",
+      "realm_name": "History",
+      "realm_id": "history",
+      "depth": 2
+    },
+    {
+      "path": "History / Historical events / Disasters",
+      "id": "history-historical-events-disasters",
+      "name": "Disasters",
+      "realm_name": "History",
+      "realm_id": "history",
+      "depth": 3
+    },
+    {
+      "path": "History / Historical events / English Reformation",
+      "id": "history-historical-events-english-reformation",
+      "name": "English Reformation",
+      "realm_name": "History",
+      "realm_id": "history",
+      "depth": 3
+    },
+    {
+      "path": "History / Historical events / Natural disasters",
+      "id": "history-historical-events-natural-disasters",
+      "name": "Natural disasters",
+      "realm_name": "History",
+      "realm_id": "history",
+      "depth": 3
+    },
+    {
+      "path": "Math / Branches of mathematics / Pure mathematics",
+      "id": "math-branches-of-mathematics-pure-mathematics",
+      "name": "Pure mathematics",
+      "realm_name": "Math",
+      "realm_id": "math",
+      "depth": 3
+    },
+    {
+      "path": "Religion / Concepts / Sacred architecture",
+      "id": "religion-concepts-sacred-architecture",
+      "name": "Sacred architecture",
+      "realm_name": "Religion",
+      "realm_id": "religion",
+      "depth": 3
+    },
+    {
+      "path": "Religion / Major religions / Christianity",
+      "id": "religion-major-religions-christianity",
+      "name": "Christianity",
+      "realm_name": "Religion",
+      "realm_id": "religion",
+      "depth": 3
+    },
+    {
+      "path": "Religion / Religious roles / Patriarchs",
+      "id": "religion-religious-roles-patriarchs",
+      "name": "Patriarchs",
+      "realm_name": "Religion",
+      "realm_id": "religion",
+      "depth": 3
+    },
+    {
+      "path": "Religion / Sacred texts / Bible",
+      "id": "religion-sacred-texts-bible",
+      "name": "Bible",
+      "realm_name": "Religion",
+      "realm_id": "religion",
+      "depth": 3
+    },
+    {
+      "path": "Science / Astronomy and space science / Space exploration",
+      "id": "science-astronomy-and-space-science-space-exploration",
+      "name": "Space exploration",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Biology / Botany",
+      "id": "science-biology-botany",
+      "name": "Botany",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Biology / Botany / Plant pathology",
+      "id": "science-biology-botany-plant-pathology",
+      "name": "Plant pathology",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 4
+    },
+    {
+      "path": "Science / Biology / Botany / Species",
+      "id": "science-biology-botany-species",
+      "name": "Species",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 4
+    },
+    {
+      "path": "Science / Biology / Conservation",
+      "id": "science-biology-conservation",
+      "name": "Conservation",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Biology / Ecology",
+      "id": "science-biology-ecology",
+      "name": "Ecology",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Biology / Ethology",
+      "id": "science-biology-ethology",
+      "name": "Ethology",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Biology / Genetics",
+      "id": "science-biology-genetics",
+      "name": "Genetics",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Biology / Taxonomy",
+      "id": "science-biology-taxonomy",
+      "name": "Taxonomy",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Biology / Zoology",
+      "id": "science-biology-zoology",
+      "name": "Zoology",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Biology / Zoology / Birds",
+      "id": "science-biology-zoology-birds",
+      "name": "Birds",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 4
+    },
+    {
+      "path": "Science / Biology / Zoology / Fish",
+      "id": "science-biology-zoology-fish",
+      "name": "Fish",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 4
+    },
+    {
+      "path": "Science / Biology / Zoology / Fish / By region",
+      "id": "science-biology-zoology-fish-by-region",
+      "name": "By region",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 5
+    },
+    {
+      "path": "Science / Biology / Zoology / Insects",
+      "id": "science-biology-zoology-insects",
+      "name": "Insects",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 4
+    },
+    {
+      "path": "Science / Biology / Zoology / Insects / By region",
+      "id": "science-biology-zoology-insects-by-region",
+      "name": "By region",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 5
+    },
+    {
+      "path": "Science / Biology / Zoology / Mammals",
+      "id": "science-biology-zoology-mammals",
+      "name": "Mammals",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 4
+    },
+    {
+      "path": "Science / Biology / Zoology / Paleontology",
+      "id": "science-biology-zoology-paleontology",
+      "name": "Paleontology",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 4
+    },
+    {
+      "path": "Science / Chemistry / Biochemistry",
+      "id": "science-chemistry-biochemistry",
+      "name": "Biochemistry",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Chemistry / Electrochemistry",
+      "id": "science-chemistry-electrochemistry",
+      "name": "Electrochemistry",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Chemistry / Elements",
+      "id": "science-chemistry-elements",
+      "name": "Elements",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Chemistry / Elements / Isotopes",
+      "id": "science-chemistry-elements-isotopes",
+      "name": "Isotopes",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 4
+    },
+    {
+      "path": "Science / Chemistry / Organic chemistry",
+      "id": "science-chemistry-organic-chemistry",
+      "name": "Organic chemistry",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Chemistry / Thermodynamics",
+      "id": "science-chemistry-thermodynamics",
+      "name": "Thermodynamics",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Physics / Electromagnetism",
+      "id": "science-physics-electromagnetism",
+      "name": "Electromagnetism",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Physics / Nuclear physics",
+      "id": "science-physics-nuclear-physics",
+      "name": "Nuclear physics",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Physics / Particle physics",
+      "id": "science-physics-particle-physics",
+      "name": "Particle physics",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Physics / Quantum field theory",
+      "id": "science-physics-quantum-field-theory",
+      "name": "Quantum field theory",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Science / Physics / Relativity",
+      "id": "science-physics-relativity",
+      "name": "Relativity",
+      "realm_name": "Science",
+      "realm_id": "science",
+      "depth": 3
+    },
+    {
+      "path": "Society / Economy and business / Companies",
+      "id": "society-economy-and-business-companies",
+      "name": "Companies",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 3
+    },
+    {
+      "path": "Society / Economy and business / Economists",
+      "id": "society-economy-and-business-economists",
+      "name": "Economists",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 3
+    },
+    {
+      "path": "Society / Economy and business / Finance / European sovereign-debt crisis",
+      "id": "society-economy-and-business-finance-european-sovereign-debt-crisis",
+      "name": "European sovereign-debt crisis",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 4
+    },
+    {
+      "path": "Society / Economy and business / Retail",
+      "id": "society-economy-and-business-retail",
+      "name": "Retail",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 3
+    },
+    {
+      "path": "Society / Government / Foreign policy",
+      "id": "society-government-foreign-policy",
+      "name": "Foreign policy",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 3
+    },
+    {
+      "path": "Society / Government / International organizations",
+      "id": "society-government-international-organizations",
+      "name": "International organizations",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 3
+    },
+    {
+      "path": "Society / Government / International organizations (categories) / UN",
+      "id": "society-government-international-organizations-categories-un",
+      "name": "UN",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 4
+    },
+    {
+      "path": "Society / Government / International organizations / UN",
+      "id": "society-government-international-organizations-un",
+      "name": "UN",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 4
+    },
+    {
+      "path": "Society / Government / National symbols",
+      "id": "society-government-national-symbols",
+      "name": "National symbols",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 3
+    },
+    {
+      "path": "Society / Government / United States",
+      "id": "society-government-united-states",
+      "name": "United States",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 3
+    },
+    {
+      "path": "Society / Government / United States / Congress",
+      "id": "society-government-united-states-congress",
+      "name": "Congress",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 4
+    },
+    {
+      "path": "Society / Linguistics / Phonetics",
+      "id": "society-linguistics-phonetics",
+      "name": "Phonetics",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 3
+    },
+    {
+      "path": "Society / Politics / Political parties",
+      "id": "society-politics-political-parties",
+      "name": "Political parties",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 3
+    },
+    {
+      "path": "Society / Social institutions / Professional bodies",
+      "id": "society-social-institutions-professional-bodies",
+      "name": "Professional bodies",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 3
+    },
+    {
+      "path": "Society / Social movements / LGBT",
+      "id": "society-social-movements-lgbt",
+      "name": "LGBT",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 3
+    },
+    {
+      "path": "Society / Social movements / Labor",
+      "id": "society-social-movements-labor",
+      "name": "Labor",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 3
+    },
+    {
+      "path": "Society / Social movements / Suffragists",
+      "id": "society-social-movements-suffragists",
+      "name": "Suffragists",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 3
+    },
+    {
+      "path": "Society / Social movements / Women",
+      "id": "society-social-movements-women",
+      "name": "Women",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 3
+    },
+    {
+      "path": "Society / Social sciences / Psychology",
+      "id": "society-social-sciences-psychology",
+      "name": "Psychology",
+      "realm_name": "Society",
+      "realm_id": "society",
+      "depth": 3
+    },
+    {
+      "path": "Tech / Computing / Character encoding",
+      "id": "tech-computing-character-encoding",
+      "name": "Character encoding",
+      "realm_name": "Tech",
+      "realm_id": "tech",
+      "depth": 3
+    },
+    {
+      "path": "Tech / Computing / File formats",
+      "id": "tech-computing-file-formats",
+      "name": "File formats",
+      "realm_name": "Tech",
+      "realm_id": "tech",
+      "depth": 3
+    },
+    {
+      "path": "Tech / Computing / Software / Accessibility",
+      "id": "tech-computing-software-accessibility",
+      "name": "Accessibility",
+      "realm_name": "Tech",
+      "realm_id": "tech",
+      "depth": 4
+    },
+    {
+      "path": "Tech / Computing / Software / Software engineering",
+      "id": "tech-computing-software-software-engineering",
+      "name": "Software engineering",
+      "realm_name": "Tech",
+      "realm_id": "tech",
+      "depth": 4
+    },
+    {
+      "path": "Tech / Computing / Software / Web development",
+      "id": "tech-computing-software-web-development",
+      "name": "Web development",
+      "realm_name": "Tech",
+      "realm_id": "tech",
+      "depth": 4
+    },
+    {
+      "path": "Tech / Construction and built environment / Civil engineering",
+      "id": "tech-construction-and-built-environment-civil-engineering",
+      "name": "Civil engineering",
+      "realm_name": "Tech",
+      "realm_id": "tech",
+      "depth": 3
+    },
+    {
+      "path": "Tech / Construction and built environment / Civil engineering / Bridges",
+      "id": "tech-construction-and-built-environment-civil-engineering-bridges",
+      "name": "Bridges",
+      "realm_name": "Tech",
+      "realm_id": "tech",
+      "depth": 4
+    },
+    {
+      "path": "Tech / Construction and built environment / Civil engineering / Tunnels",
+      "id": "tech-construction-and-built-environment-civil-engineering-tunnels",
+      "name": "Tunnels",
+      "realm_name": "Tech",
+      "realm_id": "tech",
+      "depth": 4
+    },
+    {
+      "path": "Tech / Construction and built environment / Heritage registers",
+      "id": "tech-construction-and-built-environment-heritage-registers",
+      "name": "Heritage registers",
+      "realm_name": "Tech",
+      "realm_id": "tech",
+      "depth": 3
+    },
+    {
+      "path": "Tech / Internet and Web / Protocols",
+      "id": "tech-internet-and-web-protocols",
+      "name": "Protocols",
+      "realm_name": "Tech",
+      "realm_id": "tech",
+      "depth": 3
+    },
+    {
+      "path": "Tech / Internet and Web / Protocols / HTTP",
+      "id": "tech-internet-and-web-protocols-http",
+      "name": "HTTP",
+      "realm_name": "Tech",
+      "realm_id": "tech",
+      "depth": 4
+    },
+    {
+      "path": "Tech / Transport technology / Aircraft",
+      "id": "tech-transport-technology-aircraft",
+      "name": "Aircraft",
+      "realm_name": "Tech",
+      "realm_id": "tech",
+      "depth": 3
+    },
+    {
+      "path": "Tech / Transport technology / Aircraft / Airports",
+      "id": "tech-transport-technology-aircraft-airports",
+      "name": "Airports",
+      "realm_name": "Tech",
+      "realm_id": "tech",
+      "depth": 4
+    },
+    {
+      "path": "Tech / Transport technology / Maritime",
+      "id": "tech-transport-technology-maritime",
+      "name": "Maritime",
+      "realm_name": "Tech",
+      "realm_id": "tech",
+      "depth": 3
+    },
+    {
+      "path": "Tech / Transport technology / Rail transport",
+      "id": "tech-transport-technology-rail-transport",
+      "name": "Rail transport",
+      "realm_name": "Tech",
+      "realm_id": "tech",
+      "depth": 3
+    }
+  ],
+  "containerIdCollisions": [],
+  "dupContainers": [],
+  "maxContainerDepth": 7
+}

@@ -1,0 +1,12 @@
+id	depth	type	is_leaf	name	path
+math-lists	2	event	false	Lists	Math / Lists
+math-lists-basic-mathematics	3	event	true	Basic mathematics	Math / Lists / Basic mathematics
+math-lists-games-mathematical	3	event	true	Games (mathematical)	Math / Lists / Games (mathematical)
+math-lists-integrals	3	event	true	Integrals	Math / Lists / Integrals
+math-lists-mathematical-series	3	event	true	Mathematical series	Math / Lists / Mathematical series
+math-lists-mathematics-lists-meta	3	event	true	Mathematics lists (meta)	Math / Lists / Mathematics lists (meta)
+math-lists-prime-numbers-list	3	event	true	Prime numbers list	Math / Lists / Prime numbers list
+math-lists-principia-mathematica-glossary-items	3	event	true	Principia Mathematica glossary items	Math / Lists / Principia Mathematica glossary items
+math-lists-shapes-with-metaphorical-names	3	event	true	Shapes with metaphorical names	Math / Lists / Shapes with metaphorical names
+math-lists-systems-theory	3	event	true	Systems theory	Math / Lists / Systems theory
+math-lists-tensor-theory	3	event	true	Tensor theory	Math / Lists / Tensor theory

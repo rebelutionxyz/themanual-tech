@@ -1,0 +1,14 @@
+id	depth	type	is_leaf	name	path
+philosophy-lists	2	event	false	Lists	Philosophy / Lists
+philosophy-lists-aesthetics-topics-list	3	event	true	Aesthetics topics list	Philosophy / Lists / Aesthetics topics list
+philosophy-lists-eastern-philosophers-timeline	3	event	true	Eastern philosophers timeline	Philosophy / Lists / Eastern philosophers timeline
+philosophy-lists-epistemology-topics-list	3	event	true	Epistemology topics list	Philosophy / Lists / Epistemology topics list
+philosophy-lists-ethics-topics-list	3	event	true	Ethics topics list	Philosophy / Lists / Ethics topics list
+philosophy-lists-history-of-western-philosophy-list	3	event	true	History of Western Philosophy list	Philosophy / Lists / History of Western Philosophy list
+philosophy-lists-logic-topics-list	3	event	true	Logic topics list	Philosophy / Lists / Logic topics list
+philosophy-lists-metaphysics-topics-list	3	event	true	Metaphysics topics list	Philosophy / Lists / Metaphysics topics list
+philosophy-lists-philosophers-role-category	3	event	true	Philosophers (role/category)	Philosophy / Lists / Philosophers (role/category)
+philosophy-lists-philosophical-timelines	3	event	true	Philosophical timelines	Philosophy / Lists / Philosophical timelines
+philosophy-lists-philosophies-list	3	event	true	Philosophies list	Philosophy / Lists / Philosophies list
+philosophy-lists-philosophy-topics-list	3	event	true	Philosophy topics list	Philosophy / Lists / Philosophy topics list
+philosophy-lists-western-philosophers-timeline	3	event	true	Western philosophers timeline	Philosophy / Lists / Western philosophers timeline

@@ -1,0 +1,17 @@
+id	depth	type	is_leaf	name	path
+self-lists	2	event	false	Lists	Self / Lists
+self-lists-association-footballer-playing-deaths	3	event	true	Association footballer playing deaths	Self / Lists / Association footballer playing deaths
+self-lists-bow-tie-wearers	3	event	true	Bow tie wearers	Self / Lists / Bow tie wearers
+self-lists-cyclist-race-deaths	3	event	true	Cyclist race deaths	Self / Lists / Cyclist race deaths
+self-lists-disappeared-mysteriously	3	event	true	Disappeared mysteriously	Self / Lists / Disappeared mysteriously
+self-lists-entertainer-deaths-while-performing	3	event	true	Entertainer deaths while performing	Self / Lists / Entertainer deaths while performing
+self-lists-eponymous-laws	3	event	true	Eponymous laws	Self / Lists / Eponymous laws
+self-lists-eponyms	3	event	true	Eponyms	Self / Lists / Eponyms
+self-lists-families-by-tree	3	event	true	Families by tree	Self / Lists / Families by tree
+self-lists-inventors-killed-by-their-own-inventions	3	event	true	Inventors killed by their own inventions	Self / Lists / Inventors killed by their own inventions
+self-lists-personal-timelines	3	event	true	Personal timelines	Self / Lists / Personal timelines
+self-lists-political-self-immolations	3	event	true	Political self-immolations	Self / Lists / Political self-immolations
+self-lists-selfie-related-injuries-and-deaths	3	event	true	Selfie-related injuries and deaths	Self / Lists / Selfie-related injuries and deaths
+self-lists-terms-for-men	3	event	true	Terms for men	Self / Lists / Terms for men
+self-lists-unusual-deaths	3	event	true	Unusual deaths	Self / Lists / Unusual deaths
+self-lists-wartime-cross-dressers	3	event	true	Wartime cross-dressers	Self / Lists / Wartime cross-dressers

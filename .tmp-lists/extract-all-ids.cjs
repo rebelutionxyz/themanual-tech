@@ -1,0 +1,10 @@
+const fs = require('fs');
+const src = String.raw`C:\Users\Butch\.claude\projects\C--Users-Butch-Documents-HONEYCOMB-TheMANUAL-tech\85380cb0-df28-4c52-ab80-e6d02083ffe5\tool-results\mcp-claude_ai_Supabase-execute_sql-1779198324529.txt`;
+const raw = fs.readFileSync(src, 'utf8');
+const outer = JSON.parse(raw);
+const inner = outer.result;
+const m = inner.match(/<untrusted-data-[a-f0-9-]+>\s*(\[[\s\S]*?\])\s*<\/untrusted-data/);
+const rows = JSON.parse(m[1]);
+console.log('total atoms:', rows.length);
+fs.writeFileSync('.tmp-lists/_all_ids.json', JSON.stringify(rows.map(r => ({id: r.id, path: r.path}))));
+console.log('wrote _all_ids.json');

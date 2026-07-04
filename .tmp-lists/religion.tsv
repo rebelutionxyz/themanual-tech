@@ -1,0 +1,25 @@
+id	depth	type	is_leaf	name	path
+religion-lists	2	event	false	Lists	Religion / Lists
+religion-lists-angels-list	3	event	true	Angels list	Religion / Lists / Angels list
+religion-lists-bible-stories	3	event	true	Bible stories	Religion / Lists / Bible stories
+religion-lists-biblical-nameless	3	event	true	Biblical nameless	Religion / Lists / Biblical nameless
+religion-lists-biblical-names	3	event	true	Biblical names	Religion / Lists / Biblical names
+religion-lists-cathedrals	3	event	true	Cathedrals	Religion / Lists / Cathedrals
+religion-lists-christian-denominations-list	3	event	true	Christian denominations list	Religion / Lists / Christian denominations list
+religion-lists-deities-list	3	event	true	Deities list	Religion / Lists / Deities list
+religion-lists-demons-list	3	event	true	Demons list	Religion / Lists / Demons list
+religion-lists-dramatic-portrayals-of-jesus-christ	3	event	true	Dramatic portrayals of Jesus Christ	Religion / Lists / Dramatic portrayals of Jesus Christ
+religion-lists-founders-religious-list	3	event	true	Founders (religious) list	Religion / Lists / Founders (religious) list
+religion-lists-hinduism-lists	3	event	true	Hinduism lists	Religion / Lists / Hinduism lists
+religion-lists-indigetes-roman-gods-and-goddesses-list	3	event	true	Indigetes (Roman gods and goddesses) list	Religion / Lists / Indigetes (Roman gods and goddesses) list
+religion-lists-languages-by-year-of-first-bible-translation	3	event	true	Languages by year of first Bible translation	Religion / Lists / Languages by year of first Bible translation
+religion-lists-major-religious-groups	3	event	true	Major religious groups	Religion / Lists / Major religious groups
+religion-lists-monasteries-dissolved-by-henry-viii	3	event	true	Monasteries dissolved by Henry VIII	Religion / Lists / Monasteries dissolved by Henry VIII
+religion-lists-mormonism-list	3	event	true	Mormonism list	Religion / Lists / Mormonism list
+religion-lists-patriarchs-of-antioch	3	event	true	Patriarchs of Antioch	Religion / Lists / Patriarchs of Antioch
+religion-lists-patriarchs-of-constantinople	3	event	true	Patriarchs of Constantinople	Religion / Lists / Patriarchs of Constantinople
+religion-lists-people-claimed-to-be-jesus	3	event	true	People claimed to be Jesus	Religion / Lists / People claimed to be Jesus
+religion-lists-popes-list	3	event	true	Popes list	Religion / Lists / Popes list
+religion-lists-religions-and-spiritual-traditions	3	event	true	Religions and spiritual traditions	Religion / Lists / Religions and spiritual traditions
+religion-lists-saints-list	3	event	true	Saints list	Religion / Lists / Saints list
+religion-lists-sexually-active-popes	3	event	true	Sexually active popes	Religion / Lists / Sexually active popes

@@ -1,0 +1,8 @@
+id	depth	type	is_leaf	name	path
+justice-lists	2	event	false	Lists	Justice / Lists
+justice-lists-government-oversight-bodies	3	event	true	Government oversight bodies	Justice / Lists / Government oversight bodies
+justice-lists-investigative-journalism-outlets	3	event	true	Investigative journalism outlets	Justice / Lists / Investigative journalism outlets
+justice-lists-notable-accountability-cases-reference	3	event	true	Notable accountability cases (reference)	Justice / Lists / Notable accountability cases (reference)
+justice-lists-notable-whistleblowers-reference	3	event	true	Notable whistleblowers (reference)	Justice / Lists / Notable whistleblowers (reference)
+justice-lists-truth-commissions-historical	3	event	true	Truth commissions (historical)	Justice / Lists / Truth commissions (historical)
+justice-lists-whistleblower-support-organizations	3	event	true	Whistleblower support organizations	Justice / Lists / Whistleblower support organizations

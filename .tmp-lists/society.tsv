@@ -1,0 +1,88 @@
+id	depth	type	is_leaf	name	path
+society-lists	2	event	false	Lists	Society / Lists
+society-lists-academic-fields	3	event	true	Academic fields	Society / Lists / Academic fields
+society-lists-acronyms	3	event	true	Acronyms	Society / Lists / Acronyms
+society-lists-admissions-tests	3	event	true	Admissions tests	Society / Lists / Admissions tests
+society-lists-banks-list	3	event	true	Banks list	Society / Lists / Banks list
+society-lists-british-professional-bodies	3	event	true	British professional bodies	Society / Lists / British professional bodies
+society-lists-business-theorists	3	event	true	Business theorists	Society / Lists / Business theorists
+society-lists-california-suffragists	3	event	true	California suffragists	Society / Lists / California suffragists
+society-lists-case-law-list	3	event	true	Case law (list)	Society / Lists / Case law (list)
+society-lists-civic-fraternal-service-professional-organizations	3	event	true	Civic, fraternal, service, professional organizations	Society / Lists / Civic, fraternal, service, professional organizations
+society-lists-civics-topics	3	event	true	Civics topics	Society / Lists / Civics topics
+society-lists-clinical-psychologists	3	event	true	Clinical psychologists	Society / Lists / Clinical psychologists
+society-lists-companies-list	3	event	true	Companies (list)	Society / Lists / Companies (list)
+society-lists-consonants	3	event	true	Consonants	Society / Lists / Consonants
+society-lists-cooperatives-list	3	event	true	Cooperatives list	Society / Lists / Cooperatives list
+society-lists-corporate-assets	3	event	true	Corporate assets	Society / Lists / Corporate assets
+society-lists-countries-by-nominal-gdp	3	event	true	Countries by nominal GDP	Society / Lists / Countries by nominal GDP
+society-lists-countries-by-nominal-gdp-per-capita	3	event	true	Countries by nominal GDP per capita	Society / Lists / Countries by nominal GDP per capita
+society-lists-countries-by-ppp-gdp	3	event	true	Countries by PPP GDP	Society / Lists / Countries by PPP GDP
+society-lists-countries-by-ppp-gdp-per-capita	3	event	true	Countries by PPP GDP per capita	Society / Lists / Countries by PPP GDP per capita
+society-lists-credentials-in-psychology	3	event	true	Credentials in psychology	Society / Lists / Credentials in psychology
+society-lists-current-members-of-the-united-states-congress	3	event	true	Current members of the United States Congress	Society / Lists / Current members of the United States Congress
+society-lists-department-stores	3	event	true	Department stores	Society / Lists / Department stores
+society-lists-diagnostic-classification-and-rating-scales	3	event	true	Diagnostic classification and rating scales	Society / Lists / Diagnostic classification and rating scales
+society-lists-economists	3	event	true	Economists	Society / Lists / Economists
+society-lists-emoticons	3	event	true	Emoticons	Society / Lists / Emoticons
+society-lists-emotions-list	3	event	true	Emotions list	Society / Lists / Emotions list
+society-lists-employee-owned-companies	3	event	true	Employee-owned companies	Society / Lists / Employee-owned companies
+society-lists-employer-associations-list	3	event	true	Employer associations list	Society / Lists / Employer associations list
+society-lists-english-words-list	3	event	true	English words list	Society / Lists / English words list
+society-lists-environmental-issues	3	event	true	Environmental issues	Society / Lists / Environmental issues
+society-lists-environmental-organizations	3	event	true	Environmental organizations	Society / Lists / Environmental organizations
+society-lists-european-sovereign-debt-crisis-acronyms	3	event	true	European sovereign-debt crisis acronyms	Society / Lists / European sovereign-debt crisis acronyms
+society-lists-feminism-list	3	event	true	Feminism list	Society / Lists / Feminism list
+society-lists-feminist-economists	3	event	true	Feminist economists	Society / Lists / Feminist economists
+society-lists-fictional-psychiatrists	3	event	true	Fictional psychiatrists	Society / Lists / Fictional psychiatrists
+society-lists-fields-of-doctoral-studies	3	event	true	Fields of doctoral studies	Society / Lists / Fields of doctoral studies
+society-lists-generic-names-of-political-parties	3	event	true	Generic names of political parties	Society / Lists / Generic names of political parties
+society-lists-green-topics	3	event	true	Green topics	Society / Lists / Green topics
+society-lists-guide-dog-schools	3	event	true	Guide Dog Schools	Society / Lists / Guide Dog Schools
+society-lists-hieroglyphs-list	3	event	true	Hieroglyphs list	Society / Lists / Hieroglyphs list
+society-lists-honorary-societies	3	event	true	Honorary societies	Society / Lists / Honorary societies
+society-lists-intelligence-agencies-list	3	event	true	Intelligence agencies list	Society / Lists / Intelligence agencies list
+society-lists-languages-list	3	event	true	Languages list	Society / Lists / Languages list
+society-lists-lgbt-related-organizations	3	event	true	LGBT-related organizations	Society / Lists / LGBT-related organizations
+society-lists-lifestyles	3	event	true	Lifestyles	Society / Lists / Lifestyles
+society-lists-memory-biases-list	3	event	true	Memory biases list	Society / Lists / Memory biases list
+society-lists-micronations	3	event	true	Micronations	Society / Lists / Micronations
+society-lists-national-anthems	3	event	true	National anthems	Society / Lists / National anthems
+society-lists-national-legislatures	3	event	true	National legislatures	Society / Lists / National legislatures
+society-lists-nlp-related-articles	3	event	true	NLP-related articles	Society / Lists / NLP-related articles
+society-lists-phonetics-topics	3	event	true	Phonetics topics	Society / Lists / Phonetics topics
+society-lists-political-parties	3	event	true	Political parties	Society / Lists / Political parties
+society-lists-prizes-medals-and-awards	3	event	true	Prizes, medals, and awards	Society / Lists / Prizes, medals, and awards
+society-lists-psychological-schools	3	event	true	Psychological schools	Society / Lists / Psychological schools
+society-lists-psychologists	3	event	true	Psychologists	Society / Lists / Psychologists
+society-lists-psychology-disciplines	3	event	true	Psychology disciplines	Society / Lists / Psychology disciplines
+society-lists-public-utilities-list	3	event	true	Public utilities list	Society / Lists / Public utilities list
+society-lists-scandals-with-gate-suffix	3	event	true	Scandals with "-gate" suffix	Society / Lists / Scandals with "-gate" suffix
+society-lists-schools-by-country	3	event	true	Schools by country	Society / Lists / Schools by country
+society-lists-scientific-journals-in-psychology	3	event	true	Scientific journals in psychology	Society / Lists / Scientific journals in psychology
+society-lists-secret-police-organizations	3	event	true	Secret police organizations	Society / Lists / Secret police organizations
+society-lists-shibboleths	3	event	true	Shibboleths	Society / Lists / Shibboleths
+society-lists-social-psychologists	3	event	true	Social psychologists	Society / Lists / Social psychologists
+society-lists-social-science-journals	3	event	true	Social science journals	Society / Lists / Social science journals
+society-lists-sociologists	3	event	true	Sociologists	Society / Lists / Sociologists
+society-lists-stock-exchanges	3	event	true	Stock exchanges	Society / Lists / Stock exchanges
+society-lists-stock-market-indices	3	event	true	Stock market indices	Society / Lists / Stock market indices
+society-lists-store-brands	3	event	true	Store brands	Society / Lists / Store brands
+society-lists-strikes-list	3	event	true	Strikes list	Society / Lists / Strikes list
+society-lists-subfields-of-sociology-list	3	event	true	Subfields of sociology list	Society / Lists / Subfields of sociology list
+society-lists-supermarkets	3	event	true	Supermarkets	Society / Lists / Supermarkets
+society-lists-symbols-list	3	event	true	Symbols list	Society / Lists / Symbols list
+society-lists-think-tanks	3	event	true	Think tanks	Society / Lists / Think tanks
+society-lists-timeline-of-sociology	3	event	true	Timeline of sociology	Society / Lists / Timeline of sociology
+society-lists-trade-unions-list	3	event	true	Trade unions list	Society / Lists / Trade unions list
+society-lists-traded-commodities	3	event	true	Traded commodities	Society / Lists / Traded commodities
+society-lists-united-nations-member-states	3	event	true	United Nations member states	Society / Lists / United Nations member states
+society-lists-united-states-federal-agencies	3	event	true	United States federal agencies	Society / Lists / United States federal agencies
+society-lists-united-states-mints	3	event	true	United States Mints	Society / Lists / United States Mints
+society-lists-universities-and-colleges-list	3	event	true	Universities and colleges (list)	Society / Lists / Universities and colleges (list)
+society-lists-us-presidents-with-facial-hair	3	event	true	US Presidents with facial hair	Society / Lists / US Presidents with facial hair
+society-lists-us-states-by-unemployment-rate	3	event	true	US states by unemployment rate	Society / Lists / US states by unemployment rate
+society-lists-vowels-table	3	event	true	Vowels table	Society / Lists / Vowels table
+society-lists-women-s-organizations	3	event	true	Women's organizations	Society / Lists / Women's organizations
+society-lists-writing-systems-list	3	event	true	Writing systems list	Society / Lists / Writing systems list
+society-lists-youth-rights-list	3	event	true	Youth rights list	Society / Lists / Youth rights list

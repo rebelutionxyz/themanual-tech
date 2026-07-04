@@ -1,0 +1,229 @@
+id	depth	type	is_leaf	name	path
+culture-games-board-games-chess-lists	5	event	false	Lists	Culture / Games / Board games / Chess / Lists
+culture-games-board-games-chess-lists-chess-books	6	event	true	Chess books	Culture / Games / Board games / Chess / Lists / Chess books
+culture-games-board-games-chess-lists-chess-games	6	event	true	Chess games	Culture / Games / Board games / Chess / Lists / Chess games
+culture-games-board-games-chess-lists-chess-openings	6	event	true	Chess openings	Culture / Games / Board games / Chess / Lists / Chess openings
+culture-games-board-games-chess-lists-chess-players	6	event	true	Chess players	Culture / Games / Board games / Chess / Lists / Chess players
+culture-games-board-games-chess-lists-chess-terms	6	event	true	Chess terms	Culture / Games / Board games / Chess / Lists / Chess terms
+culture-games-board-games-chess-lists-chess-tournaments	6	event	true	Chess tournaments	Culture / Games / Board games / Chess / Lists / Chess tournaments
+culture-games-board-games-chess-lists-chess-world-records	6	event	true	Chess world records	Culture / Games / Board games / Chess / Lists / Chess world records
+culture-games-board-games-chess-lists-fairy-pieces	6	event	true	Fairy pieces	Culture / Games / Board games / Chess / Lists / Fairy pieces
+culture-games-board-games-chess-lists-world-championship-matches	6	event	true	World championship matches	Culture / Games / Board games / Chess / Lists / World championship matches
+culture-games-lists	3	event	false	Lists	Culture / Games / Lists
+culture-games-lists-board-game-publishers	4	event	true	Board game publishers	Culture / Games / Lists / Board game publishers
+culture-games-lists-games-by-year-non-video	4	event	true	Games by year (non-video)	Culture / Games / Lists / Games by year (non-video)
+culture-games-lists-japanese-board-games	4	event	true	Japanese board games	Culture / Games / Lists / Japanese board games
+culture-games-lists-mancala-variants	4	event	true	Mancala variants	Culture / Games / Lists / Mancala variants
+culture-games-lists-miniature-wargames	4	event	true	Miniature wargames	Culture / Games / Lists / Miniature wargames
+culture-games-video-games-lists	4	event	false	Lists	Culture / Games / Video games / Lists
+culture-games-video-games-lists-arcade-games	5	event	true	Arcade games	Culture / Games / Video games / Lists / Arcade games
+culture-games-video-games-lists-console-palettes	5	event	true	Console palettes	Culture / Games / Video games / Lists / Console palettes
+culture-literature-lists	3	event	false	Lists	Culture / Literature / Lists
+culture-literature-lists-books	4	event	false	Books	Culture / Literature / Lists / Books
+culture-literature-lists-books-banned-books	5	event	true	Banned books	Culture / Literature / Lists / Books / Banned books
+culture-literature-lists-books-best-selling-books	5	event	true	Best-selling books	Culture / Literature / Lists / Books / Best-selling books
+culture-literature-lists-books-by-genre	5	event	true	By genre	Culture / Literature / Lists / Books / By genre
+culture-literature-lists-books-literary-awards	5	event	true	Literary awards	Culture / Literature / Lists / Books / Literary awards
+culture-literature-lists-books-writers	5	event	true	Writers	Culture / Literature / Lists / Books / Writers
+culture-literature-lists-by-year	4	event	true	By year	Culture / Literature / Lists / By year
+culture-literature-lists-electronic-literature	4	event	false	Electronic literature	Culture / Literature / Lists / Electronic literature
+culture-literature-lists-electronic-literature-electronic-literature-authors-critics-and-works	5	event	true	Electronic literature authors, critics, and works	Culture / Literature / Lists / Electronic literature / Electronic literature authors, critics, and works
+culture-literature-lists-fiction	4	event	false	Fiction	Culture / Literature / Lists / Fiction
+culture-literature-lists-fiction-comics	5	event	false	Comics	Culture / Literature / Lists / Fiction / Comics
+culture-literature-lists-fiction-comics-best-selling-manga	6	event	true	Best-selling manga	Culture / Literature / Lists / Fiction / Comics / Best-selling manga
+culture-literature-lists-fiction-comics-comic-books	6	event	false	Comic books	Culture / Literature / Lists / Fiction / Comics / Comic books
+culture-literature-lists-fiction-comics-comic-books-dc-comics	7	event	false	DC Comics	Culture / Literature / Lists / Fiction / Comics / Comic books / DC Comics
+culture-literature-lists-fiction-comics-comic-books-dc-comics-dc-characters	8	event	true	DC characters	Culture / Literature / Lists / Fiction / Comics / Comic books / DC Comics / DC characters
+culture-literature-lists-fiction-comics-comic-books-dc-comics-dc-universe-locations	8	event	true	DC Universe locations	Culture / Literature / Lists / Fiction / Comics / Comic books / DC Comics / DC Universe locations
+culture-literature-lists-fiction-comics-comic-books-dc-comics-elseworlds	8	event	true	Elseworlds	Culture / Literature / Lists / Fiction / Comics / Comic books / DC Comics / Elseworlds
+culture-literature-lists-fiction-comics-comic-books-dc-comics-justice-league-members	8	event	true	Justice League members	Culture / Literature / Lists / Fiction / Comics / Comic books / DC Comics / Justice League members
+culture-literature-lists-fiction-comics-comic-books-dc-comics-legion-of-super-heroes-members	8	event	true	Legion of Super-Heroes members	Culture / Literature / Lists / Fiction / Comics / Comic books / DC Comics / Legion of Super-Heroes members
+culture-literature-lists-fiction-comics-comic-books-dc-comics-superman-enemies	8	event	true	Superman enemies	Culture / Literature / Lists / Fiction / Comics / Comic books / DC Comics / Superman enemies
+culture-literature-lists-fiction-comics-comic-books-marvel-comics	7	event	false	Marvel Comics	Culture / Literature / Lists / Fiction / Comics / Comic books / Marvel Comics
+culture-literature-lists-fiction-comics-comic-books-marvel-comics-avengers	8	event	true	Avengers	Culture / Literature / Lists / Fiction / Comics / Comic books / Marvel Comics / Avengers
+culture-literature-lists-fiction-comics-comic-books-marvel-comics-marvel-characters	8	event	true	Marvel characters	Culture / Literature / Lists / Fiction / Comics / Comic books / Marvel Comics / Marvel characters
+culture-literature-lists-fiction-comics-comic-books-marvel-comics-x-men	8	event	true	X-Men	Culture / Literature / Lists / Fiction / Comics / Comic books / Marvel Comics / X-Men
+culture-literature-lists-fiction-comics-comic-strips	6	event	true	Comic strips	Culture / Literature / Lists / Fiction / Comics / Comic strips
+culture-literature-lists-fiction-comics-manga	6	event	true	Manga	Culture / Literature / Lists / Fiction / Comics / Manga
+culture-literature-lists-fiction-fairy-tales	5	event	true	Fairy tales	Culture / Literature / Lists / Fiction / Fairy tales
+culture-literature-lists-fiction-fictional-characters	5	event	true	Fictional characters	Culture / Literature / Lists / Fiction / Fictional characters
+culture-literature-lists-fiction-fictional-computers	5	event	true	Fictional computers	Culture / Literature / Lists / Fiction / Fictional computers
+culture-literature-lists-fiction-fictional-places	5	event	false	Fictional places	Culture / Literature / Lists / Fiction / Fictional places
+culture-literature-lists-fiction-fictional-places-fictional-countries	6	event	true	Fictional countries	Culture / Literature / Lists / Fiction / Fictional places / Fictional countries
+culture-literature-lists-fiction-fictional-places-fictional-planets	6	event	true	Fictional planets	Culture / Literature / Lists / Fiction / Fictional places / Fictional planets
+culture-literature-lists-fiction-fictional-places-imaginary-universes	6	event	true	Imaginary universes	Culture / Literature / Lists / Fiction / Fictional places / Imaginary universes
+culture-literature-lists-fiction-fictional-robots-and-androids	5	event	true	Fictional robots and androids	Culture / Literature / Lists / Fiction / Fictional robots and androids
+culture-literature-lists-fiction-major-themes	5	event	false	Major themes	Culture / Literature / Lists / Fiction / Major themes
+culture-literature-lists-fiction-major-themes-adultery	6	event	true	Adultery	Culture / Literature / Lists / Fiction / Major themes / Adultery
+culture-literature-lists-fiction-major-themes-family	6	event	true	Family	Culture / Literature / Lists / Fiction / Major themes / Family
+culture-literature-lists-fiction-major-themes-sadomasochism	6	event	true	Sadomasochism	Culture / Literature / Lists / Fiction / Major themes / Sadomasochism
+culture-literature-lists-fiction-major-themes-science-fiction	6	event	true	Science fiction	Culture / Literature / Lists / Fiction / Major themes / Science fiction
+culture-literature-lists-fiction-major-themes-travel	6	event	true	Travel	Culture / Literature / Lists / Fiction / Major themes / Travel
+culture-literature-lists-magazines	4	event	false	Magazines	Culture / Literature / Lists / Magazines
+culture-literature-lists-magazines-anomalous-phenomena-magazines	5	event	true	Anomalous phenomena magazines	Culture / Literature / Lists / Magazines / Anomalous phenomena magazines
+culture-literature-lists-magazines-magazines-by-circulation	5	event	true	Magazines by circulation	Culture / Literature / Lists / Magazines / Magazines by circulation
+culture-literature-lists-magazines-men-s-magazines	5	event	true	Men's magazines	Culture / Literature / Lists / Magazines / Men's magazines
+culture-literature-lists-magazines-teen-magazines	5	event	true	Teen magazines	Culture / Literature / Lists / Magazines / Teen magazines
+culture-literature-lists-magazines-women-s-magazines	5	event	true	Women's magazines	Culture / Literature / Lists / Magazines / Women's magazines
+culture-literature-lists-publishers	4	event	true	Publishers	Culture / Literature / Lists / Publishers
+culture-literature-lists-scientific-journals	4	event	true	Scientific journals	Culture / Literature / Lists / Scientific journals
+culture-mass-media-broadcast-media-television-lists	5	event	false	Lists	Culture / Mass media / Broadcast media / Television / Lists
+culture-mass-media-broadcast-media-television-lists-by-year	6	event	true	By year	Culture / Mass media / Broadcast media / Television / Lists / By year
+culture-mass-media-broadcast-media-television-lists-television-channels	6	event	false	Television channels	Culture / Mass media / Broadcast media / Television / Lists / Television channels
+culture-mass-media-broadcast-media-television-lists-television-channels-by-country	7	event	false	By country	Culture / Mass media / Broadcast media / Television / Lists / Television channels / By country
+culture-mass-media-broadcast-media-television-lists-television-channels-by-country-australia	8	event	true	Australia	Culture / Mass media / Broadcast media / Television / Lists / Television channels / By country / Australia
+culture-mass-media-broadcast-media-television-lists-television-channels-by-country-canada	8	event	true	Canada	Culture / Mass media / Broadcast media / Television / Lists / Television channels / By country / Canada
+culture-mass-media-broadcast-media-television-lists-television-channels-by-country-denmark	8	event	true	Denmark	Culture / Mass media / Broadcast media / Television / Lists / Television channels / By country / Denmark
+culture-mass-media-broadcast-media-television-lists-television-channels-by-country-ireland	8	event	true	Ireland	Culture / Mass media / Broadcast media / Television / Lists / Television channels / By country / Ireland
+culture-mass-media-broadcast-media-television-lists-television-channels-by-country-united-kingdom	8	event	true	United Kingdom	Culture / Mass media / Broadcast media / Television / Lists / Television channels / By country / United Kingdom
+culture-mass-media-broadcast-media-television-lists-television-channels-by-country-united-states	8	event	true	United States	Culture / Mass media / Broadcast media / Television / Lists / Television channels / By country / United States
+culture-mass-media-broadcast-media-television-lists-television-channels-by-language	7	event	false	By language	Culture / Mass media / Broadcast media / Television / Lists / Television channels / By language
+culture-mass-media-broadcast-media-television-lists-television-channels-by-language-french	8	event	true	French	Culture / Mass media / Broadcast media / Television / Lists / Television channels / By language / French
+culture-mass-media-broadcast-media-television-lists-television-channels-by-language-german	8	event	true	German	Culture / Mass media / Broadcast media / Television / Lists / Television channels / By language / German
+culture-mass-media-broadcast-media-television-lists-television-channels-by-language-greek	8	event	true	Greek	Culture / Mass media / Broadcast media / Television / Lists / Television channels / By language / Greek
+culture-mass-media-broadcast-media-television-lists-television-channels-by-language-italian	8	event	true	Italian	Culture / Mass media / Broadcast media / Television / Lists / Television channels / By language / Italian
+culture-mass-media-broadcast-media-television-lists-television-channels-by-language-spanish	8	event	true	Spanish	Culture / Mass media / Broadcast media / Television / Lists / Television channels / By language / Spanish
+culture-mass-media-broadcast-media-television-lists-television-channels-by-language-tamil	8	event	true	Tamil	Culture / Mass media / Broadcast media / Television / Lists / Television channels / By language / Tamil
+culture-mass-media-broadcast-media-television-lists-television-networks	6	event	true	Television networks	Culture / Mass media / Broadcast media / Television / Lists / Television networks
+culture-mass-media-broadcast-media-television-lists-television-programs	6	event	false	Television programs	Culture / Mass media / Broadcast media / Television / Lists / Television programs
+culture-mass-media-broadcast-media-television-lists-television-programs-animated-series	7	event	true	Animated series	Culture / Mass media / Broadcast media / Television / Lists / Television programs / Animated series
+culture-mass-media-broadcast-media-television-lists-television-programs-anime-lists	7	event	true	Anime lists	Culture / Mass media / Broadcast media / Television / Lists / Television programs / Anime lists
+culture-mass-media-broadcast-media-television-lists-television-programs-bl-dramas	7	event	true	BL dramas	Culture / Mass media / Broadcast media / Television / Lists / Television programs / BL dramas
+culture-mass-media-broadcast-media-television-lists-television-programs-british-tv-shows-remade-for-the-american-market	7	event	true	British TV shows remade for the American market	Culture / Mass media / Broadcast media / Television / Lists / Television programs / British TV shows remade for the American market
+culture-mass-media-broadcast-media-television-lists-television-programs-by-broadcaster	7	event	false	By broadcaster	Culture / Mass media / Broadcast media / Television / Lists / Television programs / By broadcaster
+culture-mass-media-broadcast-media-television-lists-television-programs-by-broadcaster-abc	8	event	true	ABC	Culture / Mass media / Broadcast media / Television / Lists / Television programs / By broadcaster / ABC
+culture-mass-media-broadcast-media-television-lists-television-programs-by-broadcaster-ant1	8	event	true	ANT1	Culture / Mass media / Broadcast media / Television / Lists / Television programs / By broadcaster / ANT1
+culture-mass-media-broadcast-media-television-lists-television-programs-by-broadcaster-bbc	8	event	true	BBC	Culture / Mass media / Broadcast media / Television / Lists / Television programs / By broadcaster / BBC
+culture-mass-media-broadcast-media-television-lists-television-programs-by-broadcaster-cartoon-network	8	event	true	Cartoon Network	Culture / Mass media / Broadcast media / Television / Lists / Television programs / By broadcaster / Cartoon Network
+culture-mass-media-broadcast-media-television-lists-television-programs-by-broadcaster-cbs	8	event	true	CBS	Culture / Mass media / Broadcast media / Television / Lists / Television programs / By broadcaster / CBS
+culture-mass-media-broadcast-media-television-lists-television-programs-by-broadcaster-ert	8	event	true	ERT	Culture / Mass media / Broadcast media / Television / Lists / Television programs / By broadcaster / ERT
+culture-mass-media-broadcast-media-television-lists-television-programs-by-broadcaster-fox	8	event	true	Fox	Culture / Mass media / Broadcast media / Television / Lists / Television programs / By broadcaster / Fox
+culture-mass-media-broadcast-media-television-lists-television-programs-by-broadcaster-mega-channel	8	event	true	MEGA Channel	Culture / Mass media / Broadcast media / Television / Lists / Television programs / By broadcaster / MEGA Channel
+culture-mass-media-broadcast-media-television-lists-television-programs-by-broadcaster-mtv	8	event	true	MTV	Culture / Mass media / Broadcast media / Television / Lists / Television programs / By broadcaster / MTV
+culture-mass-media-broadcast-media-television-lists-television-programs-by-broadcaster-nbc	8	event	true	NBC	Culture / Mass media / Broadcast media / Television / Lists / Television programs / By broadcaster / NBC
+culture-mass-media-broadcast-media-television-lists-television-programs-by-broadcaster-upn	8	event	true	UPN	Culture / Mass media / Broadcast media / Television / Lists / Television programs / By broadcaster / UPN
+culture-mass-media-broadcast-media-television-lists-television-programs-by-characters	7	event	false	By characters	Culture / Mass media / Broadcast media / Television / Lists / Television programs / By characters
+culture-mass-media-broadcast-media-television-lists-television-programs-by-characters-muppets	8	event	true	Muppets	Culture / Mass media / Broadcast media / Television / Lists / Television programs / By characters / Muppets
+culture-mass-media-broadcast-media-television-lists-television-programs-by-program	7	event	false	By program	Culture / Mass media / Broadcast media / Television / Lists / Television programs / By program
+culture-mass-media-broadcast-media-television-lists-television-programs-by-program-invader-zim	8	event	true	Invader Zim	Culture / Mass media / Broadcast media / Television / Lists / Television programs / By program / Invader Zim
+culture-mass-media-broadcast-media-television-lists-television-programs-children-s-television-series	7	event	true	Children's television series	Culture / Mass media / Broadcast media / Television / Lists / Television programs / Children's television series
+culture-mass-media-broadcast-media-television-lists-television-programs-comedies	7	event	true	Comedies	Culture / Mass media / Broadcast media / Television / Lists / Television programs / Comedies
+culture-mass-media-broadcast-media-television-lists-television-programs-cult-television-shows	7	event	true	Cult television shows	Culture / Mass media / Broadcast media / Television / Lists / Television programs / Cult television shows
+culture-mass-media-broadcast-media-television-lists-television-programs-dramedies	7	event	true	Dramedies	Culture / Mass media / Broadcast media / Television / Lists / Television programs / Dramedies
+culture-mass-media-broadcast-media-television-lists-television-programs-most-watched-television-episodes	7	event	true	Most-watched television episodes	Culture / Mass media / Broadcast media / Television / Lists / Television programs / Most-watched television episodes
+culture-mass-media-broadcast-media-television-lists-television-programs-sci-fi-tv-programs	7	event	true	Sci-fi TV programs	Culture / Mass media / Broadcast media / Television / Lists / Television programs / Sci-fi TV programs
+culture-mass-media-broadcast-media-television-lists-television-programs-soap-operas	7	event	true	Soap operas	Culture / Mass media / Broadcast media / Television / Lists / Television programs / Soap operas
+culture-mass-media-broadcast-media-television-lists-television-programs-spin-off-shows	7	event	true	Spin-off shows	Culture / Mass media / Broadcast media / Television / Lists / Television programs / Spin-off shows
+culture-mass-media-broadcast-media-television-lists-television-programs-tv-shows-by-city-setting	7	event	true	TV shows by city setting	Culture / Mass media / Broadcast media / Television / Lists / Television programs / TV shows by city setting
+culture-mass-media-broadcast-media-television-lists-television-programs-uk-television-series	7	event	true	UK television series	Culture / Mass media / Broadcast media / Television / Lists / Television programs / UK television series
+culture-mass-media-broadcast-media-television-lists-tv-stations-in-north-america	6	event	true	TV stations in North America	Culture / Mass media / Broadcast media / Television / Lists / TV stations in North America
+culture-mass-media-film-and-cinema-lists	4	event	false	Lists	Culture / Mass media / Film and cinema / Lists
+culture-mass-media-film-and-cinema-lists-actors	5	event	true	Actors	Culture / Mass media / Film and cinema / Lists / Actors
+culture-mass-media-film-and-cinema-lists-directors	5	event	true	Directors	Culture / Mass media / Film and cinema / Lists / Directors
+culture-mass-media-film-and-cinema-lists-film-awards	5	event	true	Film awards	Culture / Mass media / Film and cinema / Lists / Film awards
+culture-mass-media-film-and-cinema-lists-film-festivals	5	event	true	Film festivals	Culture / Mass media / Film and cinema / Lists / Film festivals
+culture-mass-media-film-and-cinema-lists-film-institutes	5	event	true	Film institutes	Culture / Mass media / Film and cinema / Lists / Film institutes
+culture-mass-media-film-and-cinema-lists-films	5	event	false	Films	Culture / Mass media / Film and cinema / Lists / Films
+culture-mass-media-film-and-cinema-lists-films-by-genre	6	event	false	By genre	Culture / Mass media / Film and cinema / Lists / Films / By genre
+culture-mass-media-film-and-cinema-lists-films-by-genre-cult	7	event	true	Cult	Culture / Mass media / Film and cinema / Lists / Films / By genre / Cult
+culture-mass-media-film-and-cinema-lists-films-by-genre-fantasy	7	event	true	Fantasy	Culture / Mass media / Film and cinema / Lists / Films / By genre / Fantasy
+culture-mass-media-film-and-cinema-lists-films-by-genre-horror	7	event	true	Horror	Culture / Mass media / Film and cinema / Lists / Films / By genre / Horror
+culture-mass-media-film-and-cinema-lists-films-by-genre-musicals	7	event	true	Musicals	Culture / Mass media / Film and cinema / Lists / Films / By genre / Musicals
+culture-mass-media-film-and-cinema-lists-films-by-genre-noir	7	event	true	Noir	Culture / Mass media / Film and cinema / Lists / Films / By genre / Noir
+culture-mass-media-film-and-cinema-lists-films-by-genre-science-fiction	7	event	true	Science fiction	Culture / Mass media / Film and cinema / Lists / Films / By genre / Science fiction
+culture-mass-media-film-and-cinema-lists-films-by-genre-war	7	event	true	War	Culture / Mass media / Film and cinema / Lists / Films / By genre / War
+culture-mass-media-film-and-cinema-lists-films-by-genre-westerns	7	event	true	Westerns	Culture / Mass media / Film and cinema / Lists / Films / By genre / Westerns
+culture-mass-media-film-and-cinema-lists-films-by-title	6	event	true	By title	Culture / Mass media / Film and cinema / Lists / Films / By title
+culture-mass-media-film-and-cinema-lists-films-by-year	6	event	false	By year	Culture / Mass media / Film and cinema / Lists / Films / By year
+culture-mass-media-film-and-cinema-lists-films-by-year-1920s	7	event	true	1920s	Culture / Mass media / Film and cinema / Lists / Films / By year / 1920s
+culture-mass-media-film-and-cinema-lists-films-by-year-1930s	7	event	true	1930s	Culture / Mass media / Film and cinema / Lists / Films / By year / 1930s
+culture-mass-media-film-and-cinema-lists-films-by-year-1940s	7	event	true	1940s	Culture / Mass media / Film and cinema / Lists / Films / By year / 1940s
+culture-mass-media-film-and-cinema-lists-films-by-year-1950s	7	event	true	1950s	Culture / Mass media / Film and cinema / Lists / Films / By year / 1950s
+culture-mass-media-film-and-cinema-lists-films-by-year-1960s	7	event	true	1960s	Culture / Mass media / Film and cinema / Lists / Films / By year / 1960s
+culture-mass-media-film-and-cinema-lists-films-by-year-1970s	7	event	true	1970s	Culture / Mass media / Film and cinema / Lists / Films / By year / 1970s
+culture-mass-media-film-and-cinema-lists-films-by-year-1980s	7	event	true	1980s	Culture / Mass media / Film and cinema / Lists / Films / By year / 1980s
+culture-mass-media-film-and-cinema-lists-films-by-year-1990s	7	event	true	1990s	Culture / Mass media / Film and cinema / Lists / Films / By year / 1990s
+culture-mass-media-film-and-cinema-lists-films-by-year-2000s	7	event	true	2000s	Culture / Mass media / Film and cinema / Lists / Films / By year / 2000s
+culture-mass-media-film-and-cinema-lists-films-by-year-2010s	7	event	true	2010s	Culture / Mass media / Film and cinema / Lists / Films / By year / 2010s
+culture-mass-media-film-and-cinema-lists-films-computer-animated-films	6	event	true	Computer-animated films	Culture / Mass media / Film and cinema / Lists / Films / Computer-animated films
+culture-mass-media-film-and-cinema-lists-films-film-series	6	event	true	Film series	Culture / Mass media / Film and cinema / Lists / Films / Film series
+culture-mass-media-film-and-cinema-lists-films-greatest	6	event	true	Greatest	Culture / Mass media / Film and cinema / Lists / Films / Greatest
+culture-mass-media-film-and-cinema-lists-films-highest-grossing	6	event	true	Highest-grossing	Culture / Mass media / Film and cinema / Lists / Films / Highest-grossing
+culture-mass-media-film-and-cinema-lists-films-most-expensive	6	event	true	Most expensive	Culture / Mass media / Film and cinema / Lists / Films / Most expensive
+culture-mass-media-film-and-cinema-lists-films-preserved-films	6	event	true	Preserved films	Culture / Mass media / Film and cinema / Lists / Films / Preserved films
+culture-mass-media-film-and-cinema-lists-films-rated-nc-17	6	event	true	Rated NC-17	Culture / Mass media / Film and cinema / Lists / Films / Rated NC-17
+culture-mass-media-film-and-cinema-lists-films-trilogies	6	event	true	Trilogies	Culture / Mass media / Film and cinema / Lists / Films / Trilogies
+culture-mass-media-film-and-cinema-lists-films-worst	6	event	true	Worst	Culture / Mass media / Film and cinema / Lists / Films / Worst
+culture-performing-arts-music-lists	4	event	false	Lists	Culture / Performing arts / Music / Lists
+culture-performing-arts-music-lists-concert-tours	5	event	true	Concert tours	Culture / Performing arts / Music / Lists / Concert tours
+culture-performing-arts-music-lists-electronic-music-lists	5	event	false	Electronic music lists	Culture / Performing arts / Music / Lists / Electronic music lists
+culture-performing-arts-music-lists-electronic-music-lists-music-genres	6	event	true	Music genres	Culture / Performing arts / Music / Lists / Electronic music lists / Music genres
+culture-performing-arts-music-lists-electronic-music-lists-record-labels	6	event	true	Record labels	Culture / Performing arts / Music / Lists / Electronic music lists / Record labels
+culture-performing-arts-music-lists-music-genres	5	event	true	Music genres	Culture / Performing arts / Music / Lists / Music genres
+culture-performing-arts-music-lists-musical-events	5	event	true	Musical events	Culture / Performing arts / Music / Lists / Musical events
+culture-performing-arts-music-lists-musical-instruments	5	event	true	Musical instruments	Culture / Performing arts / Music / Lists / Musical instruments
+culture-performing-arts-music-lists-musicians-and-musical-groups	5	event	false	Musicians and musical groups	Culture / Performing arts / Music / Lists / Musicians and musical groups
+culture-performing-arts-music-lists-musicians-and-musical-groups-bands	6	event	false	Bands	Culture / Performing arts / Music / Lists / Musicians and musical groups / Bands
+culture-performing-arts-music-lists-musicians-and-musical-groups-bands-hardcore-punk-bands	7	event	true	Hardcore punk bands	Culture / Performing arts / Music / Lists / Musicians and musical groups / Bands / Hardcore punk bands
+culture-performing-arts-music-lists-musicians-and-musical-groups-composers	6	event	false	Composers	Culture / Performing arts / Music / Lists / Musicians and musical groups / Composers
+culture-performing-arts-music-lists-musicians-and-musical-groups-composers-classical-music-composers	7	event	true	Classical music composers	Culture / Performing arts / Music / Lists / Musicians and musical groups / Composers / Classical music composers
+culture-performing-arts-music-lists-musicians-and-musical-groups-composers-songwriters-hall-of-fame	7	event	true	Songwriters Hall of Fame	Culture / Performing arts / Music / Lists / Musicians and musical groups / Composers / Songwriters Hall of Fame
+culture-performing-arts-music-lists-musicians-and-musical-groups-musicians	6	event	false	Musicians	Culture / Performing arts / Music / Lists / Musicians and musical groups / Musicians
+culture-performing-arts-music-lists-musicians-and-musical-groups-musicians-alternative-music-artists	7	event	true	Alternative music artists	Culture / Performing arts / Music / Lists / Musicians and musical groups / Musicians / Alternative music artists
+culture-performing-arts-music-lists-musicians-and-musical-groups-musicians-ambient-artists	7	event	true	Ambient artists	Culture / Performing arts / Music / Lists / Musicians and musical groups / Musicians / Ambient artists
+culture-performing-arts-music-lists-musicians-and-musical-groups-musicians-best-selling-music-artists	7	event	true	Best-selling music artists	Culture / Performing arts / Music / Lists / Musicians and musical groups / Musicians / Best-selling music artists
+culture-performing-arts-music-lists-musicians-and-musical-groups-musicians-disco-artists	7	event	true	Disco artists	Culture / Performing arts / Music / Lists / Musicians and musical groups / Musicians / Disco artists
+culture-performing-arts-music-lists-musicians-and-musical-groups-musicians-grammy-hall-of-fame-award-recipients	7	event	true	Grammy Hall of Fame Award recipients	Culture / Performing arts / Music / Lists / Musicians and musical groups / Musicians / Grammy Hall of Fame Award recipients
+culture-performing-arts-music-lists-musicians-and-musical-groups-musicians-hip-hop-artists	7	event	true	Hip hop artists	Culture / Performing arts / Music / Lists / Musicians and musical groups / Musicians / Hip hop artists
+culture-performing-arts-music-lists-musicians-and-musical-groups-musicians-r-b-musicians	7	event	true	R&B musicians	Culture / Performing arts / Music / Lists / Musicians and musical groups / Musicians / R&B musicians
+culture-performing-arts-music-lists-musicians-and-musical-groups-musicians-soul-musicians	7	event	true	Soul musicians	Culture / Performing arts / Music / Lists / Musicians and musical groups / Musicians / Soul musicians
+culture-performing-arts-music-lists-opera-houses	5	event	true	Opera houses	Culture / Performing arts / Music / Lists / Opera houses
+culture-performing-arts-music-lists-record-labels	5	event	true	Record labels	Culture / Performing arts / Music / Lists / Record labels
+culture-performing-arts-music-lists-schools-of-music	5	event	true	Schools of music	Culture / Performing arts / Music / Lists / Schools of music
+culture-performing-arts-music-lists-songs-and-compositions	5	event	false	Songs and compositions	Culture / Performing arts / Music / Lists / Songs and compositions
+culture-performing-arts-music-lists-songs-and-compositions-albums	6	event	true	Albums	Culture / Performing arts / Music / Lists / Songs and compositions / Albums
+culture-performing-arts-music-lists-songs-and-compositions-best-selling-singles-by-year-uk	6	event	true	Best selling singles by year (UK)	Culture / Performing arts / Music / Lists / Songs and compositions / Best selling singles by year (UK)
+culture-performing-arts-music-lists-songs-and-compositions-christmas-carols	6	event	true	Christmas carols	Culture / Performing arts / Music / Lists / Songs and compositions / Christmas carols
+culture-performing-arts-music-lists-songs-and-compositions-christmas-number-one-singles-uk	6	event	true	Christmas number one singles (UK)	Culture / Performing arts / Music / Lists / Songs and compositions / Christmas number one singles (UK)
+culture-performing-arts-music-lists-songs-and-compositions-compositions-of-johann-sebastian-bach	6	event	true	Compositions of Johann Sebastian Bach	Culture / Performing arts / Music / Lists / Songs and compositions / Compositions of Johann Sebastian Bach
+culture-performing-arts-music-lists-songs-and-compositions-famous-operas	6	event	true	Famous operas	Culture / Performing arts / Music / Lists / Songs and compositions / Famous operas
+culture-performing-arts-music-lists-songs-and-compositions-operettas	6	event	true	Operettas	Culture / Performing arts / Music / Lists / Songs and compositions / Operettas
+culture-performing-arts-music-lists-video-game-music	5	event	false	Video game music	Culture / Performing arts / Music / Lists / Video game music
+culture-performing-arts-music-lists-video-game-music-video-game-musicians	6	event	true	Video game musicians	Culture / Performing arts / Music / Lists / Video game music / Video game musicians
+culture-sports-ball-games-association-football-lists	5	event	false	Lists	Culture / Sports / Ball games / Association football / Lists
+culture-sports-ball-games-association-football-lists-100-greatest-living-football-players	6	event	true	100 Greatest Living Football Players	Culture / Sports / Ball games / Association football / Lists / 100 Greatest Living Football Players
+culture-sports-ball-games-association-football-lists-football-clubs-in-france	6	event	true	Football clubs in France	Culture / Sports / Ball games / Association football / Lists / Football clubs in France
+culture-sports-ball-games-association-football-lists-football-teams	6	event	true	Football teams	Culture / Sports / Ball games / Association football / Lists / Football teams
+culture-sports-ball-games-association-football-lists-national-association-football-teams-by-nickname	6	event	true	National association football teams by nickname	Culture / Sports / Ball games / Association football / Lists / National association football teams by nickname
+culture-sports-ball-games-association-football-lists-women-s-association-football-clubs	6	event	true	Women's association football clubs	Culture / Sports / Ball games / Association football / Lists / Women's association football clubs
+culture-sports-ball-games-baseball-lists	5	event	false	Lists	Culture / Sports / Ball games / Baseball / Lists
+culture-sports-ball-games-baseball-lists-al-gold-glove-winners	6	event	false	AL Gold Glove Winners	Culture / Sports / Ball games / Baseball / Lists / AL Gold Glove Winners
+culture-sports-ball-games-baseball-lists-al-gold-glove-winners-1st-base	7	event	true	1st Base	Culture / Sports / Ball games / Baseball / Lists / AL Gold Glove Winners / 1st Base
+culture-sports-ball-games-baseball-lists-al-gold-glove-winners-2nd-base	7	event	true	2nd Base	Culture / Sports / Ball games / Baseball / Lists / AL Gold Glove Winners / 2nd Base
+culture-sports-ball-games-baseball-lists-al-gold-glove-winners-3rd-base	7	event	true	3rd Base	Culture / Sports / Ball games / Baseball / Lists / AL Gold Glove Winners / 3rd Base
+culture-sports-ball-games-baseball-lists-al-gold-glove-winners-catcher	7	event	true	Catcher	Culture / Sports / Ball games / Baseball / Lists / AL Gold Glove Winners / Catcher
+culture-sports-ball-games-baseball-lists-al-gold-glove-winners-outfield	7	event	true	Outfield	Culture / Sports / Ball games / Baseball / Lists / AL Gold Glove Winners / Outfield
+culture-sports-ball-games-baseball-lists-al-gold-glove-winners-pitcher	7	event	true	Pitcher	Culture / Sports / Ball games / Baseball / Lists / AL Gold Glove Winners / Pitcher
+culture-sports-ball-games-baseball-lists-al-gold-glove-winners-shortstop	7	event	true	Shortstop	Culture / Sports / Ball games / Baseball / Lists / AL Gold Glove Winners / Shortstop
+culture-sports-ball-games-baseball-lists-highest-paid-baseball-players	6	event	true	Highest paid baseball players	Culture / Sports / Ball games / Baseball / Lists / Highest paid baseball players
+culture-sports-ball-games-baseball-lists-lifetime-home-run-leaders	6	event	true	Lifetime home run leaders	Culture / Sports / Ball games / Baseball / Lists / Lifetime home run leaders
+culture-sports-ball-games-baseball-lists-major-league-baseball-players	6	event	true	Major league baseball players	Culture / Sports / Ball games / Baseball / Lists / Major league baseball players
+culture-sports-ball-games-baseball-lists-nl-gold-glove-winners	6	event	false	NL Gold Glove Winners	Culture / Sports / Ball games / Baseball / Lists / NL Gold Glove Winners
+culture-sports-ball-games-baseball-lists-nl-gold-glove-winners-1st-base	7	event	true	1st Base	Culture / Sports / Ball games / Baseball / Lists / NL Gold Glove Winners / 1st Base
+culture-sports-ball-games-baseball-lists-nl-gold-glove-winners-2nd-base	7	event	true	2nd Base	Culture / Sports / Ball games / Baseball / Lists / NL Gold Glove Winners / 2nd Base
+culture-sports-ball-games-baseball-lists-nl-gold-glove-winners-3rd-base	7	event	true	3rd Base	Culture / Sports / Ball games / Baseball / Lists / NL Gold Glove Winners / 3rd Base
+culture-sports-ball-games-baseball-lists-nl-gold-glove-winners-catcher	7	event	true	Catcher	Culture / Sports / Ball games / Baseball / Lists / NL Gold Glove Winners / Catcher
+culture-sports-ball-games-baseball-lists-nl-gold-glove-winners-outfield	7	event	true	Outfield	Culture / Sports / Ball games / Baseball / Lists / NL Gold Glove Winners / Outfield
+culture-sports-ball-games-baseball-lists-nl-gold-glove-winners-pitcher	7	event	true	Pitcher	Culture / Sports / Ball games / Baseball / Lists / NL Gold Glove Winners / Pitcher
+culture-sports-ball-games-baseball-lists-nl-gold-glove-winners-shortstop	7	event	true	Shortstop	Culture / Sports / Ball games / Baseball / Lists / NL Gold Glove Winners / Shortstop
+culture-sports-ball-games-baseball-lists-triple-crown	6	event	true	Triple crown	Culture / Sports / Ball games / Baseball / Lists / Triple crown
+culture-sports-combat-sports-martial-arts-lists	5	event	false	Lists	Culture / Sports / Combat sports / Martial arts / Lists
+culture-sports-combat-sports-martial-arts-lists-martial-arts-weapons	6	event	true	Martial arts weapons	Culture / Sports / Combat sports / Martial arts / Lists / Martial arts weapons
+culture-sports-lists	3	event	false	Lists	Culture / Sports / Lists
+culture-sports-lists-climbing	4	event	true	Climbing	Culture / Sports / Lists / Climbing
+culture-sports-lists-gay-athletes	4	event	true	Gay athletes	Culture / Sports / Lists / Gay athletes
+culture-sports-lists-judo-techniques	4	event	true	Judo techniques	Culture / Sports / Lists / Judo techniques
+culture-sports-lists-ski-areas	4	event	true	Ski areas	Culture / Sports / Lists / Ski areas
+culture-sports-lists-sports-leagues	4	event	false	Sports leagues	Culture / Sports / Lists / Sports leagues
+culture-sports-lists-sports-leagues-defunct-sports-leagues	5	event	true	Defunct sports leagues	Culture / Sports / Lists / Sports leagues / Defunct sports leagues
+culture-sports-lists-surfing	4	event	true	Surfing	Culture / Sports / Lists / Surfing

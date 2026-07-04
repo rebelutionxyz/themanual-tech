@@ -1,0 +1,20 @@
+id	depth	type	is_leaf	name	path
+human-activities-lists	2	event	false	Lists	Human activities / Lists
+human-activities-lists-battles-by-casualties	3	event	true	Battles by casualties	Human activities / Lists / Battles by casualties
+human-activities-lists-carbon-dioxide-emissions-by-country	3	event	true	Carbon dioxide emissions by country	Human activities / Lists / Carbon dioxide emissions by country
+human-activities-lists-environmental-disasters-list	3	event	true	Environmental disasters list	Human activities / Lists / Environmental disasters list
+human-activities-lists-environmental-issues	3	event	true	Environmental issues	Human activities / Lists / Environmental issues
+human-activities-lists-games	3	event	true	Games	Human activities / Lists / Games
+human-activities-lists-greenhouse-gas-emissions-top-contributors	3	event	true	Greenhouse gas emissions, top contributors	Human activities / Lists / Greenhouse gas emissions, top contributors
+human-activities-lists-greenhouse-gases-ipcc-list	3	event	true	Greenhouse gases (IPCC list)	Human activities / Lists / Greenhouse gases (IPCC list)
+human-activities-lists-languages	3	event	true	Languages	Human activities / Lists / Languages
+human-activities-lists-martial-arts	3	event	true	Martial arts	Human activities / Lists / Martial arts
+human-activities-lists-methods-of-capital-punishment	3	event	true	Methods of capital punishment	Human activities / Lists / Methods of capital punishment
+human-activities-lists-mudras	3	event	true	Mudras	Human activities / Lists / Mudras
+human-activities-lists-musical-instruments	3	event	true	Musical instruments	Human activities / Lists / Musical instruments
+human-activities-lists-newspapers	3	event	true	Newspapers	Human activities / Lists / Newspapers
+human-activities-lists-schools	3	event	true	Schools	Human activities / Lists / Schools
+human-activities-lists-songs	3	event	true	Songs	Human activities / Lists / Songs
+human-activities-lists-spin-offs	3	event	true	Spin-offs	Human activities / Lists / Spin-offs
+human-activities-lists-wars-by-death-toll	3	event	true	Wars by death toll	Human activities / Lists / Wars by death toll
+human-activities-lists-weight-training-exercises	3	event	true	Weight training exercises	Human activities / Lists / Weight training exercises

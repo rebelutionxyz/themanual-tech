@@ -1,0 +1,52 @@
+id	depth	type	is_leaf	name	path
+history-lists	2	event	false	Lists	History / Lists
+history-lists-archaeological-sites	3	event	true	Archaeological sites	History / Lists / Archaeological sites
+history-lists-battles	3	event	true	Battles	History / Lists / Battles
+history-lists-by-decade-century-or-millennium	3	event	true	By decade, century, or millennium	History / Lists / By decade, century, or millennium
+history-lists-by-year	3	event	true	By year	History / Lists / By year
+history-lists-civil-wars-list	3	event	true	Civil wars list	History / Lists / Civil wars list
+history-lists-coups-and-coup-attempts	3	event	true	Coups and coup attempts	History / Lists / Coups and coup attempts
+history-lists-cyclones-list	3	event	true	Cyclones list	History / Lists / Cyclones list
+history-lists-disasters	3	event	true	Disasters	History / Lists / Disasters
+history-lists-earthquakes	3	event	true	Earthquakes	History / Lists / Earthquakes
+history-lists-epidemics	3	event	true	Epidemics	History / Lists / Epidemics
+history-lists-famous-deaths-by-cause	3	event	true	Famous deaths by cause	History / Lists / Famous deaths by cause
+history-lists-famous-speeches	3	event	true	Famous speeches	History / Lists / Famous speeches
+history-lists-fires	3	event	true	Fires	History / Lists / Fires
+history-lists-foreign-policy-doctrines	3	event	true	Foreign policy doctrines	History / Lists / Foreign policy doctrines
+history-lists-former-sovereign-states	3	event	true	Former sovereign states	History / Lists / Former sovereign states
+history-lists-guerrilla-movements	3	event	true	Guerrilla movements	History / Lists / Guerrilla movements
+history-lists-helicopter-prison-escapes	3	event	true	Helicopter prison escapes	History / Lists / Helicopter prison escapes
+history-lists-historians-by-subfield	3	event	true	Historians by subfield	History / Lists / Historians by subfield
+history-lists-historical-anniversaries	3	event	true	Historical anniversaries	History / Lists / Historical anniversaries
+history-lists-historical-sites	3	event	true	Historical sites	History / Lists / Historical sites
+history-lists-industrial-disasters	3	event	true	Industrial disasters	History / Lists / Industrial disasters
+history-lists-invasions	3	event	true	Invasions	History / Lists / Invasions
+history-lists-inventions	3	event	true	Inventions	History / Lists / Inventions
+history-lists-inventors-killed-by-their-own-inventions	3	event	true	Inventors killed by their own inventions	History / Lists / Inventors killed by their own inventions
+history-lists-kidnappings	3	event	true	Kidnappings	History / Lists / Kidnappings
+history-lists-military-disasters	3	event	true	Military disasters	History / Lists / Military disasters
+history-lists-military-operations	3	event	true	Military operations	History / Lists / Military operations
+history-lists-missing-treasure	3	event	true	Missing treasure	History / Lists / Missing treasure
+history-lists-musical-events-historical	3	event	true	Musical events (historical)	History / Lists / Musical events (historical)
+history-lists-natural-disasters	3	event	true	Natural disasters	History / Lists / Natural disasters
+history-lists-nobel-prizes	3	event	true	Nobel Prizes	History / Lists / Nobel Prizes
+history-lists-nuclear-accidents	3	event	true	Nuclear accidents	History / Lists / Nuclear accidents
+history-lists-on-this-day	3	event	true	On this day	History / Lists / On this day
+history-lists-power-outages	3	event	true	Power outages	History / Lists / Power outages
+history-lists-recessions	3	event	true	Recessions	History / Lists / Recessions
+history-lists-revolutions-and-rebellions	3	event	true	Revolutions and rebellions	History / Lists / Revolutions and rebellions
+history-lists-riots	3	event	true	Riots	History / Lists / Riots
+history-lists-roman-governorships-of-britain	3	event	true	Roman Governorships of Britain	History / Lists / Roman Governorships of Britain
+history-lists-roman-sites	3	event	true	Roman sites	History / Lists / Roman sites
+history-lists-scientific-discoveries	3	event	true	Scientific discoveries	History / Lists / Scientific discoveries
+history-lists-sieges	3	event	true	Sieges	History / Lists / Sieges
+history-lists-space-shuttle-missions	3	event	true	Space Shuttle missions	History / Lists / Space Shuttle missions
+history-lists-strikes	3	event	true	Strikes	History / Lists / Strikes
+history-lists-tariffs	3	event	true	Tariffs	History / Lists / Tariffs
+history-lists-ticker-tape-parades-in-new-york-city	3	event	true	Ticker-tape parades in New York City	History / Lists / Ticker-tape parades in New York City
+history-lists-treaties	3	event	true	Treaties	History / Lists / Treaties
+history-lists-un-peacekeeping-missions	3	event	true	UN peacekeeping missions	History / Lists / UN peacekeeping missions
+history-lists-united-states-supreme-court-cases	3	event	true	United States Supreme Court cases	History / Lists / United States Supreme Court cases
+history-lists-wobbly-lingo	3	event	true	Wobbly lingo	History / Lists / Wobbly lingo
+history-lists-world-records-in-chess-historical	3	event	true	World records in chess (historical)	History / Lists / World records in chess (historical)
