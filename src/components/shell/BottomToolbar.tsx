@@ -288,7 +288,7 @@ function TasksPopup({ onClose }: { onClose: () => void }) {
           <X size={16} />
         </button>
         <iframe
-          src="/mini-waves-v77.html"
+          src="/mini-waves-v78.html"
           title="MiniWaves"
           className="h-full w-full border-0"
           style={{ display: 'block', background: '#030508' }}
