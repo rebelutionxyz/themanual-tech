@@ -49,6 +49,7 @@ supabase/.temp/
 # Migration scratch
 .tmp-*
 
+# local port / scratch dirs
 # DingleBERRY port package — source for the staged surface port (slices B+).
 # Kept on disk as the look/structure source of truth; not tracked.
 _dberry_port/

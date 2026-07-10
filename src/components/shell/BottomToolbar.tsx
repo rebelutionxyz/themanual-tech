@@ -184,8 +184,12 @@ export function BottomToolbar({ accent }: { accent: string }) {
       {/* BLiNG! → the FreedomBLiNGS popup (the balance page + SEND module). */}
       {open === 'bling' && <BlingPopup onClose={() => setOpen(null)} />}
 
+      {/* Tasks → MiniWaves (V76) popup — same overlay pattern as BLiNG!,
+          sized near-fullscreen because V76 is a full task manager. */}
+      {open === 'tasks' && <TasksPopup onClose={() => setOpen(null)} />}
+
       {/* Other launchers → the placeholder anchored popover (unchanged). */}
-      {active && open !== 'bling' && (
+      {active && open !== 'bling' && open !== 'tasks' && (
         <>
           <div
             className="fixed inset-0 z-50"
@@ -249,6 +253,47 @@ function BlingPopup({ onClose }: { onClose: () => void }) {
           <X size={16} />
         </button>
         <BlingPopupContent />
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** MiniWaves popup (Tasks launcher) — "MiniWaves. In the Flow."
+ *  The real V76 standalone build (/public/mini-waves-v76.html) in an iframe,
+ *  portaled to body like BlingPopup but near-fullscreen: V76 is a full
+ *  motion-first task manager, not a widget. Same iframe sandbox flags as
+ *  WavesPage (/waves) — local storage, modals, drag-drop all live inside V76. */
+function TasksPopup({ onClose }: { onClose: () => void }) {
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex overflow-y-auto bg-black/60 p-3 backdrop-blur-sm sm:p-6"
+      onMouseDown={onClose}
+      // biome-ignore lint/a11y/useSemanticElements: native <dialog> needs imperative showModal(); this overlay is mounted declaratively
+      role="dialog"
+      aria-modal="true"
+      aria-label="Tasks — MiniWaves"
+    >
+      <div
+        className="relative m-auto h-[92dvh] w-full max-w-6xl overflow-hidden rounded-2xl shadow-2xl"
+        style={{ background: '#030508' }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/30 text-[#F3E7D8] shadow-sm backdrop-blur transition-colors hover:bg-black/50"
+        >
+          <X size={16} />
+        </button>
+        <iframe
+          src="/mini-waves-v77.html"
+          title="MiniWaves"
+          className="h-full w-full border-0"
+          style={{ display: 'block', background: '#030508' }}
+          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
+        />
       </div>
     </div>,
     document.body,
