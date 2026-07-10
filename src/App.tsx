@@ -109,16 +109,16 @@ function OGOnly({ children }: { children: ReactNode }) {
 }
 
 /** Post-login router for allowlisted Bees — directs by security level.
- *  Keyholder → Nucleus, property owner → Nexus, else HQ. Both role flags
- *  fail-soft to false until the registries + check-keyholder deploy
- *  (Lock 8 / 9.6), so today OG lands at /hq; the cascade upgrades itself
- *  automatically when real tiers go live. */
+ *  Keyholder → Nucleus, property owner → Nexus, else MiniWaves (the OG
+ *  daily driver). Both role flags fail-soft to false until the registries +
+ *  check-keyholder deploy (Lock 8 / 9.6), so today OG lands in MiniWaves;
+ *  the cascade upgrades itself automatically when real tiers go live. */
 function ManagementRedirect() {
   const { role, loading } = useUserRole();
   if (loading) return null;
   if (role.isKeyholder) return <Navigate to="/nucleus" replace />;
   if (role.isPropertyOwner) return <Navigate to="/nexus" replace />;
-  return <Navigate to="/hq" replace />;
+  return <Navigate to="/miniwaves" replace />;
 }
 
 function AppContent() {
