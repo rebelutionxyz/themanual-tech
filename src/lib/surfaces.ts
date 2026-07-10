@@ -297,7 +297,7 @@ export const SURFACES: SurfaceDef[] = [
     slug: 'waves',
     name: 'WAVES',
     function: 'Motion Flow',
-    description: 'Mini Waves. One Ocean at a time. Full 8-level hierarchy of motion.',
+    description: 'Mini Waves. One Vessel at a time. Full 10-level hierarchy of motion.',
     purpose:
       'Orchestrate your life by motion. Vessels, Oceans, Waves, Tides, Flows — tasks tagged by what they feel like, not where they live.',
     icon: Waves,

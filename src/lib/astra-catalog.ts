@@ -86,7 +86,7 @@ export const ASTRA_CATALOG: AstraCatalogEntry[] = [
   { slug: 'theranking',    wordmark: 'TheRanking',      category: 'connection', hosts: ['TheRanking.app'],                                       status: 'deferred',                                description: 'Hot-or-Not 2.0 (Bee-vetted lists).' },
 
   // ─── Do (4) ─────────────────────────────────────────────────────────
-  { slug: 'miniwaves',     wordmark: 'MiNiWaVeS',       category: 'do', hosts: ['MiniWaves.app'],                                                status: 'live',                                    description: 'Project-scaffold tool (V76 live).' },
+  { slug: 'miniwaves',     wordmark: 'MiNiWaVeS',       category: 'do', hosts: ['MiniWaves.app'],                                                status: 'live',                                    description: 'Motion-first task manager (V77 live).' },
   { slug: 'production',    wordmark: 'Production',      category: 'do', hosts: [],                                                               status: 'deferred',                                description: 'Long-form production pipeline.' },
   { slug: 'brandosophic',  wordmark: 'BRANDoSOPHIC',    category: 'do', hosts: ['BRANDoSOPHIC.com', 'rebelution.site'],                          status: 'scaffolded',                              description: 'Brand-design + identity surface.' },
   { slug: 'safetycheck',   wordmark: 'Safety Check',    category: 'do', hosts: ['Takefiveforsafety.com', 'Safetymeeting.tech', 'Safetymeeting.ai'], status: 'deferred',                            description: 'Partner co-brand safety meetings.' },

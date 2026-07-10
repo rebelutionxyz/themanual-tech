@@ -12,11 +12,14 @@ const WAVES_COLOR = '#0EA5E9'; // ocean/sky blue — matches Mini Waves V76 --oc
  * For now: real Mini Waves, zero loss, native access via the right rail.
  */
 export function WavesPage() {
-  // Set a page title hint
+  // Set a page title hint. Restore whatever title was active before mount
+  // (AstraContext owns the per-host default) instead of hard-resetting to
+  // 'The Manual' — that clobbered astra siteTitles (atlasintel.fyi bug class).
   useEffect(() => {
-    document.title = 'Mini Waves · The Manual';
+    const previous = document.title;
+    document.title = 'MiniWaves. In the Flow.';
     return () => {
-      document.title = 'The Manual';
+      document.title = previous;
     };
   }, []);
 
@@ -28,8 +31,8 @@ export function WavesPage() {
       }}
     >
       <iframe
-        src="/mini-waves-v76.html"
-        title="Mini Waves V76"
+        src="/mini-waves-v77.html"
+        title="MiniWaves V77"
         className="h-full w-full border-0"
         style={{
           display: 'block',

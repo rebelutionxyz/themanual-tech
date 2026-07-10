@@ -6,7 +6,9 @@
 // wordmark: canonical stylized form is 'MiNiWaVeS' (matches astra-catalog.ts +
 //   the load-bearing-casing pattern: BLiNG!, AtlasINTEL, FreedomBLiNGs).
 //   "Mini Waves" is the spoken/display form.
-// Hierarchy: Ocean → Trickle (8 levels); H2O + Dribble dropped.
+// Hierarchy: Vessel → Dribble (10 levels; resequenced 2026-07-10, H2O dropped).
+//   Vessel · Ocean · Wave · Tide · Flow · Ripple · Drip · Drop · Trickle · Dribble.
+//   Search/nav ceiling: Ripple. Post depth: Dribble (9 levels below Vessel).
 //
 // JUDGMENT CALLS (pattern-derived; flagged for OG HUMAN ratification on the PR):
 //   - constellation: 'honeycomb' — non-Atlas, HoneyComb-native productivity surface.
@@ -23,7 +25,7 @@ export const miniwavesAstra: AstraConfig = {
   hosts: ['miniwaves.app', 'www.miniwaves.app'],
   wordmark: 'MiNiWaVeS',
   siteTitle: 'MiNiWaVeS · HONEYCOMB Motion Flow',
-  tagline: 'Orchestrate your life by motion, Ocean to Trickle.',
+  tagline: 'Orchestrate your life by motion, Vessel to Dribble.',
   primarySurface: 'waves',
   constellation: 'honeycomb',
   accent: '#0EA5E9',

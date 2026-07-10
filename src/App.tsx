@@ -234,8 +234,12 @@ function AppContent() {
               <Route path="gradations" element={<GradationsPage />} />
             </Route>
 
-            {/* Waves surface — Mini Waves V76 embedded via iframe */}
+            {/* Waves surface — Mini Waves V76 embedded via iframe.
+              /miniwaves is the Astra-named alias (MiNiWaVeS lives inside
+              theMANUAL.tech for now — no standalone site; also reachable via
+              the Tasks launcher popup in the community bottom toolbar). */}
             <Route path="/waves" element={<WavesPage />} />
+            <Route path="/miniwaves" element={<WavesPage />} />
 
             {/* BLiNG! surface — freedomblings.com embedded via iframe.
               Per manual-spine-api-v1.md §3, /bling is a canonical universal
