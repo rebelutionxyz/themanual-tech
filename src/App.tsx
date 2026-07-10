@@ -14,6 +14,7 @@ import {
 import { AstraProvider, useAstra } from '@/lib/astras/AstraContext';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { BlingsPage } from '@/pages/BlingsPage';
+import { ComingSoonPage } from '@/pages/ComingSoonPage';
 import { CollectionPage } from '@/pages/CollectionPage';
 import { CollectionsIndexPage } from '@/pages/CollectionsIndexPage';
 import { HandleSettingsPage } from '@/pages/HandleSettingsPage';
@@ -71,6 +72,8 @@ import { ChannelPage } from '@/pages/pulse/ChannelPage';
 import { PulseHome } from '@/pages/pulse/PulseHome';
 import { WatchPage } from '@/pages/pulse/WatchPage';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import { useUserRole } from '@/lib/useUserRole';
 
 export default function App() {
   return (
@@ -89,6 +92,35 @@ const ADMIN_SURFACE_PATHS = new Set(['/myhex', '/nexus', '/nucleus']);
 // here — the shell renders its own ticker. Other surfaces keep the legacy chrome.
 const COMMUNITY_PREFIXES = ['/intel', '/unite', '/rule', '/give', '/pulse', '/bazaar'];
 
+// Chrome-free paths — the front door (login / coming-soon) and MiniWaves,
+// which owns its own shell (V77). No SiteHeader / ticker / toolbar.
+const CHROME_FREE_PATHS = new Set(['/', '/waves', '/miniwaves']);
+
+// Management allowlist — OG HUMAN only, until the role registries (Lock 8 /
+// 9.6) deploy and real tier checks replace this. Landing gate 2026-07-10.
+const OG_HANDLES = new Set(['fnulnu']);
+
+/** Gate a route to allowlisted handles; everyone else → front door. */
+function OGOnly({ children }: { children: ReactNode }) {
+  const { bee, loading } = useAuth();
+  if (loading) return null;
+  if (!bee || !OG_HANDLES.has(bee.handle)) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+/** Post-login router for allowlisted Bees — directs by security level.
+ *  Keyholder → Nucleus, property owner → Nexus, else HQ. Both role flags
+ *  fail-soft to false until the registries + check-keyholder deploy
+ *  (Lock 8 / 9.6), so today OG lands at /hq; the cascade upgrades itself
+ *  automatically when real tiers go live. */
+function ManagementRedirect() {
+  const { role, loading } = useUserRole();
+  if (loading) return null;
+  if (role.isKeyholder) return <Navigate to="/nucleus" replace />;
+  if (role.isPropertyOwner) return <Navigate to="/nexus" replace />;
+  return <Navigate to="/hq" replace />;
+}
+
 function AppContent() {
   const activeAstra = useAstra();
   const { bee, loading: authLoading } = useAuth();
@@ -97,11 +129,12 @@ function AppContent() {
   const isCommunitySurface = COMMUNITY_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
-  const hideGlobalChrome = isAdminSurface || isCommunitySurface;
+  const isChromeFree = CHROME_FREE_PATHS.has(pathname);
+  const hideGlobalChrome = isAdminSurface || isCommunitySurface || isChromeFree;
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-bg text-text">
-      {!isCommunitySurface && <SiteHeader />}
+      {!isCommunitySurface && !isChromeFree && <SiteHeader />}
       {/* Phase C Component D: top-ticker promotion slot below header.
           Hides itself when no DB match + no astra fallback (D-4).
           Suppressed on admin + community surfaces — they own their own chrome. */}
@@ -114,26 +147,38 @@ function AppContent() {
           standalone pages scroll here. min-h-0 lets inner scrollers engage. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         <Routes>
-          {/* Home — astra-aware first, then admin tier-1 redirect for signed-in
-            Bees on theMANUAL.tech root, then anonymous HomePage. */}
+          {/* Front door (landing gate 2026-07-10) — astra-aware first, then:
+            anonymous → login module · allowlisted OG → management (by
+            security level) · any other signed-in Bee → blank coming soon. */}
           <Route
             path="/"
             element={
               activeAstra ? (
                 <Navigate to={`/${activeAstra.primarySurface}`} replace />
-              ) : authLoading ? null : bee ? (
-                <Navigate to="/myhex" replace />
+              ) : authLoading ? null : !bee ? (
+                <LoginPage />
+              ) : OG_HANDLES.has(bee.handle) ? (
+                <ManagementRedirect />
               ) : (
-                <HomePage />
+                <ComingSoonPage />
               )
             }
           />
+          {/* Old anonymous homepage — parked, reachable, off the front door. */}
+          <Route path="/home" element={<HomePage />} />
 
           {/* Admin tier surfaces (My Hex / Nexus / Nucleus) — outside
             PlatformLayout because they own their own chrome. */}
           <Route path="/myhex" element={<MyHexPage />} />
           <Route path="/nexus" element={<NexusPage />} />
           <Route path="/nucleus" element={<NucleusPage />} />
+
+          {/* MiniWaves (V77) — chrome-free, owns its own shell. No SiteHeader,
+            no toolbar, no breadcrumbs. /miniwaves is the Astra-named path,
+            /waves the legacy alias; also reachable via the Tasks launcher
+            popup in the community bottom toolbar. */}
+          <Route path="/waves" element={<WavesPage />} />
+          <Route path="/miniwaves" element={<WavesPage />} />
 
           {/* Auth */}
           <Route path="/login" element={<LoginPage />} />
@@ -234,13 +279,6 @@ function AppContent() {
               <Route path="gradations" element={<GradationsPage />} />
             </Route>
 
-            {/* Waves surface — Mini Waves V76 embedded via iframe.
-              /miniwaves is the Astra-named alias (MiNiWaVeS lives inside
-              theMANUAL.tech for now — no standalone site; also reachable via
-              the Tasks launcher popup in the community bottom toolbar). */}
-            <Route path="/waves" element={<WavesPage />} />
-            <Route path="/miniwaves" element={<WavesPage />} />
-
             {/* BLiNG! surface — freedomblings.com embedded via iframe.
               Per manual-spine-api-v1.md §3, /bling is a canonical universal
               path. The iframe wrapper IS the v1 implementation; replacing
@@ -253,7 +291,14 @@ function AppContent() {
               These resolve identically from any host; AstraConfig provides
               theming via useAstra(). MUST be registered BEFORE the /:slug
               catch-all or react-router-dom will match them as Astra surfaces. */}
-            <Route path="/hq" element={<HQControlRoom />} />
+            <Route
+              path="/hq"
+              element={
+                <OGOnly>
+                  <HQControlRoom />
+                </OGOnly>
+              }
+            />
             <Route path="/groups" element={<ManualGroupsPlaceholder />} />
             <Route path="/comms" element={<CommsPlaceholder />} />
             <Route path="/notifications" element={<NotificationCenter />} />
