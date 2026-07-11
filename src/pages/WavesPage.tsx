@@ -31,7 +31,7 @@ export function WavesPage() {
       }}
     >
       <iframe
-        src="/mini-waves-v78.html"
+        src="/mini-waves-v90.html"
         title="MiniWaves"
         className="h-full w-full border-0"
         style={{
