@@ -5,7 +5,6 @@ import { TopToolbar } from '@/components/layout/TopToolbar';
 import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
 import {
   CartPlaceholder,
-  CommsPlaceholder,
   ManualGroupsPlaceholder,
   NotificationCenter,
   OpenAPIDocs,
@@ -15,6 +14,7 @@ import { AstraProvider, useAstra } from '@/lib/astras/AstraContext';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { BlingsPage } from '@/pages/BlingsPage';
 import { ComingSoonPage } from '@/pages/ComingSoonPage';
+import { CommsPage } from '@/pages/comms/CommsPage';
 import { CollectionPage } from '@/pages/CollectionPage';
 import { CollectionsIndexPage } from '@/pages/CollectionsIndexPage';
 import { HandleSettingsPage } from '@/pages/HandleSettingsPage';
@@ -90,7 +90,7 @@ const ADMIN_SURFACE_PATHS = new Set(['/myhex', '/nexus', '/nucleus']);
 // Community surfaces own the white X-style shell (logo + lens controls live in
 // the GlobalSidebar), so the global SiteHeader / ticker / toolbar are suppressed
 // here — the shell renders its own ticker. Other surfaces keep the legacy chrome.
-const COMMUNITY_PREFIXES = ['/intel', '/unite', '/rule', '/give', '/pulse', '/bazaar'];
+const COMMUNITY_PREFIXES = ['/intel', '/unite', '/rule', '/give', '/pulse', '/bazaar', '/comms'];
 
 // Chrome-free paths — the front door (login / coming-soon) and MiniWaves,
 // which owns its own shell (V77). No SiteHeader / ticker / toolbar.
@@ -207,6 +207,13 @@ function AppContent() {
             <Route path="/rule/:id" element={<EventPage />} />
             <Route path="/give" element={<GivePage />} />
 
+            {/* COMMS — Bee-to-Bee DMs + groups (v1 text layer, 2026-07-10).
+              Backend RPCs were already deployed; this is their first UI.
+              /comms/:conversationId matches the deep link comms_send writes
+              into notifications. Rooms + roulette gated on LiveKit. */}
+            <Route path="/comms" element={<CommsPage />} />
+            <Route path="/comms/:conversationId" element={<CommsPage />} />
+
             {/* PULSE — Live News Network. Mounts in the SAME community shell as
               INTEL/UNITE/RULE/GIVE (sidebar + new header + single RealmStrip);
               pages are flat children so the shell never unmounts. The realm
@@ -300,7 +307,6 @@ function AppContent() {
               }
             />
             <Route path="/groups" element={<ManualGroupsPlaceholder />} />
-            <Route path="/comms" element={<CommsPlaceholder />} />
             <Route path="/notifications" element={<NotificationCenter />} />
             <Route path="/cart" element={<CartPlaceholder />} />
             <Route path="/api/docs" element={<OpenAPIDocs />} />
