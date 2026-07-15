@@ -23,6 +23,7 @@ import {
   Compass,
   HeartHandshake,
   Megaphone,
+  MessageCircle,
   MessageSquare,
   Package,
   Plus,
@@ -32,7 +33,7 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
-type Surface = 'intel' | 'unite' | 'rule' | 'give' | 'pulse' | 'bazaar';
+type Surface = 'intel' | 'unite' | 'rule' | 'give' | 'pulse' | 'bazaar' | 'comms';
 
 const ACCENT: Record<Surface, string> = {
   intel: '#1D9BF0',
@@ -43,6 +44,8 @@ const ACCENT: Record<Surface, string> = {
   // the relit cards' SURFACE_BY_SLUG.get('pulse')?.color).
   pulse: SURFACE_BY_SLUG.get('pulse')?.color ?? '#DC2626',
   bazaar: BAZAAR_ACCENT,
+  // COMMS lilac — canonical color from the surface registry.
+  comms: SURFACE_BY_SLUG.get('comms')?.color ?? '#9B7FC8',
 };
 
 const VIEW_ROUTE_MAP: Record<string, IntelView> = { '/intel/mine': 'mythreads' };
@@ -54,6 +57,7 @@ function surfaceFromPath(pathname: string): Surface {
   if (pathname.startsWith('/give')) return 'give';
   if (pathname.startsWith('/pulse')) return 'pulse';
   if (pathname.startsWith('/bazaar')) return 'bazaar';
+  if (pathname.startsWith('/comms')) return 'comms';
   return 'intel';
 }
 
@@ -180,6 +184,12 @@ export function CommunityLayout() {
       if (location.pathname !== '/pulse') navigate('/pulse');
       return;
     }
+    if (surface === 'comms') {
+      // COMMS is self-contained (conversation list + thread live on the center
+      // page); the only own item is Conversations → /comms.
+      if (location.pathname !== '/comms') navigate('/comms');
+      return;
+    }
     if (surface === 'bazaar') {
       // BAZAAR sidebar items are route links; this guards the give-fallthrough.
       return;
@@ -203,7 +213,7 @@ export function CommunityLayout() {
         ? uniteView
         : surface === 'rule'
           ? ruleView
-          : surface === 'pulse'
+          : surface === 'pulse' || surface === 'comms'
             ? 'home'
             : surface === 'bazaar'
               ? bazaarItem
@@ -293,6 +303,11 @@ function buildItems(surface: Surface, c: Counts): SidebarItem[] {
     // PULSE is self-contained (live / upcoming / library / search live on the
     // center page), so the sidebar is just Explore + the shared utility tail.
     return [{ id: 'home', label: 'Explore', icon: Compass }, ...COMMON_TAIL];
+  }
+  if (surface === 'comms') {
+    // COMMS — conversation list + thread live on the center page, so the
+    // sidebar is just Conversations + the shared utility tail.
+    return [{ id: 'home', label: 'Conversations', icon: MessageCircle }, ...COMMON_TAIL];
   }
   if (surface === 'bazaar') {
     // BAZAAR — route-link items (Browse / OFFER / Orders) + the shared tail.
