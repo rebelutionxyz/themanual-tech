@@ -69,6 +69,7 @@ export const SURFACE_FRIENDLY: Record<string, string> = {
   unite: 'Groups',
   rule: 'Events',
   give: 'Give',
+  comms: 'COMMs',
 };
 
 /** Astra dropdown entries (relay order; "Marketplace" → Bazaar for firewall). */
@@ -81,7 +82,7 @@ export interface AstraSwitchItem {
 
 export const ASTRA_SWITCHER: AstraSwitchItem[] = [
   // Alpha order; BLiNG! lives only on the bottom toolbar (FreedomBLiNGS popup).
-  { label: 'COMMs', slug: 'chat', to: '/chat', icon: MessageCircle },
+  { label: 'COMMs', slug: 'comms', to: '/comms', icon: MessageCircle },
   { label: 'Events', slug: 'rule', to: '/rule', icon: Calendar },
   { label: 'INTEL', slug: 'intel', to: '/intel', icon: MessagesSquare },
   { label: 'Give', slug: 'give', to: '/give', icon: HeartHandshake },
