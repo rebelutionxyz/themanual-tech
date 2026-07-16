@@ -1,3 +1,4 @@
+import { WatchedGroupsRow } from '@/components/groups/WatchedGroupsRow';
 import { L3Refinement } from '@/components/intel/L3Refinement';
 import { PostConsole } from '@/components/intel/PostConsole';
 import { ReportsQueue } from '@/components/intel/ReportsQueue';
@@ -143,6 +144,9 @@ export function IntelPage() {
           setPrefix(parts);
         }}
       />
+
+      {/* Bookmarked = Watching: watched groups ride above the saved threads. */}
+      {activeView === 'saved' && <WatchedGroupsRow />}
 
       {/* Recency window control folded into the toolbar's Time popup
           (dispatch §5). hotWindow/breakingWindow still drive the list below. */}

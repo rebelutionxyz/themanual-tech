@@ -5,13 +5,13 @@ import type { IntelView } from '@/components/intel/IntelSidebar';
 import { CommunityShell } from '@/components/shell/CommunityShell';
 import { COMMON_TAIL, type SidebarItem } from '@/components/shell/sidebarNav';
 import { useAuth } from '@/lib/auth';
-import { SURFACE_BY_SLUG } from '@/lib/surfaces';
 import { countMyGoingUpcoming } from '@/lib/events';
 import { isForumModerator } from '@/lib/forumMod';
 import { countMyGroups } from '@/lib/groups';
 import { countThreadsByAuthor } from '@/lib/intel';
 import { unreadNotificationsCount } from '@/lib/notifications';
 import { countSavedThreads } from '@/lib/reactions';
+import { SURFACE_BY_SLUG } from '@/lib/surfaces';
 import type { EventsOutletCtx, EventsView } from '@/pages/events/EventsLayout';
 import type { GiveOutletCtx, GiveView } from '@/pages/give/GiveLayout';
 import type { GroupsOutletCtx, GroupsView } from '@/pages/groups/GroupsLayout';
@@ -28,6 +28,7 @@ import {
   MessageSquare,
   Package,
   Plus,
+  Shield,
   ShoppingBag,
   Users,
 } from 'lucide-react';
@@ -148,6 +149,14 @@ export function CommunityLayout() {
       .then(setMyGroups)
       .catch(() => setMyGroups(0));
   }, [bee?.id]);
+
+  // UNITE counts (My Groups badge) — refetched on join/leave (fired by
+  // GroupPage), mirroring the intel-counts-refresh pattern.
+  useEffect(() => {
+    const onRefresh = () => refreshGroups();
+    window.addEventListener('unite-counts-refresh', onRefresh);
+    return () => window.removeEventListener('unite-counts-refresh', onRefresh);
+  }, [refreshGroups]);
   const refreshGoing = useCallback(() => {
     if (!bee?.id) return setGoing(0);
     countMyGoingUpcoming(bee.id)
@@ -327,11 +336,15 @@ function tailItems(c: Counts): SidebarItem[] {
 
 function buildItems(surface: Surface, c: Counts): SidebarItem[] {
   if (surface === 'unite') {
-    // Relay UNITE pass-1 list (creation stays on the center page's Create button).
+    // Relay UNITE pass-1 list (creation stays on the center page's Create
+    // button). Following live 2026-07-16 — bee_follows reuse: groups CREATED
+    // by Bees you follow (same semantics as the INTEL Following feed).
+    // Moderating de-orphans listMyModeratingGroups (RULE "Hosting" parallel).
     return [
       { id: 'discover', label: 'Explore', icon: Compass },
-      { id: 'following', label: 'Following', icon: Users, soon: true },
+      { id: 'following', label: 'Following', icon: Users },
       { id: 'mine', label: 'My Groups', icon: HeartHandshake, badge: c.myGroups },
+      { id: 'moderating', label: 'Moderating', icon: Shield },
       ...tailItems(c),
     ];
   }

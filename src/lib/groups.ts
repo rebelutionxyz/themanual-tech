@@ -338,3 +338,40 @@ export async function createGroupThread(
   const r = unwrap<{ thread_id?: string; id?: string }>(data, error);
   return String(r.thread_id ?? r.id ?? '');
 }
+
+// ──────────────────────── Following + Watching ────────────────────────
+// UNITE Following reuses the bee_follows graph (lib/follows.ts) verbatim:
+// groups CREATED by Bees you follow — same semantics as the INTEL feed
+// (threads by Bees you follow). One follow graph, every surface.
+// Watching a specific group = a Bookmark (entity_saves, source_surface
+// 'unite') — private, no follow edge, no owner notification.
+
+/**
+ * Groups created by any of these Bees — the UNITE Following view
+ * (feed with listFollowedBeeIds). RLS scopes visibility: public groups
+ * plus private/secret ones you belong to.
+ */
+export async function listGroupsByCreators(creatorIds: string[]): Promise<Group[]> {
+  if (!supabase || creatorIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('groups')
+    .select('*')
+    .in('created_by', creatorIds)
+    .order('member_count', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapGroup);
+}
+
+/** Resolve group ids → groups, preserving input order (Bookmarked groups row). */
+export async function getGroupsByIds(ids: string[]): Promise<Group[]> {
+  if (!supabase || ids.length === 0) return [];
+  const { data, error } = await supabase.from('groups').select('*').in('id', ids);
+  if (error) throw new Error(error.message);
+  const byId = new Map(
+    (data ?? []).map((r) => {
+      const g = mapGroup(r as Record<string, unknown>);
+      return [g.id, g] as const;
+    }),
+  );
+  return ids.map((id) => byId.get(id)).filter((g): g is Group => Boolean(g));
+}

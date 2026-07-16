@@ -10,13 +10,16 @@ const INTEL_COLOR = '#1D9BF0';
  * Follow / Following toggle for a Bee author (bee_follows_v1).
  * Hidden when signed out or when the target is the signed-in Bee.
  * Fires `intel-counts-refresh` so the shell + Following feed stay honest.
+ * `accent` recolors the pill per surface (defaults to INTEL sky).
  */
 export function FollowBeeButton({
   beeId,
   className,
+  accent = INTEL_COLOR,
 }: {
   beeId: string;
   className?: string;
+  accent?: string;
 }) {
   const { bee } = useAuth();
   const [following, setFollowing] = useState<boolean | null>(null);
@@ -73,8 +76,8 @@ export function FollowBeeButton({
       )}
       style={
         following
-          ? { borderColor: `${INTEL_COLOR}50`, color: INTEL_COLOR, background: `${INTEL_COLOR}12` }
-          : { borderColor: INTEL_COLOR, color: '#ffffff', background: INTEL_COLOR }
+          ? { borderColor: `${accent}50`, color: accent, background: `${accent}12` }
+          : { borderColor: accent, color: '#ffffff', background: accent }
       }
     >
       {following ? <UserCheck size={12} /> : <UserPlus size={12} />}

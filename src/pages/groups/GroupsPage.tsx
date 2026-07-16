@@ -1,14 +1,16 @@
 import { SurfaceHeader } from '@/components/shell/SurfaceHeader';
 import { SURFACE_FRIENDLY } from '@/components/shell/sidebarNav';
 import { useAuth } from '@/lib/auth';
-import { CARD_INK, realmCardStyle } from '@/lib/realmCardStyle';
+import { listFollowedBeeIds } from '@/lib/follows';
 import {
   type Group,
   type GroupSort,
   listGroups,
+  listGroupsByCreators,
   listMyGroups,
   listMyModeratingGroups,
 } from '@/lib/groups';
+import { CARD_INK, realmCardStyle } from '@/lib/realmCardStyle';
 import { cn, formatCount } from '@/lib/utils';
 import type { GroupsOutletCtx, GroupsView } from '@/pages/groups/GroupsLayout';
 import { useLensStore } from '@/stores/useLensStore';
@@ -33,7 +35,12 @@ export function GroupsPage() {
     try {
       if (view === 'discover') setGroups(await listGroups(sort, realmPath));
       else if (!bee?.id) setGroups([]);
-      else if (view === 'mine') setGroups(await listMyGroups(bee.id));
+      else if (view === 'following') {
+        // Following = groups CREATED by Bees you follow (bee_follows reuse,
+        // same semantics as the INTEL Following feed).
+        const followed = await listFollowedBeeIds(bee.id);
+        setGroups(followed.length > 0 ? await listGroupsByCreators(followed) : []);
+      } else if (view === 'mine') setGroups(await listMyGroups(bee.id));
       else setGroups(await listMyModeratingGroups(bee.id));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load groups');
@@ -205,6 +212,53 @@ function EmptyGroups({
   signedIn,
   onCreate,
 }: { view: GroupsView; signedIn: boolean; onCreate: () => void }) {
+  // Following gets its own block — mirrors the INTEL Following empty state.
+  if (view === 'following') {
+    return (
+      <div
+        className="rounded-lg border-2 border-dashed p-8 text-center"
+        style={{ borderColor: `${UNITE_COLOR}40`, background: `${UNITE_COLOR}08` }}
+      >
+        <div
+          className="mx-auto mb-4 h-2 w-12 rounded-full"
+          style={{ background: UNITE_COLOR, opacity: 0.6 }}
+        />
+        <div
+          className="mb-3 inline-block rounded px-2 py-0.5 font-mono uppercase tracking-widest"
+          style={{ fontSize: '10px', color: UNITE_COLOR, background: `${UNITE_COLOR}15` }}
+          data-size="meta"
+        >
+          FOLLOWING
+        </div>
+        <p
+          className="mb-2 font-display text-zinc-900"
+          style={{ fontSize: '17px', fontWeight: 500 }}
+        >
+          {signedIn ? 'No voices followed yet' : 'Sign in to build your Following view'}
+        </p>
+        <p className="mx-auto max-w-md text-zinc-500" style={{ fontSize: '13px', lineHeight: 1.5 }}>
+          {signedIn
+            ? 'Follow any Bee — from a thread or a group member list. Groups they create land here — no algorithm, you decide.'
+            : 'Your Following view is tied to your Bee account. Sign in to choose whose voices you hear.'}
+        </p>
+        {!signedIn && (
+          <Link
+            to="/login"
+            className="mt-5 inline-flex items-center gap-1.5 rounded-md border-2 px-4 py-1.5 transition-colors hover:brightness-110"
+            style={{
+              borderColor: `${UNITE_COLOR}70`,
+              color: UNITE_COLOR,
+              fontSize: '12px',
+              fontWeight: 600,
+            }}
+          >
+            Sign in
+          </Link>
+        )}
+      </div>
+    );
+  }
+
   const headline =
     view === 'discover'
       ? 'No groups yet'

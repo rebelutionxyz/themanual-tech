@@ -133,10 +133,7 @@ export async function toggleReaction(
 
   if (existing?.id) {
     // Remove
-    const { error } = await supabase
-      .from('entity_reactions')
-      .delete()
-      .eq('id', existing.id);
+    const { error } = await supabase.from('entity_reactions').delete().eq('id', existing.id);
     if (error) throw new Error(error.message);
     return 'removed';
   }
@@ -208,10 +205,7 @@ export async function toggleSave(
     .maybeSingle();
 
   if (existing?.id) {
-    const { error } = await supabase
-      .from('entity_saves')
-      .delete()
-      .eq('id', existing.id);
+    const { error } = await supabase.from('entity_saves').delete().eq('id', existing.id);
     if (error) throw new Error(error.message);
     return 'unsaved';
   }
@@ -278,6 +272,22 @@ export async function countSavedThreads(beeId: string): Promise<number> {
     .select('*', { count: 'exact', head: true })
     .eq('bee_id', beeId);
   return count ?? 0;
+}
+
+/**
+ * Group ids the Bee is watching — Bookmarked groups (source_surface 'unite'),
+ * newest save first. "Bookmarked = Watching" (2026-07-16): watching a group is
+ * a private save; no follow edge, no owner notification.
+ */
+export async function listSavedGroupIds(beeId: string): Promise<string[]> {
+  if (!supabase || !beeId) return [];
+  const { data } = await supabase
+    .from('entity_saves')
+    .select('source_id, created_at')
+    .eq('bee_id', beeId)
+    .eq('source_surface', 'unite')
+    .order('created_at', { ascending: false });
+  return (data ?? []).map((r) => String(r.source_id));
 }
 
 // ═══════════════════════════════════════════════════════════════════
