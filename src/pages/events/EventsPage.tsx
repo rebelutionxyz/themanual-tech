@@ -1,7 +1,6 @@
 import { SurfaceHeader } from '@/components/shell/SurfaceHeader';
 import { SURFACE_FRIENDLY } from '@/components/shell/sidebarNav';
 import { useAuth } from '@/lib/auth';
-import { CARD_INK, realmCardStyle } from '@/lib/realmCardStyle';
 import {
   type EventItem,
   formatEventWhen,
@@ -10,6 +9,7 @@ import {
   listMyHostedEvents,
   listPastEvents,
 } from '@/lib/events';
+import { CARD_INK, realmCardStyle } from '@/lib/realmCardStyle';
 import { formatCount } from '@/lib/utils';
 import type { EventsOutletCtx, EventsView } from '@/pages/events/EventsLayout';
 import { useLensStore } from '@/stores/useLensStore';
@@ -99,15 +99,23 @@ export function EventCard({ event }: { event: EventItem }) {
     <li>
       <Link
         to={`/rule/${event.id}`}
-        className="group block overflow-hidden rounded-lg p-4 transition-shadow hover:shadow-md"
+        className={`group block overflow-hidden rounded-lg p-4 transition-shadow hover:shadow-md${event.status === 'cancelled' ? ' opacity-55 saturate-50' : ''}`}
         style={realmCardStyle(RULE_COLOR)}
       >
         <div
-          className="mb-1 font-mono uppercase tracking-wider"
+          className="mb-1 flex items-center gap-2 font-mono uppercase tracking-wider"
           style={{ fontSize: '10.5px', color: CARD_INK.body }}
           data-size="meta"
         >
           {formatEventWhen(event.startsAt, event.endsAt)}
+          {event.status === 'cancelled' && (
+            <span
+              className="rounded bg-white/85 px-1.5 py-0.5 font-semibold text-red-700"
+              style={{ fontSize: '9px' }}
+            >
+              CANCELLED
+            </span>
+          )}
         </div>
         <h3 className="font-display text-lg leading-tight" style={{ color: CARD_INK.title }}>
           {event.title}

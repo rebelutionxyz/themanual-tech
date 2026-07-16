@@ -25,6 +25,9 @@ export interface EventItem {
   goingCount: number;
   maybeCount: number;
   createdAt: string;
+  /** 'scheduled' | 'cancelled' — event_host_v1. */
+  status: 'scheduled' | 'cancelled';
+  coverUrl: string | null;
 }
 
 export interface EventRsvpRow {
@@ -62,6 +65,8 @@ function mapEvent(row: Record<string, unknown>): EventItem {
     goingCount: Number(row.going_count ?? 0),
     maybeCount: Number(row.maybe_count ?? 0),
     createdAt: String(row.created_at ?? ''),
+    status: row.status === 'cancelled' ? 'cancelled' : 'scheduled',
+    coverUrl: (row.cover_url as string) ?? null,
   };
 }
 
@@ -91,7 +96,10 @@ export async function eventsSearch(
   return (data ?? []).map(mapEvent);
 }
 
-export async function listEvents(upcomingOnly = true, realmPath: string[] = []): Promise<EventItem[]> {
+export async function listEvents(
+  upcomingOnly = true,
+  realmPath: string[] = [],
+): Promise<EventItem[]> {
   if (!supabase) return [];
   let q = supabase.from('events').select('*').order('starts_at', { ascending: true });
   if (upcomingOnly) q = q.gte('starts_at', new Date().toISOString());
@@ -336,4 +344,63 @@ export function formatEventWhen(startsAt: string, endsAt?: string | null): strin
     if (sameDay) return `${datePart} · ${timePart} – ${endTime}`;
   }
   return `${datePart} · ${timePart}`;
+}
+
+// ───────────────────── Host controls (event_host_v1) ─────────────────────
+
+export interface UpdateEventInput extends CreateEventInput {
+  /** Set to replace the cover; omit/null to leave it unchanged. */
+  coverUrl?: string | null;
+}
+
+/** Host-only edit via event_update RPC (RLS has no UPDATE path on events). */
+export async function updateEvent(eventId: string, input: UpdateEventInput): Promise<void> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { data, error } = await supabase.rpc('event_update', {
+    p_event_id: eventId,
+    p_title: input.title,
+    p_starts_at: input.startsAt,
+    p_description: input.description ?? null,
+    p_ends_at: input.endsAt ?? null,
+    p_location_text: input.locationText ?? null,
+    p_is_virtual: input.isVirtual ?? false,
+    p_virtual_link: input.virtualLink ?? null,
+    p_lat: input.lat ?? null,
+    p_lng: input.lng ?? null,
+    p_cover_url: input.coverUrl ?? null,
+  });
+  unwrap(data, error);
+}
+
+/** Host-only cancel/restore toggle via event_cancel RPC. */
+export async function cancelEvent(eventId: string, cancelled = true): Promise<void> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { data, error } = await supabase.rpc('event_cancel', {
+    p_event_id: eventId,
+    p_cancelled: cancelled,
+  });
+  unwrap(data, error);
+}
+
+/**
+ * Upload an event cover to the group-media bucket. Path convention is what
+ * the event_media_insert storage policy keys on: events/{id}/profile/….
+ * Returns the public URL (persist it via updateEvent/coverUrl).
+ */
+export async function uploadEventCover(eventId: string, file: File): Promise<string> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `events/${eventId}/profile/cover-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage
+    .from('group-media')
+    .upload(path, file, { contentType: file.type || 'image/jpeg', upsert: false });
+  if (error) throw new Error(error.message);
+  return supabase.storage.from('group-media').getPublicUrl(path).data.publicUrl;
+}
+
+/** Handle for a bee id (host chip on the event page). */
+export async function getBeeHandle(beeId: string): Promise<string | null> {
+  if (!supabase) return null;
+  const { data } = await supabase.from('bees').select('handle').eq('id', beeId).maybeSingle();
+  return data?.handle ? String(data.handle) : null;
 }
