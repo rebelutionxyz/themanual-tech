@@ -6,6 +6,7 @@ import {
 } from '@/components/shell/sidebarNav';
 import { ManualLogo } from '@/components/ui/ManualLogo';
 import { cn } from '@/lib/utils';
+import { useBranding } from '@/stores/useBranding';
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -32,6 +33,9 @@ export function GlobalSidebar({
   collapsed,
   onToggleCollapse,
 }: GlobalSidebarProps) {
+  // HQ-editable brand config (wordmark segments, accent, logo).
+  const branding = useBranding((s) => s.branding);
+
   // Hover-to-peek while collapsed — desktop/tablet pointer affordance only
   // (matchMedia '(hover: hover)' excludes touch, where the toggle drives state).
   const [canHover] = useState(
@@ -59,6 +63,12 @@ export function GlobalSidebar({
   const mobileOpen = isMobile && !shown; // expanded on mobile → tap backdrop closes
   const lockInner = mobileCollapsed ? 'pointer-events-none' : undefined;
 
+  // Mobile: picking any destination (item row or Astra switch) auto-closes the
+  // sidebar — the reader wants the content, not the menu. Desktop unaffected.
+  const closeOnMobileNav = () => {
+    if (isMobile && !collapsed) onToggleCollapse();
+  };
+
   return (
     <>
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: mobile-only tap-to-open on the collapsed rail; keyboard users reach the same toggle via the md+ minimize button */}
@@ -78,22 +88,36 @@ export function GlobalSidebar({
         {/* Pinned: logo + minimize toggle, then the Astra selector. */}
         <div className={cn('flex-shrink-0 px-2 pt-3', lockInner)}>
           <div className={cn('mb-3 flex items-center gap-1.5', shown ? 'flex-col' : 'px-1')}>
-            <Link
-              to="/"
-              className="group flex min-w-0 flex-1 items-center gap-2.5"
-              aria-label="Home"
-            >
-              <ManualLogo size={26} className="transition-opacity group-hover:opacity-90" />
+            {/* Static brand lockup — intentionally NOT a home link (2026-07-16). */}
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+              <RebelutionMark size={26} />
               {!shown && (
-                <span className="truncate font-display text-[15px] font-semibold tracking-wide text-zinc-900">
-                  HoneyComb
+                <span
+                  className="truncate text-[19px] leading-none tracking-wide text-zinc-900"
+                  style={{ fontFamily: "'Norwester', 'Arial Narrow', sans-serif" }}
+                >
+                  {branding.wordmarkPre}
+                  <span style={{ color: branding.accentHex }}>{branding.wordmarkAccent}</span>
+                  {branding.wordmarkPost}
+                  {branding.wordmarkSuffix && (
+                    // Sans face = true lowercase (Norwester shows lowercase as small caps).
+                    <span className="font-sans text-[13px] font-semibold text-zinc-500">
+                      {branding.wordmarkSuffix}
+                    </span>
+                  )}
                 </span>
               )}
-            </Link>
+            </div>
           </div>
 
           {/* Astra dropdown */}
-          {!shown && <AstraDropdown activeSurface={activeSurface} accent={accent} />}
+          {!shown && (
+            <AstraDropdown
+              activeSurface={activeSurface}
+              accent={accent}
+              onNavigate={closeOnMobileNav}
+            />
+          )}
         </div>
 
         {/* Scrolls: the per-surface item list (between the Astra selector and the
@@ -112,6 +136,7 @@ export function GlobalSidebar({
               accent={accent}
               collapsed={shown}
               onSelect={onSelect}
+              onNavigate={closeOnMobileNav}
             />
           ))}
         </nav>
@@ -156,9 +181,47 @@ export function GlobalSidebar({
   );
 }
 
+/* ───────────────────────── Brand mark ───────────────────────── */
+
+/**
+ * Brand emblem — src comes from the HQ-editable branding config. Falls back
+ * to the ManualLogo hex if the asset is missing/unreachable, so the shell
+ * never shows a broken image. `key` on the caller resets `broken` when the
+ * configured URL changes.
+ */
+function RebelutionMark({ size = 26 }: { size?: number }) {
+  const src = useBranding((s) => s.branding.logoUrl);
+  const [broken, setBroken] = useState(false);
+  // New URL → try again.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when src changes
+  useEffect(() => setBroken(false), [src]);
+  if (broken || !src) {
+    return <ManualLogo size={size} className="transition-opacity group-hover:opacity-90" />;
+  }
+  return (
+    <img
+      src={src}
+      width={size}
+      height={size}
+      alt=""
+      aria-hidden="true"
+      className="flex-shrink-0 rounded-full object-contain transition-opacity group-hover:opacity-90"
+      onError={() => setBroken(true)}
+    />
+  );
+}
+
 /* ───────────────────────── Astra dropdown ───────────────────────── */
 
-function AstraDropdown({ activeSurface, accent }: { activeSurface: string; accent: string }) {
+function AstraDropdown({
+  activeSurface,
+  accent,
+  onNavigate,
+}: {
+  activeSurface: string;
+  accent: string;
+  onNavigate?: () => void;
+}) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -217,7 +280,10 @@ function AstraDropdown({ activeSurface, accent }: { activeSurface: string; accen
                 type="button"
                 onClick={() => {
                   setOpen(false);
-                  if (!isCurrent) navigate(a.to);
+                  if (!isCurrent) {
+                    navigate(a.to);
+                    onNavigate?.();
+                  }
                 }}
                 className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[14px] transition-colors hover:bg-zinc-50"
                 style={{
@@ -245,12 +311,15 @@ function SidebarRow({
   accent,
   collapsed,
   onSelect,
+  onNavigate,
 }: {
   item: SidebarItem;
   active: boolean;
   accent: string;
   collapsed: boolean;
   onSelect: (id: string) => void;
+  /** Fired on any activation — mobile auto-close hook. */
+  onNavigate?: () => void;
 }) {
   const Icon = item.icon;
   const base = cn(
@@ -295,6 +364,7 @@ function SidebarRow({
     return (
       <Link
         to={item.to}
+        onClick={() => onNavigate?.()}
         className={cn(base, 'hover:bg-zinc-100', active && 'font-semibold')}
         style={style}
         title={item.label}
@@ -310,7 +380,10 @@ function SidebarRow({
   return (
     <button
       type="button"
-      onClick={() => onSelect(item.id)}
+      onClick={() => {
+        onSelect(item.id);
+        onNavigate?.();
+      }}
       className={cn(base, 'hover:bg-zinc-100', active && 'font-semibold')}
       style={style}
       title={item.label}

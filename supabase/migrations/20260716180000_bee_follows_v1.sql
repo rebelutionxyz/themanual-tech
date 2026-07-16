@@ -92,8 +92,13 @@ begin
 end
 $$;
 
--- v9 hardening: no PUBLIC execute; signed-in Bees only.
+-- v9 hardening: no PUBLIC/anon execute; signed-in Bees only.
+-- (anon revoke matters: Supabase default privileges auto-grant EXECUTE to
+-- anon at create time — revoking PUBLIC alone leaves that grant standing.
+-- Applied to prod as bee_follows_v1 + bee_follows_v1a_revoke_anon.)
 revoke all on function public.bee_follow(uuid) from public;
 revoke all on function public.bee_unfollow(uuid) from public;
+revoke execute on function public.bee_follow(uuid) from anon;
+revoke execute on function public.bee_unfollow(uuid) from anon;
 grant execute on function public.bee_follow(uuid) to authenticated;
 grant execute on function public.bee_unfollow(uuid) to authenticated;

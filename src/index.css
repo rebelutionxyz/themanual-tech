@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* RebelUtion brand face — Norwester (OFL-1.1, vendored: public/fonts/).
+   Caps-only display face; lowercase renders as small caps, which is exactly
+   the RebelUtion wordmark treatment (Rebel-U-tion → big R, small EBEL, …). */
+@font-face {
+  font-family: 'Norwester';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/norwester-latin-400-normal.woff2') format('woff2');
+}
+
 @layer base {
   :root {
     color-scheme: dark;

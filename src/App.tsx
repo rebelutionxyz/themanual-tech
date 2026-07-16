@@ -76,8 +76,9 @@ import { ChannelPage } from '@/pages/pulse/ChannelPage';
 import { PulseHome } from '@/pages/pulse/PulseHome';
 import { WatchPage } from '@/pages/pulse/WatchPage';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { useUserRole } from '@/lib/useUserRole';
+import { useBranding } from '@/stores/useBranding';
 
 export default function App() {
   return (
@@ -144,6 +145,12 @@ function AppContent() {
   const activeAstra = useAstra();
   const { bee, loading: authLoading } = useAuth();
   const { pathname } = useLocation();
+
+  // Platform branding (HQ-editable): one load per session; also swaps the
+  // favicon to the configured mark.
+  useEffect(() => {
+    void useBranding.getState().load();
+  }, []);
   const isAdminSurface = ADMIN_SURFACE_PATHS.has(pathname);
   const isCommunitySurface = COMMUNITY_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
