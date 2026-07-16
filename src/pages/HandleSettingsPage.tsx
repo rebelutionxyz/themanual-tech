@@ -42,9 +42,9 @@ const TIER_LABEL: Record<Tier, string> = {
 };
 
 const TIER_COLOR: Record<Tier, string> = {
-  legendary: 'text-honey',
-  rare: 'text-text-silver-bright',
-  premium: 'text-text-silver',
+  legendary: 'text-amber-600',
+  rare: 'text-zinc-900',
+  premium: 'text-zinc-600',
 };
 
 // Mirror of public.classify_handle_tier — keep in sync with the SQL.
@@ -172,7 +172,7 @@ export function HandleSettingsPage() {
   if (authLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="h-7 w-7 animate-spin text-text-silver/40" />
+        <Loader2 className="h-7 w-7 animate-spin text-zinc-400" />
       </div>
     );
   }
@@ -206,16 +206,16 @@ export function HandleSettingsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10 md:px-8">
+    <main className="safe-pad-x mx-auto max-w-3xl px-4 py-8 md:px-8 md:py-10">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center gap-2 text-honey">
+        <div className="flex items-center gap-2 text-amber-600">
           <Hash size={18} />
-          <h1 className="font-display text-3xl font-semibold text-text-silver-bright">
+          <h1 className="font-display text-3xl font-semibold text-zinc-900">
             Premium Handles
           </h1>
         </div>
-        <p className="mt-2 max-w-xl text-text-dim" style={{ fontSize: '13px' }}>
+        <p className="mt-2 max-w-xl text-zinc-500" style={{ fontSize: '13px' }}>
           Short handles are scarce. GIVE BLiNG! to claim one — every BLiNG! you give
           returns to The Source, lifting the faucet for all Bees.
         </p>
@@ -223,19 +223,19 @@ export function HandleSettingsPage() {
 
       {/* Identity + balance */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2">
-        <div className="rounded-lg border border-border bg-bg-elevated/40 p-5">
-          <p className="font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
+        <div className="rounded-lg border border-zinc-200 bg-white p-5">
+          <p className="font-mono text-zinc-500" style={{ fontSize: '11px' }} data-size="meta">
             Current handle
           </p>
-          <p className="mt-2 font-display text-2xl font-semibold text-text-silver-bright">
+          <p className="mt-2 font-display text-2xl font-semibold text-zinc-900">
             @{bee.handle}
           </p>
         </div>
-        <div className="rounded-lg border border-border bg-bg-elevated/40 p-5">
-          <p className="font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
+        <div className="rounded-lg border border-zinc-200 bg-white p-5">
+          <p className="font-mono text-zinc-500" style={{ fontSize: '11px' }} data-size="meta">
             Your BLiNG!
           </p>
-          <p className="mt-2 font-display text-2xl font-semibold text-honey">
+          <p className="mt-2 font-display text-2xl font-semibold text-amber-600">
             {balance === null ? '—' : fmtBling(balance)}
           </p>
         </div>
@@ -247,7 +247,7 @@ export function HandleSettingsPage() {
           className={cn(
             'mb-6 flex items-start gap-2 rounded-md border p-3',
             flash.kind === 'ok'
-              ? 'border-honey/40 bg-honey/10 text-honey'
+              ? 'border-amber-300 bg-amber-50 text-amber-700'
               : 'border-kettle-contested/40 bg-kettle-contested/10 text-kettle-contested',
           )}
           style={{ fontSize: '12.5px' }}
@@ -258,18 +258,18 @@ export function HandleSettingsPage() {
       )}
 
       {/* Search / claim */}
-      <div className="rounded-lg border border-border bg-bg-elevated/40 p-6">
+      <div className="rounded-lg border border-zinc-200 bg-white p-6">
         <label
           htmlFor="handle-search"
-          className="font-mono text-text-muted"
+          className="font-mono text-zinc-500"
           style={{ fontSize: '11px' }}
           data-size="meta"
         >
           Find a handle
         </label>
         <div className="mt-2 flex items-center gap-2">
-          <div className="flex flex-1 items-center rounded-md border border-border bg-bg px-3 focus-within:border-border-bright">
-            <span className="font-display text-lg text-text-dim">@</span>
+          <div className="flex flex-1 items-center rounded-md border border-zinc-300 bg-white px-3 focus-within:border-zinc-400">
+            <span className="font-display text-lg text-zinc-500">@</span>
             <input
               id="handle-search"
               value={query}
@@ -281,7 +281,7 @@ export function HandleSettingsPage() {
               autoComplete="off"
               spellCheck={false}
               placeholder="cat"
-              className="w-full bg-transparent px-1.5 py-2.5 font-display text-lg text-text-silver-bright outline-none placeholder:text-text-dim/50"
+              className="w-full bg-transparent px-1.5 py-2.5 font-display text-lg text-zinc-900 outline-none placeholder:text-zinc-300"
             />
           </div>
           <button
@@ -291,8 +291,8 @@ export function HandleSettingsPage() {
             className={cn(
               'rounded-md px-5 py-2.5 font-mono text-sm transition-colors',
               claimable
-                ? 'bg-honey text-bg hover:bg-honey/90'
-                : 'cursor-not-allowed border border-border bg-bg-elevated text-text-dim',
+                ? 'bg-honey text-zinc-900 hover:bg-honey/90'
+                : 'cursor-not-allowed border border-zinc-200 bg-zinc-100 text-zinc-400',
             )}
           >
             Claim
@@ -301,13 +301,13 @@ export function HandleSettingsPage() {
 
         {/* Status line */}
         <div className="mt-3 min-h-[20px] font-mono" style={{ fontSize: '12px' }}>
-          {!handle && <span className="text-text-dim">Enter a 1–4 character handle.</span>}
+          {!handle && <span className="text-zinc-500">Enter a 1–4 character handle.</span>}
           {handle && !tier && (
-            <span className="text-text-dim">
+            <span className="text-zinc-500">
               @{handle} is 5+ characters — that's a free, standard handle.
             </span>
           )}
-          {handle && tier && checking && <span className="text-text-muted">Checking @{handle}…</span>}
+          {handle && tier && checking && <span className="text-zinc-500">Checking @{handle}…</span>}
           {handle && tier && !checking && taken === true && (
             <span className="text-kettle-contested">@{handle} is already claimed.</span>
           )}
@@ -326,21 +326,21 @@ export function HandleSettingsPage() {
 
       {/* Tiers */}
       <div className="mt-8">
-        <h2 className="font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
+        <h2 className="font-mono text-zinc-500" style={{ fontSize: '11px' }} data-size="meta">
           Tiers
         </h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           {(['legendary', 'rare', 'premium'] as Tier[]).map((t) => {
             const row = tiers.find((x) => x.tier_name === t);
             return (
-              <div key={t} className="rounded-lg border border-border bg-bg-elevated/40 p-4">
+              <div key={t} className="rounded-lg border border-zinc-200 bg-white p-4">
                 <p className={cn('font-display text-lg font-semibold', TIER_COLOR[t])}>
                   {TIER_LABEL[t]}
                 </p>
-                <p className="mt-1 font-mono text-honey" style={{ fontSize: '13px' }}>
+                <p className="mt-1 font-mono text-amber-600" style={{ fontSize: '13px' }}>
                   {row ? fmtBling(row.base_price_bling) : '—'} BLiNG!
                 </p>
-                <p className="mt-2 text-text-dim" style={{ fontSize: '11.5px' }}>
+                <p className="mt-2 text-zinc-500" style={{ fontSize: '11.5px' }}>
                   {row?.description ?? ''}
                 </p>
               </div>
@@ -351,20 +351,20 @@ export function HandleSettingsPage() {
 
       {/* Recent claims — social proof */}
       <div className="mt-8">
-        <h2 className="font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
+        <h2 className="font-mono text-zinc-500" style={{ fontSize: '11px' }} data-size="meta">
           Recently claimed
         </h2>
         {recent.length === 0 ? (
-          <p className="mt-3 text-text-dim" style={{ fontSize: '12px' }}>
+          <p className="mt-3 text-zinc-500" style={{ fontSize: '12px' }}>
             No premium handles claimed yet — be the first.
           </p>
         ) : (
-          <ul className="mt-3 divide-y divide-border rounded-lg border border-border bg-bg-elevated/40">
+          <ul className="mt-3 divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white">
             {recent.map((c) => (
               <li key={c.handle} className="flex items-center justify-between px-4 py-2.5">
-                <span className="font-display text-text-silver-bright">@{c.handle}</span>
+                <span className="font-display text-zinc-900">@{c.handle}</span>
                 <span
-                  className={cn('font-mono uppercase tracking-wider', TIER_COLOR[(c.tier as Tier)] ?? 'text-text-dim')}
+                  className={cn('font-mono uppercase tracking-wider', TIER_COLOR[(c.tier as Tier)] ?? 'text-zinc-500')}
                   style={{ fontSize: '10.5px' }}
                   data-size="meta"
                 >
@@ -387,22 +387,22 @@ export function HandleSettingsPage() {
       {/* Confirm modal */}
       {confirmOpen && tier && tierAmount !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-sm rounded-lg border border-border-bright bg-bg-elevated p-6">
-            <h3 className="font-display text-xl font-semibold text-text-silver-bright">
+          <div className="w-full max-w-sm rounded-lg border border-zinc-300 bg-white p-6">
+            <h3 className="font-display text-xl font-semibold text-zinc-900">
               Claim @{handle}?
             </h3>
-            <p className="mt-3 text-text-dim" style={{ fontSize: '13px' }}>
-              This GIVES <span className="font-mono text-honey">{fmtBling(tierAmount)} BLiNG!</span>{' '}
+            <p className="mt-3 text-zinc-500" style={{ fontSize: '13px' }}>
+              This GIVES <span className="font-mono text-amber-600">{fmtBling(tierAmount)} BLiNG!</span>{' '}
               from your balance to The Source pool, and reserves the{' '}
               <span className={TIER_COLOR[tier]}>{TIER_LABEL[tier]}</span> handle{' '}
-              <span className="text-text-silver-bright">@{handle}</span> to you.
+              <span className="text-zinc-900">@{handle}</span> to you.
             </p>
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
                 disabled={claiming}
                 onClick={() => setConfirmOpen(false)}
-                className="rounded-md border border-border px-4 py-2 font-mono text-sm text-text-dim hover:border-border-bright hover:text-text-silver"
+                className="rounded-md border border-zinc-200 px-4 py-2 font-mono text-sm text-zinc-500 hover:border-zinc-400 hover:text-zinc-700"
               >
                 Cancel
               </button>
@@ -410,7 +410,7 @@ export function HandleSettingsPage() {
                 type="button"
                 disabled={claiming}
                 onClick={() => void doClaim()}
-                className="inline-flex items-center gap-2 rounded-md bg-honey px-4 py-2 font-mono text-sm text-bg hover:bg-honey/90 disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-md bg-honey px-4 py-2 font-mono text-sm text-zinc-900 hover:bg-honey/90 disabled:opacity-60"
               >
                 {claiming && <Loader2 size={14} className="animate-spin" />}
                 {claiming ? 'Claiming…' : `GIVE ${fmtBling(tierAmount)} BLiNG!`}

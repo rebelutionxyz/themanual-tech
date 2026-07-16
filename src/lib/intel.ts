@@ -312,6 +312,25 @@ export async function listThreadIdsByAuthor(
 }
 
 /**
+ * Thread IDs authored by ANY of the given Bees (Following feed source).
+ * @param sortMode 'newest' = by created_at (default). 'active' = by last_activity_at.
+ */
+export async function listThreadIdsByAuthors(
+  beeIds: string[],
+  sortMode: 'newest' | 'active' = 'newest',
+): Promise<string[]> {
+  if (!supabase || beeIds.length === 0) return [];
+  const orderCol = sortMode === 'active' ? 'last_activity_at' : 'created_at';
+  const { data } = await supabase
+    .from('forum_threads')
+    .select('id')
+    .in('created_by', beeIds)
+    .order(orderCol, { ascending: false })
+    .limit(200);
+  return (data ?? []).map((r) => String(r.id));
+}
+
+/**
  * Count of threads authored by a specific Bee. Used for sidebar badge.
  * Uses head+count — no row payload transferred.
  */

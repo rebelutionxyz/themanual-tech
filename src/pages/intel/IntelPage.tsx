@@ -40,8 +40,17 @@ export function IntelPage() {
   });
   const showHeader = prefix.length > 0;
 
-  if (activeView === 'forme' || activeView === 'following') {
+  if (activeView === 'forme') {
     return <ComingSoonView view={activeView} />;
+  }
+
+  // Following — threads authored by Bees you follow (bee_follows_v1).
+  if (activeView === 'following') {
+    return (
+      <div className="safe-pad-x mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">
+        <ThreadList prefix={[]} feedSort={feedSort} followingMode />
+      </div>
+    );
   }
 
   if (activeView === 'reports') {

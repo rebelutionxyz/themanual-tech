@@ -1,3 +1,4 @@
+import { FollowBeeButton } from '@/components/intel/FollowBeeButton';
 import { InlineComposer } from '@/components/intel/InlineComposer';
 import { ReactionBar } from '@/components/intel/ReactionBar';
 import { SaveButton } from '@/components/intel/SaveButton';
@@ -230,6 +231,7 @@ export function ThreadPage() {
                 />
                 @{thread.authorHandle}
               </span>
+              <FollowBeeButton beeId={thread.createdBy} />
               <span className="text-zinc-500/40" aria-hidden="true">
                 ·
               </span>

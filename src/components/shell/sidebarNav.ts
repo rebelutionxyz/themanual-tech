@@ -53,12 +53,14 @@ export const NEUTRAL_INK = '#536471';
  * destination are `soon`.
  */
 export const COMMON_TAIL: SidebarItem[] = [
-  { id: 'bookmarks', label: 'Bookmarked', icon: Bookmark, soon: true },
+  // Saved threads live on INTEL (entity_saves + ThreadList savedMode); the
+  // tail links there from every surface. Badge injected by CommunityLayout.
+  { id: 'bookmarks', label: 'Bookmarked', icon: Bookmark, to: '/intel/saved' },
   { id: 'notifications', label: 'Notifications', icon: Bell, to: '/notifications' },
   { id: 'report', label: 'Reported', icon: Flag, to: '/intel/reported' },
-  { id: 'creators', label: 'Creators Studio', icon: Clapperboard, soon: true },
-  { id: 'premium', label: 'Premium', icon: Crown, soon: true },
-  { id: 'business', label: 'Business', icon: Briefcase, soon: true },
+  { id: 'creators', label: 'Creators Studio', icon: Clapperboard, to: '/studio' },
+  { id: 'premium', label: 'Premium', icon: Crown, to: '/premium' },
+  { id: 'business', label: 'Business', icon: Briefcase, to: '/business' },
   { id: 'advertising', label: 'Advertise', icon: Megaphone, to: '/promotion' },
   { id: 'settings', label: 'Settings', icon: Settings, to: '/settings/handle' },
 ];

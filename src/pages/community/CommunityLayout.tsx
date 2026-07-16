@@ -10,6 +10,7 @@ import { countMyGoingUpcoming } from '@/lib/events';
 import { isForumModerator } from '@/lib/forumMod';
 import { countMyGroups } from '@/lib/groups';
 import { countThreadsByAuthor } from '@/lib/intel';
+import { unreadNotificationsCount } from '@/lib/notifications';
 import { countSavedThreads } from '@/lib/reactions';
 import type { EventsOutletCtx, EventsView } from '@/pages/events/EventsLayout';
 import type { GiveOutletCtx, GiveView } from '@/pages/give/GiveLayout';
@@ -48,7 +49,22 @@ const ACCENT: Record<Surface, string> = {
   comms: SURFACE_BY_SLUG.get('comms')?.color ?? '#9B7FC8',
 };
 
-const VIEW_ROUTE_MAP: Record<string, IntelView> = { '/intel/mine': 'mythreads' };
+const VIEW_ROUTE_MAP: Record<string, IntelView> = {
+  '/intel/mine': 'mythreads',
+  '/intel/saved': 'saved',
+};
+
+/** Utility-tail route → tail item id (sidebar highlight on tail surfaces). */
+const TAIL_ROUTE_ITEM: [string, string][] = [
+  ['/notifications', 'notifications'],
+  ['/studio', 'creators'],
+  ['/premium', 'premium'],
+  ['/business', 'business'],
+  ['/promotion', 'advertising'],
+  ['/settings', 'settings'],
+  ['/intel/reported', 'report'],
+  ['/intel/saved', 'bookmarks'],
+];
 const UNFILTERED_VIEWS: IntelView[] = ['mythreads', 'saved', 'home'];
 
 function surfaceFromPath(pathname: string): Surface {
@@ -93,9 +109,38 @@ export function CommunityLayout() {
 
   const [myThreads, setMyThreads] = useState(0);
   const [saved, setSaved] = useState(0);
+  const [notif, setNotif] = useState(0);
   const [isMod, setIsMod] = useState(false);
   const [myGroups, setMyGroups] = useState(0);
   const [going, setGoing] = useState(0);
+
+  // Personal counts (My Posts badge, Bookmarked badge, unread notifications).
+  // Refetched on sign-in change AND on the shared `intel-counts-refresh`
+  // event (fired by ThreadList on save/unsave, IntelPage on thread create,
+  // NotificationsPage on read/dismiss).
+  const refreshPersonal = useCallback(() => {
+    if (!bee?.id) {
+      setMyThreads(0);
+      setSaved(0);
+      setNotif(0);
+      return;
+    }
+    countThreadsByAuthor(bee.id)
+      .then(setMyThreads)
+      .catch(() => setMyThreads(0));
+    countSavedThreads(bee.id)
+      .then(setSaved)
+      .catch(() => setSaved(0));
+    unreadNotificationsCount()
+      .then(setNotif)
+      .catch(() => setNotif(0));
+  }, [bee?.id]);
+
+  useEffect(() => {
+    const onRefresh = () => refreshPersonal();
+    window.addEventListener('intel-counts-refresh', onRefresh);
+    return () => window.removeEventListener('intel-counts-refresh', onRefresh);
+  }, [refreshPersonal]);
 
   const refreshGroups = useCallback(() => {
     if (!bee?.id) return setMyGroups(0);
@@ -112,25 +157,19 @@ export function CommunityLayout() {
 
   useEffect(() => {
     if (!bee?.id) {
-      setMyThreads(0);
-      setSaved(0);
       setIsMod(false);
       setMyGroups(0);
       setGoing(0);
+      refreshPersonal();
       return;
     }
-    countThreadsByAuthor(bee.id)
-      .then(setMyThreads)
-      .catch(() => setMyThreads(0));
-    countSavedThreads(bee.id)
-      .then(setSaved)
-      .catch(() => setSaved(0));
+    refreshPersonal();
     isForumModerator(bee.id)
       .then(setIsMod)
       .catch(() => setIsMod(false));
     refreshGroups();
     refreshGoing();
-  }, [bee?.id, refreshGroups, refreshGoing]);
+  }, [bee?.id, refreshPersonal, refreshGroups, refreshGoing]);
 
   // INTEL: route → view sync (e.g. /intel/mine).
   // biome-ignore lint/correctness/useExhaustiveDependencies: only re-syncs on route change; store actions/state intentionally omitted
@@ -200,15 +239,20 @@ export function CommunityLayout() {
   }
 
   const accent = ACCENT[surface];
-  const items = buildItems(surface, { myThreads, saved, isMod, myGroups, going });
+  const items = buildItems(surface, { myThreads, saved, notif, isMod, myGroups, going });
   const bazaarItem = location.pathname.startsWith('/bazaar/new')
     ? 'offer'
     : location.pathname.startsWith('/bazaar/orders')
       ? 'orders'
       : 'browse';
-  const activeItemId =
+  // Utility-tail routes highlight their own tail item regardless of surface.
+  const tailActive = TAIL_ROUTE_ITEM.find(([p]) => location.pathname.startsWith(p))?.[1];
+  const surfaceActiveId =
     surface === 'intel'
-      ? activeView
+      ? // Bookmarked is a tail link (id 'bookmarks') driving the 'saved' view.
+        activeView === 'saved'
+        ? 'bookmarks'
+        : activeView
       : surface === 'unite'
         ? uniteView
         : surface === 'rule'
@@ -218,6 +262,7 @@ export function CommunityLayout() {
             : surface === 'bazaar'
               ? bazaarItem
               : giveView;
+  const activeItemId = tailActive ?? surfaceActiveId;
 
   const outletCtx =
     surface === 'unite'
@@ -265,9 +310,19 @@ export function CommunityLayout() {
 interface Counts {
   myThreads: number;
   saved: number;
+  notif: number;
   isMod: boolean;
   myGroups: number;
   going: number;
+}
+
+/** Shared utility tail with live personal badges (saved + unread) painted in. */
+function tailItems(c: Counts): SidebarItem[] {
+  return COMMON_TAIL.map((t) => {
+    if (t.id === 'bookmarks' && c.saved > 0) return { ...t, badge: c.saved };
+    if (t.id === 'notifications' && c.notif > 0) return { ...t, badge: c.notif };
+    return t;
+  });
 }
 
 function buildItems(surface: Surface, c: Counts): SidebarItem[] {
@@ -277,7 +332,7 @@ function buildItems(surface: Surface, c: Counts): SidebarItem[] {
       { id: 'discover', label: 'Explore', icon: Compass },
       { id: 'following', label: 'Following', icon: Users, soon: true },
       { id: 'mine', label: 'My Groups', icon: HeartHandshake, badge: c.myGroups },
-      ...COMMON_TAIL,
+      ...tailItems(c),
     ];
   }
   if (surface === 'rule') {
@@ -288,7 +343,7 @@ function buildItems(surface: Surface, c: Counts): SidebarItem[] {
       { id: 'following', label: 'Following', icon: Users, soon: true },
       { id: 'hosting', label: 'Hosting', icon: Megaphone },
       { id: 'going', label: 'Attending', icon: Check, badge: c.going },
-      ...COMMON_TAIL,
+      ...tailItems(c),
     ];
   }
   if (surface === 'give') {
@@ -296,18 +351,18 @@ function buildItems(surface: Surface, c: Counts): SidebarItem[] {
       { id: 'discover', label: 'Explore', icon: Compass },
       { id: 'create', label: 'Create Campaign', icon: Plus },
       { id: 'mine', label: 'My Campaigns', icon: HeartHandshake },
-      ...COMMON_TAIL,
+      ...tailItems(c),
     ];
   }
   if (surface === 'pulse') {
     // PULSE is self-contained (live / upcoming / library / search live on the
     // center page), so the sidebar is just Explore + the shared utility tail.
-    return [{ id: 'home', label: 'Explore', icon: Compass }, ...COMMON_TAIL];
+    return [{ id: 'home', label: 'Explore', icon: Compass }, ...tailItems(c)];
   }
   if (surface === 'comms') {
     // COMMS — conversation list + thread live on the center page, so the
     // sidebar is just Conversations + the shared utility tail.
-    return [{ id: 'home', label: 'Conversations', icon: MessageCircle }, ...COMMON_TAIL];
+    return [{ id: 'home', label: 'Conversations', icon: MessageCircle }, ...tailItems(c)];
   }
   if (surface === 'bazaar') {
     // BAZAAR — route-link items (Browse / OFFER / Orders) + the shared tail.
@@ -315,7 +370,7 @@ function buildItems(surface: Surface, c: Counts): SidebarItem[] {
       { id: 'browse', label: 'Browse', icon: ShoppingBag, to: '/bazaar' },
       { id: 'offer', label: 'New Offer', icon: Plus, to: '/bazaar/new' },
       { id: 'orders', label: 'Orders', icon: Package, to: '/bazaar/orders' },
-      ...COMMON_TAIL,
+      ...tailItems(c),
     ];
   }
   // intel — Explore · Following · My Posts (pass-12). The old Trending/Breaking/
@@ -325,7 +380,7 @@ function buildItems(surface: Surface, c: Counts): SidebarItem[] {
     { id: 'home', label: 'Explore', icon: Compass },
     { id: 'following', label: 'Following', icon: Users },
     { id: 'mythreads', label: 'My Posts', icon: MessageSquare, badge: c.myThreads },
-    ...COMMON_TAIL,
+    ...tailItems(c),
   ];
 }
 

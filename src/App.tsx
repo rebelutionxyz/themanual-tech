@@ -6,10 +6,14 @@ import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
 import {
   CartPlaceholder,
   ManualGroupsPlaceholder,
-  NotificationCenter,
   OpenAPIDocs,
   StatusPage,
 } from '@/components/universal/UniversalPlaceholders';
+import { AdvertisePage } from '@/pages/AdvertisePage';
+import { BusinessPage } from '@/pages/BusinessPage';
+import { NotificationsPage } from '@/pages/NotificationsPage';
+import { PremiumPage } from '@/pages/PremiumPage';
+import { StudioPage } from '@/pages/StudioPage';
 import { AstraProvider, useAstra } from '@/lib/astras/AstraContext';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { BlingsPage } from '@/pages/BlingsPage';
@@ -90,7 +94,22 @@ const ADMIN_SURFACE_PATHS = new Set(['/myhex', '/nexus', '/nucleus']);
 // Community surfaces own the white X-style shell (logo + lens controls live in
 // the GlobalSidebar), so the global SiteHeader / ticker / toolbar are suppressed
 // here — the shell renders its own ticker. Other surfaces keep the legacy chrome.
-const COMMUNITY_PREFIXES = ['/intel', '/unite', '/rule', '/give', '/pulse', '/bazaar', '/comms'];
+const COMMUNITY_PREFIXES = [
+  '/intel',
+  '/unite',
+  '/rule',
+  '/give',
+  '/pulse',
+  '/bazaar',
+  '/comms',
+  // Sidebar utility-tail surfaces — same white shell, no skin switch.
+  '/notifications',
+  '/studio',
+  '/premium',
+  '/business',
+  '/promotion',
+  '/settings',
+];
 
 // Chrome-free paths — the front door (login / coming-soon) and MiniWaves,
 // which owns its own shell (V77). No SiteHeader / ticker / toolbar.
@@ -183,9 +202,8 @@ function AppContent() {
           {/* Auth */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/profile" element={<ProfilePage />} />
-          {/* Premium handle claims — SINK 1. Standalone (own <main>), inherits
-            the global SiteHeader chrome like /profile. */}
-          <Route path="/settings/handle" element={<HandleSettingsPage />} />
+          {/* Premium handle claims (SINK 1) moved into the community shell —
+            see the utility-tail routes inside CommunityLayout below. */}
           {/* /bees/me — owner-profile alias → canonical /profile. Public
             /bees/:handle is deferred pending a bees-RLS migration (email +
             bling_balance are anon-readable; see feat/profile-public-view notes). */}
@@ -198,6 +216,7 @@ function AppContent() {
           <Route element={<CommunityLayout />}>
             <Route path="/intel" element={<IntelPage />} />
             <Route path="/intel/mine" element={<IntelPage />} />
+            <Route path="/intel/saved" element={<IntelPage />} />
             <Route path="/intel/new" element={<NewThreadPage />} />
             <Route path="/intel/t/:threadId" element={<ThreadPage />} />
             <Route path="/intel/reported" element={<ReportedPage />} />
@@ -229,6 +248,17 @@ function AppContent() {
             <Route path="/bazaar/new" element={<BazaarNew />} />
             <Route path="/bazaar/orders" element={<BazaarOrders />} />
             <Route path="/bazaar/:id" element={<BazaarListingDetail />} />
+
+            {/* Sidebar utility-tail surfaces (Intel menu completion 2026-07-16):
+              Notifications, Creators Studio (Workshop section), Premium
+              (ad-relief ladder), Business (org hub). They live INSIDE the
+              white community shell — no skin switch when navigating the tail. */}
+            <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/studio" element={<StudioPage />} />
+            <Route path="/premium" element={<PremiumPage />} />
+            <Route path="/business" element={<BusinessPage />} />
+            <Route path="/promotion" element={<AdvertisePage />} />
+            <Route path="/settings/handle" element={<HandleSettingsPage />} />
           </Route>
 
           {/* Platform surfaces (right rail + utility chrome) */}
@@ -307,7 +337,6 @@ function AppContent() {
               }
             />
             <Route path="/groups" element={<ManualGroupsPlaceholder />} />
-            <Route path="/notifications" element={<NotificationCenter />} />
             <Route path="/cart" element={<CartPlaceholder />} />
             <Route path="/api/docs" element={<OpenAPIDocs />} />
             <Route path="/status" element={<StatusPage />} />

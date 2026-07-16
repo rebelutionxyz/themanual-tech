@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MessageSquare, Lock, Clock, Bookmark, BookmarkCheck, Share2, Check, X } from 'lucide-react';
-import { listThreads, listThreadsByIds, listThreadIdsByAuthor, relativeTime, type ForumThread } from '@/lib/intel';
+import { listFollowedBeeIds } from '@/lib/follows';
+import { listThreads, listThreadsByIds, listThreadIdsByAuthor, listThreadIdsByAuthors, relativeTime, type ForumThread } from '@/lib/intel';
 import { forumSearch, listThreadFeed, type FeedSort, type ThreadFeedItem } from '@/lib/forumFeed';
 import { timeAfterISO } from '@/lib/timePresets';
 import {
@@ -45,6 +46,8 @@ interface ThreadListProps {
   savedMode?: boolean;
   /** When true, list only threads authored by this Bee, newest first. Ignores the prefix. */
   myThreadsMode?: boolean;
+  /** When true, list only threads authored by Bees this Bee follows. Ignores the prefix. */
+  followingMode?: boolean;
 }
 
 /** forum_thread_feed row → the ForumThread shape the cards render. */
@@ -73,6 +76,7 @@ export function ThreadList({
   feedSort,
   savedMode = false,
   myThreadsMode = false,
+  followingMode = false,
 }: ThreadListProps) {
   const { atoms } = useManualData();
   const { bee } = useAuth();
@@ -86,7 +90,9 @@ export function ThreadList({
     ? 'intel-sort-saved'
     : myThreadsMode
       ? 'intel-sort-mythreads'
-      : null;
+      : followingMode
+        ? 'intel-sort-following'
+        : null;
   const [personalSortMode, setPersonalSortModeState] = useState<'newest' | 'active'>(() => {
     if (!personalSortKey) return 'newest';
     try {
@@ -189,15 +195,24 @@ export function ThreadList({
                 return listThreadsByIds(ids);
               })()
             : Promise.resolve([] as ForumThread[])
-          : feedSort
-            ? listThreadFeed(realmPrefixes, feedSort, 20, 0, after).then((items) =>
-                items.map(feedItemToThread),
-              )
-            : listThreads({
-                prefix,
-                sortBy,
-                timeWindowHours,
-              });
+          : followingMode
+            ? bee?.id
+              ? (async () => {
+                  const followed = await listFollowedBeeIds(bee.id);
+                  if (followed.length === 0) return [] as ForumThread[];
+                  const ids = await listThreadIdsByAuthors(followed, personalSortMode);
+                  return listThreadsByIds(ids);
+                })()
+              : Promise.resolve([] as ForumThread[])
+            : feedSort
+              ? listThreadFeed(realmPrefixes, feedSort, 20, 0, after).then((items) =>
+                  items.map(feedItemToThread),
+                )
+              : listThreads({
+                  prefix,
+                  sortBy,
+                  timeWindowHours,
+                });
 
     threadPromise
       .then(async (result) => {
@@ -271,7 +286,7 @@ export function ThreadList({
     return () => {
       cancelled = true;
     };
-  }, [prefixKey, realmKey, searchTerm, timePreset, sortBy, timeWindowHours, feedSort, savedMode, myThreadsMode, personalSortMode, bee?.id]);
+  }, [prefixKey, realmKey, searchTerm, timePreset, sortBy, timeWindowHours, feedSort, savedMode, myThreadsMode, followingMode, personalSortMode, bee?.id]);
 
   if (error) {
     return (
@@ -316,11 +331,13 @@ export function ThreadList({
         l3={prefix[2] ?? null}
         savedMode={savedMode}
         myThreadsMode={myThreadsMode}
+        followingMode={followingMode}
         signedIn={Boolean(bee?.id)}
       />
     );
 
-  const showPersonalSortToggle = (savedMode || myThreadsMode) && threads.length > 0;
+  const showPersonalSortToggle =
+    (savedMode || myThreadsMode || followingMode) && threads.length > 0;
 
   return (
     <>
@@ -329,7 +346,7 @@ export function ThreadList({
         <PersonalSortToggle
           mode={personalSortMode}
           onChange={setPersonalSortMode}
-          accentColor={savedMode ? '#FAD15E' : BEE_COLOR}
+          accentColor={savedMode ? '#FAD15E' : followingMode ? '#1D9BF0' : BEE_COLOR}
         />
       )}
       <ul className="space-y-2">
@@ -908,6 +925,7 @@ function EmptyThreads({
   l3,
   savedMode = false,
   myThreadsMode = false,
+  followingMode = false,
   signedIn = true,
 }: {
   realmId: RealmId | null;
@@ -915,8 +933,54 @@ function EmptyThreads({
   l3: string | null;
   savedMode?: boolean;
   myThreadsMode?: boolean;
+  followingMode?: boolean;
   signedIn?: boolean;
 }) {
+  if (followingMode) {
+    const signedOut = !signedIn;
+    const headline = signedOut ? 'Sign in to build your Following feed' : 'No voices followed yet';
+    const subtext = signedOut
+      ? 'Your Following feed is tied to your Bee account. Sign in to choose whose voices you hear.'
+      : 'Open any thread and hit Follow on its author. Threads from Bees you follow land here — no algorithm, you decide.';
+    const FOLLOW_COLOR = '#1D9BF0';
+    return (
+      <div
+        className="rounded-lg border-2 border-dashed p-8 text-center"
+        style={{ borderColor: `${FOLLOW_COLOR}40`, background: `${FOLLOW_COLOR}08` }}
+      >
+        <div
+          className="mx-auto mb-4 h-2 w-12 rounded-full"
+          style={{ background: FOLLOW_COLOR, opacity: 0.6 }}
+        />
+        <div
+          className="mb-3 inline-block rounded px-2 py-0.5 font-mono uppercase tracking-widest"
+          style={{ fontSize: '10px', color: FOLLOW_COLOR, background: `${FOLLOW_COLOR}15` }}
+          data-size="meta"
+        >
+          FOLLOWING
+        </div>
+        <p className="mb-2 font-display text-zinc-900" style={{ fontSize: '17px', fontWeight: 500 }}>
+          {headline}
+        </p>
+        <p className="mx-auto max-w-md text-zinc-500" style={{ fontSize: '13px', lineHeight: '1.5' }}>
+          {subtext}
+        </p>
+        <Link
+          to={signedOut ? '/login' : '/intel'}
+          className="mt-5 inline-flex items-center gap-1.5 rounded-md border-2 px-4 py-1.5 transition-colors hover:brightness-110"
+          style={{
+            borderColor: `${FOLLOW_COLOR}70`,
+            color: FOLLOW_COLOR,
+            fontSize: '12px',
+            fontWeight: 600,
+          }}
+        >
+          {signedOut ? 'Sign in' : 'Explore threads'}
+        </Link>
+      </div>
+    );
+  }
+
   if (myThreadsMode) {
     const signedOut = !signedIn;
     const headline = signedOut ? 'Sign in to see your threads' : 'Your first thread is waiting';
