@@ -122,9 +122,22 @@ function GroupCard({ group }: { group: Group }) {
         style={realmCardStyle(UNITE_COLOR)}
       >
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-display text-lg leading-tight" style={{ color: CARD_INK.title }}>
-            {group.name}
-          </h3>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/20 font-display text-white"
+              style={{ fontSize: '16px' }}
+              aria-hidden="true"
+            >
+              {group.avatarUrl ? (
+                <img src={group.avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                group.name.charAt(0).toUpperCase()
+              )}
+            </span>
+            <h3 className="font-display text-lg leading-tight" style={{ color: CARD_INK.title }}>
+              {group.name}
+            </h3>
+          </div>
           <span
             className="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-mono uppercase tracking-wider text-white/65"
             style={{ fontSize: '9.5px' }}

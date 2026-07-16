@@ -1,4 +1,4 @@
-import { type GroupVisibility, createGroup } from '@/lib/groups';
+import { type Group, type GroupVisibility, updateGroupDetails } from '@/lib/groups';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -11,33 +11,26 @@ const VISIBILITY_OPTS: { value: GroupVisibility; label: string; hint: string }[]
   { value: 'secret', label: 'Secret', hint: 'Invisible to non-members' },
 ];
 
-/** Slugify a name → lowercase [a-z0-9-], collapsed, 2–60. */
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60);
-}
-
-export function CreateGroupModal({
+/**
+ * Owner-only details editor (name, tagline, description, visibility).
+ * Writes ride the groups_update_owner RLS policy directly. Slug is
+ * immutable (it's the URL). White-shell styling, UNITE purple.
+ */
+export function EditGroupModal({
+  group,
   onClose,
-  onCreated,
+  onSaved,
 }: {
+  group: Group;
   onClose: () => void;
-  onCreated: (slug: string) => void;
+  onSaved: () => void;
 }) {
-  const [name, setName] = useState('');
-  const [slug, setSlug] = useState('');
-  const [slugTouched, setSlugTouched] = useState(false);
-  const [visibility, setVisibility] = useState<GroupVisibility>('public');
-  const [tagline, setTagline] = useState('');
-  const [description, setDescription] = useState('');
+  const [name, setName] = useState(group.name);
+  const [tagline, setTagline] = useState(group.tagline ?? '');
+  const [description, setDescription] = useState(group.description ?? '');
+  const [visibility, setVisibility] = useState<GroupVisibility>(group.visibility);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Auto-derive slug from name until the Bee edits the slug directly.
-  const effectiveSlug = slugTouched ? slug : slugify(name);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -48,24 +41,23 @@ export function CreateGroupModal({
   }, [onClose]);
 
   const nameOk = name.trim().length >= 2 && name.trim().length <= 80;
-  const slugOk = /^[a-z0-9-]{2,60}$/.test(effectiveSlug);
-  const canSubmit = nameOk && slugOk && !submitting;
+  const canSubmit = nameOk && !submitting;
 
   async function handleSubmit() {
     if (!canSubmit) return;
     setSubmitting(true);
     setError(null);
     try {
-      const result = await createGroup({
+      await updateGroupDetails(group.id, {
         name: name.trim(),
-        slug: effectiveSlug,
-        visibility,
-        tagline: tagline.trim() || undefined,
-        description: description.trim() || undefined,
+        tagline: tagline.trim() || null,
+        description: description.trim() || null,
+        // Visibility rides the same owner policy; RLS enforces ownership.
+        ...(visibility !== group.visibility ? { visibility } : {}),
       });
-      onCreated(result.slug);
+      onSaved();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create group');
+      setError(e instanceof Error ? e.message : 'Failed to save changes');
       setSubmitting(false);
     }
   }
@@ -80,12 +72,12 @@ export function CreateGroupModal({
       />
       <dialog
         open
-        aria-label="Create a group"
+        aria-label="Edit group details"
         className="relative z-10 m-0 w-full max-w-md overflow-hidden rounded-xl border border-zinc-200 bg-white p-0 text-zinc-900 shadow-2xl"
       >
-        <div className="flex items-center justify-between border-zinc-200 border-b px-5 py-3">
+        <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-3">
           <h2 className="font-display tracking-wide text-zinc-900" style={{ fontSize: '17px' }}>
-            Create a group
+            Edit group details
           </h2>
           <button
             type="button"
@@ -103,29 +95,30 @@ export function CreateGroupModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={80}
-              placeholder="Sovereign Beekeepers"
               className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-400"
               style={{ fontSize: '14px' }}
             />
           </Field>
 
-          <Field
-            label="URL slug"
-            hint={slugOk ? `/unite/${effectiveSlug}` : 'a–z, 0–9, hyphen · 2–60'}
-          >
+          <Field label="Tagline" hint="optional">
             <input
-              value={effectiveSlug}
-              onChange={(e) => {
-                setSlugTouched(true);
-                setSlug(slugify(e.target.value));
-              }}
-              maxLength={60}
-              placeholder="sovereign-beekeepers"
-              className={cn(
-                'w-full rounded-md border bg-white px-3 py-2 font-mono text-zinc-900 outline-none focus:border-zinc-400',
-                effectiveSlug && !slugOk ? 'border-red-300' : 'border-zinc-200',
-              )}
-              style={{ fontSize: '13px' }}
+              value={tagline}
+              onChange={(e) => setTagline(e.target.value)}
+              maxLength={140}
+              placeholder="One line on what this group is for"
+              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-400"
+              style={{ fontSize: '14px' }}
+            />
+          </Field>
+
+          <Field label="Description" hint="optional">
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={4}
+              placeholder="What the group does, who it's for…"
+              className="w-full resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-400"
+              style={{ fontSize: '14px', lineHeight: 1.5 }}
             />
           </Field>
 
@@ -161,28 +154,6 @@ export function CreateGroupModal({
             </p>
           </Field>
 
-          <Field label="Tagline" hint="optional">
-            <input
-              value={tagline}
-              onChange={(e) => setTagline(e.target.value)}
-              maxLength={140}
-              placeholder="One line on what this group is for"
-              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-400"
-              style={{ fontSize: '14px' }}
-            />
-          </Field>
-
-          <Field label="Description" hint="optional">
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              placeholder="What the group does, who it's for…"
-              className="w-full resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-400"
-              style={{ fontSize: '14px', lineHeight: 1.5 }}
-            />
-          </Field>
-
           {error && (
             <p className="text-red-600" style={{ fontSize: '12px' }}>
               {error}
@@ -190,7 +161,7 @@ export function CreateGroupModal({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-zinc-200 border-t px-5 py-3">
+        <div className="flex items-center justify-end gap-2 border-t border-zinc-200 px-5 py-3">
           <button
             type="button"
             onClick={onClose}
@@ -206,7 +177,7 @@ export function CreateGroupModal({
             className="inline-flex items-center justify-center rounded-md px-4 py-2 font-medium text-white transition-colors disabled:pointer-events-none disabled:opacity-50"
             style={{ background: UNITE_COLOR, fontSize: '14px' }}
           >
-            {submitting ? 'Creating…' : 'Create group'}
+            {submitting ? 'Saving…' : 'Save changes'}
           </button>
         </div>
       </dialog>

@@ -21,6 +21,9 @@ export interface Group {
   parentSurface: string | null;
   parentId: string | null;
   createdAt: string;
+  avatarUrl: string | null;
+  coverUrl: string | null;
+  locationText: string | null;
 }
 
 export interface GroupMember {
@@ -44,6 +47,9 @@ function mapGroup(row: Record<string, unknown>): Group {
     parentSurface: (row.parent_surface as string) ?? null,
     parentId: (row.parent_id as string) ?? null,
     createdAt: String(row.created_at ?? ''),
+    avatarUrl: (row.avatar_url as string) ?? null,
+    coverUrl: (row.cover_url as string) ?? null,
+    locationText: (row.location_text as string) ?? null,
   };
 }
 
@@ -360,6 +366,199 @@ export async function listGroupsByCreators(creatorIds: string[]): Promise<Group[
     .order('member_count', { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapGroup);
+}
+
+// ──────────────────── Profile (avatar/cover/details) + media ────────────────────
+// groups_profile_v1 + group_media_storage_v1. Details update rides the
+// existing groups_update_owner RLS policy (owner only); uploads ride the
+// group-media bucket policies (profile/ = owner+mods, album/ = members).
+
+export interface GroupDetailsPatch {
+  name?: string;
+  tagline?: string | null;
+  description?: string | null;
+  visibility?: GroupVisibility;
+  avatar_url?: string | null;
+  cover_url?: string | null;
+}
+
+/** Owner-only direct update (RLS-enforced). */
+export async function updateGroupDetails(groupId: string, patch: GroupDetailsPatch): Promise<void> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.from('groups').update(patch).eq('id', groupId);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Upload an image to the group-media bucket. Path convention is what the
+ * storage RLS keys on: profile/ (avatar, cover — owner/mods), album/ (members).
+ * Returns the public URL.
+ */
+export async function uploadGroupImage(
+  groupId: string,
+  kind: 'avatar' | 'cover' | 'album',
+  file: File,
+): Promise<string> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path =
+    kind === 'album'
+      ? `groups/${groupId}/album/${crypto.randomUUID()}.${ext}`
+      : `groups/${groupId}/profile/${kind}-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage
+    .from('group-media')
+    .upload(path, file, { contentType: file.type || 'image/jpeg', upsert: false });
+  if (error) throw new Error(error.message);
+  return supabase.storage.from('group-media').getPublicUrl(path).data.publicUrl;
+}
+
+export interface AlbumImage {
+  path: string;
+  url: string;
+  name: string;
+  createdAt: string | null;
+}
+
+/** Album grid for the Images tab, newest upload first. */
+export async function listGroupAlbum(groupId: string): Promise<AlbumImage[]> {
+  const sb = supabase;
+  if (!sb) return [];
+  const dir = `groups/${groupId}/album`;
+  const { data, error } = await sb.storage
+    .from('group-media')
+    .list(dir, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
+  if (error) throw new Error(error.message);
+  return (data ?? [])
+    .filter((o) => o.name && !o.name.startsWith('.'))
+    .map((o) => {
+      const path = `${dir}/${o.name}`;
+      return {
+        path,
+        url: sb.storage.from('group-media').getPublicUrl(path).data.publicUrl,
+        name: o.name,
+        createdAt: (o as { created_at?: string }).created_at ?? null,
+      };
+    });
+}
+
+/** Remove an album image (RLS: uploader, or group owner/mods). */
+export async function deleteGroupAlbumImage(path: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.storage.from('group-media').remove([path]);
+  if (error) throw new Error(error.message);
+}
+
+// ─────────────────────────── Activity feed ───────────────────────────
+
+export type GroupActivityKind = 'thread' | 'reply' | 'join' | 'event';
+
+export interface GroupActivityItem {
+  kind: GroupActivityKind;
+  at: string;
+  handle: string | null;
+  /** Thread/event title where applicable. */
+  title: string | null;
+  /** Deep-link id: thread id for thread/reply, event id for event. */
+  refId: string | null;
+}
+
+/**
+ * Merged recent-activity feed for the Activity tab: new threads, replies,
+ * joins, and scheduled events — newest first. Four cheap queries + one
+ * handle batch; RLS scopes everything.
+ */
+export async function getGroupActivity(groupId: string, limit = 30): Promise<GroupActivityItem[]> {
+  if (!supabase) return [];
+  const PER = 12;
+
+  const [thr, mem, evt] = await Promise.all([
+    supabase
+      .from('forum_threads')
+      .select('id, title, created_by, created_at')
+      .eq('parent_id', groupId)
+      .order('created_at', { ascending: false })
+      .limit(PER),
+    supabase
+      .from('group_memberships')
+      .select('bee_id, joined_at')
+      .eq('group_id', groupId)
+      .order('joined_at', { ascending: false })
+      .limit(PER),
+    supabase
+      .from('events')
+      .select('id, title, created_by, created_at')
+      .eq('parent_id', groupId)
+      .order('created_at', { ascending: false })
+      .limit(PER),
+  ]);
+
+  // Replies live on posts of this group's threads (two-step: ids → posts).
+  const threadRows = thr.data ?? [];
+  const titleByThread = new Map(threadRows.map((t) => [String(t.id), String(t.title)]));
+  let postRows: { thread_id: unknown; bee_id: unknown; created_at: unknown }[] = [];
+  if (threadRows.length > 0) {
+    const { data: posts } = await supabase
+      .from('forum_posts')
+      .select('thread_id, bee_id, created_at')
+      .in(
+        'thread_id',
+        threadRows.map((t) => String(t.id)),
+      )
+      .order('created_at', { ascending: false })
+      .limit(PER);
+    postRows = posts ?? [];
+  }
+
+  // Handle batch.
+  const beeIds = new Set<string>();
+  for (const t of threadRows) beeIds.add(String(t.created_by));
+  for (const m of mem.data ?? []) beeIds.add(String(m.bee_id));
+  for (const e of evt.data ?? []) beeIds.add(String(e.created_by));
+  for (const p of postRows) beeIds.add(String(p.bee_id));
+  const handleById = new Map<string, string>();
+  if (beeIds.size > 0) {
+    const { data: bees } = await supabase
+      .from('bees')
+      .select('id, handle')
+      .in('id', Array.from(beeIds));
+    for (const b of bees ?? []) handleById.set(String(b.id), String(b.handle));
+  }
+
+  const items: GroupActivityItem[] = [
+    ...threadRows.map((t) => ({
+      kind: 'thread' as const,
+      at: String(t.created_at ?? ''),
+      handle: handleById.get(String(t.created_by)) ?? null,
+      title: String(t.title),
+      refId: String(t.id),
+    })),
+    ...postRows.map((p) => ({
+      kind: 'reply' as const,
+      at: String(p.created_at ?? ''),
+      handle: handleById.get(String(p.bee_id)) ?? null,
+      title: titleByThread.get(String(p.thread_id)) ?? null,
+      refId: String(p.thread_id),
+    })),
+    ...(mem.data ?? []).map((m) => ({
+      kind: 'join' as const,
+      at: String(m.joined_at ?? ''),
+      handle: handleById.get(String(m.bee_id)) ?? null,
+      title: null,
+      refId: null,
+    })),
+    ...(evt.data ?? []).map((e) => ({
+      kind: 'event' as const,
+      at: String(e.created_at ?? ''),
+      handle: handleById.get(String(e.created_by)) ?? null,
+      title: String(e.title),
+      refId: String(e.id),
+    })),
+  ];
+
+  return items
+    .filter((i) => i.at)
+    .sort((a, b) => (a.at < b.at ? 1 : -1))
+    .slice(0, limit);
 }
 
 /** Resolve group ids → groups, preserving input order (Bookmarked groups row). */
