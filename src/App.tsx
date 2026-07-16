@@ -76,7 +76,7 @@ import { ChannelPage } from '@/pages/pulse/ChannelPage';
 import { PulseHome } from '@/pages/pulse/PulseHome';
 import { WatchPage } from '@/pages/pulse/WatchPage';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { type ReactNode, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useUserRole } from '@/lib/useUserRole';
 import { useBranding } from '@/stores/useBranding';
 
@@ -120,13 +120,9 @@ const CHROME_FREE_PATHS = new Set(['/', '/waves', '/miniwaves']);
 // 9.6) deploy and real tier checks replace this. Landing gate 2026-07-10.
 const OG_HANDLES = new Set(['fnulnu']);
 
-/** Gate a route to allowlisted handles; everyone else → front door. */
-function OGOnly({ children }: { children: ReactNode }) {
-  const { bee, loading } = useAuth();
-  if (loading) return null;
-  if (!bee || !OG_HANDLES.has(bee.handle)) return <Navigate to="/" replace />;
-  return <>{children}</>;
-}
+// OGOnly (handle-allowlist route gate) removed 2026-07-16 — /hq now relies on
+// HQControlRoom's own bees.is_admin gate. OG_HANDLES below still drives the
+// front-door management redirect only.
 
 /** Post-login router for allowlisted Bees — directs by security level.
  *  Keyholder → Nucleus, property owner → Nexus, else MiniWaves (the OG
@@ -335,14 +331,11 @@ function AppContent() {
               These resolve identically from any host; AstraConfig provides
               theming via useAstra(). MUST be registered BEFORE the /:slug
               catch-all or react-router-dom will match them as Astra surfaces. */}
-            <Route
-              path="/hq"
-              element={
-                <OGOnly>
-                  <HQControlRoom />
-                </OGOnly>
-              }
-            />
+            {/* HQ gates itself on bees.is_admin (the same authority the DB's
+              is_platform_admin() uses) — the old OGOnly handle-allowlist
+              wrapper contradicted it (fnulnu hardcoded vs is_admin on the
+              actual admin Bee) and made /hq unreachable. Removed 2026-07-16. */}
+            <Route path="/hq" element={<HQControlRoom />} />
             <Route path="/groups" element={<ManualGroupsPlaceholder />} />
             <Route path="/cart" element={<CartPlaceholder />} />
             <Route path="/api/docs" element={<OpenAPIDocs />} />
