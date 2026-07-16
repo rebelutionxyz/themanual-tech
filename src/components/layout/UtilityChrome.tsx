@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { Bell, MessageCircle, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { SearchModal } from './SearchModal';
-import { HoneyDrop } from '@/components/ui/HoneyDrop';
 import { cn } from '@/lib/utils';
 
 /**
@@ -89,19 +88,8 @@ export function UtilityChrome() {
           </IconButton>
         )}
 
-        {/* 6. BLiNG! — gold honey-drop link to the Sovereign Ledger, sits
-            immediately left of the avatar (dispatch §3). */}
-        <Link
-          to="/freedomblings"
-          className="ml-0.5 flex items-center gap-1.5 rounded-full border border-honey/40 bg-bg-elevated px-2.5 py-1 transition-colors hover:border-honey/70 hover:bg-honey/10"
-          title="BLiNG! · Sovereign Ledger"
-          aria-label="BLiNG!"
-        >
-          <HoneyDrop size={14} />
-          <span className="bling font-mono tracking-wide" style={{ fontSize: '12px' }}>
-            BLiNG!
-          </span>
-        </Link>
+        {/* 6. BLiNG! pill removed from the black shell 2026-07-16 (Butch) —
+            the Sovereign Ledger stays reachable at /freedomblings. */}
 
         {/* 7. Profile-avatar: avatar on right, handle reveals on hover */}
         {bee ? (

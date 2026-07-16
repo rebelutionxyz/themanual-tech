@@ -1,7 +1,6 @@
 import { HQControlRoom } from '@/components/hq/HQControlRoom';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
 import { SiteHeader } from '@/components/layout/SiteHeader';
-import { TopToolbar } from '@/components/layout/TopToolbar';
 import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
 import {
   CartPlaceholder,
@@ -161,9 +160,10 @@ function AppContent() {
           Hides itself when no DB match + no astra fallback (D-4).
           Suppressed on admin + community surfaces — they own their own chrome. */}
       {!hideGlobalChrome && <TopTickerSlot />}
-      {/* Top Top toolbar — global platform chrome (dispatch A1). Identical on
-          every surface; suppressed on admin + community surfaces. */}
-      {!hideGlobalChrome && <TopToolbar />}
+      {/* Top Top toolbar (Search/Location/Time/Realm + breadcrumb strip)
+          removed from the black shell 2026-07-16 (Butch) — component file
+          kept (src/components/layout/TopToolbar.tsx); re-add the render here
+          to restore. The white community shell keeps its own LensRow. */}
       {/* Single content region below the fixed header cluster. Platform surfaces
           size to h-full and own their internal scroll (one scrollbar); tall
           standalone pages scroll here. min-h-0 lets inner scrollers engage. */}

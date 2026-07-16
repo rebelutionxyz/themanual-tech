@@ -145,24 +145,20 @@ function HQShell({ bee }: { bee: { handle: string } }) {
   // pane (which already sits below the global chrome) — no header-height math.
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      {/* HQ header — static at the top of the self-contained pane */}
-      <header className="flex-none border-b border-border bg-bg-elevated/95 px-4 py-3 backdrop-blur md:px-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="font-display text-lg font-semibold text-text-silver-bright">HQ Control Room</h1>
+      {/* Full-width HQ header deleted 2026-07-16 (Butch) — the title +
+          admin line now lead the sidebar below. */}
+      <div className="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[16rem_1fr]">
+        {/* Sidebar */}
+        <aside className="flex-none overflow-y-auto border-b border-border bg-bg-elevated/30 px-3 py-4 md:border-b-0 md:border-r md:py-6">
+          {/* Title block — moved from the deleted header */}
+          <div className="mb-4 px-3">
+            <h1 className="font-display text-lg font-semibold text-text-silver-bright">
+              HQ Control Room
+            </h1>
             <p className="font-mono text-text-muted" style={{ fontSize: '11px' }}>
               admin: @{bee.handle}
             </p>
           </div>
-          <span className="font-mono uppercase tracking-wider text-text-muted" style={{ fontSize: '10px' }}>
-            v1 · OG HUMAN gate
-          </span>
-        </div>
-      </header>
-
-      <div className="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[16rem_1fr]">
-        {/* Sidebar */}
-        <aside className="flex-none overflow-y-auto border-b border-border bg-bg-elevated/30 px-3 py-4 md:border-b-0 md:border-r md:py-6">
           <nav className="flex flex-col gap-0.5">
             {SECTIONS.map((s, i) => {
               const Icon = s.icon;
