@@ -186,21 +186,7 @@ function GiveComposer() {
         />
       </div>
 
-      <div className="comp-summary">
-        <BMark />
-        <span>
-          <b>Fee-free.</b>{' '}
-          {amtMicros && amtMicros >= MIN_MICROS && recipient && !isSelf ? (
-            <>
-              The whole <b>{fmtBling(amtMicros)} BLiNG!</b> reaches <b>{recipient.display}</b> —
-              nothing is taken in between.
-            </>
-          ) : (
-            <>The whole amount moves — no cut, no fee, ever.</>
-          )}
-        </span>
-      </div>
-
+      {/* Fee-free info box removed 2026-07-16 (Butch) — matches the SEND popup. */}
       {give.status === 'error' && give.error && <div className="comp-error">{give.error}</div>}
 
       <button

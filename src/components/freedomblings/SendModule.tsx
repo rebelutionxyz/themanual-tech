@@ -132,7 +132,7 @@ export function SendModule() {
           style={{ color: MUTED }}
           htmlFor="send-to"
         >
-          To
+          Send to
         </label>
         <input
           id="send-to"
@@ -243,24 +243,7 @@ export function SendModule() {
         />
       </div>
 
-      <div
-        className="flex items-start gap-2.5 rounded-2xl px-4 py-3 text-[12.5px] leading-relaxed"
-        style={{ background: SUNKEN, border: `1px dashed ${BORDER}`, color: MUTED }}
-      >
-        <BMark />
-        <span>
-          <b style={{ color: CREAM }}>Fee-free.</b>{' '}
-          {amtMicros && amtMicros >= MIN_MICROS && recipient && !isSelf ? (
-            <>
-              The whole <b style={{ color: CREAM }}>{fmtBling(amtMicros)} BLiNG!</b> reaches{' '}
-              <b style={{ color: CREAM }}>{recipient.display}</b> — nothing is taken in between.
-            </>
-          ) : (
-            <>The whole amount moves — no cut, no fee, ever.</>
-          )}
-        </span>
-      </div>
-
+      {/* Fee-free info box removed 2026-07-16 (Butch). */}
       {send.status === 'error' && send.error && (
         <div
           className="rounded-xl px-3.5 py-2.5 text-[12.5px] leading-snug"
@@ -289,7 +272,7 @@ export function SendModule() {
         {send.status === 'sending'
           ? 'SENDING…'
           : amtMicros && amtMicros >= MIN_MICROS && recipient && !isSelf
-            ? `SEND ${fmtBling(amtMicros)} to ${recipient.display}`
+            ? `Send ${fmtBling(amtMicros)} BLiNG! to ${recipient.display}`
             : 'SEND'}
       </button>
     </div>
