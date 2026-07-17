@@ -1,26 +1,26 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Radio } from 'lucide-react';
+import { ChannelModal } from '@/components/pulse/CreatorModals';
+import { PulseSearch } from '@/components/pulse/PulseSearch';
+import { LibraryCard, LiveNowCard, PULSE_RED, UpcomingCard } from '@/components/pulse/cards';
+import { ScrollRow } from '@/components/ui/ScrollRow';
+import { useAuth } from '@/lib/auth';
 import { REALM_ID_BY_NAME } from '@/lib/constants';
+import {
+  type PulseLibraryItem,
+  type PulseLive,
+  type PulseUpcoming,
+  getChannelById,
+  pulseLibrary,
+  pulseLiveNow,
+  pulseMyChannel,
+  pulseUpcoming,
+} from '@/lib/pulse';
 import { timeAfterISO } from '@/lib/timePresets';
 import { useLensStore } from '@/stores/useLensStore';
 import { REALM_COLOR_FALLBACK, useRealmColors } from '@/stores/useRealmColors';
 import type { RealmId } from '@/types/manual';
-import {
-  pulseLiveNow,
-  pulseUpcoming,
-  pulseLibrary,
-  type PulseLive,
-  type PulseUpcoming,
-  type PulseLibraryItem,
-} from '@/lib/pulse';
-import { ScrollRow } from '@/components/ui/ScrollRow';
-import { PulseSearch } from '@/components/pulse/PulseSearch';
-import {
-  LiveNowCard,
-  UpcomingCard,
-  LibraryCard,
-  PULSE_RED,
-} from '@/components/pulse/cards';
+import { Radio, Tv } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 const LIBRARY_PAGE = 24;
 
@@ -62,7 +62,10 @@ export function PulseHome() {
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-7 md:px-8">
-      <PulseHeader realm={realmLabel} />
+      <div className="flex items-start justify-between gap-3">
+        <PulseHeader realm={realmLabel} />
+        <MyChannelCta />
+      </div>
 
       <div className="mt-6">
         <PulseSearch />
@@ -292,7 +295,12 @@ function LibrarySection({
     setLoadingMore(true);
     try {
       const offset = items?.length ?? 0;
-      const page = await pulseLibrary(realmPrefixes, LIBRARY_PAGE, offset, timeAfterISO(timePreset));
+      const page = await pulseLibrary(
+        realmPrefixes,
+        LIBRARY_PAGE,
+        offset,
+        timeAfterISO(timePreset),
+      );
       setItems((prev) => [...(prev ?? []), ...page]);
       if (page.length < LIBRARY_PAGE) setExhausted(true);
     } catch (err: unknown) {
@@ -361,5 +369,80 @@ function LibrarySection({
         </>
       )}
     </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// My-channel CTA (create → ChannelModal; existing → link)
+// ─────────────────────────────────────────────────────────────────────────
+
+function MyChannelCta() {
+  const { bee } = useAuth();
+  const navigate = useNavigate();
+  const [handle, setHandle] = useState<string | null>(null);
+  const [checked, setChecked] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!bee?.id) {
+      setChecked(true);
+      setHandle(null);
+      return;
+    }
+    pulseMyChannel()
+      .then(async (id) => {
+        if (!id) return null;
+        const ch = await getChannelById(id);
+        return ch?.handle ?? null;
+      })
+      .then((h) => {
+        if (!cancelled) {
+          setHandle(h);
+          setChecked(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bee?.id]);
+
+  if (!bee || !checked) return null;
+
+  if (handle) {
+    return (
+      <Link
+        to={`/pulse/c/${handle}`}
+        className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 font-semibold transition-colors hover:brightness-110"
+        style={{ borderColor: `${PULSE_RED}60`, color: PULSE_RED, fontSize: '12px' }}
+      >
+        <Tv size={13} /> My channel
+      </Link>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setCreateOpen(true)}
+        className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 font-semibold text-white transition-colors hover:brightness-110"
+        style={{ background: PULSE_RED, fontSize: '12px' }}
+      >
+        <Tv size={13} /> Create channel
+      </button>
+      {createOpen && (
+        <ChannelModal
+          onClose={() => setCreateOpen(false)}
+          onSaved={(h) => {
+            setCreateOpen(false);
+            navigate(`/pulse/c/${h}`);
+          }}
+        />
+      )}
+    </>
   );
 }
