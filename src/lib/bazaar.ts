@@ -109,7 +109,11 @@ export async function bazaarBrowse(f: BazaarBrowseFilters = {}): Promise<BazaarL
 }
 
 /** Astra-local search across listings (≥2 chars). */
-export async function bazaarSearch(query: string, limit = 30, offset = 0): Promise<BazaarListing[]> {
+export async function bazaarSearch(
+  query: string,
+  limit = 30,
+  offset = 0,
+): Promise<BazaarListing[]> {
   const q = query.trim();
   if (!supabase || q.length < 2) return [];
   const { data, error } = await supabase.rpc('bazaar_search', {
@@ -328,4 +332,39 @@ export function formatFiat(cents: number | null): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Seller listing management + photo uploads (astras sweep: BAZAAR pass)
+// ─────────────────────────────────────────────────────────────────────────
+
+/** The caller's own OFFERs (any status), via bazaar_my_listings. */
+export async function bazaarMyListings(): Promise<BazaarListing[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('bazaar_my_listings');
+  if (error) throw new Error(error.message);
+  return ((data as Row[]) ?? []).map(mapListing);
+}
+
+/** Withdraw an OFFER (seller-only; the RPC guards open orders). */
+export async function bazaarCancelListing(listingId: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.rpc('bazaar_cancel_listing', { p_listing_id: listingId });
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Upload a listing photo to the group-media bucket. Path is keyed on the
+ * uploader (bazaar/{bee_id}/… — bazaar_media_insert policy) because photos
+ * upload before the listing exists; the URL goes into image_urls on create.
+ */
+export async function uploadListingImage(beeId: string, file: File): Promise<string> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `bazaar/${beeId}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from('group-media')
+    .upload(path, file, { contentType: file.type || 'image/jpeg', upsert: false });
+  if (error) throw new Error(error.message);
+  return supabase.storage.from('group-media').getPublicUrl(path).data.publicUrl;
 }

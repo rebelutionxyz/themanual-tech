@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Plus, ShoppingBag, X } from 'lucide-react';
-import { bazaarCreateListing } from '@/lib/bazaar';
-import { useAuth } from '@/lib/auth';
-import { cn } from '@/lib/utils';
 import { BAZAAR_ACCENT } from '@/components/bazaar/cards';
 import { useCategoryGroups } from '@/components/bazaar/useCategoryGroups';
+import { useAuth } from '@/lib/auth';
+import { bazaarCreateListing, uploadListingImage } from '@/lib/bazaar';
+import { cn } from '@/lib/utils';
+import { ArrowLeft, ImagePlus, Loader2, Plus, ShoppingBag, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 const CONDITIONS: { value: string; label: string }[] = [
   { value: 'new', label: 'New' },
@@ -29,6 +29,27 @@ export function BazaarNew() {
   const [quantity, setQuantity] = useState('1');
   const [description, setDescription] = useState('');
   const [imageInputs, setImageInputs] = useState<string[]>(['']);
+  const [uploadingImages, setUploadingImages] = useState(0);
+  const imageFileInput = useRef<HTMLInputElement>(null);
+
+  async function onImageFilesPicked(files: FileList | null) {
+    if (!files || files.length === 0 || !bee?.id) return;
+    const batch = Array.from(files).slice(0, 6);
+    setUploadingImages(batch.length);
+    for (const file of batch) {
+      try {
+        const url = await uploadListingImage(bee.id, file);
+        setImageInputs((prev) => {
+          const next = prev.filter((v) => v.trim() !== '');
+          return [...next, url, ''];
+        });
+      } catch {
+        /* per-file errors stay quiet; the row simply doesn't appear */
+      } finally {
+        setUploadingImages((n) => Math.max(0, n - 1));
+      }
+    }
+  }
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +110,10 @@ export function BazaarNew() {
           <ShoppingBag size={22} style={{ color: BAZAAR_ACCENT }} />
         </div>
         <div>
-          <h1 className="font-display text-2xl font-semibold tracking-wide" style={{ color: BAZAAR_ACCENT }}>
+          <h1
+            className="font-display text-2xl font-semibold tracking-wide"
+            style={{ color: BAZAAR_ACCENT }}
+          >
             Make an Offer
           </h1>
           <p className="font-mono text-zinc-500" style={{ fontSize: '12px' }}>
@@ -99,7 +123,10 @@ export function BazaarNew() {
       </div>
 
       {!bee && (
-        <p className="mt-5 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-600" style={{ fontSize: '13px' }}>
+        <p
+          className="mt-5 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-600"
+          style={{ fontSize: '13px' }}
+        >
           You’ll need to{' '}
           <Link to="/login" className="font-semibold" style={{ color: BAZAAR_ACCENT }}>
             sign in
@@ -220,8 +247,29 @@ export function BazaarNew() {
               className="inline-flex items-center gap-1 font-medium text-zinc-600 transition-colors hover:text-zinc-900"
               style={{ fontSize: '12px' }}
             >
-              <Plus size={13} /> Add image
+              <Plus size={13} /> Add image URL
             </button>
+            <button
+              type="button"
+              onClick={() => imageFileInput.current?.click()}
+              disabled={uploadingImages > 0}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium text-white transition-colors hover:brightness-110 disabled:opacity-60"
+              style={{ background: BAZAAR_ACCENT }}
+            >
+              <ImagePlus size={13} />
+              {uploadingImages > 0 ? `Uploading ${uploadingImages}…` : 'Upload photos'}
+            </button>
+            <input
+              ref={imageFileInput}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                void onImageFilesPicked(e.target.files);
+                e.target.value = '';
+              }}
+            />
           </div>
         </Field>
 
