@@ -6,6 +6,7 @@ import {
   createGroup,
   findBeeByHandle,
   hasUnread,
+  leaveConversation,
   listConversations,
   listMessages,
   markRead,
@@ -13,7 +14,7 @@ import {
   startDirect,
 } from '@/lib/comms';
 import { cn } from '@/lib/utils';
-import { ArrowLeft, MessageCircle, Plus, Send, Users } from 'lucide-react';
+import { ArrowLeft, LogOut, MessageCircle, Plus, Radio, Send, Shuffle, Users } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -91,7 +92,9 @@ export function CommsPage() {
       <CommsHeader />
 
       {error && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+          {error}
+        </div>
       )}
 
       <div className="flex min-h-0 flex-1 gap-4">
@@ -140,7 +143,8 @@ export function CommsPage() {
             {convos === null && <div className="p-4 text-sm text-zinc-400">Loading…</div>}
             {convos !== null && convos.length === 0 && (
               <div className="p-4 text-sm leading-relaxed text-zinc-400">
-                No conversations yet. Start a DM with a Bee handle — the water carries it from there.
+                No conversations yet. Start a DM with a Bee handle — the water carries it from
+                there.
               </div>
             )}
             {(convos ?? []).map((c) => {
@@ -160,7 +164,11 @@ export function CommsPage() {
                     className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-white"
                     style={{ background: COMMS_COLOR }}
                   >
-                    {c.kind === 'group' ? <Users size={14} /> : conversationTitle(c, bee.id).slice(1, 2).toUpperCase()}
+                    {c.kind === 'group' ? (
+                      <Users size={14} />
+                    ) : (
+                      conversationTitle(c, bee.id).slice(1, 2).toUpperCase()
+                    )}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span
@@ -176,16 +184,46 @@ export function CommsPage() {
                     </span>
                   </span>
                   {unread && (
-                    <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ background: COMMS_COLOR }} />
+                    <span
+                      className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                      style={{ background: COMMS_COLOR }}
+                    />
                   )}
                 </button>
               );
             })}
           </div>
+
+          {/* Rooms + Roulette — voice layer, gated on LiveKit */}
+          <div className="border-t border-zinc-100 p-2">
+            <div className="flex items-center gap-1.5">
+              <span
+                className="inline-flex flex-1 cursor-not-allowed items-center justify-center gap-1 rounded-md border border-dashed px-2 py-1.5 font-mono text-[10px] uppercase tracking-wider opacity-70"
+                style={{ borderColor: `${COMMS_COLOR}50`, color: COMMS_COLOR }}
+                title="Live voice rooms — land with the LiveKit rail"
+                data-size="meta"
+              >
+                <Radio size={10} /> Rooms · SOON
+              </span>
+              <span
+                className="inline-flex flex-1 cursor-not-allowed items-center justify-center gap-1 rounded-md border border-dashed px-2 py-1.5 font-mono text-[10px] uppercase tracking-wider opacity-70"
+                style={{ borderColor: `${COMMS_COLOR}50`, color: COMMS_COLOR }}
+                title="Roulette — meet a random Bee, lands with the LiveKit rail"
+                data-size="meta"
+              >
+                <Shuffle size={10} /> Roulette · SOON
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Thread */}
-        <div className={cn('flex min-w-0 flex-1 flex-col rounded-xl border border-zinc-200 bg-white', !active && 'hidden md:flex')}>
+        <div
+          className={cn(
+            'flex min-w-0 flex-1 flex-col rounded-xl border border-zinc-200 bg-white',
+            !active && 'hidden md:flex',
+          )}
+        >
           {!active ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
               <MessageCircle size={32} style={{ color: COMMS_COLOR }} className="opacity-40" />
@@ -201,6 +239,10 @@ export function CommsPage() {
               onSent={() => {
                 loadMessages();
                 loadConvos();
+              }}
+              onLeft={() => {
+                loadConvos();
+                navigate('/comms');
               }}
             />
           )}
@@ -233,15 +275,19 @@ function Thread({
   myBeeId,
   onBack,
   onSent,
+  onLeft,
 }: {
   conversation: Conversation;
   messages: CommsMessage[];
   myBeeId: string;
   onBack: () => void;
   onSent: () => void;
+  onLeft: () => void;
 }) {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [leaveArmed, setLeaveArmed] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const handleFor = (beeId: string) =>
     conversation.participants.find((p) => p.beeId === beeId)?.handle ?? 'bee';
@@ -280,20 +326,64 @@ function Thread({
           {conversationTitle(conversation, myBeeId)}
         </span>
         <span className="ml-auto text-[11px] text-zinc-400">
-          {conversation.participants.length} {conversation.participants.length === 1 ? 'Bee' : 'Bees'}
+          {conversation.participants.length}{' '}
+          {conversation.participants.length === 1 ? 'Bee' : 'Bees'}
         </span>
+        {leaveArmed ? (
+          <span className="flex flex-shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={async () => {
+                if (leaving) return;
+                setLeaving(true);
+                try {
+                  await leaveConversation(conversation.id);
+                  onLeft();
+                } finally {
+                  setLeaving(false);
+                  setLeaveArmed(false);
+                }
+              }}
+              disabled={leaving}
+              className="rounded-full bg-red-600 px-2 py-0.5 text-[10.5px] font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+            >
+              {leaving ? '…' : 'Confirm leave'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setLeaveArmed(false)}
+              className="rounded-full border border-zinc-200 px-1.5 py-0.5 text-[10.5px] font-semibold text-zinc-500 hover:text-zinc-800"
+            >
+              Stay
+            </button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setLeaveArmed(true)}
+            title="Leave this conversation"
+            aria-label="Leave this conversation"
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-zinc-300 transition-colors hover:bg-red-50 hover:text-red-600"
+          >
+            <LogOut size={13} />
+          </button>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
         {messages.length === 0 && (
-          <p className="pt-6 text-center text-sm text-zinc-300">No messages yet — say the first thing.</p>
+          <p className="pt-6 text-center text-sm text-zinc-300">
+            No messages yet — say the first thing.
+          </p>
         )}
         {messages.map((m) => {
           const mine = m.senderBeeId === myBeeId;
           return (
             <div key={m.id} className={cn('flex flex-col', mine ? 'items-end' : 'items-start')}>
               {conversation.kind === 'group' && !mine && (
-                <span className="mb-0.5 px-1 text-[10px] font-semibold text-zinc-400">@{handleFor(m.senderBeeId)}</span>
+                <span className="mb-0.5 px-1 text-[10px] font-semibold text-zinc-400">
+                  @{handleFor(m.senderBeeId)}
+                </span>
               )}
               <div
                 className={cn(
