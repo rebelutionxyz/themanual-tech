@@ -18,10 +18,17 @@ const SHOW_RIGHT_RAIL = false;
 
 /**
  * Horizontal 14-realm strip — RETIRED. Realm navigation now lives entirely in
- * the White-Rabbit right-column tree (RealmTreeSlider), which drives the same
- * lens. Component file kept; flip to true to restore the strip.
+ * the White-Rabbit realm tree, which drives the same lens. Component file
+ * kept; flip to true to restore the strip.
  */
 const SHOW_REALM_STRIP = false;
+
+/**
+ * Right-column realm slide-over — RETIRED 2026-07-18 (Butch). The realm tree
+ * now opens as a TOP-TOOLBAR dropdown (LensRow → Popup → RealmTreeContent),
+ * matching Location/Time/Search. Flip to true to restore the slide-over.
+ */
+const SHOW_REALM_SLIDEOVER = false;
 
 interface CommunityShellProps {
   /** Active surface slug (intel / unite / rule / give) — drives nav + dropdown. */
@@ -103,8 +110,9 @@ export function CommunityShell({
             </div>
             {/* Cross-Astra Overview rail — hidden on mobile, side column at md+. */}
             {SHOW_RIGHT_RAIL && <RightRail />}
-            {/* White-Rabbit realm-tree slide-over — overlays the content region. */}
-            <RealmTreeSlider />
+            {/* White-Rabbit realm-tree slide-over — retired; the tree is a
+                top-toolbar dropdown now. */}
+            {SHOW_REALM_SLIDEOVER && <RealmTreeSlider />}
           </div>
           {/* Selected-realm chips — bottom of the content column (right of the
               sidebar), above the bottom toolbar. */}

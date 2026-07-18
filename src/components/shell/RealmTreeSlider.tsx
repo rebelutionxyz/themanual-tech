@@ -7,45 +7,48 @@ import { Check, ChevronRight, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 /**
- * White-Rabbit right-column realm navigator: browses the FULL taxonomy ONE LEVEL
- * AT A TIME (lazy). The root realms load on first open; each node fetches its
- * direct children via realm_children(pathParts) when expanded. A node is
+ * White-Rabbit realm navigator: browses the FULL taxonomy ONE LEVEL AT A
+ * TIME (lazy). Root realms load on first open; each node fetches its direct
+ * children via realm_children(pathParts) when expanded. A node is
  * expandable iff NOT isLeaf.
  *
  * MULTI-SELECT: clicking a node label toggles it in/out of the lens selection
  * (useLensStore.selectedRealms); the single-prefix feed `path` derives from the
  * FIRST selection (interim), and the full set shows as chips above the bottom
- * toolbar. Dismisses on Esc, click-outside, pointer-leave (150ms grace), or
- * toggle again.
+ * toolbar.
+ *
+ * 2026-07-18 (Butch): the tree now renders in a TOP-TOOLBAR DROPDOWN (LensRow
+ * → Popup → RealmTreeContent), matching Location/Time. The right-column
+ * slide-over below is retired but kept intact — CommunityShell gates it off.
  */
 const keyOf = (parts: string[]) => parts.join('|');
 
 /** Max child rows rendered per node before the "Show all" reveal. */
 const CHILD_CAP = 100;
 
-export function RealmTreeSlider() {
-  const open = useRealmTreeStore((s) => s.open);
-  const close = useRealmTreeStore((s) => s.close);
+/** Root realms are stable per session — fetched once, shared across opens. */
+let rootsCache: RealmTreeRow[] | null = null;
+
+/**
+ * The tree itself — store-driven, lazy, host-agnostic. Rendered by the
+ * LensRow Realm dropdown (primary) and the retired slide-over (gated off).
+ */
+export function RealmTreeContent() {
   const colors = useRealmColors((s) => s.colors) as Record<string, string>;
   const selectedRealms = useLensStore((s) => s.selectedRealms);
   const toggleRealm = useLensStore((s) => s.toggleRealm);
   const clearRealms = useLensStore((s) => s.clearRealms);
 
-  const panelRef = useRef<HTMLDivElement>(null);
-  const leaveTimer = useRef<number | undefined>(undefined);
-  const fetchedRef = useRef(false);
-
-  const [roots, setRoots] = useState<RealmTreeRow[] | null>(null);
+  const [roots, setRoots] = useState<RealmTreeRow[] | null>(rootsCache);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Lazy fetch the root realms on first open.
   useEffect(() => {
-    if (!open || fetchedRef.current) return;
-    fetchedRef.current = true;
+    if (rootsCache) return;
     setLoading(true);
     fetchRealmChildren([])
       .then((r) => {
+        rootsCache = r;
         setRoots(r);
         setLoading(false);
       })
@@ -53,7 +56,65 @@ export function RealmTreeSlider() {
         setError(e instanceof Error ? e.message : 'Failed to load');
         setLoading(false);
       });
-  }, [open]);
+  }, []);
+
+  const selectedKeys = useMemo(
+    () => new Set(selectedRealms.map((r) => r.key)),
+    [selectedRealms],
+  );
+  const colorFor = (realmId: string) => colors[realmId] ?? REALM_COLOR_FALLBACK;
+  const noneSelected = selectedRealms.length === 0;
+
+  return (
+    <div className="py-1">
+      {/* Clear / all-realms affordance — resets the whole selection. */}
+      <button
+        type="button"
+        onClick={() => clearRealms()}
+        className={cn(
+          'flex w-full items-center gap-1.5 py-1.5 pr-2 pl-3 text-left transition-colors hover:bg-zinc-50',
+          noneSelected ? 'font-semibold text-zinc-900' : 'text-zinc-600',
+        )}
+        style={{ fontSize: '13px' }}
+      >
+        <span className="inline-block w-[13px] flex-shrink-0" aria-hidden="true" />
+        All realms
+      </button>
+
+      {loading && <Note depth={0}>Loading…</Note>}
+      {error && !loading && (
+        <Note depth={0} tone="error">
+          {error}
+        </Note>
+      )}
+      {!loading && !error && roots?.length === 0 && <Note depth={0}>No realms yet.</Note>}
+      {!loading &&
+        !error &&
+        roots?.map((row) => (
+          <TreeRow
+            key={row.id}
+            row={row}
+            depth={0}
+            colorFor={colorFor}
+            selectedKeys={selectedKeys}
+            onToggle={toggleRealm}
+          />
+        ))}
+    </div>
+  );
+}
+
+/**
+ * RETIRED right-column slide-over host (2026-07-18) — kept intact and gated
+ * off in CommunityShell; flip its SHOW_REALM_SLIDEOVER to restore.
+ */
+export function RealmTreeSlider() {
+  const open = useRealmTreeStore((s) => s.open);
+  const close = useRealmTreeStore((s) => s.close);
+  const selectedRealms = useLensStore((s) => s.selectedRealms);
+
+  const panelRef = useRef<HTMLDivElement>(null);
+  const leaveTimer = useRef<number | undefined>(undefined);
 
   // Esc + click-outside — active only while open.
   useEffect(() => {
@@ -77,13 +138,6 @@ export function RealmTreeSlider() {
 
   // Clear any pending leave-timer on unmount.
   useEffect(() => () => window.clearTimeout(leaveTimer.current), []);
-
-  const selectedKeys = useMemo(
-    () => new Set(selectedRealms.map((r) => r.key)),
-    [selectedRealms],
-  );
-  const colorFor = (realmId: string) => colors[realmId] ?? REALM_COLOR_FALLBACK;
-  const noneSelected = selectedRealms.length === 0;
 
   return (
     <aside
@@ -117,41 +171,7 @@ export function RealmTreeSlider() {
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto py-1">
-        {/* Clear / all-realms affordance — resets the whole selection. */}
-        <button
-          type="button"
-          onClick={() => clearRealms()}
-          className={cn(
-            'flex w-full items-center gap-1.5 py-1.5 pr-2 pl-3 text-left transition-colors hover:bg-zinc-50',
-            noneSelected ? 'font-semibold text-zinc-900' : 'text-zinc-600',
-          )}
-          style={{ fontSize: '13px' }}
-        >
-          <span className="inline-block w-[13px] flex-shrink-0" aria-hidden="true" />
-          All realms
-        </button>
-
-        {loading && <Note depth={0}>Loading…</Note>}
-        {error && !loading && (
-          <Note depth={0} tone="error">
-            {error}
-          </Note>
-        )}
-        {!loading && !error && roots?.length === 0 && <Note depth={0}>No realms yet.</Note>}
-        {!loading &&
-          !error &&
-          roots?.map((row) => (
-            <TreeRow
-              key={row.id}
-              row={row}
-              depth={0}
-              colorFor={colorFor}
-              selectedKeys={selectedKeys}
-              onToggle={toggleRealm}
-            />
-          ))}
-      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">{open && <RealmTreeContent />}</div>
     </aside>
   );
 }

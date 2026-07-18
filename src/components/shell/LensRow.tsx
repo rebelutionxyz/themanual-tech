@@ -1,24 +1,28 @@
 import { Popup, StubPanel, TimePresetPanel } from '@/components/layout/lensPanels';
 import { BlingPopup, readableInk } from '@/components/shell/BottomToolbar';
 import { ModalLink } from '@/components/shell/ModalLink';
+import { RealmTreeContent } from '@/components/shell/RealmTreeSlider';
+import { SearchPanel } from '@/components/shell/SearchDropdown';
 import { HoneyDrop } from '@/components/ui/HoneyDrop';
 import { useAuth } from '@/lib/auth';
 import { timePresetLabel } from '@/lib/timePresets';
 import { cn } from '@/lib/utils';
 import { useCartStore } from '@/stores/useCartStore';
 import { useLensStore } from '@/stores/useLensStore';
-import { useRealmTreeStore } from '@/stores/useRealmTreeStore';
-import { Clock, type LucideIcon, MapPin, Rabbit, Search, ShoppingCart, X } from 'lucide-react';
+import { Clock, type LucideIcon, MapPin, Rabbit, Search, ShoppingCart } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 
-// Realm moved out of the lens popups into the persistent RealmStrip (pass 18).
-type LensId = 'location' | 'time';
+// Realm + Search joined the anchored-dropdown family 2026-07-18 (Butch) —
+// every top-bar control now opens the same way as Location/Time.
+type LensId = 'location' | 'time' | 'realm' | 'search';
 
 /**
- * Horizontal lens bar at the top of the community center column — Search ·
- * Location · Time. (Realm is now the persistent strip below this row.)
+ * Horizontal lens bar at the top of the community center column —
+ * [identity · BLiNG!] left, [Search · Location · Time · Realm · Cart] right.
+ * Search and Realm open anchored dropdowns like Location/Time: Search shows
+ * its results INSIDE the dropdown; Realm hosts the lazy taxonomy tree.
  */
 export function LensRow({ accent }: { accent: string }) {
   const { bee } = useAuth();
@@ -60,7 +64,8 @@ export function LensRow({ accent }: { accent: string }) {
     setOpenLens(id);
   }
 
-  const popWidth = 300;
+  // Wider panels for the content-bearing dropdowns.
+  const popWidth = openLens === 'search' ? 400 : openLens === 'realm' ? 330 : 300;
   const popStyle: React.CSSProperties = anchor
     ? {
         position: 'fixed',
@@ -79,6 +84,10 @@ export function LensRow({ accent }: { accent: string }) {
   // Time lens — selected preset shows inline after the clock; null = "Time".
   const timePreset = useLensStore((s) => s.timePreset);
   const timeLabel = timePresetLabel(timePreset) ?? 'Time';
+
+  // Realm lens — selected count shows inline after the rabbit.
+  const realmCount = useLensStore((s) => s.selectedRealms.length);
+  const realmLabel = realmCount > 0 ? `Realm · ${realmCount}` : 'Realm';
 
   return (
     // Spans only the center content column. SOLID Astra accent — matches the
@@ -141,13 +150,19 @@ export function LensRow({ accent }: { accent: string }) {
         <span className="hidden md:inline">BLiNG!</span>
       </button>
 
-      {/* ml-auto on the first control floats the whole Search/Location/Time
-          group (and the trailing Cart) to the RIGHT edge of the row. Degrades
-          to 0 when the row overflows on narrow screens, so the touch-scroller
-          still reaches every control.
-          NOTE: there is no "Realm" control in this row — the 14-realm picker is
-          the separate persistent RealmStrip below (pass 18). Not added here. */}
-      <SearchLens ink={ink} onDark={onDark} className="ml-auto" />
+      {/* ml-auto on the first control floats the lens group (and the trailing
+          Cart) to the RIGHT edge of the row. Degrades to 0 when the row
+          overflows on narrow screens, so the touch-scroller still reaches
+          every control. */}
+      <LensButton
+        icon={Search}
+        label="Search"
+        ink={ink}
+        onDark={onDark}
+        active={openLens === 'search'}
+        onClick={(b) => openAt('search', b)}
+        className="ml-auto"
+      />
       <LensButton
         icon={MapPin}
         label="Location"
@@ -165,11 +180,16 @@ export function LensRow({ accent }: { accent: string }) {
         onClick={(b) => openAt('time', b)}
       />
 
-      {/* White Rabbit — toggles the right-column realm-tree slider. Reuses the
-          lucide Rabbit icon from the INTEL composer's atom picker. The
-          data-rabbit-toggle hook lets the slider's click-outside guard ignore
-          this button (no close-then-reopen race). */}
-      <RabbitButton ink={ink} onDark={onDark} />
+      {/* White Rabbit — the realm-tree DROPDOWN (2026-07-18), same anchored
+          pattern as Location/Time. */}
+      <LensButton
+        icon={Rabbit}
+        label={realmLabel}
+        ink={ink}
+        onDark={onDark}
+        active={openLens === 'realm' || realmCount > 0}
+        onClick={(b) => openAt('realm', b)}
+      />
 
       {/* Cart — sits at the right end of the floated group. */}
       <CartIcon ink={ink} onDark={onDark} accent={accent} />
@@ -201,6 +221,23 @@ export function LensRow({ accent }: { accent: string }) {
                 <TimePresetPanel onClose={() => setOpenLens(null)} />
               </Popup>
             )}
+            {openLens === 'realm' && (
+              <Popup title="Realm" style={popStyle} onClose={() => setOpenLens(null)}>
+                {/* White card inside the silver panel so the tree keeps its
+                    own light styling; capped height, own scroll. */}
+                <div className="max-h-[55vh] overflow-y-auto rounded-md bg-white">
+                  <RealmTreeContent />
+                </div>
+              </Popup>
+            )}
+            {openLens === 'search' && (
+              <Popup title="Search" style={popStyle} onClose={() => setOpenLens(null)}>
+                <SearchPanel
+                  standingOn={window.location.pathname.split('/')[1] || 'intel'}
+                  onNavigate={() => setOpenLens(null)}
+                />
+              </Popup>
+            )}
           </>,
           document.body,
         )}
@@ -208,109 +245,9 @@ export function LensRow({ accent }: { accent: string }) {
   );
 }
 
-/**
- * Inline Astra-local search (replaces the old popup). Collapsed = a magnifier;
- * click → an input expands IN the lens row. Typing drives useLensStore.searchTerm
- * (≥2 chars runs the surface's content search, cross-realm — the per-surface RPC
- * is wired in the content component, e.g. ThreadList → forumSearch). Click-out
- * collapses + REMEMBERS the term; reopening prefills it; the ✕ clears it back to
- * the normal feed. Icon shows lit when a search is active.
- */
-function SearchLens({
-  ink,
-  onDark,
-  className,
-}: {
-  ink: string;
-  onDark: boolean;
-  className?: string;
-}) {
-  const term = useLensStore((s) => s.searchTerm);
-  const setSearchTerm = useLensStore((s) => s.setSearchTerm);
-  const clearSearch = useLensStore((s) => s.clearSearch);
-  const [expanded, setExpanded] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const active = term.trim().length >= 2;
-
-  // Collapse on click-outside (the term is kept — remembered for reopen).
-  useEffect(() => {
-    if (!expanded) return;
-    const onDown = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setExpanded(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [expanded]);
-
-  if (!expanded) {
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          setExpanded(true);
-          requestAnimationFrame(() => inputRef.current?.focus());
-        }}
-        title={active ? `Searching: ${term}` : 'Search'}
-        aria-label="Search"
-        className={cn(
-          'flex flex-shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
-          active ? 'font-semibold' : onDark ? 'hover:bg-white/10' : 'hover:bg-black/10',
-          className,
-        )}
-        style={
-          active
-            ? { color: ink, background: onDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)' }
-            : { color: ink, opacity: 0.85 }
-        }
-      >
-        <Search size={16} />
-        {/* Desktop + tablet: icon + label (Butch 2026-07-18). Mobile: icon only. */}
-        <span className="hidden md:inline">Search</span>
-      </button>
-    );
-  }
-
-  return (
-    <div
-      ref={wrapRef}
-      className={cn('flex h-8 flex-shrink-0 items-center gap-1.5 rounded-md px-2', className)}
-      style={{ background: onDark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.10)', color: ink }}
-    >
-      <Search size={16} className="flex-shrink-0" style={{ color: ink }} />
-      <input
-        ref={inputRef}
-        // type="text" (not "search") so the browser's native clear ✕ doesn't
-        // double up with our custom ✕ below.
-        type="text"
-        value={term}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') setExpanded(false);
-        }}
-        placeholder="Search this Astra…"
-        aria-label="Search"
-        className="w-40 bg-transparent text-[13px] outline-none placeholder:opacity-60 sm:w-56"
-        style={{ color: ink }}
-      />
-      {term && (
-        <button
-          type="button"
-          onClick={() => {
-            clearSearch();
-            inputRef.current?.focus();
-          }}
-          aria-label="Clear search"
-          title="Clear search"
-          className="flex flex-shrink-0 items-center justify-center rounded p-0.5 opacity-80 transition-opacity hover:opacity-100"
-          style={{ color: ink }}
-        >
-          <X size={14} />
-        </button>
-      )}
-    </div>
-  );
-}
+// SearchLens (inline bar-expanding search that filtered the feed) retired
+// 2026-07-18 — Search is an anchored dropdown with results inside
+// (SearchDropdown.tsx). useLensStore.searchTerm is no longer set from here.
 
 function LensButton({
   icon: Icon,
@@ -355,39 +292,8 @@ function LensButton({
   );
 }
 
-/** The Realm control (White Rabbit motif) — toggles the right-column realm
-    sidebar (multi-select). Renders IDENTICALLY to the other lens controls
-    (mirrors LensButton's classes/structure): rabbit icon + "Realm" label,
-    contrast ink, same hover, and the same active treatment when its panel (the
-    realm sidebar) is open. No badge — selected realms show as chips. Keeps
-    data-rabbit-toggle so the sidebar's outside-click dismiss ignores it. */
-function RabbitButton({ ink, onDark }: { ink: string; onDark: boolean }) {
-  const open = useRealmTreeStore((s) => s.open);
-  const toggle = useRealmTreeStore((s) => s.toggle);
-
-  return (
-    <button
-      type="button"
-      data-rabbit-toggle
-      onClick={() => toggle()}
-      title="Realm"
-      aria-label="Realm"
-      aria-pressed={open}
-      className={cn(
-        'flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
-        open ? 'font-semibold' : onDark ? 'hover:bg-white/10' : 'hover:bg-black/10',
-      )}
-      style={
-        open
-          ? { color: ink, background: onDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)' }
-          : { color: ink, opacity: 0.85 }
-      }
-    >
-      <Rabbit size={16} />
-      <span className="hidden md:inline">Realm</span>
-    </button>
-  );
-}
+// RabbitButton (toggled the right-column realm slide-over) retired
+// 2026-07-18 — Realm is now a LensButton opening the anchored dropdown above.
 
 /** Cart — right-aligned in the lens row; hidden until something's in it. Ink
     flips for contrast against the solid accent bar; the count badge is the ink
