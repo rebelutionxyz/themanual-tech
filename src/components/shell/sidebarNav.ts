@@ -49,6 +49,8 @@ export interface SidebarItem {
    * still render the full page — the popup and the page are one route.
    */
   modal?: boolean;
+  /** Render a thin divider above this item (tail grouping). */
+  dividerAbove?: boolean;
 }
 
 export const NEUTRAL_INK = '#536471';
@@ -59,13 +61,20 @@ export const NEUTRAL_INK = '#536471';
  * destination are `soon`.
  */
 export const COMMON_TAIL: SidebarItem[] = [
-  // Bookmarked = the cross-surface shelf popup (/bookmarks). INTEL's own
-  // /intel/saved thread view still exists; the tail now opens the whole
-  // shelf. Badge injected by CommunityLayout.
-  { id: 'bookmarks', label: 'Saved', icon: Bookmark, to: '/bookmarks', modal: true },
   { id: 'notifications', label: 'Notifications', icon: Bell, to: '/notifications', modal: true },
   { id: 'report', label: 'Reported', icon: Flag, to: '/intel/reported', modal: true },
-  { id: 'creators', label: 'Creators Studio', icon: Clapperboard, to: '/studio', modal: true },
+  // Saved = the cross-surface shelf popup (/bookmarks). INTEL's own
+  // /intel/saved thread view still exists. Badge injected by CommunityLayout.
+  { id: 'bookmarks', label: 'Saved', icon: Bookmark, to: '/bookmarks', modal: true },
+  // Thin divider: the personal trio above, services below (Butch 2026-07-18).
+  {
+    id: 'creators',
+    label: 'Creators Studio',
+    icon: Clapperboard,
+    to: '/studio',
+    modal: true,
+    dividerAbove: true,
+  },
   { id: 'premium', label: 'Premium', icon: Crown, to: '/premium', modal: true },
   { id: 'business', label: 'Business', icon: Briefcase, to: '/business', modal: true },
   { id: 'advertising', label: 'Advertise', icon: Megaphone, to: '/promotion', modal: true },

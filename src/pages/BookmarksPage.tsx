@@ -9,8 +9,16 @@ import { type SavedItem, listMySaves, unsaveById } from '@/lib/bookmarks';
 import { relativeTime } from '@/lib/intel';
 import { createShareLink } from '@/lib/reactions';
 import { cn } from '@/lib/utils';
-import { ArrowDownUp, Bookmark, BookmarkMinus, Check, Link2, Search } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ArrowDownUp,
+  Bookmark,
+  BookmarkMinus,
+  Check,
+  ChevronDown,
+  Link2,
+  Search,
+} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const ACCENT = '#D97706'; // honey ink (matches NotificationsPage)
@@ -107,19 +115,36 @@ export function BookmarksPage() {
     [items],
   );
 
+  // The view after the surface scope — realm options derive from THIS, so
+  // the realm dropdown only ever offers realms you can actually see (an
+  // empty scoped view shows no realm control at all).
+  const scopedItems = useMemo(
+    () =>
+      effectiveSurface === 'all'
+        ? (items ?? [])
+        : (items ?? []).filter((i) => i.surface === effectiveSurface),
+    [items, effectiveSurface],
+  );
+
   const realmsOnShelf = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const i of items ?? []) {
-      if (i.realmId) m.set(i.realmId, i.realmName ?? i.realmId);
+    const m = new Map<string, { name: string; color: string | null }>();
+    for (const i of scopedItems) {
+      if (i.realmId) m.set(i.realmId, { name: i.realmName ?? i.realmId, color: i.realmColor });
     }
     return Array.from(m.entries())
-      .map(([id, name]) => ({ id, name }))
+      .map(([id, v]) => ({ id, name: v.name, color: v.color }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [items]);
+  }, [scopedItems]);
+
+  // Selected realm no longer present in the current view → reset to All.
+  useEffect(() => {
+    if (realmFilter !== 'all' && !realmsOnShelf.some((r) => r.id === realmFilter)) {
+      setRealmFilter('all');
+    }
+  }, [realmsOnShelf, realmFilter]);
 
   const visible = useMemo(() => {
-    let xs = items ?? [];
-    if (effectiveSurface !== 'all') xs = xs.filter((i) => i.surface === effectiveSurface);
+    let xs = scopedItems;
     if (realmFilter !== 'all') xs = xs.filter((i) => i.realmId === realmFilter);
     const q = query.trim().toLowerCase();
     if (q) {
@@ -132,7 +157,7 @@ export function BookmarksPage() {
     return [...xs].sort((a, b) =>
       oldestFirst ? a.savedAt.localeCompare(b.savedAt) : b.savedAt.localeCompare(a.savedAt),
     );
-  }, [items, effectiveSurface, realmFilter, query, oldestFirst]);
+  }, [scopedItems, realmFilter, query, oldestFirst]);
 
   const total = items?.length ?? 0;
 
@@ -170,19 +195,7 @@ export function BookmarksPage() {
           />
         </label>
         {realmsOnShelf.length > 0 && (
-          <select
-            value={realmFilter}
-            onChange={(e) => setRealmFilter(e.target.value)}
-            aria-label="Filter by realm"
-            className="flex-shrink-0 rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-[12.5px] text-zinc-600"
-          >
-            <option value="all">All realms</option>
-            {realmsOnShelf.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
+          <RealmDropdown realms={realmsOnShelf} value={realmFilter} onChange={setRealmFilter} />
         )}
         <button
           type="button"
@@ -311,6 +324,124 @@ export function BookmarksPage() {
         </ul>
       )}
     </div>
+  );
+}
+
+/**
+ * Realm filter — toolbar-lens-style dropdown built from the realms present
+ * in the current view, each wearing its realms.color dot.
+ */
+function RealmDropdown({
+  realms,
+  value,
+  onChange,
+}: {
+  realms: { id: string; name: string; color: string | null }[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    // Capture phase: Esc closes the MENU without also closing the popup.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, [open]);
+
+  const current = value === 'all' ? null : (realms.find((r) => r.id === value) ?? null);
+  const FALLBACK = '#8A8175';
+
+  return (
+    <div ref={ref} className="relative flex-shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label="Filter by realm"
+        className="flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-[12.5px] font-medium transition-colors hover:bg-zinc-50"
+      >
+        <span
+          className="h-2 w-2 flex-shrink-0 rounded-full"
+          style={{ background: current ? (current.color ?? FALLBACK) : '#a1a1aa' }}
+          aria-hidden="true"
+        />
+        <span style={{ color: current ? (current.color ?? undefined) : '#52525b' }}>
+          {current ? current.name : 'All realms'}
+        </span>
+        <ChevronDown
+          size={13}
+          className={cn('text-zinc-400 transition-transform', open && 'rotate-180')}
+        />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-20 mt-1 max-h-64 w-44 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+          <RealmMenuRow
+            label="All realms"
+            color="#a1a1aa"
+            active={value === 'all'}
+            onClick={() => {
+              onChange('all');
+              setOpen(false);
+            }}
+          />
+          {realms.map((r) => (
+            <RealmMenuRow
+              key={r.id}
+              label={r.name}
+              color={r.color ?? FALLBACK}
+              active={value === r.id}
+              onClick={() => {
+                onChange(r.id);
+                setOpen(false);
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RealmMenuRow({
+  label,
+  color,
+  active,
+  onClick,
+}: {
+  label: string;
+  color: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12.5px] text-zinc-700 transition-colors hover:bg-zinc-50"
+      style={{ fontWeight: active ? 700 : 500, background: active ? `${color}14` : undefined }}
+    >
+      <span
+        className="h-2 w-2 flex-shrink-0 rounded-full"
+        style={{ background: color }}
+        aria-hidden="true"
+      />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+    </button>
   );
 }
 

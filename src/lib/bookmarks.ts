@@ -19,9 +19,10 @@ export interface SavedItem {
   title: string;
   /** Deep link — null when the surface has no resolver or the row is gone. */
   url: string | null;
-  /** Realm id + display name when the entity carries one (bazaar doesn't). */
+  /** Realm id + display name + color when the entity carries one (bazaar doesn't). */
   realmId: string | null;
   realmName: string | null;
+  realmColor: string | null;
   resolved: boolean;
 }
 
@@ -144,12 +145,16 @@ export async function listMySaves(beeId: string): Promise<SavedItem[]> {
     for (const v of m.values()) if (v.realm) realmIds.add(v.realm);
   }
   const realmNames = new Map<string, string>();
+  const realmColors = new Map<string, string | null>();
   if (realmIds.size > 0) {
     const { data: realmRows } = await sb
       .from('realms')
-      .select('id, name')
+      .select('id, name, color')
       .in('id', Array.from(realmIds));
-    for (const r of realmRows ?? []) realmNames.set(String(r.id), String(r.name ?? r.id));
+    for (const r of realmRows ?? []) {
+      realmNames.set(String(r.id), String(r.name ?? r.id));
+      realmColors.set(String(r.id), (r.color as string | null) ?? null);
+    }
   }
 
   return saves.map((s) => {
@@ -161,6 +166,7 @@ export async function listMySaves(beeId: string): Promise<SavedItem[]> {
       url: hit?.url ?? null,
       realmId,
       realmName: realmId ? (realmNames.get(realmId) ?? realmId) : null,
+      realmColor: realmId ? (realmColors.get(realmId) ?? null) : null,
       resolved: Boolean(hit),
     };
   });

@@ -1,15 +1,15 @@
-import { ModalLink } from '@/components/shell/ModalLink';
 import {
   ASTRA_SWITCHER,
   SURFACE_FRIENDLY,
   type SidebarItem,
   astraColor,
 } from '@/components/shell/sidebarNav';
+import { ModalLink } from '@/components/shell/ModalLink';
 import { ManualLogo } from '@/components/ui/ManualLogo';
 import { cn } from '@/lib/utils';
 import { useBranding } from '@/stores/useBranding';
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 interface GlobalSidebarProps {
@@ -130,15 +130,20 @@ export function GlobalSidebar({
           )}
         >
           {items.map((item) => (
-            <SidebarRow
-              key={item.id}
-              item={item}
-              active={item.id === activeItemId}
-              accent={accent}
-              collapsed={shown}
-              onSelect={onSelect}
-              onNavigate={closeOnMobileNav}
-            />
+            <Fragment key={item.id}>
+              {/* Thin tail divider (e.g. personal trio ↑ / services ↓). */}
+              {item.dividerAbove && (
+                <div className="mx-1 my-1.5 border-t border-zinc-200" aria-hidden="true" />
+              )}
+              <SidebarRow
+                item={item}
+                active={item.id === activeItemId}
+                accent={accent}
+                collapsed={shown}
+                onSelect={onSelect}
+                onNavigate={closeOnMobileNav}
+              />
+            </Fragment>
           ))}
         </nav>
         {/* Pinned bottom: collapse / expand toggle (md+; mobile uses tap-to-open
