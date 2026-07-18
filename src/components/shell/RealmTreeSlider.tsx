@@ -26,29 +26,50 @@ const keyOf = (parts: string[]) => parts.join('|');
 /** Max child rows rendered per node before the "Show all" reveal. */
 const CHILD_CAP = 100;
 
-/** Root realms are stable per session — fetched once, shared across opens. */
-let rootsCache: RealmTreeRow[] | null = null;
+/** Children are stable per session — fetched once per root, shared. */
+const childrenCache = new Map<string, RealmTreeRow[]>();
 
 /**
  * The tree itself — store-driven, lazy, host-agnostic. Rendered by the
- * LensRow Realm dropdown (primary) and the retired slide-over (gated off).
+ * LensRow Realm dropdown (topic realms, Geography excluded), the LensRow
+ * Location dropdown (rooted AT Geography — locations live in the realm
+ * taxonomy, Butch 2026-07-18), and the retired slide-over (gated off).
+ * Selection always drives the ONE shared lens (chips + feed prefix); the
+ * clear affordance only clears selections within THIS tree's scope.
  */
-export function RealmTreeContent() {
+export function RealmTreeContent({
+  rootPath = [],
+  excludeRoots = [],
+  clearLabel = 'All realms',
+}: {
+  /** Browse the subtree under this path (empty = the realm roots). */
+  rootPath?: string[];
+  /** Root realm NAMES to hide when browsing from the top. */
+  excludeRoots?: string[];
+  /** Label for the scoped clear affordance. */
+  clearLabel?: string;
+}) {
   const colors = useRealmColors((s) => s.colors) as Record<string, string>;
   const selectedRealms = useLensStore((s) => s.selectedRealms);
   const toggleRealm = useLensStore((s) => s.toggleRealm);
-  const clearRealms = useLensStore((s) => s.clearRealms);
+  const removeRealm = useLensStore((s) => s.removeRealm);
 
-  const [roots, setRoots] = useState<RealmTreeRow[] | null>(rootsCache);
+  const cacheKey = rootPath.join('|');
+  const [roots, setRoots] = useState<RealmTreeRow[] | null>(childrenCache.get(cacheKey) ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: cacheKey encodes rootPath
   useEffect(() => {
-    if (rootsCache) return;
+    const cached = childrenCache.get(cacheKey);
+    if (cached) {
+      setRoots(cached);
+      return;
+    }
     setLoading(true);
-    fetchRealmChildren([])
+    fetchRealmChildren(rootPath)
       .then((r) => {
-        rootsCache = r;
+        childrenCache.set(cacheKey, r);
         setRoots(r);
         setLoading(false);
       })
@@ -56,21 +77,33 @@ export function RealmTreeContent() {
         setError(e instanceof Error ? e.message : 'Failed to load');
         setLoading(false);
       });
-  }, []);
+  }, [cacheKey]);
 
   const selectedKeys = useMemo(
     () => new Set(selectedRealms.map((r) => r.key)),
     [selectedRealms],
   );
   const colorFor = (realmId: string) => colors[realmId] ?? REALM_COLOR_FALLBACK;
-  const noneSelected = selectedRealms.length === 0;
+
+  const visibleRoots = (roots ?? []).filter((r) => !excludeRoots.includes(r.name));
+
+  // Selections within THIS tree's scope (rooted → under the root; top-level
+  // → any root except the excluded ones).
+  const inScope = (parts: string[]) =>
+    rootPath.length > 0
+      ? rootPath.every((seg, i) => parts[i] === seg)
+      : !excludeRoots.includes(parts[0]);
+  const scopedSelections = selectedRealms.filter((r) => inScope(r.pathParts));
+  const noneSelected = scopedSelections.length === 0;
 
   return (
     <div className="py-1">
-      {/* Clear / all-realms affordance — resets the whole selection. */}
+      {/* Scoped clear — resets only this tree's selections. */}
       <button
         type="button"
-        onClick={() => clearRealms()}
+        onClick={() => {
+          for (const r of scopedSelections) removeRealm(r.key);
+        }}
         className={cn(
           'flex w-full items-center gap-1.5 py-1.5 pr-2 pl-3 text-left transition-colors hover:bg-zinc-50',
           noneSelected ? 'font-semibold text-zinc-900' : 'text-zinc-600',
@@ -78,7 +111,7 @@ export function RealmTreeContent() {
         style={{ fontSize: '13px' }}
       >
         <span className="inline-block w-[13px] flex-shrink-0" aria-hidden="true" />
-        All realms
+        {clearLabel}
       </button>
 
       {loading && <Note depth={0}>Loading…</Note>}
@@ -87,10 +120,10 @@ export function RealmTreeContent() {
           {error}
         </Note>
       )}
-      {!loading && !error && roots?.length === 0 && <Note depth={0}>No realms yet.</Note>}
+      {!loading && !error && visibleRoots.length === 0 && <Note depth={0}>No realms yet.</Note>}
       {!loading &&
         !error &&
-        roots?.map((row) => (
+        visibleRoots.map((row) => (
           <TreeRow
             key={row.id}
             row={row}

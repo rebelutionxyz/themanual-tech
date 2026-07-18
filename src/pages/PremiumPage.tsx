@@ -66,15 +66,6 @@ export function PremiumPage() {
                   : undefined
               }
             >
-              {isTop && (
-                <span
-                  className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full px-2.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-widest"
-                  style={{ background: GOLD, color: '#18181b' }}
-                  data-size="meta"
-                >
-                  The full comb
-                </span>
-              )}
               <p
                 className="font-display text-[17px] font-semibold"
                 style={{ color: isTop ? GOLD_TEXT : undefined }}

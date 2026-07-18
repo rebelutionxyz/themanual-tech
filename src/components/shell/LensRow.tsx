@@ -6,10 +6,6 @@ import { RealmTreeContent } from '@/components/shell/RealmTreeSlider';
 import { SearchPanel } from '@/components/shell/SearchDropdown';
 import { HoneyDrop } from '@/components/ui/HoneyDrop';
 import { useAuth } from '@/lib/auth';
-import { countryName } from '@/lib/geo/countries';
-import { getSearchLocation } from '@/lib/geo/storage';
-import type { GeoLocation } from '@/lib/geo/types';
-import { usStateName } from '@/lib/geo/us-states';
 import { timePresetLabel } from '@/lib/timePresets';
 import { cn } from '@/lib/utils';
 import { useCartStore } from '@/stores/useCartStore';
@@ -70,7 +66,8 @@ export function LensRow({ accent }: { accent: string }) {
   }
 
   // Wider panels for the content-bearing dropdowns.
-  const popWidth = openLens === 'search' ? 400 : openLens === 'realm' ? 330 : 300;
+  const popWidth =
+    openLens === 'search' ? 400 : openLens === 'realm' || openLens === 'location' ? 330 : 300;
   const popStyle: React.CSSProperties = anchor
     ? {
         position: 'fixed',
@@ -90,22 +87,19 @@ export function LensRow({ accent }: { accent: string }) {
   const timePreset = useLensStore((s) => s.timePreset);
   const timeLabel = timePresetLabel(timePreset) ?? 'Time';
 
-  // Realm lens — the count shows inline after the rabbit; the selected
-  // chips render in the RealmChipsBar just BELOW this bar, upper left
-  // (Butch 2026-07-18 — chips out of the toolbar so controls keep room).
-  const realmCount = useLensStore((s) => s.selectedRealms.length);
+  // ONE shared lens, two doors (Butch 2026-07-18): topic realms open via
+  // the rabbit, Geography (locations live in the realm taxonomy) via the
+  // pin. Chips render behind the Astra name; feeds filter via the shared
+  // prefix. Counts/labels split by whether the selection is under Geography.
+  const selectedRealms = useLensStore((s) => s.selectedRealms);
+  const geoSelections = selectedRealms.filter((r) => r.pathParts[0] === 'Geography');
+  const topicSelections = selectedRealms.filter((r) => r.pathParts[0] !== 'Geography');
+  const realmCount = topicSelections.length;
   const realmLabel = realmCount > 0 ? `Realm · ${realmCount}` : 'Realm';
-
-  // Location lens — completed (Butch 2026-07-18): the selection persists in
-  // the geo storage and shows inline on the button.
-  const [geo, setGeo] = useState<GeoLocation | null>(() => getSearchLocation());
+  const locCount = geoSelections.length;
   const locLabel =
-    geo && geo !== 'Global'
-      ? geo.region
-        ? (usStateName(geo.region) ?? geo.region)
-        : (countryName(geo.country) ?? geo.country)
-      : 'Location';
-  const locActive = locLabel !== 'Location';
+    locCount === 1 ? geoSelections[0].name : locCount > 1 ? `Location · ${locCount}` : 'Location';
+  const locActive = locCount > 0;
 
   return (
     // Spans only the center content column. SOLID Astra accent — matches the
@@ -231,8 +225,10 @@ export function LensRow({ accent }: { accent: string }) {
             />
             {openLens === 'location' && (
               <Popup title="Location" style={popStyle} onClose={() => setOpenLens(null)}>
-                <div className="rounded-md bg-white">
-                  <LocationPanel onChanged={() => setGeo(getSearchLocation())} />
+                {/* The Geography branch of the realm tree — drill USA → NY →
+                    NYC → SoHo; picks drive the shared lens. */}
+                <div className="max-h-[55vh] overflow-y-auto rounded-md bg-white">
+                  <LocationPanel />
                 </div>
               </Popup>
             )}
@@ -246,7 +242,8 @@ export function LensRow({ accent }: { accent: string }) {
                 {/* White card inside the silver panel so the tree keeps its
                     own light styling; capped height, own scroll. */}
                 <div className="max-h-[55vh] overflow-y-auto rounded-md bg-white">
-                  <RealmTreeContent />
+                  {/* Topic realms only — Geography has its own door (Location). */}
+                  <RealmTreeContent excludeRoots={['Geography']} />
                 </div>
               </Popup>
             )}
