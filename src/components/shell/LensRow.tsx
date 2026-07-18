@@ -1,15 +1,22 @@
-import { Popup, StubPanel, TimePresetPanel } from '@/components/layout/lensPanels';
+import { Popup, TimePresetPanel } from '@/components/layout/lensPanels';
 import { BlingPopup, readableInk } from '@/components/shell/BottomToolbar';
+import { LocationPanel } from '@/components/shell/LocationPanel';
 import { ModalLink } from '@/components/shell/ModalLink';
 import { RealmTreeContent } from '@/components/shell/RealmTreeSlider';
 import { SearchPanel } from '@/components/shell/SearchDropdown';
 import { HoneyDrop } from '@/components/ui/HoneyDrop';
 import { useAuth } from '@/lib/auth';
+import { REALM_ID_BY_NAME } from '@/lib/constants';
+import { countryName } from '@/lib/geo/countries';
+import { getSearchLocation } from '@/lib/geo/storage';
+import type { GeoLocation } from '@/lib/geo/types';
+import { usStateName } from '@/lib/geo/us-states';
 import { timePresetLabel } from '@/lib/timePresets';
 import { cn } from '@/lib/utils';
 import { useCartStore } from '@/stores/useCartStore';
 import { useLensStore } from '@/stores/useLensStore';
-import { Clock, type LucideIcon, MapPin, Rabbit, Search, ShoppingCart } from 'lucide-react';
+import { REALM_COLOR_FALLBACK, useRealmColors } from '@/stores/useRealmColors';
+import { Clock, type LucideIcon, MapPin, Rabbit, Search, ShoppingCart, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
@@ -85,9 +92,26 @@ export function LensRow({ accent }: { accent: string }) {
   const timePreset = useLensStore((s) => s.timePreset);
   const timeLabel = timePresetLabel(timePreset) ?? 'Time';
 
-  // Realm lens — selected count shows inline after the rabbit.
-  const realmCount = useLensStore((s) => s.selectedRealms.length);
+  // Realm lens — selected realms render as closeable chips IN the bar
+  // (Butch 2026-07-18; replaces the bottom RealmChipsBar), and the count
+  // shows inline after the rabbit.
+  const selectedRealms = useLensStore((s) => s.selectedRealms);
+  const removeRealm = useLensStore((s) => s.removeRealm);
+  const clearRealms = useLensStore((s) => s.clearRealms);
+  const realmColors = useRealmColors((s) => s.colors) as Record<string, string>;
+  const realmCount = selectedRealms.length;
   const realmLabel = realmCount > 0 ? `Realm · ${realmCount}` : 'Realm';
+
+  // Location lens — completed (Butch 2026-07-18): the selection persists in
+  // the geo storage and shows inline on the button.
+  const [geo, setGeo] = useState<GeoLocation | null>(() => getSearchLocation());
+  const locLabel =
+    geo && geo !== 'Global'
+      ? geo.region
+        ? (usStateName(geo.region) ?? geo.region)
+        : (countryName(geo.country) ?? geo.country)
+      : 'Location';
+  const locActive = locLabel !== 'Location';
 
   return (
     // Spans only the center content column. SOLID Astra accent — matches the
@@ -150,6 +174,49 @@ export function LensRow({ accent }: { accent: string }) {
         <span className="hidden md:inline">BLiNG!</span>
       </button>
 
+      {/* Selected realm chips — closeable buttons VISIBLE in the top bar
+          (white-backed so they read on any Astra accent). */}
+      {selectedRealms.map((r) => {
+        const realmId = r.pathParts[0] ? (REALM_ID_BY_NAME[r.pathParts[0]] ?? '') : '';
+        const color = realmColors[realmId] ?? REALM_COLOR_FALLBACK;
+        return (
+          <span
+            key={r.key}
+            title={r.pathParts.join(' / ')}
+            className="inline-flex flex-shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[12px] text-zinc-800"
+            style={{ background: 'rgba(255,255,255,0.92)' }}
+          >
+            <span
+              className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
+              style={{ background: color }}
+              aria-hidden="true"
+            />
+            <span className="max-w-[140px] truncate">{r.name}</span>
+            <button
+              type="button"
+              onClick={() => removeRealm(r.key)}
+              aria-label={`Remove ${r.name}`}
+              title={`Remove ${r.name}`}
+              className="-mr-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-black/10 hover:text-zinc-700"
+            >
+              <X size={11} />
+            </button>
+          </span>
+        );
+      })}
+      {realmCount >= 2 && (
+        <button
+          type="button"
+          onClick={() => clearRealms()}
+          className={cn(
+            'flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors',
+            onDark ? 'text-white/80 hover:bg-white/10' : 'text-black/70 hover:bg-black/10',
+          )}
+        >
+          Clear all
+        </button>
+      )}
+
       {/* ml-auto on the first control floats the lens group (and the trailing
           Cart) to the RIGHT edge of the row. Degrades to 0 when the row
           overflows on narrow screens, so the touch-scroller still reaches
@@ -165,11 +232,12 @@ export function LensRow({ accent }: { accent: string }) {
       />
       <LensButton
         icon={MapPin}
-        label="Location"
+        label={locLabel}
         ink={ink}
         onDark={onDark}
-        active={openLens === 'location'}
+        active={openLens === 'location' || locActive}
         onClick={(b) => openAt('location', b)}
+        mobileText={locActive ? locLabel : undefined}
       />
       <LensButton
         icon={Clock}
@@ -178,6 +246,7 @@ export function LensRow({ accent }: { accent: string }) {
         onDark={onDark}
         active={openLens === 'time' || timePreset != null}
         onClick={(b) => openAt('time', b)}
+        mobileText={timePreset != null ? timeLabel : undefined}
       />
 
       {/* White Rabbit — the realm-tree DROPDOWN (2026-07-18), same anchored
@@ -189,6 +258,7 @@ export function LensRow({ accent }: { accent: string }) {
         onDark={onDark}
         active={openLens === 'realm' || realmCount > 0}
         onClick={(b) => openAt('realm', b)}
+        mobileText={realmCount > 0 ? String(realmCount) : undefined}
       />
 
       {/* Cart — sits at the right end of the floated group. */}
@@ -210,10 +280,9 @@ export function LensRow({ accent }: { accent: string }) {
             />
             {openLens === 'location' && (
               <Popup title="Location" style={popStyle} onClose={() => setOpenLens(null)}>
-                <StubPanel
-                  line="No location field wired yet."
-                  note="Geo scoping attaches here once content carries a location."
-                />
+                <div className="rounded-md bg-white">
+                  <LocationPanel onChanged={() => setGeo(getSearchLocation())} />
+                </div>
               </Popup>
             )}
             {openLens === 'time' && (
@@ -257,6 +326,7 @@ function LensButton({
   active,
   onClick,
   className,
+  mobileText,
 }: {
   icon: LucideIcon;
   label: string;
@@ -267,6 +337,8 @@ function LensButton({
   active?: boolean;
   onClick: (btn: HTMLButtonElement) => void;
   className?: string;
+  /** Shown NEXT TO the icon on mobile (informative selections: counts, picks). */
+  mobileText?: string;
 }) {
   return (
     <button
@@ -286,8 +358,10 @@ function LensButton({
       }
     >
       <Icon size={16} />
-      {/* Desktop: icon + label. Mobile (<md): icons only. */}
+      {/* Desktop: icon + label. Mobile (<md): icon only — unless there's an
+          informative selection (mobileText) worth the space (Butch 2026-07-18). */}
       <span className="hidden md:inline">{label}</span>
+      {mobileText != null && <span className="md:hidden">{mobileText}</span>}
     </button>
   );
 }

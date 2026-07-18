@@ -66,25 +66,32 @@ const SOURCES: Source[] = [
 ];
 
 /**
- * Title search across every community surface (RLS scopes visibility).
- * Returns up to `perSurface` hits per surface, in SOURCES order — the
- * panel re-sorts the standing surface to the top.
+ * Title search across community surfaces (RLS scopes visibility). Pass
+ * `surface` to narrow to one Astra (deeper per-surface limit); otherwise
+ * every surface contributes up to `perSurface` hits, in SOURCES order —
+ * the panel re-sorts the standing surface to the top.
  */
-export async function quickSearch(term: string, perSurface = 5): Promise<QuickHit[]> {
+export async function quickSearch(
+  term: string,
+  surface?: string,
+  perSurface = 5,
+): Promise<QuickHit[]> {
   const q = term.trim();
   if (!supabase || q.length < 2) return [];
   const sb = supabase;
+  const sources = surface ? SOURCES.filter((s) => s.surface === surface) : SOURCES;
+  const limit = surface ? 12 : perSurface;
   // Escape PostgREST ilike wildcards so a literal % / _ in the term matches itself.
   const like = `%${q.replace(/([%_])/g, '\\$1')}%`;
 
   const groups = await Promise.all(
-    SOURCES.map(async (src) => {
+    sources.map(async (src) => {
       try {
         const { data } = await sb
           .from(src.table)
           .select(src.select)
           .ilike(src.titleCol, like)
-          .limit(perSurface);
+          .limit(limit);
         return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
           surface: src.surface,
           title: String(r[src.titleCol] ?? ''),

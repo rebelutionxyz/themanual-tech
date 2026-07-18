@@ -30,6 +30,12 @@ const SHOW_REALM_STRIP = false;
  */
 const SHOW_REALM_SLIDEOVER = false;
 
+/**
+ * Bottom selected-realm chips bar — RETIRED 2026-07-18 (Butch). The chips
+ * live in the top LensRow as closeable buttons now. Flip to restore.
+ */
+const SHOW_REALM_CHIPS_BAR = false;
+
 interface CommunityShellProps {
   /** Active surface slug (intel / unite / rule / give) — drives nav + dropdown. */
   activeSurface: string;
@@ -114,9 +120,10 @@ export function CommunityShell({
                 top-toolbar dropdown now. */}
             {SHOW_REALM_SLIDEOVER && <RealmTreeSlider />}
           </div>
-          {/* Selected-realm chips — bottom of the content column (right of the
-              sidebar), above the bottom toolbar. */}
-          <RealmChipsBar />
+          {/* Selected-realm chips — RETIRED here 2026-07-18 (Butch): they now
+              render as closeable buttons IN the top LensRow, where they're
+              visible. Flip to restore the bottom bar. */}
+          {SHOW_REALM_CHIPS_BAR && <RealmChipsBar />}
         </div>
       </div>
       {/* REGION 2 — bottom toolbar. A full-width child of the OUTER CONTAINER, so
