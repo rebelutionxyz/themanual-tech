@@ -172,6 +172,22 @@ export async function listMySaves(beeId: string): Promise<SavedItem[]> {
   });
 }
 
+/**
+ * Count of the Bee's saves on ONE surface. The tail badge uses this so the
+ * number previews what the Saved popup opens to (it defaults to the surface
+ * the Bee is standing on) — a shelf-wide count next to a scoped view reads
+ * as a bug (Butch, 2026-07-18).
+ */
+export async function countMySavesForSurface(beeId: string, surface: string): Promise<number> {
+  if (!supabase || !beeId) return 0;
+  const { count } = await supabase
+    .from('entity_saves')
+    .select('*', { count: 'exact', head: true })
+    .eq('bee_id', beeId)
+    .eq('source_surface', surface);
+  return count ?? 0;
+}
+
 /** Remove one save by its entity_saves id (RLS: owner only). */
 export async function unsaveById(saveId: string): Promise<void> {
   if (!supabase) throw new Error('Supabase not configured');

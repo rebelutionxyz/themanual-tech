@@ -61,7 +61,15 @@ export const NEUTRAL_INK = '#536471';
  * destination are `soon`.
  */
 export const COMMON_TAIL: SidebarItem[] = [
-  { id: 'notifications', label: 'Notifications', icon: Bell, to: '/notifications', modal: true },
+  // Divider: each surface's own items above, the shared tail below.
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    icon: Bell,
+    to: '/notifications',
+    modal: true,
+    dividerAbove: true,
+  },
   { id: 'report', label: 'Reported', icon: Flag, to: '/intel/reported', modal: true },
   // Saved = the cross-surface shelf popup (/bookmarks). INTEL's own
   // /intel/saved thread view still exists. Badge injected by CommunityLayout.
@@ -78,7 +86,15 @@ export const COMMON_TAIL: SidebarItem[] = [
   { id: 'premium', label: 'Premium', icon: Crown, to: '/premium', modal: true },
   { id: 'business', label: 'Business', icon: Briefcase, to: '/business', modal: true },
   { id: 'advertising', label: 'Advertise', icon: Megaphone, to: '/promotion', modal: true },
-  { id: 'settings', label: 'Settings', icon: Settings, to: '/settings/handle', modal: true },
+  // Divider: services above, account-level Settings below (Butch 2026-07-18).
+  {
+    id: 'settings',
+    label: 'Settings',
+    icon: Settings,
+    to: '/settings/handle',
+    modal: true,
+    dividerAbove: true,
+  },
 ];
 
 /** Friendly per-surface label shown as the Astra dropdown's current value. */

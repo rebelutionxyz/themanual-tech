@@ -1,15 +1,14 @@
 import { BlingPopupContent } from '@/components/freedomblings/BlingPopupContent';
-import { ModalLink } from '@/components/shell/ModalLink';
 import type { ShellIcon } from '@/components/shell/sidebarNav';
-import { HoneyDrop } from '@/components/ui/HoneyDrop';
-import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { Hammer, ShieldAlert, Sparkles, Waves, X } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link } from 'react-router-dom';
 
-type LauncherId = 'bling' | 'oracle' | 'workshop' | 'security' | 'tasks';
+// 'bling' retired from the launcher row 2026-07-18 — the BLiNG! trigger (and
+// the identity chip) moved UP to the top toolbar (LensRow); BlingPopup below
+// is exported for it.
+type LauncherId = 'oracle' | 'workshop' | 'security' | 'tasks';
 
 interface Launcher {
   id: LauncherId;
@@ -24,13 +23,6 @@ interface Launcher {
 // Bottom utility launchers. Each opens an OVERLAY popup (no navigation) —
 // mirrors the top lens toolbar in height + right-of-sidebar span.
 const LAUNCHERS: Launcher[] = [
-  {
-    id: 'bling',
-    label: 'BLiNG!',
-    icon: HoneyDrop,
-    title: 'BLiNG!',
-    lines: ['Your BLiNG! wallet, the bonding curve, and the order book.'],
-  },
   {
     id: 'oracle',
     label: 'AtlasOracle',
@@ -81,11 +73,9 @@ export function readableInk(hex: string): string {
  * rather than navigating.
  */
 export function BottomToolbar({ accent }: { accent: string }) {
-  const { bee } = useAuth();
   // Hold contrast on the colored bar: light ink on dark accents, dark on light.
   const ink = readableInk(accent);
   const onDark = ink === '#ffffff';
-  const hoverBg = onDark ? 'hover:bg-white/10' : 'hover:bg-black/10';
   const [open, setOpen] = useState<LauncherId | null>(null);
   const [anchor, setAnchor] = useState<{ left: number; bottom: number } | null>(null);
 
@@ -129,45 +119,7 @@ export function BottomToolbar({ accent }: { accent: string }) {
         className="flex h-11 items-center gap-1 overflow-x-auto px-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        {/* Profile — FIRST item, sticky so it stays visible while the rest
-            scrolls under it. */}
-        {bee ? (
-          <ModalLink
-            to="/profile"
-            title={`@${bee.handle}`}
-            aria-label={`Profile — @${bee.handle}`}
-            className={cn(
-              'sticky left-0 z-10 mr-1 flex max-w-[160px] flex-shrink-0 items-center gap-2 rounded-md px-1.5 py-1 transition-colors',
-              hoverBg,
-            )}
-            style={{ background: accent }}
-          >
-            <span
-              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md font-display text-[13px] font-semibold"
-              style={{
-                background: onDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.14)',
-                color: ink,
-              }}
-            >
-              {bee.handle.slice(0, 1).toUpperCase()}
-            </span>
-            <span className="min-w-0 truncate text-[13px] font-medium" style={{ color: ink }}>
-              @{bee.handle}
-            </span>
-          </ModalLink>
-        ) : (
-          <Link
-            to="/login"
-            className={cn(
-              'sticky left-0 z-10 mr-1 flex-shrink-0 rounded-md px-2.5 py-1.5 text-[13px] font-semibold transition-colors',
-              hoverBg,
-            )}
-            style={{ background: accent, color: ink }}
-          >
-            Sign in
-          </Link>
-        )}
-
+        {/* Identity chip moved UP to the top toolbar (LensRow) 2026-07-18. */}
         {LAUNCHERS.map((l) => (
           <LauncherButton
             key={l.id}
@@ -182,15 +134,12 @@ export function BottomToolbar({ accent }: { accent: string }) {
         {/* Settings removed (pass 17) — it lives permanently in the left sidebar tail. */}
       </div>
 
-      {/* BLiNG! → the FreedomBLiNGS popup (the balance page + SEND module). */}
-      {open === 'bling' && <BlingPopup onClose={() => setOpen(null)} />}
-
       {/* Tasks → MiniWaves (V76) popup — same overlay pattern as BLiNG!,
           sized near-fullscreen because V76 is a full task manager. */}
       {open === 'tasks' && <TasksPopup onClose={() => setOpen(null)} />}
 
       {/* Other launchers → the placeholder anchored popover (unchanged). */}
-      {active && open !== 'bling' && open !== 'tasks' && (
+      {active && open !== 'tasks' && (
         <>
           <div
             className="fixed inset-0 z-50"
@@ -229,8 +178,9 @@ export function BottomToolbar({ accent }: { accent: string }) {
 
 /** FreedomBLiNGS popup (pass 17/18) — dark-brown redesign: hero balance · FREEd/
  *  GOT/GAVE tiles · SEND · circulating supply · infinite-scroll transactions.
- *  Portaled to body; data-surface scopes the SEND module's freedomblings tokens. */
-function BlingPopup({ onClose }: { onClose: () => void }) {
+ *  Portaled to body; data-surface scopes the SEND module's freedomblings tokens.
+ *  Exported: the trigger lives in the TOP toolbar (LensRow) since 2026-07-18. */
+export function BlingPopup({ onClose }: { onClose: () => void }) {
   return createPortal(
     <div
       className="fixed inset-0 z-[100] flex overflow-y-auto bg-black/60 p-3 backdrop-blur-sm sm:p-6"

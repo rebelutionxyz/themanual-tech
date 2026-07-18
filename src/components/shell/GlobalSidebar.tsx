@@ -4,6 +4,7 @@ import {
   type SidebarItem,
   astraColor,
 } from '@/components/shell/sidebarNav';
+import { readableInk } from '@/components/shell/BottomToolbar';
 import { ModalLink } from '@/components/shell/ModalLink';
 import { ManualLogo } from '@/components/ui/ManualLogo';
 import { cn } from '@/lib/utils';
@@ -248,6 +249,9 @@ function AstraDropdown({
 
   const current = (SURFACE_FRIENDLY[activeSurface] ?? activeSurface).toUpperCase();
   const CurrentIcon = ASTRA_SWITCHER.find((a) => a.slug === activeSurface)?.icon;
+  // Solid Astra-colored control (Butch 2026-07-18) — the open MENU below
+  // stays white; contrast ink flips exactly like the top/bottom toolbars.
+  const ink = readableInk(accent);
 
   return (
     <div ref={ref} className="relative mb-1">
@@ -255,22 +259,22 @@ function AstraDropdown({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 border border-zinc-200 px-3 py-2 text-left transition-colors hover:bg-zinc-50"
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-opacity hover:opacity-90"
+        style={{ background: accent }}
       >
         <span className="flex min-w-0 items-center gap-2">
-          {CurrentIcon && (
-            <CurrentIcon size={17} className="flex-shrink-0" style={{ color: accent }} />
-          )}
+          {CurrentIcon && <CurrentIcon size={17} className="flex-shrink-0" style={{ color: ink }} />}
           <span
             className="truncate font-display text-[15px] font-bold tracking-wide"
-            style={{ color: accent }}
+            style={{ color: ink }}
           >
             {current}
           </span>
         </span>
         <ChevronDown
           size={16}
-          className={cn('flex-shrink-0 text-zinc-500 transition-transform', open && 'rotate-180')}
+          className={cn('flex-shrink-0 transition-transform', open && 'rotate-180')}
+          style={{ color: ink }}
         />
       </button>
 

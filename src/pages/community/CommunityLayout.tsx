@@ -8,9 +8,9 @@ import { useAuth } from '@/lib/auth';
 import { countMyGoingUpcoming } from '@/lib/events';
 import { isForumModerator } from '@/lib/forumMod';
 import { countMyGroups } from '@/lib/groups';
+import { countMySavesForSurface } from '@/lib/bookmarks';
 import { countThreadsByAuthor } from '@/lib/intel';
 import { unreadNotificationsCount } from '@/lib/notifications';
-import { countSavedThreads } from '@/lib/reactions';
 import { SURFACE_BY_SLUG } from '@/lib/surfaces';
 import type { EventsOutletCtx, EventsView } from '@/pages/events/EventsLayout';
 import type { GiveOutletCtx, GiveView } from '@/pages/give/GiveLayout';
@@ -136,13 +136,16 @@ export function CommunityLayout() {
     countThreadsByAuthor(bee.id)
       .then(setMyThreads)
       .catch(() => setMyThreads(0));
-    countSavedThreads(bee.id)
+    // Saved badge previews the popup's default scope: THIS surface's saves
+    // only — the popup opens scoped to where the Bee is standing, so the
+    // number and the opened view always agree.
+    countMySavesForSurface(bee.id, surface)
       .then(setSaved)
       .catch(() => setSaved(0));
     unreadNotificationsCount()
       .then(setNotif)
       .catch(() => setNotif(0));
-  }, [bee?.id]);
+  }, [bee?.id, surface]);
 
   useEffect(() => {
     const onRefresh = () => refreshPersonal();

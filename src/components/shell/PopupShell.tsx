@@ -93,8 +93,11 @@ export function PopupShell({ popupKey, children }: { popupKey: string; children:
             </button>
           </span>
         </div>
-        {/* Scrolling body with breathing room on both sides. */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-8">
+        {/* Scrolling body with breathing room on both sides. The chrome above
+            IS the title, so any page-level <h1> is hidden UNIVERSALLY here —
+            content starts right under the tab, no doubled headings, every
+            popup (Butch 2026-07-18). */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-8 [&_h1]:hidden">
           {children}
         </div>
       </div>

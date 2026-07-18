@@ -1,5 +1,8 @@
 import { Popup, StubPanel, TimePresetPanel } from '@/components/layout/lensPanels';
-import { readableInk } from '@/components/shell/BottomToolbar';
+import { BlingPopup, readableInk } from '@/components/shell/BottomToolbar';
+import { ModalLink } from '@/components/shell/ModalLink';
+import { HoneyDrop } from '@/components/ui/HoneyDrop';
+import { useAuth } from '@/lib/auth';
 import { timePresetLabel } from '@/lib/timePresets';
 import { cn } from '@/lib/utils';
 import { useCartStore } from '@/stores/useCartStore';
@@ -18,7 +21,9 @@ type LensId = 'location' | 'time';
  * Location · Time. (Realm is now the persistent strip below this row.)
  */
 export function LensRow({ accent }: { accent: string }) {
+  const { bee } = useAuth();
   const [openLens, setOpenLens] = useState<LensId | null>(null);
+  const [blingOpen, setBlingOpen] = useState(false);
   const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null);
   // The trigger button for the open lens — re-measured on scroll/resize so the
   // popup tracks it instead of drifting.
@@ -83,6 +88,59 @@ export function LensRow({ accent }: { accent: string }) {
       className="flex h-11 flex-shrink-0 items-center gap-1 overflow-x-auto px-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       style={{ background: accent }}
     >
+      {/* LEFT group — identity + BLiNG!, moved up from the bottom toolbar
+          (Butch 2026-07-18). Floats left; the lens group floats right via
+          SearchLens's ml-auto. */}
+      {bee ? (
+        <ModalLink
+          to="/profile"
+          title={`@${bee.handle}`}
+          aria-label={`Profile — @${bee.handle}`}
+          className={cn(
+            'flex max-w-[160px] flex-shrink-0 items-center gap-2 rounded-md px-1.5 py-1 transition-colors',
+            onDark ? 'hover:bg-white/10' : 'hover:bg-black/10',
+          )}
+        >
+          <span
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md font-display text-[13px] font-semibold"
+            style={{
+              background: onDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.14)',
+              color: ink,
+            }}
+          >
+            {bee.handle.slice(0, 1).toUpperCase()}
+          </span>
+          <span className="min-w-0 truncate text-[13px] font-medium" style={{ color: ink }}>
+            @{bee.handle}
+          </span>
+        </ModalLink>
+      ) : (
+        <Link
+          to="/login"
+          className={cn(
+            'flex-shrink-0 rounded-md px-2.5 py-1.5 text-[13px] font-semibold transition-colors',
+            onDark ? 'hover:bg-white/10' : 'hover:bg-black/10',
+          )}
+          style={{ color: ink }}
+        >
+          Sign in
+        </Link>
+      )}
+      <button
+        type="button"
+        onClick={() => setBlingOpen(true)}
+        title="BLiNG!"
+        aria-label="BLiNG!"
+        className={cn(
+          'flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
+          onDark ? 'hover:bg-white/10' : 'hover:bg-black/10',
+        )}
+        style={{ color: ink, opacity: 0.9 }}
+      >
+        <HoneyDrop size={16} style={{ color: ink }} />
+        <span className="hidden md:inline">BLiNG!</span>
+      </button>
+
       {/* ml-auto on the first control floats the whole Search/Location/Time
           group (and the trailing Cart) to the RIGHT edge of the row. Degrades
           to 0 when the row overflows on narrow screens, so the touch-scroller
@@ -115,6 +173,9 @@ export function LensRow({ accent }: { accent: string }) {
 
       {/* Cart — sits at the right end of the floated group. */}
       <CartIcon ink={ink} onDark={onDark} accent={accent} />
+
+      {/* BLiNG! popup — portals itself to <body>. */}
+      {blingOpen && <BlingPopup onClose={() => setBlingOpen(false)} />}
 
       {/* Popups are PORTALED to <body> — the lens row's backdrop-filter +
           overflow-x would otherwise become the containing block for our
@@ -204,6 +265,8 @@ function SearchLens({
         }
       >
         <Search size={16} />
+        {/* Desktop + tablet: icon + label (Butch 2026-07-18). Mobile: icon only. */}
+        <span className="hidden md:inline">Search</span>
       </button>
     );
   }
