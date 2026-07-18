@@ -31,21 +31,24 @@ const childrenCache = new Map<string, RealmTreeRow[]>();
 
 /**
  * The tree itself — store-driven, lazy, host-agnostic. Rendered by the
- * LensRow Realm dropdown (topic realms, Geography excluded), the LensRow
- * Location dropdown (rooted AT Geography — locations live in the realm
- * taxonomy, Butch 2026-07-18), and the retired slide-over (gated off).
- * Selection always drives the ONE shared lens (chips + feed prefix); the
- * clear affordance only clears selections within THIS tree's scope.
+ * LensRow Realm dropdown (full taxonomy MINUS the Geography → Countries
+ * places subtree — places belong to the Location lens' cascading selects,
+ * while academic Geography stays a pickable topic) and the retired
+ * slide-over (gated off). Selection always drives the ONE shared lens
+ * (chips + feed prefix); the clear affordance only clears selections
+ * within THIS tree's scope.
  */
 export function RealmTreeContent({
   rootPath = [],
-  excludeRoots = [],
+  excludePaths = [],
   clearLabel = 'All realms',
 }: {
   /** Browse the subtree under this path (empty = the realm roots). */
   rootPath?: string[];
-  /** Root realm NAMES to hide when browsing from the top. */
-  excludeRoots?: string[];
+  /** Node paths to hide AT ANY DEPTH (hiding a node hides its subtree) —
+   *  e.g. [['Geography','Countries']] keeps academic Geography browsable
+   *  while places stay exclusive to the Location lens. */
+  excludePaths?: string[][];
   /** Label for the scoped clear affordance. */
   clearLabel?: string;
 }) {
@@ -85,14 +88,18 @@ export function RealmTreeContent({
   );
   const colorFor = (realmId: string) => colors[realmId] ?? REALM_COLOR_FALLBACK;
 
-  const visibleRoots = (roots ?? []).filter((r) => !excludeRoots.includes(r.name));
+  // A node is hidden when its path sits at-or-under any excluded path.
+  const isHidden = (parts: string[]) =>
+    excludePaths.some(
+      (ex) => parts.length >= ex.length && ex.every((seg, i) => parts[i] === seg),
+    );
+
+  const visibleRoots = (roots ?? []).filter((r) => !isHidden(r.pathParts));
 
   // Selections within THIS tree's scope (rooted → under the root; top-level
-  // → any root except the excluded ones).
+  // → anything not hidden).
   const inScope = (parts: string[]) =>
-    rootPath.length > 0
-      ? rootPath.every((seg, i) => parts[i] === seg)
-      : !excludeRoots.includes(parts[0]);
+    rootPath.length > 0 ? rootPath.every((seg, i) => parts[i] === seg) : !isHidden(parts);
   const scopedSelections = selectedRealms.filter((r) => inScope(r.pathParts));
   const noneSelected = scopedSelections.length === 0;
 
@@ -131,6 +138,7 @@ export function RealmTreeContent({
             colorFor={colorFor}
             selectedKeys={selectedKeys}
             onToggle={toggleRealm}
+            isHidden={isHidden}
           />
         ))}
     </div>
@@ -235,12 +243,15 @@ function TreeRow({
   colorFor,
   selectedKeys,
   onToggle,
+  isHidden,
 }: {
   row: RealmTreeRow;
   depth: number;
   colorFor: (realmId: string) => string;
   selectedKeys: Set<string>;
   onToggle: (pathParts: string[]) => void;
+  /** Host tree's exclusion test — hidden children (and their subtrees) never render. */
+  isHidden: (parts: string[]) => boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [children, setChildren] = useState<RealmTreeRow[] | null>(null);
@@ -254,6 +265,10 @@ function TreeRow({
   const expandable = !row.isLeaf; // full taxonomy → is_leaf is authoritative
   const color = colorFor(row.realmId);
   const selected = selectedKeys.has(keyOf(row.pathParts));
+
+  // Excluded subtrees (e.g. Geography → Countries) drop out before the cap,
+  // so the cap + "Show all" count only visible children.
+  const visibleChildren = children === null ? null : children.filter((c) => !isHidden(c.pathParts));
 
   // Lazy-load this node's direct children once (idempotent).
   function loadChildren() {
@@ -349,7 +364,7 @@ function TreeRow({
           )}
           {!loading &&
             !error &&
-            (showAll ? children : children?.slice(0, CHILD_CAP))?.map((child) => (
+            (showAll ? visibleChildren : visibleChildren?.slice(0, CHILD_CAP))?.map((child) => (
               <TreeRow
                 key={child.id}
                 row={child}
@@ -357,16 +372,17 @@ function TreeRow({
                 colorFor={colorFor}
                 selectedKeys={selectedKeys}
                 onToggle={onToggle}
+                isHidden={isHidden}
               />
             ))}
-          {!loading && !error && !showAll && (children?.length ?? 0) > CHILD_CAP && (
+          {!loading && !error && !showAll && (visibleChildren?.length ?? 0) > CHILD_CAP && (
             <button
               type="button"
               onClick={() => setShowAll(true)}
               className="w-full py-1.5 pr-2 text-left font-medium text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-700"
               style={{ fontSize: '12px', paddingLeft: 12 + (depth + 1) * 14 }}
             >
-              Show all {children?.length}
+              Show all {visibleChildren?.length}
             </button>
           )}
         </>

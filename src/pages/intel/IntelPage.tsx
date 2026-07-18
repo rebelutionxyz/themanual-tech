@@ -3,6 +3,7 @@ import { L3Refinement } from '@/components/intel/L3Refinement';
 import { PostConsole } from '@/components/intel/PostConsole';
 import { ReportsQueue } from '@/components/intel/ReportsQueue';
 import { ThreadList } from '@/components/intel/ThreadList';
+import { PLACES_ROOT } from '@/components/shell/LocationPanel';
 import { RealmChips } from '@/components/shell/RealmChipsBar';
 import { REALM_ID_BY_NAME } from '@/lib/constants';
 import { SURFACE_BY_SLUG } from '@/lib/surfaces';
@@ -62,8 +63,9 @@ export function IntelPage() {
             {INTEL_NAME}
           </button>
           {/* Selected realms as closeable buttons, right behind the Astra
-              name — replaces the breadcrumb trail (Butch 2026-07-18). */}
-          <RealmChips />
+              name — replaces the breadcrumb trail (Butch 2026-07-18).
+              A place pick shows in the LocationBadge, not here. */}
+          <RealmChips excludePrefixes={[PLACES_ROOT]} />
         </div>
       )}
 

@@ -10,17 +10,28 @@ import { X } from 'lucide-react';
  * name (Butch 2026-07-18 — replaces the breadcrumb trail). Hidden when
  * nothing is selected; full path on hover since leaf names repeat.
  */
-export function RealmChips({ className }: { className?: string }) {
+export function RealmChips({
+  className,
+  excludePrefixes = [],
+}: {
+  className?: string;
+  /** Path PREFIXES to hide (e.g. PLACES_ROOT = Geography → Countries — those
+   *  picks show in the LocationBadge instead). Academic Geography selections
+   *  fall outside the prefix and render like any other topic chip. */
+  excludePrefixes?: string[][];
+}) {
   const selected = useLensStore((s) => s.selectedRealms);
   const removeRealm = useLensStore((s) => s.removeRealm);
-  const clearRealms = useLensStore((s) => s.clearRealms);
   const colors = useRealmColors((s) => s.colors) as Record<string, string>;
 
-  if (selected.length === 0) return null;
+  const visible = selected.filter(
+    (r) => !excludePrefixes.some((p) => p.every((seg, i) => r.pathParts[i] === seg)),
+  );
+  if (visible.length === 0) return null;
 
   return (
     <div className={cn('flex min-w-0 flex-wrap items-center gap-1.5', className)}>
-      {selected.map((r) => {
+      {visible.map((r) => {
         const realmId = r.pathParts[0] ? (REALM_ID_BY_NAME[r.pathParts[0]] ?? '') : '';
         const color = colors[realmId] ?? REALM_COLOR_FALLBACK;
         return (
@@ -48,10 +59,12 @@ export function RealmChips({ className }: { className?: string }) {
           </span>
         );
       })}
-      {selected.length >= 2 && (
+      {visible.length >= 2 && (
         <button
           type="button"
-          onClick={() => clearRealms()}
+          onClick={() => {
+            for (const r of visible) removeRealm(r.key);
+          }}
           className="ml-1 flex-shrink-0 rounded-full px-2 py-0.5 font-medium text-[11px] text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
         >
           Clear all

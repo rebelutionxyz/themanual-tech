@@ -2,6 +2,7 @@ import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
 import { BottomToolbar } from '@/components/shell/BottomToolbar';
 import { GlobalSidebar } from '@/components/shell/GlobalSidebar';
 import { LensRow } from '@/components/shell/LensRow';
+import { LocationBadge } from '@/components/shell/LocationPanel';
 import { RealmStrip } from '@/components/shell/RealmStrip';
 import { RealmTreeSlider } from '@/components/shell/RealmTreeSlider';
 import { RightRail } from '@/components/shell/RightRail';
@@ -99,6 +100,8 @@ export function CommunityShell({
           {/* TOP toolbar. (Selected-realm chips render inline in the surface
               headers, right behind the Astra name — not as a shell bar.) */}
           <LensRow accent={accent} />
+          {/* Selected location — upper right, under the toolbar. Self-hides. */}
+          <LocationBadge />
           {/* Content region (flex-1) + the realm slide-over, which overlays ONLY
               this region — never the top/bottom toolbars or the chips. */}
           <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">

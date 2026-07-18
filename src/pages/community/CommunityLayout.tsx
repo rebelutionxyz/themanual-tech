@@ -30,6 +30,7 @@ import {
   Plus,
   Shield,
   ShoppingBag,
+  Ticket,
   Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -359,13 +360,17 @@ function buildItems(surface: Surface, c: Counts): SidebarItem[] {
     ];
   }
   if (surface === 'rule') {
-    // Explore · Following · Hosting · Attending (pass-12). Create stays on the
-    // center page's Create button; Upcoming/Past are the Explore view's sorts.
+    // RULE order (Butch 2026-07-18): Explore · Following · Attending ·
+    // Tickets | Create Event · Hosting · Attendees | tail. Create moved
+    // from the center page into the sidebar (action → CreateEventModal).
     return [
       { id: 'upcoming', label: 'Explore', icon: Compass },
       { id: 'following', label: 'Following', icon: Users, soon: true },
-      { id: 'hosting', label: 'Hosting', icon: Megaphone },
       { id: 'going', label: 'Attending', icon: Check, badge: c.going },
+      { id: 'tickets', label: 'Tickets', icon: Ticket, soon: true },
+      { id: 'create', label: 'Create Event', icon: Plus, dividerAbove: true },
+      { id: 'hosting', label: 'Hosting', icon: Megaphone },
+      { id: 'attendees', label: 'Attendees', icon: Users, soon: true },
       ...tailItems(c),
     ];
   }

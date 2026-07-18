@@ -87,7 +87,10 @@ export function SearchPanel({
         <AstraFilter value={surf} onChange={setSurf} />
       </div>
 
-      <div className="max-h-[50vh] overflow-y-auto py-1">
+      {/* min-height keeps the panel DEEP enough that the Astra filter's menu
+          (8 rows, anchored to the input row) never clips against the popup's
+          overflow-hidden shell (Butch 2026-07-18). */}
+      <div className="max-h-[50vh] min-h-[280px] overflow-y-auto py-1">
         {term.trim().length < 2 ? (
           <Hint>Type at least 2 characters…</Hint>
         ) : loading && hits === null ? (

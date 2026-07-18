@@ -49,23 +49,9 @@ export function EventsPage() {
   return (
     <div className="min-h-full bg-white">
       <div className="safe-pad-x mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">
-        <SurfaceHeader
-          friendly={SURFACE_FRIENDLY.rule}
-          icon={Calendar}
-          accent={RULE_COLOR}
-          action={
-            bee && (
-              <button
-                type="button"
-                onClick={openCreate}
-                className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-md px-3 py-2 font-medium text-bg transition-colors hover:brightness-110"
-                style={{ background: RULE_COLOR, fontSize: '13px' }}
-              >
-                <Plus size={15} /> Create
-              </button>
-            )
-          }
-        />
+        {/* Create moved to the sidebar (Butch 2026-07-18) — the empty-state
+            CTA below keeps a create path when the list is bare. */}
+        <SurfaceHeader friendly={SURFACE_FRIENDLY.rule} icon={Calendar} accent={RULE_COLOR} />
 
         {error && (
           <div

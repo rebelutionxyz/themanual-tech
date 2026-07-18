@@ -1,6 +1,6 @@
 import { Popup, TimePresetPanel } from '@/components/layout/lensPanels';
 import { BlingPopup, readableInk } from '@/components/shell/BottomToolbar';
-import { LocationPanel } from '@/components/shell/LocationPanel';
+import { LocationPanel, PLACES_ROOT } from '@/components/shell/LocationPanel';
 import { ModalLink } from '@/components/shell/ModalLink';
 import { RealmTreeContent } from '@/components/shell/RealmTreeSlider';
 import { SearchPanel } from '@/components/shell/SearchDropdown';
@@ -88,18 +88,19 @@ export function LensRow({ accent }: { accent: string }) {
   const timeLabel = timePresetLabel(timePreset) ?? 'Time';
 
   // ONE shared lens, two doors (Butch 2026-07-18): topic realms open via
-  // the rabbit, Geography (locations live in the realm taxonomy) via the
-  // pin. Chips render behind the Astra name; feeds filter via the shared
-  // prefix. Counts/labels split by whether the selection is under Geography.
+  // the rabbit, PLACES (Geography → Countries — the geonames subtree) via
+  // the pin. Chips render behind the Astra name; feeds filter via the shared
+  // prefix. Academic Geography (Branches, Concepts, …) counts as a TOPIC —
+  // only picks under the Countries subtree are locations.
   const selectedRealms = useLensStore((s) => s.selectedRealms);
-  const geoSelections = selectedRealms.filter((r) => r.pathParts[0] === 'Geography');
-  const topicSelections = selectedRealms.filter((r) => r.pathParts[0] !== 'Geography');
+  const isPlace = (parts: string[]) => PLACES_ROOT.every((seg, i) => parts[i] === seg);
+  const geoSelections = selectedRealms.filter((r) => isPlace(r.pathParts));
+  const topicSelections = selectedRealms.filter((r) => !isPlace(r.pathParts));
   const realmCount = topicSelections.length;
   const realmLabel = realmCount > 0 ? `Realm · ${realmCount}` : 'Realm';
-  const locCount = geoSelections.length;
-  const locLabel =
-    locCount === 1 ? geoSelections[0].name : locCount > 1 ? `Location · ${locCount}` : 'Location';
-  const locActive = locCount > 0;
+  // The picked location displays in the LocationBadge UNDER the toolbar,
+  // upper right (Butch 2026-07-18) — the button stays a plain "Location".
+  const locActive = geoSelections.length > 0;
 
   return (
     // Spans only the center content column. SOLID Astra accent — matches the
@@ -177,12 +178,11 @@ export function LensRow({ accent }: { accent: string }) {
       />
       <LensButton
         icon={MapPin}
-        label={locLabel}
+        label="Location"
         ink={ink}
         onDark={onDark}
         active={openLens === 'location' || locActive}
         onClick={(b) => openAt('location', b)}
-        mobileText={locActive ? locLabel : undefined}
       />
       <LensButton
         icon={Clock}
@@ -242,8 +242,10 @@ export function LensRow({ accent }: { accent: string }) {
                 {/* White card inside the silver panel so the tree keeps its
                     own light styling; capped height, own scroll. */}
                 <div className="max-h-[55vh] overflow-y-auto rounded-md bg-white">
-                  {/* Topic realms only — Geography has its own door (Location). */}
-                  <RealmTreeContent excludeRoots={['Geography']} />
+                  {/* Full taxonomy MINUS the places subtree (Geography →
+                      Countries) — places have their own door (Location).
+                      Academic Geography stays browsable here. */}
+                  <RealmTreeContent excludePaths={[PLACES_ROOT]} />
                 </div>
               </Popup>
             )}
