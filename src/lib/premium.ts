@@ -1,12 +1,14 @@
 import { supabase } from './supabase';
 
 // ═════════════════════════════════════════════════════════════════════
-// PREMIUM — ad-relief membership ladder (fiat rail F6).
+// PREMIUM — membership ladder (fiat rail F6).
 //
-// Canon: shared/canon/atlasads-advertising-2026-06-07.md §6 [LOCKED]
-//   $0 full slot set · $3 reduced · $8 minimal (ticker only) ·
-//   $13 Royal Jelly = commercial-ad-free. Member promotions remain at
-//   ALL tiers — relief targets commercial ads only.
+// Canon §6 UNLOCKED (Butch 2026-07-18): the ad-relief framing in
+// shared/canon/atlasads-advertising-2026-06-07.md predates the
+// FreedomBlings v9 renovation and no longer applies as written. Premium
+// is being re-based on storage + services (addon allowances at tiers);
+// Premium + the small GIVE fee are the intended primary Bee-side charges.
+// The ladder below stands as PLACEHOLDER pricing until the rework lands.
 // Status reads from `subscriptions` (RLS: owner). Checkout goes live with
 // Stripe activation (venue rail shipped first; membership products next).
 // ═════════════════════════════════════════════════════════════════════

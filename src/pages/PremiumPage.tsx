@@ -8,11 +8,12 @@ const GOLD = '#FAD15E'; // fills (dark ink on top)
 const GOLD_TEXT = '#B45309'; // text/borders on white
 
 /**
- * PREMIUM — the ad-relief membership ladder (/premium).
- * Canon §6 [LOCKED]: $0 full slots · $3 reduced · $8 ticker-only ·
- * $13 Royal Jelly = commercial-ad-free. Member promotions remain at all
- * tiers — relief targets commercial ads only. Monthly DONATION goes live
- * with Stripe activation; until then the ladder reads, the CTA waits.
+ * PREMIUM — the membership ladder (/premium).
+ * Canon §6 UNLOCKED (Butch 2026-07-18): the ad-relief framing predates the
+ * FreedomBlings v9 renovation and no longer applies as written. Premium is
+ * being re-based on storage + services (addon allowances at tiers); the
+ * explainer copy is gone — the levels explain themselves. Ladder pricing
+ * stands as placeholder until the rework lands.
  */
 export function PremiumPage() {
   const { bee } = useAuth();
@@ -46,11 +47,6 @@ export function PremiumPage() {
         <h1 className="mb-2 font-display text-3xl font-semibold text-zinc-900">
           Less noise. Same honey.
         </h1>
-        <p className="mx-auto max-w-xl text-[14px] leading-relaxed text-zinc-500">
-          A monthly DONATION dials commercial advertising down — all the way to zero. Every user
-          funds the house one way: by seeing ads, or by direct support. Member promotions stay at
-          every tier; relief targets <em>commercial</em> ads only.
-        </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -122,13 +118,14 @@ export function PremiumPage() {
         })}
       </div>
 
-      <div className="mx-auto mt-8 max-w-2xl rounded-lg border border-zinc-200 bg-zinc-50/60 p-4 text-center">
-        <p className="font-mono text-[11.5px] leading-relaxed text-zinc-500" data-size="meta">
-          89% of platform revenue flows back to Bees; 11% to R&D. Ad-relief simply moves you
-          between funding buckets — no freeloader gap, no pressure to over-saturate.
-          {!bee && ' Sign in to see your tier.'}
+      {!bee && (
+        <p
+          className="mt-8 text-center font-mono text-[11.5px] text-zinc-500"
+          data-size="meta"
+        >
+          Sign in to see your tier.
         </p>
-      </div>
+      )}
     </div>
   );
 }
