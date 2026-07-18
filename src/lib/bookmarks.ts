@@ -19,6 +19,9 @@ export interface SavedItem {
   title: string;
   /** Deep link — null when the surface has no resolver or the row is gone. */
   url: string | null;
+  /** Realm id + display name when the entity carries one (bazaar doesn't). */
+  realmId: string | null;
+  realmName: string | null;
   resolved: boolean;
 }
 
@@ -27,39 +30,54 @@ interface Resolver {
   select: string;
   title: (r: Record<string, unknown>) => string;
   url: (r: Record<string, unknown>) => string;
+  realm?: (r: Record<string, unknown>) => string | null;
 }
 
-/** Per-surface entity resolvers (source_id → title + deep link). */
+/** primary_realm when set, else the realm_path root. */
+function realmFromRow(r: Record<string, unknown>): string | null {
+  const primary = r.primary_realm;
+  if (typeof primary === 'string' && primary) return primary;
+  const path = r.realm_path;
+  if (Array.isArray(path) && path.length > 0 && typeof path[0] === 'string') return path[0];
+  return null;
+}
+
+/** Per-surface entity resolvers (source_id → title + deep link + realm). */
 const RESOLVERS: Record<string, Resolver> = {
   intel: {
     table: 'forum_threads',
-    select: 'id, title',
+    select: 'id, title, primary_realm, realm_path',
     title: (r) => String(r.title ?? ''),
     url: (r) => `/intel/t/${r.id}`,
+    realm: realmFromRow,
   },
   unite: {
     table: 'groups',
-    select: 'id, name, slug',
+    select: 'id, name, slug, realm_path',
     title: (r) => String(r.name ?? ''),
     url: (r) => `/unite/${r.slug}`,
+    realm: realmFromRow,
   },
   rule: {
     table: 'events',
-    select: 'id, title',
+    select: 'id, title, realm_path',
     title: (r) => String(r.title ?? ''),
     url: (r) => `/rule/${r.id}`,
+    realm: realmFromRow,
   },
   give: {
     table: 'give_campaigns',
-    select: 'id, title, slug',
+    select: 'id, title, slug, realm_path',
     title: (r) => String(r.title ?? ''),
     url: (r) => `/give/${r.slug}`,
+    realm: realmFromRow,
   },
   pulse: {
     table: 'pulse_broadcasts',
-    select: 'id, title',
+    select: 'id, title, primary_realm, realm_path',
     title: (r) => String(r.title ?? ''),
     url: (r) => `/pulse/watch/${r.id}`,
+    realm: realmFromRow,
   },
   bazaar: {
     table: 'bazaar_listings',
@@ -98,27 +116,51 @@ export async function listMySaves(beeId: string): Promise<SavedItem[]> {
     bySurface.set(s.surface, list);
   }
 
-  const resolvedBySurface = new Map<string, Map<string, { title: string; url: string }>>();
+  const resolvedBySurface = new Map<
+    string,
+    Map<string, { title: string; url: string; realm: string | null }>
+  >();
   await Promise.all(
     Array.from(bySurface.entries()).map(async ([surface, ids]) => {
       const resolver = RESOLVERS[surface];
       if (!resolver) return;
       const { data: rows } = await sb.from(resolver.table).select(resolver.select).in('id', ids);
-      const m = new Map<string, { title: string; url: string }>();
+      const m = new Map<string, { title: string; url: string; realm: string | null }>();
       // Dynamic select strings defeat supabase-js's row typing — go via unknown.
       for (const row of (rows ?? []) as unknown as Record<string, unknown>[]) {
-        m.set(String(row.id), { title: resolver.title(row), url: resolver.url(row) });
+        m.set(String(row.id), {
+          title: resolver.title(row),
+          url: resolver.url(row),
+          realm: resolver.realm ? resolver.realm(row) : null,
+        });
       }
       resolvedBySurface.set(surface, m);
     }),
   );
 
+  // Resolve realm display names in one shot (realms is anon-readable).
+  const realmIds = new Set<string>();
+  for (const m of resolvedBySurface.values()) {
+    for (const v of m.values()) if (v.realm) realmIds.add(v.realm);
+  }
+  const realmNames = new Map<string, string>();
+  if (realmIds.size > 0) {
+    const { data: realmRows } = await sb
+      .from('realms')
+      .select('id, name')
+      .in('id', Array.from(realmIds));
+    for (const r of realmRows ?? []) realmNames.set(String(r.id), String(r.name ?? r.id));
+  }
+
   return saves.map((s) => {
     const hit = resolvedBySurface.get(s.surface)?.get(s.sourceId);
+    const realmId = hit?.realm ?? null;
     return {
       ...s,
       title: hit?.title || `${s.surface || 'unknown'} · ${s.sourceId.slice(0, 8)}…`,
       url: hit?.url ?? null,
+      realmId,
+      realmName: realmId ? (realmNames.get(realmId) ?? realmId) : null,
       resolved: Boolean(hit),
     };
   });

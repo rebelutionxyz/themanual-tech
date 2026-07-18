@@ -28,12 +28,12 @@ const FILL = '#FAD15E'; // honey fill (dark ink on top)
 export function NotificationsPage() {
   const { bee } = useAuth();
   const navigate = useNavigate();
-  // Popup surface scope (null on the full page = constellation, today's
-  // behavior). Scoped with no mapped Astra → honest empty state, no query.
+  // Popup scope: a specific Astra picked in the shell dropdown (null = All
+  // Astras / full page). Scoped with no mapped Astra → honest empty state.
   const popupScope = usePopupScope();
   const inPopup = popupScope !== null;
-  const scoped = popupScope?.scope === 'surface';
-  const astraId = scoped ? (popupScope?.astraId ?? null) : null;
+  const scoped = Boolean(popupScope?.surface);
+  const astraId = popupScope?.astraId ?? null;
   const [rows, setRows] = useState<NotificationItem[] | null>(null);
   // Scoped view only: fresh (unread) notifications from ANY astra, pinned
   // above the surface's own results.
@@ -206,7 +206,10 @@ export function NotificationsPage() {
 
   return (
     <div
-      className={cn('safe-pad-x mx-auto w-full max-w-2xl px-4', inPopup ? 'py-4' : 'py-6 md:py-8')}
+      className={cn(
+        'safe-pad-x mx-auto w-full max-w-2xl px-4',
+        inPopup ? 'py-4' : 'py-6 md:py-8',
+      )}
     >
       {/* In a popup, PopupShell's chrome IS the title — the page renders only
           the actions row (when there is anything to act on). */}

@@ -15,7 +15,7 @@ export function RouteModal({
   panelClass,
 }: {
   children: ReactNode;
-  /** Panel width class — defaults to max-w-2xl. */
+  /** Extra panel classes — the base panel is a uniform 80vw × 80dvh. */
   panelClass?: string;
 }) {
   const navigate = useNavigate();
@@ -39,8 +39,11 @@ export function RouteModal({
     >
       <div
         className={cn(
-          'relative m-auto w-full rounded-2xl bg-white text-zinc-900 shadow-2xl',
-          panelClass ?? 'max-w-2xl',
+          // Uniform popup size: every popup fills ~80% of the page (Butch,
+          // 2026-07-18). Children own their internal scroll (PopupShell's
+          // body region) — the panel itself never scrolls.
+          'relative m-auto flex h-[80dvh] w-[80vw] flex-col overflow-hidden rounded-2xl bg-white text-zinc-900 shadow-2xl',
+          panelClass,
         )}
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -52,9 +55,7 @@ export function RouteModal({
         >
           <X size={16} />
         </button>
-        <div className="max-h-[88vh] overflow-y-auto overscroll-contain rounded-2xl">
-          {children}
-        </div>
+        <div className="min-h-0 flex-1">{children}</div>
       </div>
     </div>
   );

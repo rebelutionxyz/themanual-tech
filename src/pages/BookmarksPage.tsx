@@ -1,5 +1,9 @@
 import { usePopupScope } from '@/components/shell/PopupShell';
-import { type CommunitySurface, popupAccent } from '@/components/shell/popupRegistry';
+import {
+  type CommunitySurface,
+  SURFACE_LABEL,
+  popupAccent,
+} from '@/components/shell/popupRegistry';
 import { useAuth } from '@/lib/auth';
 import { type SavedItem, listMySaves, unsaveById } from '@/lib/bookmarks';
 import { relativeTime } from '@/lib/intel';
@@ -12,24 +16,18 @@ import { useNavigate } from 'react-router-dom';
 const ACCENT = '#D97706'; // honey ink (matches NotificationsPage)
 const FILL = '#FAD15E';
 
-/** Friendly chip labels; unknown surfaces fall back to the raw token. */
-const SURFACE_LABEL: Record<string, string> = {
-  intel: 'INTEL',
-  unite: 'Groups',
-  rule: 'Events',
-  give: 'Give',
-  pulse: 'Pulse',
-  bazaar: 'Bazaar',
-  comms: 'COMMs',
-};
+/** Label helper — typed registry labels with a raw-token fallback. */
+function surfaceLabel(s: string): string {
+  return SURFACE_LABEL[s as CommunitySurface] ?? s;
+}
 
 /**
- * Bookmarked — the Bee's whole shelf (/bookmarks). Every entity_saves row
- * across every surface, resolved to titles + deep links: search, per-surface
- * filter chips, sort, jump-to, share (tracked link via entity_shares), and
- * unsave. In the popup, PopupShell's All/<surface> toggle presets the chip
- * filter; the chips can still drill anywhere from there. INTEL's own
- * /intel/saved thread view is unchanged — this is the cross-surface shelf.
+ * Saved — the Bee's whole shelf (/bookmarks). Every entity_saves row across
+ * every surface, resolved to titles + deep links + realms: search, realm
+ * filter, sort, jump-to, share (tracked link via entity_shares), and unsave.
+ * In the popup, the shell's Astra dropdown is THE surface filter (one
+ * control); the full page keeps its own surface chips. INTEL's /intel/saved
+ * thread view is unchanged — this is the cross-surface shelf.
  */
 export function BookmarksPage() {
   const { bee } = useAuth();
@@ -41,17 +39,13 @@ export function BookmarksPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [surfaceFilter, setSurfaceFilter] = useState<string>('all');
+  const [realmFilter, setRealmFilter] = useState<string>('all');
   const [oldestFirst, setOldestFirst] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // The shell scope toggle presets the filter: This-surface → that chip,
-  // All → every surface. Chips remain live for drilling past the preset.
-  const scopeMode = popupScope?.scope ?? null;
-  const scopeSurface = popupScope?.surface ?? null;
-  useEffect(() => {
-    if (!scopeMode) return;
-    setSurfaceFilter(scopeMode === 'surface' && scopeSurface ? scopeSurface : 'all');
-  }, [scopeMode, scopeSurface]);
+  // In the popup, the shell's Astra dropdown is THE surface filter — one
+  // control, no duplicate chips. The full page keeps its own chips.
+  const effectiveSurface = inPopup ? (popupScope?.surface ?? 'all') : surfaceFilter;
 
   const load = useCallback(async () => {
     if (!bee?.id) {
@@ -113,15 +107,32 @@ export function BookmarksPage() {
     [items],
   );
 
+  const realmsOnShelf = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const i of items ?? []) {
+      if (i.realmId) m.set(i.realmId, i.realmName ?? i.realmId);
+    }
+    return Array.from(m.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [items]);
+
   const visible = useMemo(() => {
     let xs = items ?? [];
-    if (surfaceFilter !== 'all') xs = xs.filter((i) => i.surface === surfaceFilter);
+    if (effectiveSurface !== 'all') xs = xs.filter((i) => i.surface === effectiveSurface);
+    if (realmFilter !== 'all') xs = xs.filter((i) => i.realmId === realmFilter);
     const q = query.trim().toLowerCase();
-    if (q) xs = xs.filter((i) => i.title.toLowerCase().includes(q));
+    if (q) {
+      xs = xs.filter(
+        (i) =>
+          i.title.toLowerCase().includes(q) ||
+          (i.realmName ? i.realmName.toLowerCase().includes(q) : false),
+      );
+    }
     return [...xs].sort((a, b) =>
       oldestFirst ? a.savedAt.localeCompare(b.savedAt) : b.savedAt.localeCompare(a.savedAt),
     );
-  }, [items, surfaceFilter, query, oldestFirst]);
+  }, [items, effectiveSurface, realmFilter, query, oldestFirst]);
 
   const total = items?.length ?? 0;
 
@@ -133,7 +144,7 @@ export function BookmarksPage() {
         <div className="mb-5 flex items-center justify-between gap-3">
           <h1 className="flex items-center gap-2.5 font-display text-2xl font-semibold text-zinc-900">
             <Bookmark size={22} style={{ color: ACCENT }} />
-            Bookmarked
+            Saved
             {total > 0 && (
               <span
                 className="rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold"
@@ -158,6 +169,21 @@ export function BookmarksPage() {
             className="w-full bg-transparent text-[13px] text-zinc-800 outline-none placeholder:text-zinc-400"
           />
         </label>
+        {realmsOnShelf.length > 0 && (
+          <select
+            value={realmFilter}
+            onChange={(e) => setRealmFilter(e.target.value)}
+            aria-label="Filter by realm"
+            className="flex-shrink-0 rounded-md border border-zinc-200 bg-white px-2 py-1.5 text-[12.5px] text-zinc-600"
+          >
+            <option value="all">All realms</option>
+            {realmsOnShelf.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        )}
         <button
           type="button"
           onClick={() => setOldestFirst((v) => !v)}
@@ -169,8 +195,9 @@ export function BookmarksPage() {
         </button>
       </div>
 
-      {/* Surface filter chips — built from what's actually on the shelf. */}
-      {surfacesOnShelf.length > 0 && (
+      {/* Surface filter chips — FULL PAGE ONLY. In the popup, the shell's
+          Astra dropdown is the one surface control (no duplicates). */}
+      {!inPopup && surfacesOnShelf.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-1.5">
           <FilterChip
             label="All"
@@ -181,7 +208,7 @@ export function BookmarksPage() {
           {surfacesOnShelf.map((s) => (
             <FilterChip
               key={s}
-              label={SURFACE_LABEL[s] ?? s}
+              label={surfaceLabel(s)}
               active={surfaceFilter === s}
               color={popupAccent(s as CommunitySurface)}
               onClick={() => setSurfaceFilter(s)}
@@ -229,7 +256,7 @@ export function BookmarksPage() {
                   }}
                   data-size="meta"
                 >
-                  {SURFACE_LABEL[item.surface] ?? item.surface}
+                  {surfaceLabel(item.surface)}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p
@@ -242,6 +269,7 @@ export function BookmarksPage() {
                   </p>
                   <p className="mt-1 font-mono text-[11px] text-zinc-500" data-size="meta">
                     saved {relativeTime(item.savedAt)}
+                    {item.realmName && <span className="ml-2 text-zinc-400">· {item.realmName}</span>}
                     {!item.resolved && <span className="ml-2 text-zinc-400">source unavailable</span>}
                   </p>
                 </div>

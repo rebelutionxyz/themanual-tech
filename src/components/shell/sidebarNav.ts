@@ -62,7 +62,7 @@ export const COMMON_TAIL: SidebarItem[] = [
   // Bookmarked = the cross-surface shelf popup (/bookmarks). INTEL's own
   // /intel/saved thread view still exists; the tail now opens the whole
   // shelf. Badge injected by CommunityLayout.
-  { id: 'bookmarks', label: 'Bookmarked', icon: Bookmark, to: '/bookmarks', modal: true },
+  { id: 'bookmarks', label: 'Saved', icon: Bookmark, to: '/bookmarks', modal: true },
   { id: 'notifications', label: 'Notifications', icon: Bell, to: '/notifications', modal: true },
   { id: 'report', label: 'Reported', icon: Flag, to: '/intel/reported', modal: true },
   { id: 'creators', label: 'Creators Studio', icon: Clapperboard, to: '/studio', modal: true },

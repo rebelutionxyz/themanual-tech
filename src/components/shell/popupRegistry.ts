@@ -36,6 +36,28 @@ export type CommunitySurface =
   | 'bazaar'
   | 'comms';
 
+/** Canonical order for scope dropdowns and filters. */
+export const COMMUNITY_SURFACES: CommunitySurface[] = [
+  'intel',
+  'unite',
+  'rule',
+  'give',
+  'pulse',
+  'bazaar',
+  'comms',
+];
+
+/** Friendly labels for scope dropdowns, chips, and shelf rows. */
+export const SURFACE_LABEL: Record<CommunitySurface, string> = {
+  intel: 'INTEL',
+  unite: 'Groups',
+  rule: 'Events',
+  give: 'Give',
+  pulse: 'Pulse',
+  bazaar: 'Bazaar',
+  comms: 'COMMs',
+};
+
 /**
  * Mirror of CommunityLayout's path→surface derivation. Kept here (not
  * imported from the layout) because App.tsx renders the popup layer OUTSIDE
@@ -106,7 +128,8 @@ export interface PopupDef {
 export const POPUPS: PopupDef[] = [
   {
     key: 'bookmarks',
-    title: 'Bookmarked',
+    // "Saved" matches the verb on the listing's save button (Butch, 2026-07-18).
+    title: 'Saved',
     icon: Bookmark,
     route: '/bookmarks',
     // Scope filters by entity_saves.source_surface — live data today, so
@@ -138,8 +161,6 @@ export const POPUPS: PopupDef[] = [
     route: '/studio',
     scoped: false,
     defaultScope: 'constellation',
-    // The deepest popup — give it room.
-    panelClass: 'max-w-5xl',
   },
   {
     key: 'premium',
@@ -172,7 +193,6 @@ export const POPUPS: PopupDef[] = [
     route: '/settings/handle',
     scoped: false,
     defaultScope: 'constellation',
-    panelClass: 'max-w-3xl',
   },
   {
     key: 'profile',
