@@ -97,7 +97,12 @@ export const COMMON_TAIL: SidebarItem[] = [
   },
 ];
 
-/** Friendly per-surface label shown as the Astra dropdown's current value. */
+/**
+ * Friendly per-surface label — the PAGE-HEADER noun ("Explore Groups",
+ * "Explore Events"). The Astra dropdown deliberately does NOT use these:
+ * it shows the Astra NAMES (UNITE, RULE, …) from ASTRA_SWITCHER
+ * (Butch 2026-07-18).
+ */
 export const SURFACE_FRIENDLY: Record<string, string> = {
   intel: 'INTEL',
   unite: 'Groups',
@@ -106,7 +111,7 @@ export const SURFACE_FRIENDLY: Record<string, string> = {
   comms: 'COMMs',
 };
 
-/** Astra dropdown entries (relay order; "Marketplace" → Bazaar for firewall). */
+/** Astra dropdown entries. */
 export interface AstraSwitchItem {
   label: string;
   slug: string;
@@ -115,15 +120,17 @@ export interface AstraSwitchItem {
 }
 
 export const ASTRA_SWITCHER: AstraSwitchItem[] = [
-  // Alpha order; BLiNG! lives only on the bottom toolbar (FreedomBLiNGS popup).
-  { label: 'COMMs', slug: 'comms', to: '/comms', icon: MessageCircle },
-  { label: 'Events', slug: 'rule', to: '/rule', icon: Calendar },
+  // Canonical order + Astra NAMES (Butch 2026-07-18) — the friendly nouns
+  // (Groups/Events) stay on the page headers, not here. BLiNG! lives only
+  // on the bottom toolbar (FreedomBLiNGS popup).
+  { label: 'UNITE', slug: 'unite', to: '/unite', icon: Users },
+  { label: 'RULE', slug: 'rule', to: '/rule', icon: Calendar },
+  { label: 'PULSE', slug: 'pulse', to: '/pulse', icon: Radio },
+  { label: 'JUSTICE', slug: 'justice', to: '/realm/justice', icon: Scale },
+  { label: 'GiVE', slug: 'give', to: '/give', icon: HeartHandshake },
   { label: 'INTEL', slug: 'intel', to: '/intel', icon: MessagesSquare },
-  { label: 'Give', slug: 'give', to: '/give', icon: HeartHandshake },
-  { label: 'Groups', slug: 'unite', to: '/unite', icon: Users },
-  { label: 'Justice', slug: 'justice', to: '/realm/justice', icon: Scale },
-  { label: 'Bazaar', slug: 'bazaar', to: '/bazaar', icon: Store },
-  { label: 'Pulse', slug: 'pulse', to: '/pulse', icon: Radio },
+  { label: 'COMMs', slug: 'comms', to: '/comms', icon: MessageCircle },
+  { label: 'BAZAAR', slug: 'bazaar', to: '/bazaar', icon: Store },
 ];
 
 /** Resolve an Astra/surface color on white. Astra layer (≠ realm color). */

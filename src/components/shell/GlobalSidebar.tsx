@@ -247,8 +247,13 @@ function AstraDropdown({
     };
   }, [open]);
 
-  const current = (SURFACE_FRIENDLY[activeSurface] ?? activeSurface).toUpperCase();
-  const CurrentIcon = ASTRA_SWITCHER.find((a) => a.slug === activeSurface)?.icon;
+  // The dropdown speaks Astra NAMES (UNITE, RULE, GiVE… — Butch 2026-07-18);
+  // the friendly nouns (Groups/Events) stay on the page headers. No
+  // toUpperCase — brand casing like GiVE / COMMs is intentional.
+  const currentEntry = ASTRA_SWITCHER.find((a) => a.slug === activeSurface);
+  const current =
+    currentEntry?.label ?? SURFACE_FRIENDLY[activeSurface] ?? activeSurface.toUpperCase();
+  const CurrentIcon = currentEntry?.icon;
   // Solid Astra-colored control (Butch 2026-07-18) — the open MENU below
   // stays white; contrast ink flips exactly like the top/bottom toolbars.
   const ink = readableInk(accent);
