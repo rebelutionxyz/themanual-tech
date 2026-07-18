@@ -2,6 +2,7 @@ import type { ShellIcon } from '@/components/shell/sidebarNav';
 import { SURFACE_BY_SLUG } from '@/lib/surfaces';
 import {
   Bell,
+  Bookmark,
   Briefcase,
   Clapperboard,
   Crown,
@@ -26,7 +27,14 @@ import {
 // ═════════════════════════════════════════════════════════════════════
 
 /** Community surfaces that host the white shell + utility tail. */
-export type CommunitySurface = 'intel' | 'unite' | 'rule' | 'give' | 'pulse' | 'bazaar' | 'comms';
+export type CommunitySurface =
+  | 'intel'
+  | 'unite'
+  | 'rule'
+  | 'give'
+  | 'pulse'
+  | 'bazaar'
+  | 'comms';
 
 /**
  * Mirror of CommunityLayout's path→surface derivation. Kept here (not
@@ -96,6 +104,17 @@ export interface PopupDef {
 }
 
 export const POPUPS: PopupDef[] = [
+  {
+    key: 'bookmarks',
+    title: 'Bookmarked',
+    icon: Bookmark,
+    route: '/bookmarks',
+    // Scope filters by entity_saves.source_surface — live data today, so
+    // this is the first popup where the toggle visibly works. Opens scoped
+    // to the surface the Bee is standing on (plan default).
+    scoped: true,
+    defaultScope: 'surface',
+  },
   {
     key: 'notifications',
     title: 'Notifications',

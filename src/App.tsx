@@ -2,7 +2,6 @@ import { HQControlRoom } from '@/components/hq/HQControlRoom';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
-import { PopupRoute } from '@/components/shell/PopupShell';
 import {
   CartPlaceholder,
   ManualGroupsPlaceholder,
@@ -14,6 +13,7 @@ import { AuthProvider, useAuth } from '@/lib/auth';
 import { useUserRole } from '@/lib/useUserRole';
 import { AdvertisePage } from '@/pages/AdvertisePage';
 import { BlingsPage } from '@/pages/BlingsPage';
+import { BookmarksPage } from '@/pages/BookmarksPage';
 import { BusinessPage } from '@/pages/BusinessPage';
 import { CollectionPage } from '@/pages/CollectionPage';
 import { CollectionsIndexPage } from '@/pages/CollectionsIndexPage';
@@ -77,6 +77,7 @@ import { ThreadPage } from '@/pages/intel/ThreadPage';
 import { ChannelPage } from '@/pages/pulse/ChannelPage';
 import { PulseHome } from '@/pages/pulse/PulseHome';
 import { WatchPage } from '@/pages/pulse/WatchPage';
+import { PopupRoute } from '@/components/shell/PopupShell';
 import { useBranding } from '@/stores/useBranding';
 import { useEffect } from 'react';
 import { type Location, Navigate, Route, Routes, useLocation } from 'react-router-dom';
@@ -105,6 +106,7 @@ const COMMUNITY_PREFIXES = [
   '/bazaar',
   '/comms',
   // Sidebar utility-tail surfaces — same white shell, no skin switch.
+  '/bookmarks',
   '/notifications',
   '/studio',
   '/premium',
@@ -268,6 +270,7 @@ function AppContent() {
               Notifications, Creators Studio (Workshop section), Premium
               (ad-relief ladder), Business (org hub). They live INSIDE the
               white community shell — no skin switch when navigating the tail. */}
+            <Route path="/bookmarks" element={<BookmarksPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/studio" element={<StudioPage />} />
             <Route path="/premium" element={<PremiumPage />} />
@@ -369,6 +372,14 @@ function AppContent() {
             shell's store state) — its dedicated popup is a later slice. */}
         {background && (
           <Routes>
+            <Route
+              path="/bookmarks"
+              element={
+                <PopupRoute popupKey="bookmarks">
+                  <BookmarksPage />
+                </PopupRoute>
+              }
+            />
             <Route
               path="/notifications"
               element={

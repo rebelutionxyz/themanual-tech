@@ -59,9 +59,10 @@ export const NEUTRAL_INK = '#536471';
  * destination are `soon`.
  */
 export const COMMON_TAIL: SidebarItem[] = [
-  // Saved threads live on INTEL (entity_saves + ThreadList savedMode); the
-  // tail links there from every surface. Badge injected by CommunityLayout.
-  { id: 'bookmarks', label: 'Bookmarked', icon: Bookmark, to: '/intel/saved' },
+  // Bookmarked = the cross-surface shelf popup (/bookmarks). INTEL's own
+  // /intel/saved thread view still exists; the tail now opens the whole
+  // shelf. Badge injected by CommunityLayout.
+  { id: 'bookmarks', label: 'Bookmarked', icon: Bookmark, to: '/bookmarks', modal: true },
   { id: 'notifications', label: 'Notifications', icon: Bell, to: '/notifications', modal: true },
   { id: 'report', label: 'Reported', icon: Flag, to: '/intel/reported', modal: true },
   { id: 'creators', label: 'Creators Studio', icon: Clapperboard, to: '/studio', modal: true },

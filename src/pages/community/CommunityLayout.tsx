@@ -65,6 +65,7 @@ const TAIL_ROUTE_ITEM: [string, string][] = [
   ['/settings', 'settings'],
   ['/intel/reported', 'report'],
   ['/intel/saved', 'bookmarks'],
+  ['/bookmarks', 'bookmarks'],
 ];
 const UNFILTERED_VIEWS: IntelView[] = ['mythreads', 'saved', 'home'];
 
