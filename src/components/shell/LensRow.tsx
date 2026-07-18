@@ -6,7 +6,6 @@ import { RealmTreeContent } from '@/components/shell/RealmTreeSlider';
 import { SearchPanel } from '@/components/shell/SearchDropdown';
 import { HoneyDrop } from '@/components/ui/HoneyDrop';
 import { useAuth } from '@/lib/auth';
-import { REALM_ID_BY_NAME } from '@/lib/constants';
 import { countryName } from '@/lib/geo/countries';
 import { getSearchLocation } from '@/lib/geo/storage';
 import type { GeoLocation } from '@/lib/geo/types';
@@ -15,8 +14,7 @@ import { timePresetLabel } from '@/lib/timePresets';
 import { cn } from '@/lib/utils';
 import { useCartStore } from '@/stores/useCartStore';
 import { useLensStore } from '@/stores/useLensStore';
-import { REALM_COLOR_FALLBACK, useRealmColors } from '@/stores/useRealmColors';
-import { Clock, type LucideIcon, MapPin, Rabbit, Search, ShoppingCart, X } from 'lucide-react';
+import { Clock, type LucideIcon, MapPin, Rabbit, Search, ShoppingCart } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
@@ -92,14 +90,10 @@ export function LensRow({ accent }: { accent: string }) {
   const timePreset = useLensStore((s) => s.timePreset);
   const timeLabel = timePresetLabel(timePreset) ?? 'Time';
 
-  // Realm lens — selected realms render as closeable chips IN the bar
-  // (Butch 2026-07-18; replaces the bottom RealmChipsBar), and the count
-  // shows inline after the rabbit.
-  const selectedRealms = useLensStore((s) => s.selectedRealms);
-  const removeRealm = useLensStore((s) => s.removeRealm);
-  const clearRealms = useLensStore((s) => s.clearRealms);
-  const realmColors = useRealmColors((s) => s.colors) as Record<string, string>;
-  const realmCount = selectedRealms.length;
+  // Realm lens — the count shows inline after the rabbit; the selected
+  // chips render in the RealmChipsBar just BELOW this bar, upper left
+  // (Butch 2026-07-18 — chips out of the toolbar so controls keep room).
+  const realmCount = useLensStore((s) => s.selectedRealms.length);
   const realmLabel = realmCount > 0 ? `Realm · ${realmCount}` : 'Realm';
 
   // Location lens — completed (Butch 2026-07-18): the selection persists in
@@ -173,49 +167,6 @@ export function LensRow({ accent }: { accent: string }) {
         <HoneyDrop size={16} style={{ color: ink }} />
         <span className="hidden md:inline">BLiNG!</span>
       </button>
-
-      {/* Selected realm chips — closeable buttons VISIBLE in the top bar
-          (white-backed so they read on any Astra accent). */}
-      {selectedRealms.map((r) => {
-        const realmId = r.pathParts[0] ? (REALM_ID_BY_NAME[r.pathParts[0]] ?? '') : '';
-        const color = realmColors[realmId] ?? REALM_COLOR_FALLBACK;
-        return (
-          <span
-            key={r.key}
-            title={r.pathParts.join(' / ')}
-            className="inline-flex flex-shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[12px] text-zinc-800"
-            style={{ background: 'rgba(255,255,255,0.92)' }}
-          >
-            <span
-              className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
-              style={{ background: color }}
-              aria-hidden="true"
-            />
-            <span className="max-w-[140px] truncate">{r.name}</span>
-            <button
-              type="button"
-              onClick={() => removeRealm(r.key)}
-              aria-label={`Remove ${r.name}`}
-              title={`Remove ${r.name}`}
-              className="-mr-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-black/10 hover:text-zinc-700"
-            >
-              <X size={11} />
-            </button>
-          </span>
-        );
-      })}
-      {realmCount >= 2 && (
-        <button
-          type="button"
-          onClick={() => clearRealms()}
-          className={cn(
-            'flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors',
-            onDark ? 'text-white/80 hover:bg-white/10' : 'text-black/70 hover:bg-black/10',
-          )}
-        >
-          Clear all
-        </button>
-      )}
 
       {/* ml-auto on the first control floats the lens group (and the trailing
           Cart) to the RIGHT edge of the row. Degrades to 0 when the row

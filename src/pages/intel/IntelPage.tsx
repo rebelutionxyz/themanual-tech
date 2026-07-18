@@ -3,12 +3,11 @@ import { L3Refinement } from '@/components/intel/L3Refinement';
 import { PostConsole } from '@/components/intel/PostConsole';
 import { ReportsQueue } from '@/components/intel/ReportsQueue';
 import { ThreadList } from '@/components/intel/ThreadList';
+import { RealmChips } from '@/components/shell/RealmChipsBar';
 import { REALM_ID_BY_NAME } from '@/lib/constants';
 import { SURFACE_BY_SLUG } from '@/lib/surfaces';
-import { cn } from '@/lib/utils';
 import { useIntelStore } from '@/stores/useIntelStore';
 import { useLensStore } from '@/stores/useLensStore';
-import { ChevronRight } from 'lucide-react';
 
 const INTEL_NAME = SURFACE_BY_SLUG.get('intel')?.name ?? 'INTEL';
 
@@ -20,26 +19,15 @@ export function IntelPage() {
   // The realm lens is the shared prefix (display-name segments on realm_path).
   const prefix = useLensStore((s) => s.path);
   const setPrefix = useLensStore((s) => s.setPrefix);
+  const clearRealms = useLensStore((s) => s.clearRealms);
+  const selectedCount = useLensStore((s) => s.selectedRealms.length);
 
   const selectedRealmId = prefix[0] ? (REALM_ID_BY_NAME[prefix[0]] ?? null) : null;
   const selectedL2 = prefix[1] ?? null;
 
-  // Breadcrumb segments are driven straight from the active prefix (work order
-  // §1): INTEL › {realm_path joined by ›}. Each segment pops the lens to that
-  // depth; the deepest is the current position.
-  const crumbs: BreadcrumbSegment[] = [];
-  // Root (no realm selected) shows NO header — just composer + feed. The
-  // breadcrumb appears only once a realm IS picked.
-  prefix.forEach((seg, i) => {
-    const deepest = i === prefix.length - 1;
-    crumbs.push({
-      label: seg,
-      clickable: !deepest,
-      isDeepest: deepest,
-      onClick: deepest ? undefined : () => setPrefix(prefix.slice(0, i + 1)),
-    });
-  });
-  const showHeader = prefix.length > 0;
+  // Breadcrumb trail DELETED (Butch 2026-07-18): the header is the Astra
+  // name with the selected-realm chips (closeable buttons) right behind it.
+  const showHeader = prefix.length > 0 || selectedCount > 0;
 
   if (activeView === 'forme') {
     return <ComingSoonView view={activeView} />;
@@ -61,71 +49,21 @@ export function IntelPage() {
   return (
     <div className="safe-pad-x mx-auto max-w-4xl px-4 py-6 md:px-8 md:py-8">
       {showHeader && (
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 sm:gap-x-1">
-              <button
-                type="button"
-                onClick={() => setPrefix([])}
-                title="Back to all INTEL"
-                className={cn(
-                  'font-display tracking-wide border-b border-dotted transition-all',
-                  prefix.length > 0
-                    ? 'border-transparent text-zinc-500 hover:border-current hover:text-zinc-900'
-                    : 'cursor-default border-transparent text-zinc-900',
-                  'text-[17px] sm:text-[22px]',
-                )}
-                disabled={prefix.length === 0}
-              >
-                {INTEL_NAME}
-              </button>
-
-              {crumbs.map((crumb, i) => (
-                <span
-                  key={`${crumb.label}-${i}`}
-                  className="flex items-baseline gap-x-0.5 sm:gap-x-1"
-                >
-                  <ChevronRight className="relative top-[2px] flex-shrink-0 text-zinc-400 sm:top-[3px] h-3.5 w-3.5 sm:h-[18px] sm:w-[18px]" />
-                  {crumb.clickable && crumb.onClick ? (
-                    <button
-                      type="button"
-                      onClick={crumb.onClick}
-                      title={`Back to ${crumb.label}`}
-                      className={cn(
-                        'font-display tracking-wide border-b border-dotted border-transparent transition-all hover:border-current hover:brightness-125 break-words',
-                        crumb.isDeepest
-                          ? 'text-[20px] sm:text-[26px]'
-                          : 'text-[15px] sm:text-[22px]',
-                      )}
-                      style={{
-                        color: crumb.color ?? '#71717A',
-                        fontWeight: crumb.isDeepest ? 600 : 400,
-                      }}
-                    >
-                      {crumb.label}
-                    </button>
-                  ) : (
-                    <span
-                      className={cn(
-                        'font-display tracking-wide break-words',
-                        crumb.isDeepest
-                          ? 'text-[20px] sm:text-[26px]'
-                          : 'text-[15px] sm:text-[22px]',
-                      )}
-                      style={{
-                        color: crumb.isDeepest
-                          ? (crumb.color ?? '#18181B')
-                          : (crumb.color ?? '#71717A'),
-                        fontWeight: crumb.isDeepest ? 600 : 400,
-                      }}
-                    >
-                      {crumb.label}
-                    </span>
-                  )}
-                </span>
-              ))}
-            </div>
-          </div>
+        <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <button
+            type="button"
+            onClick={() => {
+              setPrefix([]);
+              clearRealms();
+            }}
+            title="Back to all INTEL"
+            className="border-b border-dotted border-transparent font-display text-[17px] tracking-wide text-zinc-900 transition-all hover:border-current sm:text-[22px]"
+          >
+            {INTEL_NAME}
+          </button>
+          {/* Selected realms as closeable buttons, right behind the Astra
+              name — replaces the breadcrumb trail (Butch 2026-07-18). */}
+          <RealmChips />
         </div>
       )}
 
@@ -158,14 +96,6 @@ export function IntelPage() {
       />
     </div>
   );
-}
-
-interface BreadcrumbSegment {
-  label: string;
-  color?: string;
-  clickable: boolean;
-  isDeepest: boolean;
-  onClick?: () => void;
 }
 
 function ComingSoonView({ view }: { view: 'forme' | 'following' }) {

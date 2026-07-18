@@ -2,7 +2,6 @@ import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
 import { BottomToolbar } from '@/components/shell/BottomToolbar';
 import { GlobalSidebar } from '@/components/shell/GlobalSidebar';
 import { LensRow } from '@/components/shell/LensRow';
-import { RealmChipsBar } from '@/components/shell/RealmChipsBar';
 import { RealmStrip } from '@/components/shell/RealmStrip';
 import { RealmTreeSlider } from '@/components/shell/RealmTreeSlider';
 import { RightRail } from '@/components/shell/RightRail';
@@ -29,12 +28,6 @@ const SHOW_REALM_STRIP = false;
  * matching Location/Time/Search. Flip to true to restore the slide-over.
  */
 const SHOW_REALM_SLIDEOVER = false;
-
-/**
- * Bottom selected-realm chips bar — RETIRED 2026-07-18 (Butch). The chips
- * live in the top LensRow as closeable buttons now. Flip to restore.
- */
-const SHOW_REALM_CHIPS_BAR = false;
 
 interface CommunityShellProps {
   /** Active surface slug (intel / unite / rule / give) — drives nav + dropdown. */
@@ -103,7 +96,8 @@ export function CommunityShell({
           onToggleCollapse={() => setCollapsed((v) => !v)}
         />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col border-zinc-200 md:border-l">
-          {/* TOP toolbar */}
+          {/* TOP toolbar. (Selected-realm chips render inline in the surface
+              headers, right behind the Astra name — not as a shell bar.) */}
           <LensRow accent={accent} />
           {/* Content region (flex-1) + the realm slide-over, which overlays ONLY
               this region — never the top/bottom toolbars or the chips. */}
@@ -120,10 +114,6 @@ export function CommunityShell({
                 top-toolbar dropdown now. */}
             {SHOW_REALM_SLIDEOVER && <RealmTreeSlider />}
           </div>
-          {/* Selected-realm chips — RETIRED here 2026-07-18 (Butch): they now
-              render as closeable buttons IN the top LensRow, where they're
-              visible. Flip to restore the bottom bar. */}
-          {SHOW_REALM_CHIPS_BAR && <RealmChipsBar />}
         </div>
       </div>
       {/* REGION 2 — bottom toolbar. A full-width child of the OUTER CONTAINER, so
