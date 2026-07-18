@@ -39,14 +39,26 @@ function mapRow(row: Record<string, unknown>): NotificationItem {
   };
 }
 
-/** Newest-first page of the signed-in Bee's notifications (RLS-scoped). */
-export async function listNotifications(limit = 30, offset = 0): Promise<NotificationItem[]> {
+/**
+ * Newest-first page of the signed-in Bee's notifications (RLS-scoped).
+ * `astraId` narrows to one Astra's rows (popup surface scope) — most rows
+ * carry astra_id null today, so callers treat the scoped view as sparse.
+ */
+export async function listNotifications(
+  limit = 30,
+  offset = 0,
+  astraId: string | null = null,
+): Promise<NotificationItem[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase
+  let query = supabase
     .from('notifications')
     .select('id, actor_bee_id, type, entity_type, entity_id, title, body, url, is_read, created_at')
+    // New above normal: unread first, then newest-first within each band.
+    .order('is_read', { ascending: true })
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
+  if (astraId) query = query.eq('astra_id', astraId);
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   const items = ((data ?? []) as Record<string, unknown>[]).map(mapRow);
   return resolveForumUrls(items);
@@ -64,10 +76,7 @@ async function resolveForumUrls(items: NotificationItem[]): Promise<Notification
     .map((n) => n.entityId as string);
   if (postIds.length === 0) return items;
   try {
-    const { data } = await supabase
-      .from('forum_posts')
-      .select('id, thread_id')
-      .in('id', postIds);
+    const { data } = await supabase.from('forum_posts').select('id, thread_id').in('id', postIds);
     if (!data) return items;
     const threadByPost = new Map(data.map((r) => [String(r.id), String(r.thread_id)]));
     return items.map((n) => {
@@ -78,6 +87,24 @@ async function resolveForumUrls(items: NotificationItem[]): Promise<Notification
   } catch {
     return items;
   }
+}
+
+/**
+ * Unread notifications from EVERY Astra (newest first). The scoped popup
+ * view pins these above the surface's own results — being scoped never
+ * hides fresh activity from the rest of the comb.
+ */
+export async function listUnreadNotifications(limit = 20): Promise<NotificationItem[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id, actor_bee_id, type, entity_type, entity_id, title, body, url, is_read, created_at')
+    .eq('is_read', false)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  const items = ((data ?? []) as Record<string, unknown>[]).map(mapRow);
+  return resolveForumUrls(items);
 }
 
 /** Unread count for the signed-in Bee (sidebar badge). */

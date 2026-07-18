@@ -1,4 +1,5 @@
 import { BlingPopupContent } from '@/components/freedomblings/BlingPopupContent';
+import { ModalLink } from '@/components/shell/ModalLink';
 import type { ShellIcon } from '@/components/shell/sidebarNav';
 import { HoneyDrop } from '@/components/ui/HoneyDrop';
 import { useAuth } from '@/lib/auth';
@@ -131,7 +132,7 @@ export function BottomToolbar({ accent }: { accent: string }) {
         {/* Profile — FIRST item, sticky so it stays visible while the rest
             scrolls under it. */}
         {bee ? (
-          <Link
+          <ModalLink
             to="/profile"
             title={`@${bee.handle}`}
             aria-label={`Profile — @${bee.handle}`}
@@ -153,7 +154,7 @@ export function BottomToolbar({ accent }: { accent: string }) {
             <span className="min-w-0 truncate text-[13px] font-medium" style={{ color: ink }}>
               @{bee.handle}
             </span>
-          </Link>
+          </ModalLink>
         ) : (
           <Link
             to="/login"

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
 
 /**
  * Live astra_registry loader (durable source for the INTEL Astras grid + the
@@ -14,6 +14,8 @@ import { supabase } from '@/lib/supabase';
 export type AstraStatus = 'active' | 'archived' | 'off_grid';
 
 export interface AstraRow {
+  /** astra_registry.id (uuid) — scope filters match notifications.astra_id etc. */
+  id: string;
   slug: string;
   /** Canonical/function name (e.g. "Forum", "Legal"). Grid label. */
   defaultName: string;
@@ -48,6 +50,7 @@ interface AstraRegistryData {
 const GROUP_ORDER = ['Community', 'Services'];
 
 interface AstraRegistryRow {
+  id: string;
   slug: string;
   default_name: string | null;
   display_name: string;
@@ -112,7 +115,7 @@ export function useAstraRegistry(): AstraRegistryData {
           supabase
             .from('astra_registry')
             .select(
-              'slug,default_name,display_name,domain,status,astra_grid_group,show_in_grid,link_redirect_slug',
+              'id,slug,default_name,display_name,domain,status,astra_grid_group,show_in_grid,link_redirect_slug',
             ),
           supabase.from('realms').select('id,astra_slug'),
         ]);
@@ -120,6 +123,7 @@ export function useAstraRegistry(): AstraRegistryData {
         if (realmRes.error) throw realmRes.error;
 
         const rows: AstraRow[] = ((astraRes.data ?? []) as AstraRegistryRow[]).map((r) => ({
+          id: r.id,
           slug: r.slug,
           defaultName: r.default_name ?? r.display_name,
           displayName: r.display_name,

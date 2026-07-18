@@ -2,6 +2,7 @@ import { HQControlRoom } from '@/components/hq/HQControlRoom';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
+import { PopupRoute } from '@/components/shell/PopupShell';
 import {
   CartPlaceholder,
   ManualGroupsPlaceholder,
@@ -78,7 +79,7 @@ import { PulseHome } from '@/pages/pulse/PulseHome';
 import { WatchPage } from '@/pages/pulse/WatchPage';
 import { useBranding } from '@/stores/useBranding';
 import { useEffect } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { type Location, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 export default function App() {
   return (
@@ -140,7 +141,16 @@ function ManagementRedirect() {
 function AppContent() {
   const activeAstra = useAstra();
   const { bee, loading: authLoading } = useAuth();
-  const { pathname } = useLocation();
+  const location = useLocation();
+  // Modal-route popups (astra-popups Wave 1): ModalLink stashes the origin
+  // location as `background` in history state. When present, the base
+  // <Routes> keeps rendering the origin surface and the matched popup route
+  // renders in an overlay (RouteModal) — every popup keeps a shareable
+  // canonical URL; a direct hit renders the same route full-page.
+  const background = (location.state as { background?: Location } | null)?.background ?? null;
+  // Chrome flags follow the SURFACE THE BEE SEES (the background when a
+  // popup is open), not the popup's own path.
+  const pathname = background?.pathname ?? location.pathname;
 
   // Platform branding (HQ-editable): one load per session; also swaps the
   // favicon to the configured mark.
@@ -169,7 +179,7 @@ function AppContent() {
           size to h-full and own their internal scroll (one scrollbar); tall
           standalone pages scroll here. min-h-0 lets inner scrollers engage. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <Routes>
+        <Routes location={background ?? location}>
           {/* Front door (landing gate 2026-07-10) — astra-aware first, then:
             anonymous → login module · allowlisted OG → management (by
             security level) · any other signed-in Bee → blank coming soon. */}
@@ -352,6 +362,80 @@ function AppContent() {
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        {/* Popup layer — mounts only when a background location is present.
+            One <Route> per popup; each wraps the SAME page component its
+            canonical URL renders full-page, so parity is structural.
+            Bookmarked stays a navigation (IntelPage saved-mode rides the
+            shell's store state) — its dedicated popup is a later slice. */}
+        {background && (
+          <Routes>
+            <Route
+              path="/notifications"
+              element={
+                <PopupRoute popupKey="notifications">
+                  <NotificationsPage />
+                </PopupRoute>
+              }
+            />
+            <Route
+              path="/intel/reported"
+              element={
+                <PopupRoute popupKey="report">
+                  <ReportedPage />
+                </PopupRoute>
+              }
+            />
+            <Route
+              path="/studio"
+              element={
+                <PopupRoute popupKey="creators">
+                  <StudioPage />
+                </PopupRoute>
+              }
+            />
+            <Route
+              path="/premium"
+              element={
+                <PopupRoute popupKey="premium">
+                  <PremiumPage />
+                </PopupRoute>
+              }
+            />
+            <Route
+              path="/business"
+              element={
+                <PopupRoute popupKey="business">
+                  <BusinessPage />
+                </PopupRoute>
+              }
+            />
+            <Route
+              path="/promotion"
+              element={
+                <PopupRoute popupKey="advertising">
+                  <AdvertisePage />
+                </PopupRoute>
+              }
+            />
+            <Route
+              path="/settings/handle"
+              element={
+                <PopupRoute popupKey="settings">
+                  <HandleSettingsPage />
+                </PopupRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <PopupRoute popupKey="profile">
+                  <ProfilePage />
+                </PopupRoute>
+              }
+            />
+            <Route path="*" element={null} />
+          </Routes>
+        )}
       </div>
     </div>
   );

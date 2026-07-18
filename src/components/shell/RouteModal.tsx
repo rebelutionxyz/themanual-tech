@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
 import { type ReactNode, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -9,7 +10,14 @@ import { useNavigate } from 'react-router-dom';
  * EventPage, …) renders unchanged inside the panel; on a direct URL hit it
  * renders full-page instead (App's main <Routes>), never inside this frame.
  */
-export function RouteModal({ children }: { children: ReactNode }) {
+export function RouteModal({
+  children,
+  panelClass,
+}: {
+  children: ReactNode;
+  /** Panel width class — defaults to max-w-2xl. */
+  panelClass?: string;
+}) {
   const navigate = useNavigate();
   const close = () => navigate(-1);
 
@@ -30,7 +38,10 @@ export function RouteModal({ children }: { children: ReactNode }) {
       aria-modal="true"
     >
       <div
-        className="relative m-auto w-full max-w-2xl rounded-2xl bg-white text-zinc-900 shadow-2xl"
+        className={cn(
+          'relative m-auto w-full rounded-2xl bg-white text-zinc-900 shadow-2xl',
+          panelClass ?? 'max-w-2xl',
+        )}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <button

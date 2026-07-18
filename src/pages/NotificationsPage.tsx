@@ -1,9 +1,11 @@
+import { usePopupScope } from '@/components/shell/PopupShell';
 import { useAuth } from '@/lib/auth';
 import { relativeTime } from '@/lib/intel';
 import {
   type NotificationItem,
   dismissNotifications,
   listNotifications,
+  listUnreadNotifications,
   markNotificationsRead,
 } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
@@ -26,7 +28,16 @@ const FILL = '#FAD15E'; // honey fill (dark ink on top)
 export function NotificationsPage() {
   const { bee } = useAuth();
   const navigate = useNavigate();
+  // Popup surface scope (null on the full page = constellation, today's
+  // behavior). Scoped with no mapped Astra → honest empty state, no query.
+  const popupScope = usePopupScope();
+  const inPopup = popupScope !== null;
+  const scoped = popupScope?.scope === 'surface';
+  const astraId = scoped ? (popupScope?.astraId ?? null) : null;
   const [rows, setRows] = useState<NotificationItem[] | null>(null);
+  // Scoped view only: fresh (unread) notifications from ANY astra, pinned
+  // above the surface's own results.
+  const [fresh, setFresh] = useState<NotificationItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -34,18 +45,33 @@ export function NotificationsPage() {
   const load = useCallback(async () => {
     if (!bee?.id) {
       setRows([]);
+      setFresh([]);
+      setHasMore(false);
       return;
     }
     setError(null);
     try {
+      if (scoped) {
+        const [unreadAll, scopedRows] = await Promise.all([
+          listUnreadNotifications(PAGE_SIZE),
+          astraId ? listNotifications(PAGE_SIZE, 0, astraId) : Promise.resolve([]),
+        ]);
+        const scopedIds = new Set(scopedRows.map((n) => n.id));
+        setFresh(unreadAll.filter((n) => !scopedIds.has(n.id)));
+        setRows(scopedRows);
+        setHasMore(scopedRows.length === PAGE_SIZE);
+        return;
+      }
+      setFresh([]);
       const page = await listNotifications(PAGE_SIZE, 0);
       setRows(page);
       setHasMore(page.length === PAGE_SIZE);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load notifications');
       setRows([]);
+      setFresh([]);
     }
-  }, [bee?.id]);
+  }, [bee?.id, scoped, astraId]);
 
   useEffect(() => {
     setRows(null);
@@ -61,7 +87,7 @@ export function NotificationsPage() {
     if (!rows || loadingMore) return;
     setLoadingMore(true);
     try {
-      const page = await listNotifications(PAGE_SIZE, rows.length);
+      const page = await listNotifications(PAGE_SIZE, rows.length, astraId);
       setRows([...rows, ...page]);
       setHasMore(page.length === PAGE_SIZE);
     } catch {
@@ -73,8 +99,16 @@ export function NotificationsPage() {
 
   async function onMarkAllRead() {
     try {
-      await markNotificationsRead(null);
+      // Scoped view marks everything VISIBLE (the any-astra fresh strip +
+      // the surface's unread); constellation marks all (ids = null → RPC
+      // marks every unread row).
+      const ids = scoped
+        ? [...fresh.map((n) => n.id), ...(rows ?? []).filter((n) => !n.isRead).map((n) => n.id)]
+        : null;
+      await markNotificationsRead(ids);
       setRows((r) => (r ? r.map((n) => ({ ...n, isRead: true })) : r));
+      // Fresh items are read now — they belong to the All view, not the strip.
+      setFresh([]);
       pingBadges();
     } catch {
       // non-fatal
@@ -83,6 +117,7 @@ export function NotificationsPage() {
 
   async function onDismiss(id: number) {
     setRows((r) => (r ? r.filter((n) => n.id !== id) : r));
+    setFresh((f) => f.filter((n) => n.id !== id));
     try {
       await dismissNotifications([id]);
       pingBadges();
@@ -94,6 +129,7 @@ export function NotificationsPage() {
   async function onOpen(n: NotificationItem) {
     if (!n.isRead) {
       setRows((r) => (r ? r.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)) : r));
+      setFresh((f) => f.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)));
       markNotificationsRead([n.id])
         .then(pingBadges)
         .catch(() => {});
@@ -106,35 +142,108 @@ export function NotificationsPage() {
     }
   }
 
-  const unread = rows?.filter((n) => !n.isRead).length ?? 0;
+  const unread =
+    (rows?.filter((n) => !n.isRead).length ?? 0) + fresh.filter((n) => !n.isRead).length;
+  const showMarkAll = Boolean(rows && unread > 0);
+
+  const renderRow = (n: NotificationItem) => (
+    <li key={n.id}>
+      <div
+        className={cn(
+          'group flex items-start gap-3 rounded-lg border p-3.5 transition-colors',
+          n.isRead ? 'border-zinc-200 bg-white' : 'border-amber-200 bg-amber-50/60',
+          n.url && 'cursor-pointer hover:bg-zinc-50',
+        )}
+        onClick={() => onOpen(n)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            void onOpen(n);
+          }
+        }}
+        role={n.url ? 'button' : undefined}
+        tabIndex={n.url ? 0 : undefined}
+      >
+        <span
+          className="mt-1.5 block h-2 w-2 flex-shrink-0 rounded-full"
+          style={{ background: n.isRead ? 'transparent' : ACCENT }}
+          aria-hidden="true"
+        />
+        <div className="min-w-0 flex-1">
+          <p
+            className={cn(
+              'text-[14px] leading-snug',
+              n.isRead ? 'text-zinc-600' : 'font-medium text-zinc-900',
+            )}
+          >
+            {n.title}
+          </p>
+          {n.body && <p className="mt-0.5 line-clamp-2 text-[12.5px] text-zinc-500">{n.body}</p>}
+          <p className="mt-1 font-mono text-[11px] text-zinc-500" data-size="meta">
+            {n.type && (
+              <span className="mr-2 rounded bg-zinc-100 px-1.5 py-0.5 uppercase tracking-wider">
+                {n.type.replace(/_/g, ' ')}
+              </span>
+            )}
+            {n.createdAt && relativeTime(n.createdAt)}
+          </p>
+        </div>
+        <button
+          type="button"
+          aria-label="Dismiss notification"
+          title="Dismiss"
+          onClick={(e) => {
+            e.stopPropagation();
+            void onDismiss(n.id);
+          }}
+          className="flex-shrink-0 rounded p-1 text-zinc-500 opacity-0 transition-opacity hover:bg-zinc-100 hover:text-zinc-900 group-hover:opacity-100"
+        >
+          <X size={15} />
+        </button>
+      </div>
+    </li>
+  );
 
   return (
-    <div className="safe-pad-x mx-auto w-full max-w-2xl px-4 py-6 md:py-8">
-      <div className="mb-5 flex items-center justify-between gap-3">
-        <h1 className="flex items-center gap-2.5 font-display text-2xl font-semibold text-zinc-900">
-          <Bell size={22} style={{ color: ACCENT }} />
-          Notifications
-          {unread > 0 && (
-            <span
-              className="rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold"
-              style={{ color: '#18181b', background: FILL }}
-              data-size="meta"
-            >
-              {unread}
-            </span>
+    <div
+      className={cn('safe-pad-x mx-auto w-full max-w-2xl px-4', inPopup ? 'py-4' : 'py-6 md:py-8')}
+    >
+      {/* In a popup, PopupShell's chrome IS the title — the page renders only
+          the actions row (when there is anything to act on). */}
+      {(!inPopup || showMarkAll) && (
+        <div
+          className={cn(
+            'mb-5 flex items-center gap-3',
+            inPopup ? 'justify-end' : 'justify-between',
           )}
-        </h1>
-        {rows && rows.length > 0 && unread > 0 && (
-          <button
-            type="button"
-            onClick={onMarkAllRead}
-            className="flex items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 py-1.5 text-[12.5px] text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
-          >
-            <CheckCheck size={14} />
-            Mark all read
-          </button>
-        )}
-      </div>
+        >
+          {!inPopup && (
+            <h1 className="flex items-center gap-2.5 font-display text-2xl font-semibold text-zinc-900">
+              <Bell size={22} style={{ color: ACCENT }} />
+              Notifications
+              {unread > 0 && (
+                <span
+                  className="rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold"
+                  style={{ color: '#18181b', background: FILL }}
+                  data-size="meta"
+                >
+                  {unread}
+                </span>
+              )}
+            </h1>
+          )}
+          {showMarkAll && (
+            <button
+              type="button"
+              onClick={onMarkAllRead}
+              className="flex items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 py-1.5 text-[12.5px] text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
+            >
+              <CheckCheck size={14} />
+              Mark all read
+            </button>
+          )}
+        </div>
+      )}
 
       {!bee ? (
         <EmptyCard line="Sign in to see your notifications." />
@@ -144,73 +253,34 @@ export function NotificationsPage() {
         </div>
       ) : rows === null ? (
         <EmptyCard line="Loading…" />
-      ) : rows.length === 0 ? (
-        <EmptyCard line="Nothing yet. Replies, mentions, and messages land here." />
+      ) : rows.length === 0 && fresh.length === 0 ? (
+        <EmptyCard
+          line={
+            scoped
+              ? 'Nothing scoped to this surface yet — notifications land here as they start carrying a surface tag.'
+              : 'Nothing yet. Replies, mentions, and messages land here.'
+          }
+        />
       ) : (
         <>
-          <ul className="flex flex-col gap-1.5">
-            {rows.map((n) => (
-              <li key={n.id}>
-                <div
-                  className={cn(
-                    'group flex items-start gap-3 rounded-lg border p-3.5 transition-colors',
-                    n.isRead
-                      ? 'border-zinc-200 bg-white'
-                      : 'border-amber-200 bg-amber-50/60',
-                    n.url && 'cursor-pointer hover:bg-zinc-50',
-                  )}
-                  onClick={() => onOpen(n)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      void onOpen(n);
-                    }
-                  }}
-                  role={n.url ? 'button' : undefined}
-                  tabIndex={n.url ? 0 : undefined}
-                >
-                  <span
-                    className="mt-1.5 block h-2 w-2 flex-shrink-0 rounded-full"
-                    style={{ background: n.isRead ? 'transparent' : ACCENT }}
-                    aria-hidden="true"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className={cn(
-                        'text-[14px] leading-snug',
-                        n.isRead ? 'text-zinc-600' : 'font-medium text-zinc-900',
-                      )}
-                    >
-                      {n.title}
-                    </p>
-                    {n.body && (
-                      <p className="mt-0.5 line-clamp-2 text-[12.5px] text-zinc-500">{n.body}</p>
-                    )}
-                    <p className="mt-1 font-mono text-[11px] text-zinc-500" data-size="meta">
-                      {n.type && (
-                        <span className="mr-2 rounded bg-zinc-100 px-1.5 py-0.5 uppercase tracking-wider">
-                          {n.type.replace(/_/g, ' ')}
-                        </span>
-                      )}
-                      {n.createdAt && relativeTime(n.createdAt)}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    aria-label="Dismiss notification"
-                    title="Dismiss"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void onDismiss(n.id);
-                    }}
-                    className="flex-shrink-0 rounded p-1 text-zinc-500 opacity-0 transition-opacity hover:bg-zinc-100 hover:text-zinc-900 group-hover:opacity-100"
-                  >
-                    <X size={15} />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {/* Scoped view: new notifications from ANY astra pin above the
+              surface's own results — being scoped never hides fresh activity. */}
+          {scoped && fresh.length > 0 && (
+            <div className="mb-4">
+              <SectionLabel text="New · all Astras" />
+              <ul className="flex flex-col gap-1.5">{fresh.map(renderRow)}</ul>
+            </div>
+          )}
+          {scoped && fresh.length > 0 && rows.length > 0 && <SectionLabel text="This surface" />}
+          {rows.length === 0 ? (
+            scoped && (
+              <p className="px-1 text-[12.5px] text-zinc-400">
+                Nothing scoped to this surface yet.
+              </p>
+            )
+          ) : (
+            <ul className="flex flex-col gap-1.5">{rows.map(renderRow)}</ul>
+          )}
           {hasMore && (
             <div className="mt-4 flex justify-center">
               <button
@@ -226,6 +296,17 @@ export function NotificationsPage() {
         </>
       )}
     </div>
+  );
+}
+
+function SectionLabel({ text }: { text: string }) {
+  return (
+    <p
+      className="mb-1.5 px-1 font-mono text-[10px] uppercase tracking-wider text-zinc-500"
+      data-size="meta"
+    >
+      {text}
+    </p>
   );
 }
 

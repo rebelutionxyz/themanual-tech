@@ -1,3 +1,4 @@
+import { ModalLink } from '@/components/shell/ModalLink';
 import {
   ASTRA_SWITCHER,
   SURFACE_FRIENDLY,
@@ -361,8 +362,11 @@ function SidebarRow({
   const style = active ? { color: accent, background: `${accent}14` } : { color: accent };
 
   if (item.to) {
+    // modal items open as overlay popups (background-location pattern);
+    // ModalLink is a drop-in <Link> that stashes the current location.
+    const LinkComp = item.modal ? ModalLink : Link;
     return (
-      <Link
+      <LinkComp
         to={item.to}
         onClick={() => onNavigate?.()}
         className={cn(base, 'hover:bg-zinc-100', active && 'font-semibold')}
@@ -373,7 +377,7 @@ function SidebarRow({
         <Icon size={19} className="flex-shrink-0" />
         {label}
         {badge}
-      </Link>
+      </LinkComp>
     );
   }
 

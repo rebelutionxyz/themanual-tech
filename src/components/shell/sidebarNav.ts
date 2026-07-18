@@ -43,6 +43,12 @@ export interface SidebarItem {
   to?: string;
   soon?: boolean;
   badge?: number;
+  /**
+   * Open `to` as an overlay popup (ModalLink → RouteModal → PopupShell)
+   * instead of navigating the center outlet. Direct hits on the same URL
+   * still render the full page — the popup and the page are one route.
+   */
+  modal?: boolean;
 }
 
 export const NEUTRAL_INK = '#536471';
@@ -56,13 +62,13 @@ export const COMMON_TAIL: SidebarItem[] = [
   // Saved threads live on INTEL (entity_saves + ThreadList savedMode); the
   // tail links there from every surface. Badge injected by CommunityLayout.
   { id: 'bookmarks', label: 'Bookmarked', icon: Bookmark, to: '/intel/saved' },
-  { id: 'notifications', label: 'Notifications', icon: Bell, to: '/notifications' },
-  { id: 'report', label: 'Reported', icon: Flag, to: '/intel/reported' },
-  { id: 'creators', label: 'Creators Studio', icon: Clapperboard, to: '/studio' },
-  { id: 'premium', label: 'Premium', icon: Crown, to: '/premium' },
-  { id: 'business', label: 'Business', icon: Briefcase, to: '/business' },
-  { id: 'advertising', label: 'Advertise', icon: Megaphone, to: '/promotion' },
-  { id: 'settings', label: 'Settings', icon: Settings, to: '/settings/handle' },
+  { id: 'notifications', label: 'Notifications', icon: Bell, to: '/notifications', modal: true },
+  { id: 'report', label: 'Reported', icon: Flag, to: '/intel/reported', modal: true },
+  { id: 'creators', label: 'Creators Studio', icon: Clapperboard, to: '/studio', modal: true },
+  { id: 'premium', label: 'Premium', icon: Crown, to: '/premium', modal: true },
+  { id: 'business', label: 'Business', icon: Briefcase, to: '/business', modal: true },
+  { id: 'advertising', label: 'Advertise', icon: Megaphone, to: '/promotion', modal: true },
+  { id: 'settings', label: 'Settings', icon: Settings, to: '/settings/handle', modal: true },
 ];
 
 /** Friendly per-surface label shown as the Astra dropdown's current value. */

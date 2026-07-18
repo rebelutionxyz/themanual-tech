@@ -87,7 +87,13 @@ export function CommunityLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { bee } = useAuth();
-  const surface = surfaceFromPath(location.pathname);
+  // Popup-aware surface: when a popup route is open, ModalLink stashed the
+  // origin location as `background` — the shell keeps rendering THAT surface
+  // (accent, items, outlet) instead of flipping to the popup path's default.
+  const shellPath =
+    (location.state as { background?: { pathname: string } } | null)?.background?.pathname ??
+    location.pathname;
+  const surface = surfaceFromPath(shellPath);
 
   // INTEL state lives in its store; UNITE/RULE/GIVE views are local (persist
   // because this layout mounts once).
