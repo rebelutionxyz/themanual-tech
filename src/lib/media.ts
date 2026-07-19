@@ -524,7 +524,196 @@ export async function deleteFolder(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+/* ───────────────────────── collections ───────────────────────── */
+// Curation shelves (creator_studio_collections_v1): kind-scoped, m2m —
+// one asset can live in many. UI label depends on kind:
+
+export const COLLECTION_LABEL: Record<MediaKind, { one: string; many: string }> = {
+  image: { one: 'Album', many: 'Albums' },
+  video: { one: 'Playlist', many: 'Playlists' },
+  audio: { one: 'Playlist', many: 'Playlists' },
+  document: { one: 'Category', many: 'Categories' },
+};
+
+export type CollectionVisibility = 'private' | 'public';
+
+export interface MediaCollection {
+  id: string;
+  kind: MediaKind;
+  name: string;
+  visibility: CollectionVisibility;
+  itemCount: number;
+  createdAt: string;
+}
+
+interface CollectionRow {
+  id: string;
+  kind: MediaKind;
+  name: string;
+  visibility: CollectionVisibility;
+  created_at: string;
+  media_collection_items: { count: number }[] | null;
+}
+
+export async function listCollections(kind?: MediaKind): Promise<MediaCollection[]> {
+  if (!supabase) return [];
+  let q = supabase
+    .from('media_collections')
+    .select('id,kind,name,visibility,created_at,media_collection_items(count)')
+    .order('name', { ascending: true });
+  if (kind) q = q.eq('kind', kind);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as CollectionRow[]).map((r) => ({
+    id: r.id,
+    kind: r.kind,
+    name: r.name,
+    visibility: r.visibility,
+    itemCount: r.media_collection_items?.[0]?.count ?? 0,
+    createdAt: r.created_at,
+  }));
+}
+
+export async function createCollection(
+  beeId: string,
+  kind: MediaKind,
+  name: string,
+): Promise<string> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { data, error } = await supabase
+    .from('media_collections')
+    .insert({ bee_id: beeId, kind, name: name.trim() })
+    .select('id')
+    .single();
+  if (error) {
+    throw new Error(
+      error.message.includes('media_collections_unique_name_per_kind')
+        ? `A ${COLLECTION_LABEL[kind].one.toLowerCase()} with that name already exists.`
+        : error.message,
+    );
+  }
+  return (data as { id: string }).id;
+}
+
+export async function renameCollection(id: string, name: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase
+    .from('media_collections')
+    .update({ name: name.trim() })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+/** Delete a shelf; the assets inside are never touched. */
+export async function deleteCollection(id: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.from('media_collections').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+/** Add assets to a shelf (already-added ones are skipped). */
+export async function addToCollection(collectionId: string, assetIds: string[]): Promise<void> {
+  if (!supabase || assetIds.length === 0) return;
+  const { error } = await supabase.from('media_collection_items').upsert(
+    assetIds.map((asset_id) => ({ collection_id: collectionId, asset_id })),
+    { onConflict: 'collection_id,asset_id', ignoreDuplicates: true },
+  );
+  if (error) {
+    throw new Error(
+      error.message.includes('row-level security')
+        ? 'Only matching media types can go in this shelf.'
+        : error.message,
+    );
+  }
+}
+
+export async function setCollectionVisibility(
+  id: string,
+  visibility: CollectionVisibility,
+): Promise<void> {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.from('media_collections').update({ visibility }).eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * A Bee's PUBLIC shelves (profile Showcase). Readable by any signed-in Bee
+ * via the hive-read policies; harmless to call for yourself too.
+ */
+export async function listPublicCollections(beeId: string): Promise<MediaCollection[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('media_collections')
+    .select('id,kind,name,visibility,created_at,media_collection_items(count)')
+    .eq('bee_id', beeId)
+    .eq('visibility', 'public')
+    .order('name', { ascending: true });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as CollectionRow[]).map((r) => ({
+    id: r.id,
+    kind: r.kind,
+    name: r.name,
+    visibility: r.visibility,
+    itemCount: r.media_collection_items?.[0]?.count ?? 0,
+    createdAt: r.created_at,
+  }));
+}
+
+export async function removeFromCollection(
+  collectionId: string,
+  assetIds: string[],
+): Promise<void> {
+  if (!supabase || assetIds.length === 0) return;
+  const { error } = await supabase
+    .from('media_collection_items')
+    .delete()
+    .eq('collection_id', collectionId)
+    .in('asset_id', assetIds);
+  if (error) throw new Error(error.message);
+}
+
+/** Contents of a shelf, newest additions first. */
+export async function listCollectionAssets(collectionId: string): Promise<MediaAsset[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('media_collection_items')
+    .select(`added_at, media_assets(${ASSET_COLS})`)
+    .eq('collection_id', collectionId)
+    .order('added_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as { media_assets: AssetRow | AssetRow[] | null }[])
+    .map((r) => (Array.isArray(r.media_assets) ? r.media_assets[0] : r.media_assets))
+    .filter((a): a is AssetRow => a !== null && a !== undefined)
+    .filter((a) => a.trashed_at === null)
+    .map(mapAsset);
+}
+
+/**
+ * Fetch a Library asset's bytes as a File — the copy-to-bucket bridge for
+ * Astra that store their own media (group albums, event covers, listings).
+ */
+export async function copyAssetToFile(asset: MediaAsset): Promise<File> {
+  const res = await fetch(assetUrl(asset));
+  if (!res.ok) throw new Error('Could not read the Library file');
+  const blob = await res.blob();
+  return new File([blob], asset.fileName, { type: asset.mimeType });
+}
+
 /* ───────────────────────── usage ───────────────────────── */
+
+export interface QuotaStatus {
+  usedBytes: number;
+  capBytes: number;
+}
+
+/** Library cap meter (v1: flat 2 GiB per Bee — media_quota_cap()). */
+export async function quotaStatus(): Promise<QuotaStatus | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('media_quota_status');
+  if (error) throw new Error(error.message);
+  const row = (data as { used_bytes: number; cap_bytes: number }[] | null)?.[0];
+  return row ? { usedBytes: Number(row.used_bytes), capBytes: Number(row.cap_bytes) } : null;
+}
 
 export async function libraryUsage(): Promise<LibraryUsage[]> {
   if (!supabase) return [];

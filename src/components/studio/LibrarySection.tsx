@@ -1,25 +1,39 @@
+import { type Group, listMyGroups, uploadGroupImage } from '@/lib/groups';
 import { relativeTime } from '@/lib/intel';
 import {
+  COLLECTION_LABEL,
   type LibrarySort,
   type LibraryUsage,
   MEDIA_ACCEPT_ALL,
   type MediaAsset,
+  type MediaCollection,
   type MediaFolder,
   type MediaKind,
+  type QuotaStatus,
+  addToCollection,
   assetUrl,
+  copyAssetToFile,
+  createCollection,
   createFolder,
+  deleteCollection,
   deleteFolder,
   downloadAsset,
   formatBytes,
   formatDuration,
   kindFromMime,
   libraryUsage,
+  listCollectionAssets,
+  listCollections,
   listFolders,
   listLibrary,
   moveAssets,
   purgeAssets,
+  quotaStatus,
+  removeFromCollection,
+  renameCollection,
   renameFolder,
   restoreAssets,
+  setCollectionVisibility,
   trashAssets,
   updateAssetMeta,
   uploadToLibrary,
@@ -34,15 +48,21 @@ import {
   Folder,
   FolderInput,
   FolderPlus,
+  Globe,
   HardDrive,
   Image as ImageIcon,
+  Layers,
   LayoutGrid,
   Link2,
   List,
+  Lock,
+  Minus,
   Music,
   Pencil,
+  Plus,
   RotateCcw,
   Search,
+  Share2,
   Trash2,
   Upload,
   Wand2,
@@ -88,7 +108,11 @@ export function LibrarySection({ beeId }: { beeId: string }) {
 
   const [assets, setAssets] = useState<MediaAsset[] | null>(null);
   const [folders, setFolders] = useState<MediaFolder[]>([]);
+  const [collections, setCollections] = useState<MediaCollection[]>([]);
+  const [activeCollection, setActiveCollection] = useState<MediaCollection | null>(null);
   const [usage, setUsage] = useState<LibraryUsage[]>([]);
+  const [quota, setQuota] = useState<QuotaStatus | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -103,6 +127,22 @@ export function LibrarySection({ beeId }: { beeId: string }) {
 
   const load = useCallback(() => {
     setError(null);
+    if (activeCollection) {
+      listCollectionAssets(activeCollection.id)
+        .then((list) => {
+          const term = search.trim().toLowerCase();
+          setAssets(
+            term
+              ? list.filter((a) => `${a.fileName} ${a.title ?? ''}`.toLowerCase().includes(term))
+              : list,
+          );
+        })
+        .catch((e) => {
+          setAssets([]);
+          setError(e instanceof Error ? e.message : 'Load failed');
+        });
+      return;
+    }
     listLibrary({
       kind: tab === 'all' || tab === 'trash' ? null : tab,
       folderId: inTrash || searching ? undefined : folderId,
@@ -115,7 +155,7 @@ export function LibrarySection({ beeId }: { beeId: string }) {
         setAssets([]);
         setError(e instanceof Error ? e.message : 'Load failed');
       });
-  }, [tab, folderId, search, sort, inTrash, searching]);
+  }, [tab, folderId, search, sort, inTrash, searching, activeCollection]);
 
   useEffect(() => {
     setAssets(null);
@@ -126,17 +166,29 @@ export function LibrarySection({ beeId }: { beeId: string }) {
     listFolders()
       .then(setFolders)
       .catch(() => setFolders([]));
+    listCollections()
+      .then(setCollections)
+      .catch(() => setCollections([]));
     libraryUsage()
       .then(setUsage)
       .catch(() => setUsage([]));
+    quotaStatus()
+      .then(setQuota)
+      .catch(() => setQuota(null));
   }, []);
 
   const refreshMeta = useCallback(() => {
     listFolders()
       .then(setFolders)
       .catch(() => {});
+    listCollections()
+      .then(setCollections)
+      .catch(() => {});
     libraryUsage()
       .then(setUsage)
+      .catch(() => {});
+    quotaStatus()
+      .then(setQuota)
       .catch(() => {});
   }, []);
 
@@ -168,7 +220,12 @@ export function LibrarySection({ beeId }: { beeId: string }) {
                 ? {
                     ...x,
                     status: 'error' as const,
-                    error: e instanceof Error ? e.message : 'failed',
+                    error:
+                      e instanceof Error
+                        ? e.message.includes('quota')
+                          ? 'Library full — free space in Trash or delete files'
+                          : e.message
+                        : 'failed',
                   }
                 : x,
             ),
@@ -251,7 +308,48 @@ export function LibrarySection({ beeId }: { beeId: string }) {
   const totalBytes = usage.reduce((n, u) => n + u.totalBytes, 0);
   const totalCount = usage.reduce((n, u) => n + u.assetCount, 0);
 
-  const showFolders = !inTrash && !searching && childFolders.length > 0;
+  const showFolders = !inTrash && !searching && !activeCollection && childFolders.length > 0;
+
+  // Collections (Albums / Playlists / Categories) live on the kind tabs.
+  const kindTab: MediaKind | null = tab === 'all' || tab === 'trash' ? null : tab;
+  const kindCollections = kindTab ? collections.filter((c) => c.kind === kindTab) : [];
+  const shelfWord = kindTab ? COLLECTION_LABEL[kindTab] : null;
+
+  async function newCollection() {
+    if (!kindTab || !shelfWord) return;
+    const name = window.prompt(`New ${shelfWord.one} name`);
+    if (!name?.trim()) return;
+    try {
+      const id = await createCollection(beeId, kindTab, name);
+      refreshMeta();
+      return id;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not create');
+    }
+  }
+
+  async function addSelectionTo(collectionId: string) {
+    try {
+      await addToCollection(collectionId, [...selected]);
+      clearSelection();
+      refreshMeta();
+      if (activeCollection?.id === collectionId) load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Add failed');
+    }
+  }
+
+  async function removeSelectionFromActive() {
+    if (!activeCollection) return;
+    try {
+      await removeFromCollection(activeCollection.id, [...selected]);
+      clearSelection();
+      refreshMeta();
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Remove failed');
+    }
+  }
 
   return (
     // Drag-drop surface only — every action inside has its own button.
@@ -281,6 +379,7 @@ export function LibrarySection({ beeId }: { beeId: string }) {
               type="button"
               onClick={() => {
                 setTab(t.key);
+                setActiveCollection(null);
                 clearSelection();
               }}
               className={cn(
@@ -299,12 +398,30 @@ export function LibrarySection({ beeId }: { beeId: string }) {
           ))}
         </div>
         <span
-          className="flex items-center gap-1.5 font-mono text-[11px] text-zinc-500"
+          className="flex items-center gap-2 font-mono text-[11px] text-zinc-500"
           data-size="meta"
-          title="Library storage in use"
+          title={
+            quota
+              ? `${formatBytes(quota.usedBytes)} of ${formatBytes(quota.capBytes)} used`
+              : 'Library storage in use'
+          }
         >
           <HardDrive size={12} />
-          {totalCount} {totalCount === 1 ? 'item' : 'items'} · {formatBytes(totalBytes)}
+          <span>
+            {totalCount} {totalCount === 1 ? 'item' : 'items'} · {formatBytes(totalBytes)}
+            {quota && ` / ${formatBytes(quota.capBytes)}`}
+          </span>
+          {quota && (
+            <span className="h-1.5 w-20 overflow-hidden rounded-full bg-zinc-200">
+              <span
+                className="block h-full rounded-full"
+                style={{
+                  width: `${Math.min(100, (quota.usedBytes / quota.capBytes) * 100)}%`,
+                  background: quota.usedBytes / quota.capBytes > 0.9 ? '#DC2626' : ACCENT,
+                }}
+              />
+            </span>
+          )}
         </span>
       </div>
 
@@ -413,7 +530,7 @@ export function LibrarySection({ beeId }: { beeId: string }) {
       </div>
 
       {/* Breadcrumb (folder navigation) */}
-      {!inTrash && !searching && (
+      {!inTrash && !searching && !activeCollection && (
         <div
           className="mb-3 flex flex-wrap items-center gap-1 font-mono text-[11.5px]"
           data-size="meta"
@@ -462,6 +579,143 @@ export function LibrarySection({ beeId }: { beeId: string }) {
         </p>
       )}
 
+      {/* Collections rail — Albums / Playlists / Categories on the kind tabs */}
+      {kindTab && shelfWord && !searching && !activeCollection && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          <span
+            className="flex items-center gap-1 font-mono text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500"
+            data-size="meta"
+          >
+            <Layers size={12} style={{ color: ACCENT }} /> {shelfWord.many}
+          </span>
+          {kindCollections.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => {
+                setActiveCollection(c);
+                clearSelection();
+              }}
+              className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[12px] text-zinc-700 transition-colors hover:border-amber-300 hover:bg-amber-50/50"
+            >
+              <span className="max-w-[140px] truncate font-medium">{c.name}</span>
+              <span className="font-mono text-[10px] text-zinc-400" data-size="meta">
+                {c.itemCount}
+              </span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => void newCollection()}
+            className="flex items-center gap-1 rounded-full border border-dashed border-zinc-300 px-2.5 py-1 text-[12px] text-zinc-500 hover:border-amber-400 hover:text-zinc-800"
+          >
+            <Plus size={12} /> New {shelfWord.one}
+          </button>
+        </div>
+      )}
+
+      {/* Open collection header */}
+      {activeCollection && shelfWord && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveCollection(null);
+              clearSelection();
+            }}
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] uppercase tracking-wider text-zinc-500 hover:bg-white"
+            data-size="meta"
+          >
+            ← {shelfWord.many}
+          </button>
+          <span className="flex items-center gap-1.5 text-[13.5px] font-semibold text-zinc-900">
+            <Layers size={14} style={{ color: ACCENT }} />
+            {activeCollection.name}
+          </span>
+          <span className="ml-auto flex items-center gap-0.5">
+            <button
+              type="button"
+              title={
+                activeCollection.visibility === 'public'
+                  ? 'Public — any signed-in Bee can view. Click to make private.'
+                  : 'Private — only you. Click to publish to your profile Showcase.'
+              }
+              onClick={() => {
+                const next = activeCollection.visibility === 'public' ? 'private' : 'public';
+                setCollectionVisibility(activeCollection.id, next)
+                  .then(() => {
+                    setActiveCollection({ ...activeCollection, visibility: next });
+                    refreshMeta();
+                  })
+                  .catch((e) => setError(e instanceof Error ? e.message : 'Update failed'));
+              }}
+              className={cn(
+                'mr-1 flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider',
+                activeCollection.visibility === 'public'
+                  ? 'border-green-300 bg-green-50 text-green-700'
+                  : 'border-zinc-300 bg-white text-zinc-500 hover:border-zinc-400',
+              )}
+              data-size="meta"
+            >
+              {activeCollection.visibility === 'public' ? <Globe size={10} /> : <Lock size={10} />}
+              {activeCollection.visibility === 'public' ? 'Public' : 'Private'}
+            </button>
+            {activeCollection.kind === 'image' && (
+              <button
+                type="button"
+                title="Copy this Album into a group album"
+                aria-label="Share to a Group"
+                onClick={() => setShareOpen(true)}
+                className="rounded p-1 text-zinc-400 hover:bg-white hover:text-zinc-700"
+              >
+                <Share2 size={12} />
+              </button>
+            )}
+            <button
+              type="button"
+              title={`Rename ${shelfWord.one}`}
+              aria-label={`Rename ${shelfWord.one}`}
+              onClick={() => {
+                const name = window.prompt(`Rename ${shelfWord.one}`, activeCollection.name);
+                if (name?.trim() && name.trim() !== activeCollection.name) {
+                  renameCollection(activeCollection.id, name)
+                    .then(() => {
+                      setActiveCollection({ ...activeCollection, name: name.trim() });
+                      refreshMeta();
+                    })
+                    .catch((e) => setError(e instanceof Error ? e.message : 'Rename failed'));
+                }
+              }}
+              className="rounded p-1 text-zinc-400 hover:bg-white hover:text-zinc-700"
+            >
+              <Pencil size={12} />
+            </button>
+            <button
+              type="button"
+              title={`Delete ${shelfWord.one} (files stay in your Library)`}
+              aria-label={`Delete ${shelfWord.one}`}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Delete “${activeCollection.name}”? The files stay in your Library.`,
+                  )
+                ) {
+                  deleteCollection(activeCollection.id)
+                    .then(() => {
+                      setActiveCollection(null);
+                      refreshMeta();
+                    })
+                    .catch((e) => setError(e instanceof Error ? e.message : 'Delete failed'));
+                }
+              }}
+              className="rounded p-1 text-zinc-400 hover:bg-red-50 hover:text-red-600"
+            >
+              <Trash2 size={12} />
+            </button>
+          </span>
+        </div>
+      )}
+
       {/* Folder cards */}
       {showFolders && (
         <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
@@ -492,7 +746,9 @@ export function LibrarySection({ beeId }: { beeId: string }) {
             ? 'Trash is empty.'
             : searching
               ? 'Nothing matches that search.'
-              : 'Nothing here yet — drop files anywhere, or hit Upload.'}
+              : activeCollection && shelfWord
+                ? `Nothing in this ${shelfWord.one} yet — go back, select files, and use “Add to ${shelfWord.one}”.`
+                : 'Nothing here yet — drop files anywhere, or hit Upload.'}
         </div>
       ) : layout === 'grid' ? (
         <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -529,6 +785,25 @@ export function LibrarySection({ beeId }: { beeId: string }) {
           {!inTrash ? (
             <>
               <MoveMenu folders={folders} onMove={(t) => void moveSelection(t)} />
+              {kindTab && shelfWord && (
+                <AddToCollectionMenu
+                  label={shelfWord.one}
+                  collections={kindCollections}
+                  onAdd={(id) => void addSelectionTo(id)}
+                  onNew={() => {
+                    void newCollection().then((id) => {
+                      if (id) void addSelectionTo(id);
+                    });
+                  }}
+                />
+              )}
+              {activeCollection && shelfWord && (
+                <BulkButton
+                  icon={<Minus size={12} />}
+                  label={`Remove from ${shelfWord.one}`}
+                  onClick={() => void removeSelectionFromActive()}
+                />
+              )}
               <BulkButton
                 icon={<Download size={12} />}
                 label="Download"
@@ -622,6 +897,15 @@ export function LibrarySection({ beeId }: { beeId: string }) {
             <Upload size={16} /> Drop to add to your library
           </p>
         </div>
+      )}
+
+      {shareOpen && activeCollection && (
+        <GroupShareModal
+          beeId={beeId}
+          collectionName={activeCollection.name}
+          assets={(assets ?? []).filter((a) => a.kind === 'image')}
+          onClose={() => setShareOpen(false)}
+        />
       )}
 
       {newFolderOpen && (
@@ -900,6 +1184,175 @@ function MoveMenu({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function AddToCollectionMenu({
+  label,
+  collections,
+  onAdd,
+  onNew,
+}: {
+  label: string;
+  collections: MediaCollection[];
+  onAdd: (collectionId: string) => void;
+  onNew: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <BulkButton
+        icon={<Layers size={12} />}
+        label={`Add to ${label}…`}
+        onClick={() => setOpen((v) => !v)}
+      />
+      {open && (
+        <div className="absolute bottom-full left-0 z-30 mb-1 max-h-56 w-52 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+          {collections.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => {
+                onAdd(c.id);
+                setOpen(false);
+              }}
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-zinc-700 hover:bg-zinc-50"
+            >
+              <Layers size={12} style={{ color: ACCENT }} />
+              <span className="min-w-0 flex-1 truncate">{c.name}</span>
+              <span className="font-mono text-[10px] text-zinc-400" data-size="meta">
+                {c.itemCount}
+              </span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onNew();
+            }}
+            className="flex w-full items-center gap-2 border-t border-zinc-100 px-3 py-1.5 text-left text-[12px] font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            <Plus size={12} /> New {label}…
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Copy an image Album's contents into one of the Bee's group albums. */
+function GroupShareModal({
+  beeId,
+  collectionName,
+  assets,
+  onClose,
+}: {
+  beeId: string;
+  collectionName: string;
+  assets: MediaAsset[];
+  onClose: () => void;
+}) {
+  const [groups, setGroups] = useState<Group[] | null>(null);
+  const [progress, setProgress] = useState<{ at: number; total: number } | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    listMyGroups(beeId)
+      .then(setGroups)
+      .catch(() => setGroups([]));
+  }, [beeId]);
+
+  async function shareTo(group: Group) {
+    if (progress) return;
+    setError(null);
+    setProgress({ at: 0, total: assets.length });
+    try {
+      for (let i = 0; i < assets.length; i++) {
+        const file = await copyAssetToFile(assets[i]);
+        await uploadGroupImage(group.id, 'album', file);
+        setProgress({ at: i + 1, total: assets.length });
+      }
+      setDone(group.name);
+      setProgress(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Share failed');
+      setProgress(null);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop scrim; close button provided */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div className="relative w-full max-w-sm rounded-lg border border-zinc-200 bg-white p-5 shadow-xl">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-display text-[16px] font-semibold text-zinc-900">
+            Share “{collectionName}” to a Group
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+          >
+            <X size={15} />
+          </button>
+        </div>
+        <p className="mb-3 text-[12px] text-zinc-500">
+          Copies {assets.length} {assets.length === 1 ? 'image' : 'images'} into the group's album.
+          Your Library originals stay put.
+        </p>
+        {done ? (
+          <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-[12.5px] text-green-700">
+            Shared to {done} — the album has them now.
+          </p>
+        ) : progress ? (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-mono text-[12px] text-zinc-700">
+            Copying {progress.at} / {progress.total}…
+          </p>
+        ) : groups === null ? (
+          <p className="py-4 text-center text-[12.5px] text-zinc-500">Loading your groups…</p>
+        ) : groups.length === 0 ? (
+          <p className="py-4 text-center text-[12.5px] text-zinc-500">
+            You're not in any groups yet.
+          </p>
+        ) : (
+          <ul className="flex max-h-56 flex-col gap-1.5 overflow-y-auto">
+            {groups.map((g) => (
+              <li key={g.id}>
+                <button
+                  type="button"
+                  onClick={() => void shareTo(g)}
+                  disabled={assets.length === 0}
+                  className="flex w-full items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-left text-[13px] text-zinc-800 hover:border-amber-300 hover:bg-amber-50/40 disabled:opacity-50"
+                >
+                  <Share2 size={13} className="flex-shrink-0 text-zinc-400" />
+                  <span className="min-w-0 flex-1 truncate font-medium">{g.name}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {error && <p className="mt-2 text-[12px] text-red-600">{error}</p>}
+      </div>
     </div>
   );
 }

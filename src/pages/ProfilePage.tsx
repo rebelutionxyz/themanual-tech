@@ -1,21 +1,65 @@
-import { Navigate, Link } from 'react-router-dom';
-import { LogOut, Crown, Sparkles } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
-import { cn } from '@/lib/utils';
 import { ProfileLocationEditor } from '@/components/profile/ProfileLocationEditor';
-import { getOGGeneration, getOGDisplayLabel } from '@/lib/og-generation';
+import { useAuth } from '@/lib/auth';
+import {
+  COLLECTION_LABEL,
+  type MediaAsset,
+  type MediaCollection,
+  assetUrl,
+  listCollectionAssets,
+  listPublicCollections,
+} from '@/lib/media';
+import { getOGDisplayLabel, getOGGeneration } from '@/lib/og-generation';
+import { cn } from '@/lib/utils';
+import { Crown, FileText, Globe, Layers, LogOut, Music, Sparkles, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, Navigate } from 'react-router-dom';
 
 const BLING_RANK_NAMES = [
-  'Seed', 'Sprout', 'Sapling', 'Ranger', 'Scout', 'Squire', 'Knight', 'Protector',
-  'Defender', 'Guardian', 'Champion', 'Hero', 'Paladin', 'Sage', 'Wizard', 'Mystic',
-  'Oracle', 'Prophet', 'Luminary', 'Ascendant', 'Exalted', 'Sovereign', 'Radiant',
-  'Celestial', 'Divine', 'Archon', 'Demiurge', 'Eternal', 'Infinite', 'Transcendent',
-  'Absolute', 'Miraculous', 'Miracle',
+  'Seed',
+  'Sprout',
+  'Sapling',
+  'Ranger',
+  'Scout',
+  'Squire',
+  'Knight',
+  'Protector',
+  'Defender',
+  'Guardian',
+  'Champion',
+  'Hero',
+  'Paladin',
+  'Sage',
+  'Wizard',
+  'Mystic',
+  'Oracle',
+  'Prophet',
+  'Luminary',
+  'Ascendant',
+  'Exalted',
+  'Sovereign',
+  'Radiant',
+  'Celestial',
+  'Divine',
+  'Archon',
+  'Demiurge',
+  'Eternal',
+  'Infinite',
+  'Transcendent',
+  'Absolute',
+  'Miraculous',
+  'Miracle',
 ];
 
 const RING_NAMES = [
-  'NewBee', 'Producer', 'Scout', 'Builder', 'Scholar',
-  'Sentinel', 'Guardian', 'Creator', 'Queen',
+  'NewBee',
+  'Producer',
+  'Scout',
+  'Builder',
+  'Scholar',
+  'Sentinel',
+  'Guardian',
+  'Creator',
+  'Queen',
 ];
 
 const RING_THRESHOLDS = [0, 500, 2000, 6000, 15000, 35000, 75000, 150000, 300000];
@@ -110,16 +154,17 @@ export function ProfilePage() {
       {/* Phase C Component C-4: location editor — reads/writes bee_profiles */}
       <ProfileLocationEditor />
 
+      {/* Creator Studio Showcase — the Bee's PUBLIC shelves. Renders on the
+          Bee's own /profile today; the same data lights up for visitors when
+          /bees/:handle lands (hive-read policies already deployed). */}
+      <ShowcaseSection beeId={bee.id} />
+
       {/* Contributions placeholder */}
       <div className="mt-10 rounded-lg border border-border bg-bg-elevated/40 p-6">
         <h2 className="font-display text-xl font-semibold text-text-silver-bright">
           Your contributions
         </h2>
-        <p
-          className="mt-2 font-mono text-text-muted"
-          style={{ fontSize: '11px' }}
-          data-size="meta"
-        >
+        <p className="mt-2 font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
           Sources added · kettle votes · comments — coming soon
         </p>
         <Link
@@ -172,14 +217,8 @@ function RankCard({
           {title}
         </span>
       </div>
-      <p className="mt-3 font-display text-2xl font-semibold text-text-silver-bright">
-        {name}
-      </p>
-      <p
-        className="mt-0.5 font-mono text-text-muted"
-        style={{ fontSize: '11px' }}
-        data-size="meta"
-      >
+      <p className="mt-3 font-display text-2xl font-semibold text-text-silver-bright">{name}</p>
+      <p className="mt-0.5 font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
         Level {level} / {max}
       </p>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-bg">
@@ -192,14 +231,187 @@ function RankCard({
         {subtitle}
       </p>
       {nextThreshold !== null && nextThreshold !== undefined && (
-        <p
-          className="mt-2 font-mono text-text-muted"
-          style={{ fontSize: '11px' }}
-          data-size="meta"
-        >
+        <p className="mt-2 font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
           next: {nextThreshold.toLocaleString()} actions
         </p>
       )}
+    </div>
+  );
+}
+
+/* ───────────────────────── Showcase (Creator Studio) ───────────────────────── */
+
+function ShowcaseSection({ beeId }: { beeId: string }) {
+  const [shelves, setShelves] = useState<MediaCollection[] | null>(null);
+  const [open, setOpen] = useState<MediaCollection | null>(null);
+
+  useEffect(() => {
+    listPublicCollections(beeId)
+      .then(setShelves)
+      .catch(() => setShelves([]));
+  }, [beeId]);
+
+  return (
+    <div className="mt-10 rounded-lg border border-border bg-bg-elevated/40 p-6">
+      <h2 className="flex items-center gap-2 font-display text-xl font-semibold text-text-silver-bright">
+        <Globe size={17} className="text-text-silver" /> Showcase
+      </h2>
+      <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
+        Public Albums, Playlists, and Categories from your Creators Studio Library
+      </p>
+      {shelves === null ? (
+        <p className="mt-4 text-text-dim" style={{ fontSize: '12.5px' }}>
+          Loading…
+        </p>
+      ) : shelves.length === 0 ? (
+        <p className="mt-4 text-text-dim" style={{ fontSize: '12.5px' }}>
+          Nothing public yet — open a shelf in your{' '}
+          <Link to="/studio" className="underline hover:text-text-silver-bright">
+            Creators Studio Library
+          </Link>{' '}
+          and flip it to Public.
+        </p>
+      ) : (
+        <ul className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          {shelves.map((c) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                onClick={() => setOpen(c)}
+                className="w-full rounded-lg border border-border bg-bg p-3 text-left transition-colors hover:border-text-silver/40"
+              >
+                <span
+                  className="flex items-center gap-1.5 text-text-silver-bright"
+                  style={{ fontSize: '13.5px', fontWeight: 600 }}
+                >
+                  <Layers size={13} />
+                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                </span>
+                <span
+                  className="mt-1 block font-mono text-text-muted"
+                  style={{ fontSize: '10.5px' }}
+                  data-size="meta"
+                >
+                  {COLLECTION_LABEL[c.kind].one} · {c.itemCount}{' '}
+                  {c.itemCount === 1 ? 'item' : 'items'}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {open && <ShowcaseViewer collection={open} onClose={() => setOpen(null)} />}
+    </div>
+  );
+}
+
+function ShowcaseViewer({
+  collection,
+  onClose,
+}: {
+  collection: MediaCollection;
+  onClose: () => void;
+}) {
+  const [assets, setAssets] = useState<MediaAsset[] | null>(null);
+
+  useEffect(() => {
+    listCollectionAssets(collection.id)
+      .then(setAssets)
+      .catch(() => setAssets([]));
+  }, [collection.id]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop scrim; close button provided */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div className="relative flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
+          <h3 className="flex min-w-0 items-center gap-2 font-display text-[15px] font-semibold text-zinc-900">
+            <Layers size={15} className="text-amber-600" />
+            <span className="truncate">{collection.name}</span>
+            <span
+              className="font-mono text-[10.5px] font-normal uppercase tracking-wider text-zinc-400"
+              data-size="meta"
+            >
+              {COLLECTION_LABEL[collection.kind].one}
+            </span>
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          {assets === null ? (
+            <p className="py-10 text-center text-[13px] text-zinc-500">Loading…</p>
+          ) : assets.length === 0 ? (
+            <p className="py-10 text-center text-[13px] text-zinc-500">Empty shelf.</p>
+          ) : collection.kind === 'image' ? (
+            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {assets.map((a) => (
+                <li key={a.id}>
+                  <a
+                    href={assetUrl(a)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block overflow-hidden rounded-lg border border-zinc-200"
+                  >
+                    <img
+                      src={assetUrl(a)}
+                      alt={a.altText ?? a.fileName}
+                      loading="lazy"
+                      className="aspect-square w-full object-cover"
+                    />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {assets.map((a) => (
+                <li key={a.id} className="rounded-lg border border-zinc-200 p-2.5">
+                  <p className="mb-1.5 truncate text-[13px] font-medium text-zinc-800">
+                    {a.title || a.fileName}
+                  </p>
+                  {a.kind === 'video' && (
+                    // biome-ignore lint/a11y/useMediaCaption: Bee-shared media has no caption track
+                    <video
+                      src={assetUrl(a)}
+                      controls
+                      playsInline
+                      className="max-h-64 w-full rounded bg-black"
+                    />
+                  )}
+                  {a.kind === 'audio' && (
+                    // biome-ignore lint/a11y/useMediaCaption: Bee-shared media has no caption track
+                    <audio src={assetUrl(a)} controls className="w-full" />
+                  )}
+                  {a.kind === 'document' && (
+                    <a
+                      href={assetUrl(a)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 text-[12.5px] text-zinc-600 underline hover:text-zinc-900"
+                    >
+                      {a.kind === 'document' ? <FileText size={14} /> : <Music size={14} />}
+                      Open document
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

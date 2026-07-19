@@ -1,4 +1,5 @@
 import { CreateEventModal } from '@/components/events/CreateEventModal';
+import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useAuth } from '@/lib/auth';
 import {
   type EventItem,
@@ -20,6 +21,7 @@ import {
 } from '@/lib/events';
 import { type Group, getGroupsByIds } from '@/lib/groups';
 import { relativeTime } from '@/lib/intel';
+import { copyAssetToFile } from '@/lib/media';
 import { cn, formatCount } from '@/lib/utils';
 import {
   ArrowLeft,
@@ -29,6 +31,7 @@ import {
   Check,
   Clock,
   ExternalLink,
+  FolderOpen,
   HelpCircle,
   MapPin,
   MessageSquare,
@@ -75,6 +78,7 @@ export function EventPage() {
   const [cancelArmed, setCancelArmed] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const coverInput = useRef<HTMLInputElement>(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!id) return;
@@ -219,6 +223,16 @@ export function EventPage() {
             <>
               <button
                 type="button"
+                onClick={() => setLibraryOpen(true)}
+                disabled={uploadingCover}
+                className="absolute right-28 bottom-2 inline-flex items-center gap-1.5 rounded-md bg-black/55 px-2.5 py-1 text-white backdrop-blur-sm transition-colors hover:bg-black/70 disabled:opacity-60"
+                style={{ fontSize: '11.5px' }}
+              >
+                <FolderOpen size={12} />
+                Library
+              </button>
+              <button
+                type="button"
                 onClick={() => coverInput.current?.click()}
                 disabled={uploadingCover}
                 className="absolute right-2 bottom-2 inline-flex items-center gap-1.5 rounded-md bg-black/55 px-2.5 py-1 text-white backdrop-blur-sm transition-colors hover:bg-black/70 disabled:opacity-60"
@@ -234,6 +248,17 @@ export function EventPage() {
                 className="hidden"
                 onChange={(e) => onCoverPicked(e.target.files?.[0])}
               />
+              {libraryOpen && (
+                <MediaPicker
+                  kinds={['image']}
+                  title="Event cover from your Library"
+                  onClose={() => setLibraryOpen(false)}
+                  onPick={(a) => {
+                    setLibraryOpen(false);
+                    void copyAssetToFile(a).then((f) => onCoverPicked(f));
+                  }}
+                />
+              )}
             </>
           )}
         </div>

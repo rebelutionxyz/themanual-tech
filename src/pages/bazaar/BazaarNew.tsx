@@ -1,9 +1,11 @@
 import { BAZAAR_ACCENT } from '@/components/bazaar/cards';
 import { useCategoryGroups } from '@/components/bazaar/useCategoryGroups';
+import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useAuth } from '@/lib/auth';
 import { bazaarCreateListing, uploadListingImage } from '@/lib/bazaar';
+import { copyAssetToFile } from '@/lib/media';
 import { cn } from '@/lib/utils';
-import { ArrowLeft, ImagePlus, Loader2, Plus, ShoppingBag, X } from 'lucide-react';
+import { ArrowLeft, FolderOpen, ImagePlus, Loader2, Plus, ShoppingBag, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -30,6 +32,7 @@ export function BazaarNew() {
   const [description, setDescription] = useState('');
   const [imageInputs, setImageInputs] = useState<string[]>(['']);
   const [uploadingImages, setUploadingImages] = useState(0);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const imageFileInput = useRef<HTMLInputElement>(null);
 
   async function onImageFilesPicked(files: FileList | null) {
@@ -259,6 +262,14 @@ export function BazaarNew() {
               <ImagePlus size={13} />
               {uploadingImages > 0 ? `Uploading ${uploadingImages}…` : 'Upload photos'}
             </button>
+            <button
+              type="button"
+              onClick={() => setLibraryOpen(true)}
+              disabled={uploadingImages > 0}
+              className="inline-flex items-center gap-1 rounded-md border border-zinc-300 px-2 py-1 text-[12px] font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-60"
+            >
+              <FolderOpen size={13} /> From Library
+            </button>
             <input
               ref={imageFileInput}
               type="file"
@@ -270,6 +281,28 @@ export function BazaarNew() {
                 e.target.value = '';
               }}
             />
+            {libraryOpen && (
+              <MediaPicker
+                kinds={['image']}
+                title="Listing photo from your Library"
+                onClose={() => setLibraryOpen(false)}
+                onPick={(a) => {
+                  setLibraryOpen(false);
+                  if (!bee?.id) return;
+                  setUploadingImages(1);
+                  copyAssetToFile(a)
+                    .then((f) => uploadListingImage(bee.id, f))
+                    .then((url) =>
+                      setImageInputs((prev) => {
+                        const next = prev.filter((v) => v.trim() !== '');
+                        return [...next, url, ''];
+                      }),
+                    )
+                    .catch(() => {})
+                    .finally(() => setUploadingImages(0));
+                }}
+              />
+            )}
           </div>
         </Field>
 
