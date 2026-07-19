@@ -2,6 +2,7 @@ import { HQControlRoom } from '@/components/hq/HQControlRoom';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
+import { PopupRoute } from '@/components/shell/PopupShell';
 import {
   CartPlaceholder,
   ManualGroupsPlaceholder,
@@ -77,7 +78,9 @@ import { ThreadPage } from '@/pages/intel/ThreadPage';
 import { ChannelPage } from '@/pages/pulse/ChannelPage';
 import { PulseHome } from '@/pages/pulse/PulseHome';
 import { WatchPage } from '@/pages/pulse/WatchPage';
-import { PopupRoute } from '@/components/shell/PopupShell';
+import { ImageEditorPage } from '@/pages/studio/ImageEditorPage';
+import { ResponseRecorderPage } from '@/pages/studio/ResponseRecorderPage';
+import { VideoEditorPage } from '@/pages/studio/VideoEditorPage';
 import { useBranding } from '@/stores/useBranding';
 import { useEffect } from 'react';
 import { type Location, Navigate, Route, Routes, useLocation } from 'react-router-dom';
@@ -273,6 +276,11 @@ function AppContent() {
             <Route path="/bookmarks" element={<BookmarksPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/studio" element={<StudioPage />} />
+            {/* Creator Studio editors — full-page tools inside the same shell.
+              :assetId = library asset, or "new" (blank canvas, ?w=&h=). */}
+            <Route path="/studio/edit/image/:assetId" element={<ImageEditorPage />} />
+            <Route path="/studio/edit/video/:assetId" element={<VideoEditorPage />} />
+            <Route path="/studio/record" element={<ResponseRecorderPage />} />
             <Route path="/premium" element={<PremiumPage />} />
             <Route path="/business" element={<BusinessPage />} />
             <Route path="/promotion" element={<AdvertisePage />} />

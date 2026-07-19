@@ -1,5 +1,11 @@
+import { LibrarySection } from '@/components/studio/LibrarySection';
 import { useAuth } from '@/lib/auth';
-import { listThreadIdsByAuthor, listThreadsByIds, relativeTime, type ForumThread } from '@/lib/intel';
+import {
+  type ForumThread,
+  listThreadIdsByAuthor,
+  listThreadsByIds,
+  relativeTime,
+} from '@/lib/intel';
 import {
   type MyBroadcast,
   type MyChannel,
@@ -17,6 +23,7 @@ import { cn } from '@/lib/utils';
 import {
   Boxes,
   Clapperboard,
+  FolderOpen,
   Hammer,
   MessageSquare,
   MessagesSquare,
@@ -32,17 +39,18 @@ import { Link } from 'react-router-dom';
 const STUDIO_ACCENT = '#D97706'; // amber ink — honey accent that reads on white
 const STUDIO_FILL = '#FAD15E'; // honey fill (dark ink on top)
 
-type Tab = 'threads' | 'replies' | 'video';
+type Tab = 'library' | 'threads' | 'replies' | 'video';
 
 /**
  * CREATORS STUDIO — a Workshop section (/studio).
  * Create + manage everything you've put on the platform, across all Astras:
- * threads, replies, and video posts. Sibling Workshop sections (Create Novas,
- * Create Apps) land in their own dispatches.
+ * the media Library (images / video / audio / docs — the shelf every Astra
+ * pulls from), threads, replies, and video posts. Sibling Workshop sections
+ * (Create Novas, Create Apps) land in their own dispatches.
  */
 export function StudioPage() {
   const { bee } = useAuth();
-  const [tab, setTab] = useState<Tab>('threads');
+  const [tab, setTab] = useState<Tab>('library');
 
   return (
     <div className="safe-pad-x mx-auto w-full max-w-3xl px-4 py-6 md:py-8">
@@ -99,6 +107,9 @@ export function StudioPage() {
       ) : (
         <>
           <div className="mb-4 inline-flex rounded-md border border-zinc-200 bg-white p-0.5">
+            <TabButton active={tab === 'library'} onClick={() => setTab('library')}>
+              <FolderOpen size={13} /> Library
+            </TabButton>
             <TabButton active={tab === 'threads'} onClick={() => setTab('threads')}>
               <MessagesSquare size={13} /> Threads
             </TabButton>
@@ -110,6 +121,7 @@ export function StudioPage() {
             </TabButton>
           </div>
 
+          {tab === 'library' && <LibrarySection beeId={bee.id} />}
           {tab === 'threads' && <MyThreadsSection beeId={bee.id} />}
           {tab === 'replies' && <MyRepliesSection beeId={bee.id} />}
           {tab === 'video' && <MyVideoSection beeId={bee.id} />}
@@ -229,18 +241,26 @@ function EditThreadModal({
 
   return (
     <ModalShell title="Edit thread" onClose={onClose}>
-      <label htmlFor="studio-field-1" className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+      <label
+        htmlFor="studio-field-1"
+        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+      >
         Title
       </label>
-      <input id="studio-field-1"
+      <input
+        id="studio-field-1"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         className="mb-3 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[14px] text-zinc-900 outline-none focus:border-honey/60"
       />
-      <label htmlFor="studio-field-2" className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+      <label
+        htmlFor="studio-field-2"
+        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+      >
         Body
       </label>
-      <textarea id="studio-field-2"
+      <textarea
+        id="studio-field-2"
         value={body}
         onChange={(e) => setBody(e.target.value)}
         rows={7}
@@ -517,10 +537,14 @@ function CreateChannelCard({ onCreated }: { onCreated: () => void }) {
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label htmlFor="studio-field-3" className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+          <label
+            htmlFor="studio-field-3"
+            className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+          >
             Handle
           </label>
-          <input id="studio-field-3"
+          <input
+            id="studio-field-3"
             value={handle}
             onChange={(e) => setHandle(e.target.value.toLowerCase())}
             placeholder="my-channel"
@@ -531,10 +555,14 @@ function CreateChannelCard({ onCreated }: { onCreated: () => void }) {
           )}
         </div>
         <div>
-          <label htmlFor="studio-field-4" className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+          <label
+            htmlFor="studio-field-4"
+            className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+          >
             Name
           </label>
-          <input id="studio-field-4"
+          <input
+            id="studio-field-4"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="My Channel"
@@ -542,10 +570,14 @@ function CreateChannelCard({ onCreated }: { onCreated: () => void }) {
           />
         </div>
       </div>
-      <label htmlFor="studio-field-5" className="mb-1 mt-3 block font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+      <label
+        htmlFor="studio-field-5"
+        className="mb-1 mt-3 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+      >
         Tagline (optional)
       </label>
-      <input id="studio-field-5"
+      <input
+        id="studio-field-5"
         value={tagline}
         onChange={(e) => setTagline(e.target.value)}
         className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[14px] text-zinc-900 outline-none focus:border-honey/60"
@@ -576,7 +608,11 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
     setBusy(true);
     setError(null);
     try {
-      await scheduleMyBroadcast(title.trim(), new Date(when).toISOString(), summary.trim() || undefined);
+      await scheduleMyBroadcast(
+        title.trim(),
+        new Date(when).toISOString(),
+        summary.trim() || undefined,
+      );
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Scheduling failed');
@@ -586,27 +622,39 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
 
   return (
     <ModalShell title="Schedule a video post" onClose={onClose}>
-      <label htmlFor="studio-field-6" className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+      <label
+        htmlFor="studio-field-6"
+        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+      >
         Title
       </label>
-      <input id="studio-field-6"
+      <input
+        id="studio-field-6"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         className="mb-3 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[14px] text-zinc-900 outline-none focus:border-honey/60"
       />
-      <label htmlFor="studio-field-7" className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+      <label
+        htmlFor="studio-field-7"
+        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+      >
         When
       </label>
-      <input id="studio-field-7"
+      <input
+        id="studio-field-7"
         type="datetime-local"
         value={when}
         onChange={(e) => setWhen(e.target.value)}
         className="mb-3 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[14px] text-zinc-900 outline-none focus:border-honey/60"
       />
-      <label htmlFor="studio-field-8" className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+      <label
+        htmlFor="studio-field-8"
+        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+      >
         Summary (optional)
       </label>
-      <textarea id="studio-field-8"
+      <textarea
+        id="studio-field-8"
         value={summary}
         onChange={(e) => setSummary(e.target.value)}
         rows={3}
@@ -648,27 +696,39 @@ function PublishVodModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
 
   return (
     <ModalShell title="Publish a video post" onClose={onClose}>
-      <label htmlFor="studio-field-9" className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+      <label
+        htmlFor="studio-field-9"
+        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+      >
         Title
       </label>
-      <input id="studio-field-9"
+      <input
+        id="studio-field-9"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         className="mb-3 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[14px] text-zinc-900 outline-none focus:border-honey/60"
       />
-      <label htmlFor="studio-field-10" className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+      <label
+        htmlFor="studio-field-10"
+        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+      >
         Recording URL
       </label>
-      <input id="studio-field-10"
+      <input
+        id="studio-field-10"
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         placeholder="https://…"
         className="mb-3 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[14px] text-zinc-900 outline-none focus:border-honey/60"
       />
-      <label htmlFor="studio-field-11" className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+      <label
+        htmlFor="studio-field-11"
+        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+      >
         Summary (optional)
       </label>
-      <textarea id="studio-field-11"
+      <textarea
+        id="studio-field-11"
         value={summary}
         onChange={(e) => setSummary(e.target.value)}
         rows={3}
@@ -749,7 +809,11 @@ function ModalShell({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop scrim; Escape/Cancel close the dialog */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
       <div className="relative w-full max-w-lg rounded-lg border border-zinc-200 bg-white p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-display text-[17px] font-semibold text-zinc-900">{title}</h2>
