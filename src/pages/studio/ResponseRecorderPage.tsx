@@ -14,6 +14,7 @@ import {
   Check,
   Circle,
   Download,
+  EyeOff,
   Film,
   LayoutPanelLeft,
   Mic,
@@ -39,7 +40,7 @@ const FILL = '#FAD15E';
 // (source: response_recorder, edit_of: the video you responded to).
 // ═════════════════════════════════════════════════════════════════════
 
-type Layout = 'pip' | 'side' | 'camera';
+type Layout = 'pip' | 'side' | 'camera' | 'voice';
 
 function pickMime(): string {
   const candidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
@@ -80,6 +81,9 @@ export function ResponseRecorderPage() {
   const startedAt = useRef(0);
   const layoutRef = useRef<Layout>('pip');
   layoutRef.current = layout;
+  /** PiP bubble position as fractions of the available range (0–1). */
+  const pipPos = useRef({ fx: 1, fy: 1 });
+  const pipDrag = useRef<{ dx: number; dy: number } | null>(null);
 
   /* ───────────── load "respond to" source ───────────── */
 
@@ -194,7 +198,10 @@ export function ResponseRecorderPage() {
         }
       };
 
-      if (mode === 'camera' || !src) {
+      if (mode === 'voice' && src) {
+        // Voice-over: their video full screen; you're heard, not seen.
+        drawFit(src, 0, 0, w, h);
+      } else if (mode === 'camera' || !src) {
         if (cam) drawFit(cam, 0, 0, w, h, true);
       } else if (mode === 'side') {
         drawFit(src, 0, 0, w / 2, h);
@@ -202,13 +209,14 @@ export function ResponseRecorderPage() {
         ctx.fillStyle = '#18181b';
         ctx.fillRect(w / 2 - 2, 0, 4, h);
       } else {
-        // pip — source full, camera bottom-right
+        // pip — source full, camera bubble wherever the Bee dragged it
         drawFit(src, 0, 0, w, h);
         if (cam) {
           const pw = Math.round(w * 0.28);
           const ph = Math.round(pw * 0.75);
-          const px = w - pw - Math.round(w * 0.025);
-          const py = h - ph - Math.round(w * 0.025);
+          const m = Math.round(w * 0.025);
+          const px = Math.round(m + pipPos.current.fx * (w - pw - 2 * m));
+          const py = Math.round(m + pipPos.current.fy * (h - ph - 2 * m));
           ctx.save();
           ctx.strokeStyle = FILL;
           ctx.lineWidth = Math.max(3, w / 320);
@@ -433,7 +441,52 @@ export function ResponseRecorderPage() {
 
       {/* Stage */}
       <div className="relative overflow-hidden rounded-lg border border-zinc-200 bg-black">
-        <canvas ref={canvasRef} className="mx-auto block max-h-[60vh] w-full object-contain" />
+        <canvas
+          ref={canvasRef}
+          onPointerDown={(e) => {
+            if (layoutRef.current !== 'pip' || !srcVideo.current) return;
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const r = canvas.getBoundingClientRect();
+            const x = ((e.clientX - r.left) / r.width) * canvas.width;
+            const y = ((e.clientY - r.top) / r.height) * canvas.height;
+            const w = canvas.width;
+            const h = canvas.height;
+            const pw = Math.round(w * 0.28);
+            const ph = Math.round(pw * 0.75);
+            const m = Math.round(w * 0.025);
+            const px = m + pipPos.current.fx * (w - pw - 2 * m);
+            const py = m + pipPos.current.fy * (h - ph - 2 * m);
+            if (x >= px && x <= px + pw && y >= py && y <= py + ph) {
+              pipDrag.current = { dx: x - px, dy: y - py };
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }
+          }}
+          onPointerMove={(e) => {
+            const d = pipDrag.current;
+            const canvas = canvasRef.current;
+            if (!d || !canvas) return;
+            const r = canvas.getBoundingClientRect();
+            const x = ((e.clientX - r.left) / r.width) * canvas.width;
+            const y = ((e.clientY - r.top) / r.height) * canvas.height;
+            const w = canvas.width;
+            const h = canvas.height;
+            const pw = Math.round(w * 0.28);
+            const ph = Math.round(pw * 0.75);
+            const m = Math.round(w * 0.025);
+            const availW = w - pw - 2 * m;
+            const availH = h - ph - 2 * m;
+            pipPos.current = {
+              fx: Math.max(0, Math.min(1, (x - d.dx - m) / availW)),
+              fy: Math.max(0, Math.min(1, (y - d.dy - m) / availH)),
+            };
+          }}
+          onPointerUp={() => {
+            pipDrag.current = null;
+          }}
+          className="mx-auto block max-h-[60vh] w-full object-contain"
+          style={{ touchAction: 'none', cursor: layout === 'pip' && source ? 'move' : 'default' }}
+        />
         {countdown !== null && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/40">
             <span className="font-display text-[90px] font-bold text-white drop-shadow-lg">
@@ -474,6 +527,14 @@ export function ResponseRecorderPage() {
             <LayoutPanelLeft size={14} /> Split
           </LayoutBtn>
           <LayoutBtn
+            active={layout === 'voice'}
+            disabled={!source}
+            title="Voice-over — their video full screen, you're heard but not seen"
+            onClick={() => setLayout('voice')}
+          >
+            <EyeOff size={14} /> Voice
+          </LayoutBtn>
+          <LayoutBtn
             active={layout === 'camera'}
             title="Camera only"
             onClick={() => setLayout('camera')}
@@ -481,6 +542,11 @@ export function ResponseRecorderPage() {
             <Video size={14} /> Camera
           </LayoutBtn>
         </div>
+        {layout === 'pip' && source && (
+          <span className="font-mono text-[10.5px] text-zinc-400" data-size="meta">
+            drag your bubble to place it
+          </span>
+        )}
         <button
           type="button"
           onClick={() => setMicOn((v) => !v)}

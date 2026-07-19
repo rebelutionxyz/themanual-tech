@@ -52,21 +52,38 @@ export interface LibraryUsage {
 /** Accept attribute per kind (file pickers + drop validation). */
 export const MEDIA_ACCEPT: Record<MediaKind, string> = {
   image: 'image/jpeg,image/png,image/webp,image/gif,image/svg+xml,image/avif',
-  video: 'video/mp4,video/webm,video/quicktime,video/x-matroska',
-  audio: 'audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/x-wav,audio/ogg,audio/webm,audio/flac',
+  video:
+    'video/mp4,video/webm,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/x-m4v,video/3gpp',
+  audio:
+    'audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/x-wav,audio/ogg,audio/webm,audio/flac,audio/x-m4a',
   document:
     'application/pdf,text/plain,text/markdown,text/csv,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation',
 };
 
 export const MEDIA_ACCEPT_ALL = Object.values(MEDIA_ACCEPT).join(',');
 
-/** Classify a MIME type into a library kind (null = not accepted). */
+/**
+ * Classify a MIME type into a library kind (null = not accepted). STRICT
+ * membership against MEDIA_ACCEPT — which mirrors the bucket allowlist —
+ * so unsupported formats fail early with a clear message instead of a
+ * cryptic storage rejection.
+ */
 export function kindFromMime(mime: string): MediaKind | null {
-  if (mime.startsWith('image/')) return 'image';
-  if (mime.startsWith('video/')) return 'video';
-  if (mime.startsWith('audio/')) return 'audio';
-  if (MEDIA_ACCEPT.document.split(',').includes(mime)) return 'document';
+  for (const kind of Object.keys(MEDIA_ACCEPT) as MediaKind[]) {
+    if (MEDIA_ACCEPT[kind].split(',').includes(mime)) return kind;
+  }
   return null;
+}
+
+/** Translate raw storage errors into Bee-readable ones. */
+function friendlyStorageError(msg: string): string {
+  if (/exceeded the maximum allowed size|too large|payload too large/i.test(msg)) {
+    return 'Too big — over the per-file upload cap. Compress or trim it (or the cap gets raised in Supabase storage settings).';
+  }
+  if (/mime type .* is not supported/i.test(msg)) {
+    return 'That format is not accepted — use MP4/WebM/MOV for video, MP3/WAV/M4A for audio, PNG/JPG/WebP for images.';
+  }
+  return msg;
 }
 
 /** Human-readable byte count (1 dp above KB). */
@@ -232,7 +249,11 @@ export async function uploadToLibrary(
 ): Promise<MediaAsset> {
   if (!supabase) throw new Error('Supabase not configured');
   const kind = kindFromMime(file.type);
-  if (!kind) throw new Error(`File type not accepted: ${file.type || 'unknown'}`);
+  if (!kind) {
+    throw new Error(
+      `Format not accepted (${file.type || file.name.split('.').pop() || 'unknown'}) — use MP4/WebM/MOV, MP3/WAV/M4A, PNG/JPG/WebP, or PDF/DOC.`,
+    );
+  }
 
   const id = crypto.randomUUID();
   const path = `library/${beeId}/${id}.${extFor(file)}`;
@@ -241,7 +262,7 @@ export async function uploadToLibrary(
   const { error: upErr } = await supabase.storage
     .from(MEDIA_BUCKET)
     .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
-  if (upErr) throw new Error(upErr.message);
+  if (upErr) throw new Error(friendlyStorageError(upErr.message));
 
   const { data, error } = await supabase
     .from('media_assets')
@@ -295,7 +316,7 @@ export async function saveBlobToLibrary(
   const { error: upErr } = await supabase.storage
     .from(MEDIA_BUCKET)
     .upload(path, blob, { contentType: opts.mimeType, upsert: false });
-  if (upErr) throw new Error(upErr.message);
+  if (upErr) throw new Error(friendlyStorageError(upErr.message));
 
   const { data, error } = await supabase
     .from('media_assets')

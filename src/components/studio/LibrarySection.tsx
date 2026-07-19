@@ -21,7 +21,6 @@ import {
   downloadAsset,
   formatBytes,
   formatDuration,
-  kindFromMime,
   libraryUsage,
   listCollectionAssets,
   listCollections,
@@ -210,7 +209,7 @@ export function LibrarySection({ beeId }: { beeId: string }) {
         const file = list[i];
         const item = items[i];
         try {
-          if (!kindFromMime(file.type)) throw new Error('Type not accepted');
+          // uploadToLibrary raises a detailed format message when unsupported.
           await uploadToLibrary(beeId, file, inTrash ? null : folderId);
           setUploads((u) =>
             u.map((x) => (x.id === item.id ? { ...x, status: 'done' as const } : x)),
@@ -865,20 +864,25 @@ export function LibrarySection({ beeId }: { beeId: string }) {
           </div>
           <ul className="flex max-h-40 flex-col gap-1 overflow-y-auto">
             {uploads.map((u) => (
-              <li key={u.id} className="flex items-center gap-2 text-[11.5px]">
-                <span
-                  className={cn(
-                    'h-1.5 w-1.5 flex-shrink-0 rounded-full',
-                    u.status === 'uploading' && 'animate-pulse bg-amber-500',
-                    u.status === 'done' && 'bg-green-500',
-                    u.status === 'error' && 'bg-red-500',
+              <li key={u.id} className="text-[11.5px]">
+                <span className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      'h-1.5 w-1.5 flex-shrink-0 rounded-full',
+                      u.status === 'uploading' && 'animate-pulse bg-amber-500',
+                      u.status === 'done' && 'bg-green-500',
+                      u.status === 'error' && 'bg-red-500',
+                    )}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-zinc-700">{u.name}</span>
+                  {u.status === 'error' && (
+                    <span className="flex-shrink-0 text-[10px] font-semibold text-red-600">
+                      failed
+                    </span>
                   )}
-                />
-                <span className="min-w-0 flex-1 truncate text-zinc-700">{u.name}</span>
-                {u.status === 'error' && (
-                  <span className="text-[10px] text-red-600" title={u.error}>
-                    failed
-                  </span>
+                </span>
+                {u.status === 'error' && u.error && (
+                  <p className="mt-0.5 pl-3.5 text-[10.5px] leading-snug text-red-600">{u.error}</p>
                 )}
               </li>
             ))}
