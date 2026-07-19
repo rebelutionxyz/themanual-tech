@@ -45,7 +45,10 @@ function req() {
 }
 
 /** A nested `bees(handle,name)` embed comes back as an object (to-one). */
-type BeesEmbed = { handle: string; name: string | null } | { handle: string; name: string | null }[] | null;
+type BeesEmbed =
+  | { handle: string; name: string | null }
+  | { handle: string; name: string | null }[]
+  | null;
 function oneBee(b: BeesEmbed) {
   return Array.isArray(b) ? (b[0] ?? null) : b;
 }
@@ -99,13 +102,54 @@ export async function listMessages(conversationId: string, limit = 200): Promise
   }));
 }
 
-export async function sendMessage(conversationId: string, body: string): Promise<string> {
+export async function sendMessage(
+  conversationId: string,
+  body: string,
+  contentType: 'text' | 'media' = 'text',
+): Promise<string> {
   const { data, error } = await req().rpc('comms_send', {
     p_conversation_id: conversationId,
     p_body: body,
+    p_content_type: contentType,
   });
   if (error) throw error;
   return (data as Row)?.message_id ?? '';
+}
+
+// ── Media attachments (Creator Studio Library wiring, dispatch 2) ──
+// content_type='media', body = JSON payload. comms_send stores content_type
+// verbatim (no schema change needed); older clients render the raw JSON,
+// current clients render an inline preview.
+
+export interface CommsMediaPayload {
+  url: string;
+  kind: 'image' | 'video' | 'audio' | 'document';
+  name: string;
+}
+
+/** Send a Library asset into a conversation as an inline media message. */
+export async function sendMediaMessage(
+  conversationId: string,
+  payload: CommsMediaPayload,
+): Promise<string> {
+  return sendMessage(conversationId, JSON.stringify(payload), 'media');
+}
+
+/** Parse a media message body; null when malformed (render raw body instead). */
+export function parseMediaPayload(body: string): CommsMediaPayload | null {
+  try {
+    const p = JSON.parse(body) as Partial<CommsMediaPayload>;
+    if (
+      typeof p.url === 'string' &&
+      /^https?:\/\//i.test(p.url) &&
+      (p.kind === 'image' || p.kind === 'video' || p.kind === 'audio' || p.kind === 'document')
+    ) {
+      return { url: p.url, kind: p.kind, name: typeof p.name === 'string' ? p.name : 'attachment' };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /** Idempotent: returns the existing 1:1 conversation when one exists. */
@@ -138,10 +182,16 @@ export async function leaveConversation(conversationId: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function findBeeByHandle(handle: string): Promise<{ id: string; handle: string } | null> {
+export async function findBeeByHandle(
+  handle: string,
+): Promise<{ id: string; handle: string } | null> {
   const clean = handle.trim().replace(/^@/, '').toLowerCase();
   if (!clean) return null;
-  const { data, error } = await req().from('bees').select('id, handle').eq('handle', clean).maybeSingle();
+  const { data, error } = await req()
+    .from('bees')
+    .select('id, handle')
+    .eq('handle', clean)
+    .maybeSingle();
   if (error) throw error;
   return data ? { id: data.id, handle: data.handle } : null;
 }

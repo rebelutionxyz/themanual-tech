@@ -1,6 +1,7 @@
 import { CreateEventModal } from '@/components/events/CreateEventModal';
 import { EditGroupModal } from '@/components/groups/EditGroupModal';
 import { FollowBeeButton } from '@/components/intel/FollowBeeButton';
+import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useAuth } from '@/lib/auth';
 import { type EventItem, listEventsByGroup } from '@/lib/events';
 import {
@@ -28,6 +29,7 @@ import {
   uploadGroupImage,
 } from '@/lib/groups';
 import { relativeTime } from '@/lib/intel';
+import { assetUrl } from '@/lib/media';
 import { isSaved, toggleSave } from '@/lib/reactions';
 import { cn, formatCount } from '@/lib/utils';
 import {
@@ -41,6 +43,7 @@ import {
   Clapperboard,
   Clock,
   EyeOff,
+  FolderOpen,
   Globe,
   Image as ImageIcon,
   ImagePlus,
@@ -812,6 +815,7 @@ function ImagesPanel({
   const [images, setImages] = useState<AlbumImage[] | null>(null);
   const [uploading, setUploading] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
@@ -863,6 +867,15 @@ function ImagesPanel({
           )}
           <button
             type="button"
+            onClick={() => setLibraryOpen(true)}
+            disabled={uploading > 0}
+            className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 px-3 py-1.5 font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-60"
+            style={{ fontSize: '12.5px' }}
+          >
+            <FolderOpen size={14} /> From Library
+          </button>
+          <button
+            type="button"
             onClick={() => fileInput.current?.click()}
             disabled={uploading > 0}
             className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium text-bg transition-colors hover:brightness-110 disabled:opacity-60"
@@ -882,6 +895,36 @@ function ImagesPanel({
             }}
           />
         </div>
+      )}
+
+      {libraryOpen && (
+        <MediaPicker
+          kinds={['image']}
+          title="Add to the group album from your Library"
+          onClose={() => setLibraryOpen(false)}
+          onPick={(a) => {
+            setLibraryOpen(false);
+            setUploading(1);
+            setError(null);
+            // Album lists the group-media folder, so a Library pick is COPIED
+            // into it (public URL → blob → existing upload path + RLS).
+            fetch(assetUrl(a))
+              .then((r) => {
+                if (!r.ok) throw new Error('Could not read the Library file');
+                return r.blob();
+              })
+              .then((blob) =>
+                uploadGroupImage(
+                  groupId,
+                  'album',
+                  new File([blob], a.fileName, { type: a.mimeType }),
+                ),
+              )
+              .then(() => load())
+              .catch((e) => setError(e instanceof Error ? e.message : 'Copy failed'))
+              .finally(() => setUploading(0));
+          }}
+        />
       )}
 
       {error && (

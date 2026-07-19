@@ -1,4 +1,5 @@
 import { LibrarySection } from '@/components/studio/LibrarySection';
+import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useAuth } from '@/lib/auth';
 import {
   type ForumThread,
@@ -6,6 +7,7 @@ import {
   listThreadsByIds,
   relativeTime,
 } from '@/lib/intel';
+import { assetUrl } from '@/lib/media';
 import {
   type MyBroadcast,
   type MyChannel,
@@ -677,6 +679,7 @@ function PublishVodModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
   const [url, setUrl] = useState('');
   const [summary, setSummary] = useState('');
   const [busy, setBusy] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const urlOk = /^https?:\/\/.+/i.test(url.trim());
@@ -714,13 +717,34 @@ function PublishVodModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
       >
         Recording URL
       </label>
-      <input
-        id="studio-field-10"
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-        placeholder="https://…"
-        className="mb-3 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[14px] text-zinc-900 outline-none focus:border-honey/60"
-      />
+      <div className="mb-3 flex gap-2">
+        <input
+          id="studio-field-10"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://…"
+          className="min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-[14px] text-zinc-900 outline-none focus:border-honey/60"
+        />
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="flex flex-shrink-0 items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 py-2 text-[12px] text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+        >
+          <FolderOpen size={13} /> From Library
+        </button>
+      </div>
+      {pickerOpen && (
+        <MediaPicker
+          kinds={['video']}
+          title="Publish a video from your Library"
+          onClose={() => setPickerOpen(false)}
+          onPick={(a) => {
+            setUrl(assetUrl(a));
+            setTitle((t) => t || a.title || a.fileName.replace(/\.[a-z0-9]+$/i, ''));
+            setPickerOpen(false);
+          }}
+        />
+      )}
       <label
         htmlFor="studio-field-11"
         className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"

@@ -1,3 +1,4 @@
+import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useAuth } from '@/lib/auth';
 import {
   type CommsMessage,
@@ -10,11 +11,25 @@ import {
   listConversations,
   listMessages,
   markRead,
+  parseMediaPayload,
+  sendMediaMessage,
   sendMessage,
   startDirect,
 } from '@/lib/comms';
+import { assetUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
-import { ArrowLeft, LogOut, MessageCircle, Plus, Radio, Send, Shuffle, Users } from 'lucide-react';
+import {
+  ArrowLeft,
+  FileText,
+  LogOut,
+  MessageCircle,
+  Paperclip,
+  Plus,
+  Radio,
+  Send,
+  Shuffle,
+  Users,
+} from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -286,6 +301,7 @@ function Thread({
 }) {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
   const [leaveArmed, setLeaveArmed] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -385,15 +401,19 @@ function Thread({
                   @{handleFor(m.senderBeeId)}
                 </span>
               )}
-              <div
-                className={cn(
-                  'max-w-[78%] rounded-2xl px-3.5 py-2 text-[14px] leading-relaxed',
-                  mine ? 'rounded-br-md text-white' : 'rounded-bl-md bg-zinc-100 text-zinc-800',
-                )}
-                style={mine ? { background: COMMS_COLOR } : undefined}
-              >
-                {m.deletedAt ? <em className="opacity-60">message removed</em> : m.body}
-              </div>
+              {!m.deletedAt && m.contentType === 'media' && parseMediaPayload(m.body) ? (
+                <MediaBubble payload={parseMediaPayload(m.body)!} mine={mine} />
+              ) : (
+                <div
+                  className={cn(
+                    'max-w-[78%] rounded-2xl px-3.5 py-2 text-[14px] leading-relaxed',
+                    mine ? 'rounded-br-md text-white' : 'rounded-bl-md bg-zinc-100 text-zinc-800',
+                  )}
+                  style={mine ? { background: COMMS_COLOR } : undefined}
+                >
+                  {m.deletedAt ? <em className="opacity-60">message removed</em> : m.body}
+                </div>
+              )}
               <span className="mt-0.5 px-1 text-[10px] text-zinc-300">{timeAgo(m.createdAt)}</span>
             </div>
           );
@@ -402,6 +422,16 @@ function Thread({
       </div>
 
       <form onSubmit={submit} className="flex items-center gap-2 border-t border-zinc-100 p-2.5">
+        <button
+          type="button"
+          onClick={() => setAttachOpen(true)}
+          disabled={sending}
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-zinc-200 text-zinc-500 transition-colors hover:border-cyan-300 hover:text-cyan-700 disabled:opacity-40"
+          aria-label="Attach from your Library"
+          title="Attach from your Library"
+        >
+          <Paperclip size={15} />
+        </button>
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -418,7 +448,79 @@ function Thread({
           <Send size={15} />
         </button>
       </form>
+
+      {attachOpen && (
+        <MediaPicker
+          kinds={['image', 'video', 'audio', 'document']}
+          title="Send from your Library"
+          onClose={() => setAttachOpen(false)}
+          onPick={(a) => {
+            setAttachOpen(false);
+            setSending(true);
+            sendMediaMessage(conversation.id, {
+              url: assetUrl(a),
+              kind: a.kind,
+              name: a.title || a.fileName,
+            })
+              .then(onSent)
+              .finally(() => setSending(false));
+          }}
+        />
+      )}
     </>
+  );
+}
+
+/** Inline preview for content_type='media' messages (Library attachments). */
+function MediaBubble({
+  payload,
+  mine,
+}: {
+  payload: { url: string; kind: string; name: string };
+  mine: boolean;
+}) {
+  const frame = cn(
+    'max-w-[78%] overflow-hidden rounded-2xl border',
+    mine ? 'rounded-br-md border-cyan-200' : 'rounded-bl-md border-zinc-200',
+  );
+  if (payload.kind === 'image') {
+    return (
+      <a href={payload.url} target="_blank" rel="noreferrer" className={frame}>
+        <img
+          src={payload.url}
+          alt={payload.name}
+          loading="lazy"
+          className="max-h-64 w-full object-cover"
+        />
+      </a>
+    );
+  }
+  if (payload.kind === 'video') {
+    return (
+      <div className={frame}>
+        {/* biome-ignore lint/a11y/useMediaCaption: Bee-shared media has no caption track */}
+        <video src={payload.url} controls playsInline className="max-h-64 w-full bg-black" />
+      </div>
+    );
+  }
+  if (payload.kind === 'audio') {
+    return (
+      <div className={cn(frame, 'bg-white p-2')}>
+        {/* biome-ignore lint/a11y/useMediaCaption: Bee-shared media has no caption track */}
+        <audio src={payload.url} controls className="w-56 max-w-full" />
+      </div>
+    );
+  }
+  return (
+    <a
+      href={payload.url}
+      target="_blank"
+      rel="noreferrer"
+      className={cn(frame, 'flex items-center gap-2 bg-white px-3 py-2.5')}
+    >
+      <FileText size={16} className="flex-shrink-0 text-zinc-400" />
+      <span className="truncate text-[13px] font-medium text-zinc-800">{payload.name}</span>
+    </a>
   );
 }
 

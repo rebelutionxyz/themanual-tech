@@ -1,10 +1,10 @@
+import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useAuth } from '@/lib/auth';
 import {
   type MediaAsset,
   assetUrl,
   formatDuration,
   getAsset,
-  listLibrary,
   saveBlobToLibrary,
   updateAssetMeta,
 } from '@/lib/media';
@@ -1097,8 +1097,8 @@ export function VideoEditorPage() {
       </div>
 
       {pickerOpen && (
-        <LibraryPickerModal
-          kind={pickerOpen === 'clip' ? 'video' : 'audio'}
+        <MediaPicker
+          kinds={pickerOpen === 'clip' ? ['video'] : ['audio']}
           onClose={() => setPickerOpen(null)}
           onPick={(a) => {
             if (pickerOpen === 'clip') {
@@ -1113,104 +1113,6 @@ export function VideoEditorPage() {
           }}
         />
       )}
-    </div>
-  );
-}
-
-/* ───────────────────────── library picker ───────────────────────── */
-
-export function LibraryPickerModal({
-  kind,
-  onClose,
-  onPick,
-}: {
-  kind: 'video' | 'audio' | 'image';
-  onClose: () => void;
-  onPick: (a: MediaAsset) => void;
-}) {
-  const [assets, setAssets] = useState<MediaAsset[] | null>(null);
-
-  useEffect(() => {
-    listLibrary({ kind, sort: 'newest' })
-      .then(setAssets)
-      .catch(() => setAssets([]));
-  }, [kind]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop scrim; close button provided */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div className="relative flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
-          <h2 className="font-display text-[15px] font-semibold text-zinc-900">
-            Pick {kind === 'video' ? 'a video' : kind === 'audio' ? 'an audio track' : 'an image'}{' '}
-            from your Library
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="rounded p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
-          >
-            <X size={15} />
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          {assets === null ? (
-            <p className="py-8 text-center text-[12.5px] text-zinc-500">Loading…</p>
-          ) : assets.length === 0 ? (
-            <p className="py-8 text-center text-[12.5px] text-zinc-500">
-              Nothing of that type in your Library yet — upload some first.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-1.5">
-              {assets.map((a) => (
-                <li key={a.id}>
-                  <button
-                    type="button"
-                    onClick={() => onPick(a)}
-                    className="flex w-full items-center gap-2.5 rounded-md border border-zinc-200 px-2.5 py-2 text-left hover:border-amber-300 hover:bg-amber-50/40"
-                  >
-                    {kind === 'video' ? (
-                      <video
-                        src={assetUrl(a)}
-                        preload="metadata"
-                        muted
-                        playsInline
-                        className="h-10 w-14 flex-shrink-0 rounded bg-zinc-100 object-cover"
-                      />
-                    ) : kind === 'image' ? (
-                      <img
-                        src={assetUrl(a)}
-                        alt=""
-                        className="h-10 w-14 flex-shrink-0 rounded bg-zinc-100 object-cover"
-                      />
-                    ) : (
-                      <span className="flex h-10 w-14 flex-shrink-0 items-center justify-center rounded bg-zinc-100 text-zinc-400">
-                        <Music size={16} />
-                      </span>
-                    )}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[12.5px] font-medium text-zinc-800">
-                        {a.title || a.fileName}
-                      </span>
-                      {a.durationSeconds !== null && (
-                        <span className="font-mono text-[10.5px] text-zinc-500" data-size="meta">
-                          {formatDuration(a.durationSeconds)}
-                        </span>
-                      )}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

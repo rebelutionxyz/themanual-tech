@@ -1,3 +1,4 @@
+import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useAuth } from '@/lib/auth';
 import {
   type MediaAsset,
@@ -7,7 +8,6 @@ import {
   saveBlobToLibrary,
 } from '@/lib/media';
 import { cn } from '@/lib/utils';
-import { LibraryPickerModal } from '@/pages/studio/VideoEditorPage';
 import {
   ArrowLeft,
   Camera,
@@ -564,8 +564,8 @@ export function ResponseRecorderPage() {
       )}
 
       {pickerOpen && (
-        <LibraryPickerModal
-          kind="video"
+        <MediaPicker
+          kinds={['video']}
           onClose={() => setPickerOpen(false)}
           onPick={(a) => {
             setPickerOpen(false);
