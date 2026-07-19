@@ -450,7 +450,7 @@ export async function deleteGroupAlbumImage(path: string): Promise<void> {
 
 // ─────────────────────────── Activity feed ───────────────────────────
 
-export type GroupActivityKind = 'thread' | 'reply' | 'join' | 'event';
+export type GroupActivityKind = 'thread' | 'reply' | 'join' | 'event' | 'image';
 
 export interface GroupActivityItem {
   kind: GroupActivityKind;
@@ -471,7 +471,7 @@ export async function getGroupActivity(groupId: string, limit = 30): Promise<Gro
   if (!supabase) return [];
   const PER = 12;
 
-  const [thr, mem, evt] = await Promise.all([
+  const [thr, mem, evt, alb] = await Promise.all([
     supabase
       .from('forum_threads')
       .select('id, title, created_by, created_at')
@@ -490,6 +490,10 @@ export async function getGroupActivity(groupId: string, limit = 30): Promise<Gro
       .eq('parent_id', groupId)
       .order('created_at', { ascending: false })
       .limit(PER),
+    supabase.storage.from('group-media').list(`groups/${groupId}/album`, {
+      limit: PER,
+      sortBy: { column: 'created_at', order: 'desc' },
+    }),
   ]);
 
   // Replies live on posts of this group's threads (two-step: ids → posts).
@@ -553,6 +557,17 @@ export async function getGroupActivity(groupId: string, limit = 30): Promise<Gro
       title: String(e.title),
       refId: String(e.id),
     })),
+    // Album drops — storage list carries created_at but not the uploader,
+    // so these render as "A Bee added a photo to the album".
+    ...((alb.data ?? []) as { name?: string; created_at?: string }[])
+      .filter((o) => o.name && !o.name.startsWith('.'))
+      .map((o) => ({
+        kind: 'image' as const,
+        at: String(o.created_at ?? ''),
+        handle: null,
+        title: null,
+        refId: null,
+      })),
   ];
 
   return items

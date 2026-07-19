@@ -1,3 +1,4 @@
+import { MediaLightbox } from '@/components/studio/MediaLightbox';
 import { type Group, listMyGroups, uploadGroupImage } from '@/lib/groups';
 import { relativeTime } from '@/lib/intel';
 import {
@@ -56,6 +57,7 @@ import {
   Link2,
   List,
   Lock,
+  MessageSquare,
   Minus,
   Music,
   Pencil,
@@ -1498,6 +1500,7 @@ function AssetDrawer({
   const [folderId, setFolderId] = useState<string | ''>(asset.folderId ?? '');
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [talkOpen, setTalkOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const url = assetUrl(asset);
@@ -1659,6 +1662,13 @@ function AssetDrawer({
             >
               <Link2 size={13} /> {copied ? 'Copied!' : 'Copy link'}
             </button>
+            <button
+              type="button"
+              onClick={() => setTalkOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 py-1.5 text-[12px] text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+            >
+              <MessageSquare size={13} /> Discussion
+            </button>
             {asset.trashedAt === null ? (
               <button
                 type="button"
@@ -1806,6 +1816,15 @@ function AssetDrawer({
           </button>
         </div>
       </div>
+
+      {talkOpen && (
+        <MediaLightbox
+          media={{ kind: asset.kind, url, title: asset.title || asset.fileName }}
+          targetKind="asset"
+          targetRef={asset.id}
+          onClose={() => setTalkOpen(false)}
+        />
+      )}
     </div>
   );
 }

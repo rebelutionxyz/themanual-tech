@@ -1,6 +1,7 @@
 import { CreateEventModal } from '@/components/events/CreateEventModal';
 import { EditGroupModal } from '@/components/groups/EditGroupModal';
 import { FollowBeeButton } from '@/components/intel/FollowBeeButton';
+import { MediaLightbox } from '@/components/studio/MediaLightbox';
 import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useAuth } from '@/lib/auth';
 import { type EventItem, listEventsByGroup } from '@/lib/events';
@@ -563,6 +564,7 @@ const ACTIVITY_ICON = {
   reply: Reply,
   join: UserPlus,
   event: Calendar,
+  image: ImageIcon,
 } as const;
 
 function ActivityPanel({ groupId }: { groupId: string }) {
@@ -611,7 +613,9 @@ function ActivityPanel({ groupId }: { groupId: string }) {
               ? 'replied in'
               : it.kind === 'event'
                 ? 'scheduled'
-                : 'joined the group';
+                : it.kind === 'image'
+                  ? 'added a photo to the album'
+                  : 'joined the group';
         const to =
           it.kind === 'event' && it.refId
             ? `/rule/${it.refId}`
@@ -816,6 +820,7 @@ function ImagesPanel({
   const [uploading, setUploading] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [lightbox, setLightbox] = useState<AlbumImage | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
@@ -955,14 +960,19 @@ function ImagesPanel({
         <ul className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
           {images.map((img) => (
             <li key={img.path} className="group relative">
-              <a href={img.url} target="_blank" rel="noreferrer">
+              <button
+                type="button"
+                onClick={() => setLightbox(img)}
+                className="block w-full"
+                aria-label="Open image and discussion"
+              >
                 <img
                   src={img.url}
                   alt=""
                   loading="lazy"
-                  className="aspect-square w-full rounded-md border border-zinc-200 object-cover"
+                  className="aspect-square w-full rounded-md border border-zinc-200 object-cover transition-transform hover:scale-[1.015]"
                 />
-              </a>
+              </button>
               {canModerate && (
                 <button
                   type="button"
@@ -977,6 +987,15 @@ function ImagesPanel({
             </li>
           ))}
         </ul>
+      )}
+
+      {lightbox && (
+        <MediaLightbox
+          media={{ kind: 'image', url: lightbox.url, title: lightbox.name }}
+          targetKind="group_image"
+          targetRef={lightbox.path}
+          onClose={() => setLightbox(null)}
+        />
       )}
     </section>
   );

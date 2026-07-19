@@ -1,4 +1,5 @@
 import { ProfileLocationEditor } from '@/components/profile/ProfileLocationEditor';
+import { MediaLightbox } from '@/components/studio/MediaLightbox';
 import { useAuth } from '@/lib/auth';
 import {
   COLLECTION_LABEL,
@@ -314,6 +315,8 @@ function ShowcaseViewer({
   onClose: () => void;
 }) {
   const [assets, setAssets] = useState<MediaAsset[] | null>(null);
+  const [lightbox, setLightbox] = useState<MediaAsset | null>(null);
+  const [shelfTalk, setShelfTalk] = useState(false);
 
   useEffect(() => {
     listCollectionAssets(collection.id)
@@ -341,14 +344,23 @@ function ShowcaseViewer({
               {COLLECTION_LABEL[collection.kind].one}
             </span>
           </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="rounded p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
-          >
-            <X size={16} />
-          </button>
+          <span className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setShelfTalk(true)}
+              className="rounded-md border border-zinc-200 px-2 py-1 text-[11.5px] text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+            >
+              Discuss this {COLLECTION_LABEL[collection.kind].one}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="rounded p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+            >
+              <X size={16} />
+            </button>
+          </span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           {assets === null ? (
@@ -359,11 +371,11 @@ function ShowcaseViewer({
             <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {assets.map((a) => (
                 <li key={a.id}>
-                  <a
-                    href={assetUrl(a)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block overflow-hidden rounded-lg border border-zinc-200"
+                  <button
+                    type="button"
+                    onClick={() => setLightbox(a)}
+                    aria-label="Open image and discussion"
+                    className="block w-full overflow-hidden rounded-lg border border-zinc-200 transition-transform hover:scale-[1.01]"
                   >
                     <img
                       src={assetUrl(a)}
@@ -371,7 +383,7 @@ function ShowcaseViewer({
                       loading="lazy"
                       className="aspect-square w-full object-cover"
                     />
-                  </a>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -379,8 +391,15 @@ function ShowcaseViewer({
             <ul className="flex flex-col gap-2">
               {assets.map((a) => (
                 <li key={a.id} className="rounded-lg border border-zinc-200 p-2.5">
-                  <p className="mb-1.5 truncate text-[13px] font-medium text-zinc-800">
-                    {a.title || a.fileName}
+                  <p className="mb-1.5 flex items-center gap-2 text-[13px] font-medium text-zinc-800">
+                    <span className="min-w-0 flex-1 truncate">{a.title || a.fileName}</span>
+                    <button
+                      type="button"
+                      onClick={() => setLightbox(a)}
+                      className="flex-shrink-0 rounded border border-zinc-200 px-1.5 py-0.5 text-[10.5px] text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+                    >
+                      Discuss
+                    </button>
                   </p>
                   {a.kind === 'video' && (
                     // biome-ignore lint/a11y/useMediaCaption: Bee-shared media has no caption track
@@ -412,6 +431,27 @@ function ShowcaseViewer({
           )}
         </div>
       </div>
+
+      {lightbox && (
+        <MediaLightbox
+          media={{
+            kind: lightbox.kind,
+            url: assetUrl(lightbox),
+            title: lightbox.title || lightbox.fileName,
+          }}
+          targetKind="asset"
+          targetRef={lightbox.id}
+          onClose={() => setLightbox(null)}
+        />
+      )}
+      {shelfTalk && (
+        <MediaLightbox
+          media={{ kind: 'collection', url: null, title: collection.name }}
+          targetKind="collection"
+          targetRef={collection.id}
+          onClose={() => setShelfTalk(false)}
+        />
+      )}
     </div>
   );
 }
