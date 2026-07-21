@@ -5,7 +5,13 @@ import {
   VideoConference,
   useRoomContext,
 } from '@livekit/components-react';
-import { DisconnectReason, ExternalE2EEKeyProvider, Room, type RoomOptions } from 'livekit-client';
+import {
+  DisconnectReason,
+  ExternalE2EEKeyProvider,
+  Room,
+  type RoomOptions,
+  type VideoCaptureOptions,
+} from 'livekit-client';
 import { useEffect, useRef, useState } from 'react';
 import { getRoomToken, leaveRoom } from '@/lib/comms';
 
@@ -19,6 +25,13 @@ import { getRoomToken, leaveRoom } from '@/lib/comms';
 // path, but this is the standard high-probability fix.
 const ROOM_OPTIONS: RoomOptions = {
   publishDefaults: { videoCodec: 'h264', simulcast: false },
+};
+
+// Cap capture at VGA/24fps. iPad/iOS Safari freezes or blacks out its own
+// high-res camera under WebRTC load; a modest resolution is far more stable and
+// is plenty for a 1:1 call. Best-effort — Safari video is still finicky.
+const VIDEO_CAPTURE: VideoCaptureOptions = {
+  resolution: { width: 640, height: 480, frameRate: 24 },
 };
 
 /**
@@ -36,6 +49,8 @@ export function CallView({
   roomId,
   video = true,
   e2eeKey,
+  peerName,
+  phone,
   endWhenAlone,
   onClose,
 }: {
@@ -155,7 +170,7 @@ export function CallView({
         token={creds.token}
         serverUrl={creds.url}
         connect
-        video={video}
+        video={video ? VIDEO_CAPTURE : false}
         audio
         onDisconnected={(reason) => {
           if (closedRef.current) return; // we tore it down (End Call / other left)
@@ -167,7 +182,7 @@ export function CallView({
         onError={(e) => setError(e.message)}
         style={{ height: '100%' }}
       >
-        <VideoConference />
+        {!video && phone ? <AudioStage peerName={peerName} /> : <VideoConference />}
         <RoomAudioRenderer />
         <CallEndWatcher enabled={!!endWhenAlone} onEmpty={close} />
       </LiveKitRoom>
@@ -206,6 +221,47 @@ function CallEndWatcher({ enabled, onEmpty }: { enabled: boolean; onEmpty: () =>
   }, [enabled, room]);
 
   return null;
+}
+
+/**
+ * Dedicated audio-only screen for a voice call — avatar, name, mute. No video
+ * grid (and no video to decode, so it's reliable on Safari). Drives the mic on
+ * LiveKit's own room via context.
+ */
+function AudioStage({ peerName }: { peerName?: string }) {
+  const room = useRoomContext();
+  const [muted, setMuted] = useState(false);
+  const label = peerName || 'On call';
+  const initial = (peerName?.replace(/^@/, '')[0] || '•').toUpperCase();
+  const toggleMute = async () => {
+    const next = !muted;
+    setMuted(next);
+    try {
+      await room?.localParticipant.setMicrophoneEnabled(!next);
+    } catch {
+      /* mic may not be granted — leave the UI optimistic */
+    }
+  };
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-7 text-white">
+      <div className="flex h-28 w-28 items-center justify-center rounded-full bg-white/10 font-bold text-5xl">
+        {initial}
+      </div>
+      <div className="text-center">
+        <div className="font-semibold text-xl">{label}</div>
+        <div className="mt-1 text-sm text-white/50">Voice call</div>
+      </div>
+      <button
+        type="button"
+        onClick={toggleMute}
+        className={`rounded-full px-6 py-2.5 font-bold text-sm transition-colors ${
+          muted ? 'bg-white text-black hover:bg-white/90' : 'bg-white/15 text-white hover:bg-white/25'
+        }`}
+      >
+        {muted ? 'Unmute' : 'Mute'}
+      </button>
+    </div>
+  );
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
