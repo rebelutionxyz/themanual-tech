@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { callE2eeKey, joinRoom } from '@/lib/comms';
+import { callE2eeKey, joinRoom, leaveRoom } from '@/lib/comms';
 import { clearCallNotifications, registerPush, showCallNotification } from '@/lib/push';
 import { CallView } from './CallView';
 
@@ -168,11 +168,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<string | null>(null);
   const ringTimer = useRef<number | null>(null);
   const incomingRef = useRef<Incoming | null>(null);
+  const activeRef = useRef<ActiveCall | null>(null);
 
-  // Keep a ref of the current incoming so timers/subscriptions read fresh state.
+  // Keep refs of current incoming/active so timers + subscriptions read fresh state.
   useEffect(() => {
     incomingRef.current = incoming;
   }, [incoming]);
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -297,6 +301,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
             ringTimer.current = window.setTimeout(() => dismissIncoming('missed'), RING_MISS_MS);
           } else if (n.type === 'call_declined') {
             showToast(n.title || 'Call declined');
+            // Caller side: they declined — close my outgoing call for this room.
+            if (n.entity_id && activeRef.current?.roomId === n.entity_id) {
+              leaveRoom(n.entity_id).catch(() => {});
+              setActive(null);
+            }
           }
         },
       )

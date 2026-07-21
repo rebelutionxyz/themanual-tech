@@ -1,28 +1,31 @@
 import '@livekit/components-styles';
-import { LiveKitRoom, RoomAudioRenderer, VideoConference } from '@livekit/components-react';
-import { ExternalE2EEKeyProvider, Room } from 'livekit-client';
-import { useEffect, useState } from 'react';
+import {
+  LiveKitRoom,
+  RoomAudioRenderer,
+  VideoConference,
+  useRoomContext,
+} from '@livekit/components-react';
+import { ExternalE2EEKeyProvider, Room, RoomEvent } from 'livekit-client';
+import { useEffect, useRef, useState } from 'react';
 import { getRoomToken, leaveRoom } from '@/lib/comms';
 
 /**
  * A live LiveKit call (video or audio-only).
  *
- * PROVEN CONNECTION PATH: for plain (non-E2EE) calls we let LiveKitRoom manage
- * its own room. The experimental additions from earlier — a self-managed Room,
- * auto-end-when-alone, the "Calling…" gate, and the custom audio screen —
- * regressed calls across devices (drops before/after connect), so they've been
- * rolled back to restore working calls. They can return once there's a stable,
- * device-tested base. Extra props are still accepted so the call site (which
- * passes outgoing/peerName/phone/endWhenAlone) keeps compiling.
+ * PROVEN CONNECTION PATH: LiveKitRoom manages its own room for plain calls. We
+ * only OBSERVE that room (via useRoomContext, inside <CallEndWatcher>) to end the
+ * call once everyone else has left — we never replace the room, which is what
+ * previously regressed calls across devices.
  *
- * With `e2eeKey` (currently never set — E2EE calls are gated off in comms.ts)
- * the room is built with SFrame E2EE. Without it, media is transport-encrypted
+ * With `e2eeKey` (currently never set — E2EE calls are gated off in comms.ts) the
+ * room is built with SFrame E2EE; without it, media is transport-encrypted
  * (DTLS-SRTP), which works in every browser.
  */
 export function CallView({
   roomId,
   video = true,
   e2eeKey,
+  endWhenAlone,
   onClose,
 }: {
   roomId: string;
@@ -38,6 +41,7 @@ export function CallView({
   const [error, setError] = useState<string | null>(null);
   const [e2eeRoom, setE2eeRoom] = useState<Room | null>(null);
   const [e2eeReady, setE2eeReady] = useState(!e2eeKey);
+  const closedRef = useRef(false);
 
   // Fetch the access token for this room.
   useEffect(() => {
@@ -88,9 +92,11 @@ export function CallView({
     };
   }, [e2eeKey]);
 
-  // Leave only on a real end (hang-up / disconnect / close) — NOT on unmount,
-  // which React StrictMode fires spuriously in dev and would kill the room.
+  // End on a real hang-up / disconnect / empty room — never on a bare unmount
+  // (StrictMode fires that spuriously in dev). Guarded against double-close.
   const close = () => {
+    if (closedRef.current) return;
+    closedRef.current = true;
     leaveRoom(roomId).catch(() => {});
     onClose();
   };
@@ -145,9 +151,53 @@ export function CallView({
       >
         <VideoConference />
         <RoomAudioRenderer />
+        <CallEndWatcher enabled={!!endWhenAlone} onEmpty={close} />
       </LiveKitRoom>
     </div>
   );
+}
+
+/**
+ * Ends this side once everyone else has left — the other person hanging up a
+ * 1:1, or the last peer leaving a group. Observes LiveKit's own room via context
+ * (never replaces it). A short grace period ignores momentary reconnect blips so
+ * a stable call is never dropped by a hiccup. Public Rooms pass enabled=false.
+ */
+function CallEndWatcher({ enabled, onEmpty }: { enabled: boolean; onEmpty: () => void }) {
+  const room = useRoomContext();
+  const hadRemoteRef = useRef(false);
+  const onEmptyRef = useRef(onEmpty);
+  onEmptyRef.current = onEmpty;
+
+  useEffect(() => {
+    if (!enabled || !room) return;
+    let grace: number | null = null;
+    const clearGrace = () => {
+      if (grace !== null) {
+        clearTimeout(grace);
+        grace = null;
+      }
+    };
+    const check = () => {
+      if (room.remoteParticipants.size > 0) {
+        hadRemoteRef.current = true;
+        clearGrace(); // (back) in company — cancel any pending end
+      } else if (hadRemoteRef.current && grace === null) {
+        // had company, now empty — end after a short grace period
+        grace = window.setTimeout(() => onEmptyRef.current(), 1500);
+      }
+    };
+    room.on(RoomEvent.ParticipantConnected, check);
+    room.on(RoomEvent.ParticipantDisconnected, check);
+    check();
+    return () => {
+      clearGrace();
+      room.off(RoomEvent.ParticipantConnected, check);
+      room.off(RoomEvent.ParticipantDisconnected, check);
+    };
+  }, [enabled, room]);
+
+  return null;
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
