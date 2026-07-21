@@ -187,8 +187,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
               video: n.body !== 'audio',
               convId: convId || null,
             });
-            // Auto-miss after 35s of ringing.
-            ringTimer.current = window.setTimeout(() => setIncoming(null), 35000);
+            // Auto-miss after 13s of ringing.
+            ringTimer.current = window.setTimeout(() => setIncoming(null), 13000);
           } else if (n.type === 'call_declined') {
             setToast(n.title || 'Call declined');
             window.setTimeout(() => setToast(null), 4000);
@@ -212,6 +212,30 @@ export function CallProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (bee) registerPush().catch(() => {});
   }, [bee]);
+
+  // Stop ringing the instant the caller hangs up (their call room flips to ended).
+  useEffect(() => {
+    if (!supabase || !incoming) return;
+    const channel = supabase
+      .channel(`ring:${incoming.roomId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'comms_rooms',
+          filter: `id=eq.${incoming.roomId}`,
+        },
+        (payload) => {
+          const status = (payload.new as { status?: string })?.status;
+          if (status && status !== 'live') dismissIncoming();
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase?.removeChannel(channel);
+    };
+  }, [incoming, dismissIncoming]);
 
   return (
     <Ctx.Provider value={{ startCall, inCall: !!active }}>

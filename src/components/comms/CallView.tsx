@@ -114,6 +114,13 @@ export function CallView({
 
   return (
     <div className="fixed inset-0 z-50 bg-black" data-lk-theme="default">
+      <button
+        type="button"
+        onClick={close}
+        className="fixed top-4 right-4 z-[60] rounded-full bg-red-600 px-4 py-2 font-bold text-sm text-white shadow-lg hover:bg-red-700"
+      >
+        End Call
+      </button>
       <LiveKitRoom
         room={e2eeRoom ?? undefined}
         token={creds.token}

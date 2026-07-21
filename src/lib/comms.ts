@@ -278,9 +278,15 @@ export async function createGroup(title: string, memberBeeIds: string[]): Promis
 
 // ── rooms + 1:1 calls (LiveKit) ──
 
-/** Shared media key for an end-to-end-encrypted call in a conversation (null if
- *  this device holds no conversation key yet → transport-only fallback). */
+/** Shared media key for an end-to-end-encrypted call. OFF for now: LiveKit SFrame
+ *  relies on insertable streams that Safari/iOS don't reliably support, and mixed
+ *  encrypted/plain participants can't interop — so call media falls back to
+ *  transport encryption (DTLS-SRTP). Messages stay fully E2EE. Set E2EE_CALLS=true
+ *  (gated by per-browser support) to re-enable. */
+const E2EE_CALLS: boolean = false;
+
 export async function callE2eeKey(conversationId: string, roomId: string): Promise<string | null> {
+  if (!E2EE_CALLS) return null;
   const bee = await myBee();
   return deriveCallKey(bee, conversationId, roomId);
 }
