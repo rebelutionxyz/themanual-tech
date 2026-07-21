@@ -1,3 +1,4 @@
+import { CallProvider } from '@/components/comms/CallProvider';
 import { HQControlRoom } from '@/components/hq/HQControlRoom';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
 import { SiteHeader } from '@/components/layout/SiteHeader';
@@ -89,7 +90,9 @@ export default function App() {
   return (
     <AuthProvider>
       <AstraProvider>
-        <AppContent />
+        <CallProvider>
+          <AppContent />
+        </CallProvider>
       </AstraProvider>
     </AuthProvider>
   );

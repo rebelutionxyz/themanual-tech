@@ -1,19 +1,16 @@
 import { MediaPicker } from '@/components/studio/MediaPicker';
-import { CallView } from '@/components/comms/CallView';
+import { useCall } from '@/components/comms/CallProvider';
 import { RouletteView } from '@/components/comms/RouletteView';
 import { useAuth } from '@/lib/auth';
 import {
   type CommsMessage,
   type Conversation,
-  activeRoomForConversation,
   conversationTitle,
   createCallRoom,
   createGroup,
-  endRoom,
   findBeeByHandle,
   hasUnread,
   initComms,
-  joinRoom,
   leaveConversation,
   listConversations,
   listMessages,
@@ -60,8 +57,7 @@ export function CommsPage() {
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState<'dm' | 'group' | null>(null);
   const [showRoulette, setShowRoulette] = useState(false);
-  const [call, setCall] = useState<{ roomId: string; video: boolean; host: boolean } | null>(null);
-  const [incomingRoom, setIncomingRoom] = useState<string | null>(null);
+  const { startCall: enterCall } = useCall();
 
   const active = convos?.find((c) => c.id === conversationId) ?? null;
 
@@ -70,31 +66,13 @@ export function CommsPage() {
       if (!active) return;
       try {
         const { roomId } = await createCallRoom(active.id);
-        setCall({ roomId, video, host: true });
+        enterCall(roomId, video);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not start the call');
       }
     },
-    [active],
+    [active, enterCall],
   );
-
-  const endCall = useCallback(() => {
-    setCall((c) => {
-      if (c?.host) endRoom(c.roomId).catch(() => {});
-      return null;
-    });
-  }, []);
-
-  const joinCall = useCallback(async () => {
-    if (!incomingRoom) return;
-    try {
-      await joinRoom(incomingRoom);
-      setCall({ roomId: incomingRoom, video: true, host: false });
-      setIncomingRoom(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not join the call');
-    }
-  }, [incomingRoom]);
 
   const loadConvos = useCallback(async () => {
     try {
@@ -143,30 +121,6 @@ export function CommsPage() {
     if (active) syncConversationKey(active).then(loadMessages).catch(() => {});
   }, [active?.id, loadMessages]);
 
-  // Watch for a live call started by the other side of the open conversation.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the open conversation + call state
-  useEffect(() => {
-    if (!active || call) {
-      setIncomingRoom(null);
-      return;
-    }
-    let stop = false;
-    const check = async () => {
-      try {
-        const r = await activeRoomForConversation(active.id);
-        if (!stop) setIncomingRoom(r?.roomId ?? null);
-      } catch {
-        /* ignore */
-      }
-    };
-    check();
-    const t = setInterval(check, 3500);
-    return () => {
-      stop = true;
-      clearInterval(t);
-    };
-  }, [active?.id, call]);
-
   const openConversation = (id: string) => navigate(`/comms/${id}`);
 
   if (!bee) {
@@ -185,20 +139,6 @@ export function CommsPage() {
       <CommsHeader />
 
       {showRoulette && <RouletteView onClose={() => setShowRoulette(false)} />}
-      {call && <CallView key={call.roomId} roomId={call.roomId} video={call.video} onClose={endCall} />}
-
-      {incomingRoom && !call && (
-        <div className="-translate-x-1/2 fixed bottom-6 left-1/2 z-40 flex items-center gap-3 rounded-full bg-zinc-900 px-5 py-2.5 text-white shadow-xl">
-          <span className="animate-pulse font-semibold text-sm">📞 Incoming call</span>
-          <button
-            type="button"
-            onClick={joinCall}
-            className="rounded-full bg-green-500 px-4 py-1.5 font-bold text-sm text-white hover:bg-green-400"
-          >
-            Join
-          </button>
-        </div>
-      )}
 
       {error && (
         <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
