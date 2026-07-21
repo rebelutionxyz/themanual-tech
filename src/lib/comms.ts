@@ -329,6 +329,17 @@ export async function endRoom(roomId: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * End an unanswered outgoing call once the ring window (~13 rings) elapses.
+ * Ends the room and — only when nobody picked up — logs a "Missed call" to the
+ * other members and a "No answer" entry to the caller. Safe to call more than
+ * once (no-ops if the room already left 'live').
+ */
+export async function callTimeout(roomId: string): Promise<void> {
+  const { error } = await req().rpc('comms_call_timeout', { p_room_id: roomId });
+  if (error) throw error;
+}
+
 /** Mint a LiveKit access token for a room (caller must already be a participant). */
 export async function getRoomToken(
   roomId: string,

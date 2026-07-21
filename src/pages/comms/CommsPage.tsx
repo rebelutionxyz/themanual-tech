@@ -70,16 +70,20 @@ export function CommsPage() {
 
   const startCall = useCallback(
     async (video: boolean) => {
-      if (!active) return;
+      if (!active || !bee) return;
       try {
         const { roomId } = await createCallRoom(active.id, video ? 'video' : 'audio');
         const key = await callE2eeKey(active.id, roomId).catch(() => null);
-        enterCall(roomId, video, key);
+        enterCall(roomId, video, key, {
+          outgoing: true,
+          peerName: conversationTitle(active, bee.id),
+          phone: true,
+        });
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not start the call');
       }
     },
-    [active, enterCall],
+    [active, bee, enterCall],
   );
 
   const loadConvos = useCallback(async () => {

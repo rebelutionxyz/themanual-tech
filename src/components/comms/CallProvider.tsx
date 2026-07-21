@@ -19,15 +19,24 @@ import { CallView } from './CallView';
  *    open conversation, and
  *  - an accepted call keeps running as they navigate between surfaces.
  *
- * How the ring arrives: the server (`comms_room_create`) writes a
- * `call_incoming` notification to every OTHER member of the conversation. The
- * `notifications` table is in the Realtime publication, so each Bee's client
- * receives its own row live (RLS scopes delivery to the recipient). No polling.
+ * Ring lifecycle: the server (`comms_room_create`) writes a `call_incoming`
+ * notification to every OTHER member; the `notifications` table is in the
+ * Realtime publication, so each Bee's client receives its own row live. The
+ * ring sounds up to RING_COUNT times, then auto-misses. It also clears the
+ * instant the caller hangs up (we watch the call room's status). Any dismissal
+ * that wasn't an explicit accept/decline surfaces a "Missed call from …".
  */
+
+const RING_COUNT = 13; // how many times we ring before giving up
+const RING_INTERVAL_MS = 3000; // spacing between rings
+// A little past the audible rings — a safety net in case the ringer never ran
+// (e.g. a call arriving while already in another call, so the tone is muted).
+const RING_MISS_MS = RING_COUNT * RING_INTERVAL_MS + 3000;
 
 interface Incoming {
   roomId: string;
   title: string;
+  from: string; // caller handle, e.g. "@butch" — for the "Missed call from …" note
   video: boolean;
   convId: string | null;
 }
@@ -35,11 +44,19 @@ interface ActiveCall {
   roomId: string;
   video: boolean;
   e2eeKey: string | null;
+  outgoing: boolean; // true = I placed this call and am waiting for pickup
+  peerName: string; // who I'm calling / talking to, for the call screen
+  phone: boolean; // 1:1/group voice call → audio-only "phone" screen
 }
 
 interface CallCtx {
   /** Drop into a call room the caller already created (via createCallRoom). */
-  startCall: (roomId: string, video?: boolean, e2eeKey?: string | null) => void;
+  startCall: (
+    roomId: string,
+    video?: boolean,
+    e2eeKey?: string | null,
+    opts?: { outgoing?: boolean; peerName?: string; phone?: boolean },
+  ) => void;
   inCall: boolean;
 }
 
@@ -52,24 +69,28 @@ export function useCall(): CallCtx {
 }
 
 /**
- * Synthesized ringtone — no audio asset needed. NOTE: iOS Safari blocks audio
- * until the user has interacted with the page, so a cold or backgrounded tab
- * rings silently there; desktop and a foregrounded iOS tab ring out loud.
+ * Synthesized ringtone — no audio asset needed. Rings RING_COUNT times, then
+ * calls `onExhausted` (used to auto-miss the call). NOTE: iOS Safari blocks
+ * audio until the user has interacted with the page, so a cold or backgrounded
+ * tab rings silently — but the ring COUNT still advances, so the auto-miss
+ * still fires on time.
  */
-function useRinger(active: boolean) {
+function useRinger(active: boolean, onExhausted?: () => void) {
   const ctxRef = useRef<AudioContext | null>(null);
+  const exhaustedRef = useRef(onExhausted);
+  exhaustedRef.current = onExhausted;
+
   useEffect(() => {
     if (!active) return;
     const AC =
       window.AudioContext ||
       (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AC) return;
-    if (!ctxRef.current) ctxRef.current = new AC();
-    const ctx = ctxRef.current;
-    ctx.resume?.().catch(() => {});
+    if (AC && !ctxRef.current) ctxRef.current = new AC();
+    ctxRef.current?.resume?.().catch(() => {});
+
     const beep = () => {
       const c = ctxRef.current;
-      if (!c) return;
+      if (!c) return; // no audio (blocked / unsupported) — stay silent, keep counting
       const g = c.createGain();
       g.connect(c.destination);
       const t = c.currentTime;
@@ -86,13 +107,22 @@ function useRinger(active: boolean) {
         o.stop(t + 1.0);
       }
     };
+
+    let rings = 1;
     beep();
-    const id = window.setInterval(beep, 3000);
     try {
       navigator.vibrate?.([400, 200, 400]);
     } catch {
       /* vibrate unsupported (e.g. iOS) */
     }
+    const id = window.setInterval(() => {
+      rings += 1;
+      beep();
+      if (rings >= RING_COUNT) {
+        clearInterval(id);
+        exhaustedRef.current?.();
+      }
+    }, RING_INTERVAL_MS);
     return () => clearInterval(id);
   }, [active]);
 }
@@ -103,9 +133,17 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState<ActiveCall | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const ringTimer = useRef<number | null>(null);
+  const incomingRef = useRef<Incoming | null>(null);
 
-  // Audible ring while a call is coming in (and we're not already in one).
-  useRinger(!!incoming && !active);
+  // Keep a ref of the current incoming so timers/subscriptions read fresh state.
+  useEffect(() => {
+    incomingRef.current = incoming;
+  }, [incoming]);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 5000);
+  }, []);
 
   const clearRing = () => {
     if (ringTimer.current) {
@@ -114,49 +152,73 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const dismissIncoming = useCallback(() => {
-    clearRing();
-    setIncoming(null);
-  }, []);
+  // Dismiss the incoming ring. 'missed' (caller hung up / no answer) leaves a
+  // "Missed call from …" note; 'handled' (I accepted or declined) is silent.
+  const dismissIncoming = useCallback(
+    (reason: 'handled' | 'missed' = 'handled') => {
+      clearRing();
+      const cur = incomingRef.current;
+      if (cur && reason === 'missed') showToast(`Missed call from ${cur.from}`);
+      setIncoming(null);
+    },
+    [showToast],
+  );
 
-  const startCall = useCallback((roomId: string, video = true, e2eeKey: string | null = null) => {
-    setActive({ roomId, video, e2eeKey });
-    // Off-site alert: also ring the other members' registered devices.
-    supabase?.functions.invoke('push-send', { body: { room_id: roomId } }).catch(() => {});
-  }, []);
+  // Audible ring while a call is coming in (and we're not already in one).
+  // When the rings run out, treat it as a miss.
+  useRinger(!!incoming && !active, () => dismissIncoming('missed'));
+
+  const startCall = useCallback(
+    (
+      roomId: string,
+      video = true,
+      e2eeKey: string | null = null,
+      opts?: { outgoing?: boolean; peerName?: string; phone?: boolean },
+    ) => {
+      setActive({
+        roomId,
+        video,
+        e2eeKey,
+        outgoing: opts?.outgoing ?? false,
+        peerName: opts?.peerName ?? '',
+        phone: opts?.phone ?? false,
+      });
+      // Off-site alert: also ring the other members' registered devices.
+      supabase?.functions.invoke('push-send', { body: { room_id: roomId } }).catch(() => {});
+    },
+    [],
+  );
 
   const accept = useCallback(async () => {
-    if (!incoming) return;
-    const roomId = incoming.roomId;
-    const video = incoming.video;
-    const convId = incoming.convId;
-    dismissIncoming();
+    const cur = incomingRef.current;
+    if (!cur) return;
+    const { roomId, video, convId, from } = cur;
+    dismissIncoming('handled');
     try {
       await joinRoom(roomId, 'speaker');
       const e2eeKey = convId ? await callE2eeKey(convId, roomId).catch(() => null) : null;
-      setActive({ roomId, video, e2eeKey });
+      setActive({ roomId, video, e2eeKey, outgoing: false, peerName: from, phone: true });
     } catch {
-      setToast('Could not join the call');
-      window.setTimeout(() => setToast(null), 4000);
+      showToast('Could not join the call');
     }
-  }, [incoming, dismissIncoming]);
+  }, [dismissIncoming, showToast]);
 
   const decline = useCallback(async () => {
-    if (!incoming || !supabase) return;
-    const roomId = incoming.roomId;
-    dismissIncoming();
+    const cur = incomingRef.current;
+    if (!cur || !supabase) return;
+    const roomId = cur.roomId;
+    dismissIncoming('handled');
     try {
       await supabase.rpc('comms_call_decline', { p_room_id: roomId });
     } catch {
       /* best-effort — the caller just won't get the decline notice */
     }
-  }, [incoming, dismissIncoming]);
+  }, [dismissIncoming]);
 
   // Live incoming-call ring: subscribe to MY notifications over Realtime.
   useEffect(() => {
     if (!supabase || !bee) return;
     const client = supabase; // capture non-null ref for the cleanup closure
-    // Ensure Realtime carries the auth token so RLS lets my rows through.
     if (session?.access_token) client.realtime.setAuth(session.access_token);
 
     const channel = client
@@ -181,17 +243,20 @@ export function CallProvider({ children }: { children: ReactNode }) {
             clearRing();
             const convId =
               typeof n.url === 'string' && n.url.startsWith('/comms/') ? n.url.slice(7) : null;
+            const title = n.title || 'Incoming call';
+            const from = title.replace(/\s+is calling$/i, '');
             setIncoming({
               roomId: n.entity_id,
-              title: n.title || 'Incoming call',
+              title,
+              from: from === title ? 'someone' : from,
               video: n.body !== 'audio',
               convId: convId || null,
             });
-            // Auto-miss after 13s of ringing.
-            ringTimer.current = window.setTimeout(() => setIncoming(null), 13000);
+            // Safety net: auto-miss a hair past the audible rings, in case the
+            // ringer never ran (e.g. already in another call).
+            ringTimer.current = window.setTimeout(() => dismissIncoming('missed'), RING_MISS_MS);
           } else if (n.type === 'call_declined') {
-            setToast(n.title || 'Call declined');
-            window.setTimeout(() => setToast(null), 4000);
+            showToast(n.title || 'Call declined');
           }
         },
       )
@@ -201,11 +266,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
       clearRing();
       client.removeChannel(channel);
     };
-  }, [bee, session?.access_token]);
+  }, [bee, session?.access_token, dismissIncoming, showToast]);
 
   // Never ring for the call you're already in.
   useEffect(() => {
-    if (active && incoming && active.roomId === incoming.roomId) dismissIncoming();
+    if (active && incoming && active.roomId === incoming.roomId) dismissIncoming('handled');
   }, [active, incoming, dismissIncoming]);
 
   // Register for off-site push alerts once signed in (silent until granted).
@@ -213,7 +278,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (bee) registerPush().catch(() => {});
   }, [bee]);
 
-  // Stop ringing the instant the caller hangs up (their call room flips to ended).
+  // Stop ringing the instant the caller hangs up (their call room leaves 'live')
+  // — and surface it as a missed call.
   useEffect(() => {
     if (!supabase || !incoming) return;
     const channel = supabase
@@ -228,7 +294,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         },
         (payload) => {
           const status = (payload.new as { status?: string })?.status;
-          if (status && status !== 'live') dismissIncoming();
+          if (status && status !== 'live') dismissIncoming('missed');
         },
       )
       .subscribe();
@@ -248,7 +314,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
           roomId={active.roomId}
           video={active.video}
           e2eeKey={active.e2eeKey}
-          onClose={() => setActive(null)}
+          outgoing={active.outgoing}
+          peerName={active.peerName}
+          phone={active.phone}
+          onClose={(reason) => {
+            const who = active.peerName || 'them';
+            setActive(null);
+            if (reason === 'no-answer') showToast(`No answer from ${who}`);
+          }}
         />
       )}
 
