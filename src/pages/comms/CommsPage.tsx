@@ -1,6 +1,7 @@
 import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useCall } from '@/components/comms/CallProvider';
 import { RouletteView } from '@/components/comms/RouletteView';
+import { RoomsView } from '@/components/comms/RoomsView';
 import { useAuth } from '@/lib/auth';
 import { enablePush, pushPermission } from '@/lib/push';
 import {
@@ -60,6 +61,7 @@ export function CommsPage() {
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState<'dm' | 'group' | null>(null);
   const [showRoulette, setShowRoulette] = useState(false);
+  const [showRooms, setShowRooms] = useState(false);
   const [pushPerm, setPushPerm] = useState<ReturnType<typeof pushPermission>>(() => pushPermission());
   const { startCall: enterCall } = useCall();
 
@@ -164,6 +166,7 @@ export function CommsPage() {
       )}
 
       {showRoulette && <RouletteView onClose={() => setShowRoulette(false)} />}
+      {showRooms && <RoomsView onClose={() => setShowRooms(false)} />}
 
       {error && (
         <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
@@ -281,14 +284,15 @@ export function CommsPage() {
           {/* Rooms + Roulette — voice layer, gated on LiveKit */}
           <div className="border-t border-zinc-100 p-2">
             <div className="flex items-center gap-1.5">
-              <span
-                className="inline-flex flex-1 cursor-not-allowed items-center justify-center gap-1 rounded-md border border-dashed px-2 py-1.5 font-mono text-[10px] uppercase tracking-wider opacity-70"
-                style={{ borderColor: `${COMMS_COLOR}50`, color: COMMS_COLOR }}
-                title="Live voice rooms — land with the LiveKit rail"
-                data-size="meta"
+              <button
+                type="button"
+                onClick={() => setShowRooms(true)}
+                className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] uppercase tracking-wider transition-colors hover:bg-cyan-50"
+                style={{ borderColor: `${COMMS_COLOR}80`, color: COMMS_COLOR }}
+                title="Live voice rooms"
               >
-                <Radio size={10} /> Rooms · SOON
-              </span>
+                <Radio size={10} /> Rooms
+              </button>
               <button
                 type="button"
                 onClick={() => setShowRoulette(true)}

@@ -342,6 +342,55 @@ export async function activeRoomForConversation(
   return r ? { roomId: r.id } : null;
 }
 
+// ── rooms / spaces (public voice rooms) ──
+
+export interface Space {
+  id: string;
+  title: string;
+  hostHandle: string;
+  startedAt: string;
+}
+
+/** Create a public voice room (space). The creator is the host. */
+export async function createSpace(title: string): Promise<{ roomId: string; livekitRoom: string }> {
+  const { data, error } = await req().rpc('comms_room_create', {
+    p_kind: 'space',
+    p_conversation_id: null,
+    p_atom_id: null,
+    p_title: title,
+    p_is_public: true,
+    p_max: null,
+  });
+  if (error) throw error;
+  const r = data as Row;
+  return { roomId: r.room_id, livekitRoom: r.livekit_room };
+}
+
+/** Live public rooms, newest first (with host handle). */
+export async function listSpaces(): Promise<Space[]> {
+  const { data, error } = await req()
+    .from('comms_rooms')
+    .select('id, title, host_bee_id, started_at')
+    .eq('kind', 'space')
+    .eq('status', 'live')
+    .order('started_at', { ascending: false })
+    .limit(50);
+  if (error) throw error;
+  const rooms = (data ?? []) as Row[];
+  const hostIds = Array.from(new Set(rooms.map((r) => r.host_bee_id).filter(Boolean)));
+  const handles = new Map<string, string>();
+  if (hostIds.length) {
+    const { data: bs } = await req().from('bees').select('id, handle').in('id', hostIds);
+    for (const b of (bs ?? []) as Row[]) handles.set(b.id, b.handle);
+  }
+  return rooms.map((r) => ({
+    id: r.id,
+    title: r.title ?? 'Room',
+    hostHandle: handles.get(r.host_bee_id) ?? 'someone',
+    startedAt: r.started_at,
+  }));
+}
+
 // ── roulette ──
 
 export async function enqueueRoulette(
