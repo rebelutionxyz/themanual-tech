@@ -9,13 +9,16 @@ import { DisconnectReason, ExternalE2EEKeyProvider, Room, type RoomOptions } fro
 import { useEffect, useRef, useState } from 'react';
 import { getRoomToken, leaveRoom } from '@/lib/comms';
 
-// Force H.264 so iPadOS / iOS Safari can hardware-decode remote video and encode
-// its own — VP8/VP9 frequently render as a black frame (remote) or freeze
-// (local) on Safari. H.264 is supported by every browser, so this is safe for
-// desktop/Chrome too. iOS video is genuinely finicky; a native app is the fully
-// reliable path, but this is the standard, high-probability fix.
+// H.264 so iPadOS/iOS Safari can hardware-decode remote video and encode its own
+// (VP8/VP9 often render as a black frame / freeze on Safari), and simulcast OFF
+// so there's a SINGLE stream — Safari can render black when it negotiates among
+// H.264 simulcast layers, and join order (who called) changes that negotiation,
+// which is why the black was directional (iPad-as-caller). Both are safe for
+// desktop/Chrome. 1:1 is unaffected; group calls trade a little adaptive quality
+// for reliable video. iOS video is finicky; the native app is the fully reliable
+// path, but this is the standard high-probability fix.
 const ROOM_OPTIONS: RoomOptions = {
-  publishDefaults: { videoCodec: 'h264' },
+  publishDefaults: { videoCodec: 'h264', simulcast: false },
 };
 
 /**
