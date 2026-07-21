@@ -10,7 +10,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { callE2eeKey, joinRoom } from '@/lib/comms';
-import { registerPush } from '@/lib/push';
+import { clearCallNotifications, registerPush, showCallNotification } from '@/lib/push';
 import { CallView } from './CallView';
 
 /**
@@ -69,27 +69,61 @@ export function useCall(): CallCtx {
 }
 
 /**
+ * iOS/Safari won't play Web Audio until the user has interacted with the page.
+ * We keep ONE shared AudioContext and "unlock" it on the first tap/keypress
+ * anywhere in the app, so a later incoming-call ring can actually make sound
+ * even though the call itself arrived without a fresh gesture.
+ */
+let sharedAudio: AudioContext | null = null;
+function audioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  const AC =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AC) return null;
+  if (!sharedAudio) sharedAudio = new AC();
+  sharedAudio.resume?.().catch(() => {});
+  return sharedAudio;
+}
+function installAudioUnlock() {
+  if (typeof window === 'undefined') return;
+  const unlock = () => {
+    const ctx = audioContext();
+    window.removeEventListener('pointerdown', unlock);
+    window.removeEventListener('touchend', unlock);
+    window.removeEventListener('keydown', unlock);
+    if (!ctx) return;
+    try {
+      const b = ctx.createBuffer(1, 1, 22050);
+      const s = ctx.createBufferSource();
+      s.buffer = b;
+      s.connect(ctx.destination);
+      s.start(0);
+    } catch {
+      /* ignore */
+    }
+  };
+  window.addEventListener('pointerdown', unlock, { passive: true });
+  window.addEventListener('touchend', unlock, { passive: true });
+  window.addEventListener('keydown', unlock);
+}
+
+/**
  * Synthesized ringtone — no audio asset needed. Rings RING_COUNT times, then
- * calls `onExhausted` (used to auto-miss the call). NOTE: iOS Safari blocks
- * audio until the user has interacted with the page, so a cold or backgrounded
- * tab rings silently — but the ring COUNT still advances, so the auto-miss
- * still fires on time.
+ * calls `onExhausted` (used to auto-miss the call). installAudioUnlock() primes
+ * a shared context on first interaction so the ring can sound on iOS. If audio
+ * is still blocked, the ring COUNT still advances, so the auto-miss fires on
+ * time regardless.
  */
 function useRinger(active: boolean, onExhausted?: () => void) {
-  const ctxRef = useRef<AudioContext | null>(null);
   const exhaustedRef = useRef(onExhausted);
   exhaustedRef.current = onExhausted;
 
   useEffect(() => {
     if (!active) return;
-    const AC =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (AC && !ctxRef.current) ctxRef.current = new AC();
-    ctxRef.current?.resume?.().catch(() => {});
 
     const beep = () => {
-      const c = ctxRef.current;
+      const c = audioContext();
       if (!c) return; // no audio (blocked / unsupported) — stay silent, keep counting
       const g = c.createGain();
       g.connect(c.destination);
@@ -157,6 +191,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const dismissIncoming = useCallback(
     (reason: 'handled' | 'missed' = 'handled') => {
       clearRing();
+      clearCallNotifications();
       const cur = incomingRef.current;
       if (cur && reason === 'missed') showToast(`Missed call from ${cur.from}`);
       setIncoming(null);
@@ -252,6 +287,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
               video: n.body !== 'audio',
               convId: convId || null,
             });
+            // Also raise an OS-level notification (outside the browser, bottom
+            // of the screen) when COMMS isn't the focused tab — so the Bee is
+            // alerted from anywhere, not only when staring at this tab.
+            if (typeof document === 'undefined' || document.visibilityState !== 'visible') {
+              showCallNotification(
+                title,
+                n.body === 'audio' ? 'Incoming voice call' : 'Incoming video call',
+              );
+            }
             // Safety net: auto-miss a hair past the audible rings, in case the
             // ringer never ran (e.g. already in another call).
             ringTimer.current = window.setTimeout(() => dismissIncoming('missed'), RING_MISS_MS);
@@ -277,6 +321,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (bee) registerPush().catch(() => {});
   }, [bee]);
+
+  // Prime audio on the first interaction so incoming-call rings can play (iOS).
+  useEffect(() => {
+    installAudioUnlock();
+  }, []);
 
   // Stop ringing the instant the caller hangs up (their call room leaves 'live')
   // — and surface it as a missed call.
@@ -317,6 +366,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
           outgoing={active.outgoing}
           peerName={active.peerName}
           phone={active.phone}
+          endWhenAlone
           onClose={(reason) => {
             const who = active.peerName || 'them';
             setActive(null);

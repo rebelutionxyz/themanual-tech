@@ -9,10 +9,13 @@ import { callTimeout, getRoomToken, leaveRoom } from '@/lib/comms';
  * screen when `video` is false (avatar + mute, no video tiles).
  *
  * Outgoing calls (`outgoing`) show a "Calling …" screen and ring for a bounded
- * window (~13 rings). If nobody joins in time we end the call as "No answer"
- * (comms_call_timeout), which also drops a "Missed call" on the other side.
- * The moment the other side joins we flip to the connected UI and cancel the
- * timer.
+ * window (~13 rings). If nobody joins we end as "No answer" (comms_call_timeout),
+ * which drops a "Missed call" on the other side. The moment the other side joins
+ * we flip to the connected UI and cancel the timer.
+ *
+ * `endWhenAlone` auto-ends our side once everyone else has left — a 1:1 hang-up,
+ * or the last peer leaving a group call. Off for public Rooms, where sitting
+ * alone is valid.
  *
  * When `e2eeKey` is supplied the room is built with LiveKit SFrame E2EE. That's
  * currently gated OFF upstream (Safari/iOS can't do insertable streams), so the
@@ -28,6 +31,7 @@ export function CallView({
   outgoing = false,
   peerName,
   phone = false,
+  endWhenAlone = false,
   onClose,
 }: {
   roomId: string;
@@ -38,6 +42,9 @@ export function CallView({
   /** 1:1/group voice call → show the audio-only "phone" screen. Public voice
    *  Rooms leave this off and keep the multi-participant grid. */
   phone?: boolean;
+  /** Auto-end our side once everyone else has left (1:1 hang-up, or the last
+   *  peer leaving a group call). Off for public Rooms. */
+  endWhenAlone?: boolean;
   onClose: (reason?: 'no-answer') => void;
 }) {
   const [creds, setCreds] = useState<{ token: string; url: string } | null>(null);
@@ -48,6 +55,19 @@ export function CallView({
 
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const hadRemoteRef = useRef(false); // has anyone else ever been in the room?
+  const closedRef = useRef(false); // guard against double-close
+
+  // Leave only on a real end (hang-up / disconnect / auto-end) — never on a
+  // bare unmount, which React StrictMode fires spuriously in dev.
+  const close = (reason?: 'no-answer') => {
+    if (closedRef.current) return;
+    closedRef.current = true;
+    leaveRoom(roomId).catch(() => {});
+    onCloseRef.current(reason);
+  };
+  const closeRef = useRef(close);
+  closeRef.current = close;
 
   // Fetch the access token for this room.
   useEffect(() => {
@@ -98,12 +118,19 @@ export function CallView({
     };
   }, [e2eeKey]);
 
-  // Watch for the other side joining — flips us from "Calling…" to connected and
-  // cancels the no-answer timer. Sticky: once answered, stays answered.
+  // Watch the other side. First remote → we're connected (hides "Calling…" and
+  // cancels the no-answer timer). If everyone else then leaves a call that had
+  // company, end our side too (1:1: they hung up; group: the last one left).
   useEffect(() => {
     if (!room) return;
     const sync = () => {
-      if (room.remoteParticipants.size > 0) setAnswered(true);
+      const n = room.remoteParticipants.size;
+      if (n > 0) {
+        hadRemoteRef.current = true;
+        setAnswered(true);
+      } else if (endWhenAlone && hadRemoteRef.current) {
+        closeRef.current();
+      }
     };
     room.on(RoomEvent.ParticipantConnected, sync);
     room.on(RoomEvent.ParticipantDisconnected, sync);
@@ -112,24 +139,19 @@ export function CallView({
       room.off(RoomEvent.ParticipantConnected, sync);
       room.off(RoomEvent.ParticipantDisconnected, sync);
     };
-  }, [room]);
+  }, [room, endWhenAlone]);
 
   // No-answer timeout for an unanswered outgoing call.
   useEffect(() => {
     if (!outgoing || answered || !room) return;
     const t = window.setTimeout(() => {
+      if (closedRef.current) return;
+      closedRef.current = true;
       callTimeout(roomId).catch(() => {});
       onCloseRef.current('no-answer');
     }, RING_WINDOW_MS);
     return () => clearTimeout(t);
   }, [outgoing, answered, room, roomId]);
-
-  // Leave only on a real end (hang-up / disconnect) — NOT on unmount, which
-  // React StrictMode fires spuriously in dev and would kill the room.
-  const close = () => {
-    leaveRoom(roomId).catch(() => {});
-    onCloseRef.current();
-  };
 
   if (error) {
     return (
@@ -138,7 +160,7 @@ export function CallView({
           <p className="mb-4 text-red-300">{error}</p>
           <button
             type="button"
-            onClick={close}
+            onClick={() => close()}
             className="rounded-md bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20"
           >
             Close
@@ -163,7 +185,7 @@ export function CallView({
     <div className="fixed inset-0 z-50 bg-black" data-lk-theme="default">
       <button
         type="button"
-        onClick={close}
+        onClick={() => close()}
         className="fixed top-4 right-4 z-[60] rounded-full bg-red-600 px-4 py-2 font-bold text-sm text-white shadow-lg hover:bg-red-700"
       >
         End Call
@@ -175,7 +197,7 @@ export function CallView({
         connect
         video={video}
         audio
-        onDisconnected={close}
+        onDisconnected={() => close()}
         onError={(e) => setError(e.message)}
         style={{ height: '100%' }}
       >
@@ -183,7 +205,7 @@ export function CallView({
         <RoomAudioRenderer />
       </LiveKitRoom>
 
-      {outgoing && !answered && <CallingOverlay peerName={peerName} onCancel={close} />}
+      {outgoing && !answered && <CallingOverlay peerName={peerName} onCancel={() => close()} />}
     </div>
   );
 }
