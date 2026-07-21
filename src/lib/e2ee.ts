@@ -176,6 +176,26 @@ export async function resealConversationKey(beeId: string, conversationId: strin
   return ck;
 }
 
+// ── call media key (LiveKit SFrame E2EE) ────────────────────────────────────
+/**
+ * Derive a deterministic LiveKit E2EE key (a shared-passphrase string) from the
+ * conversation content key. Both members compute the same value locally from the
+ * CK they already hold, so the media key is never transmitted and the LiveKit SFU
+ * stays blind to the audio/video. Returns null when this device has no conversation
+ * key yet — the call then falls back to transport-only (DTLS-SRTP), exactly as before.
+ */
+export async function deriveCallKey(
+  beeId: string,
+  conversationId: string,
+  roomId: string,
+): Promise<string | null> {
+  const sodium = await S();
+  const ck = await getConversationKey(beeId, conversationId);
+  if (!ck) return null;
+  const material = sodium.crypto_generichash(32, sodium.from_string(`livekit-e2ee:${roomId}`), ck);
+  return sodium.to_base64(material, sodium.base64_variants.ORIGINAL);
+}
+
 // ── message body encrypt / decrypt ──────────────────────────────────────────
 const ENC_PREFIX = 'e2ee:v1:';
 

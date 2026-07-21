@@ -1,27 +1,32 @@
 import '@livekit/components-styles';
 import { LiveKitRoom, RoomAudioRenderer, VideoConference } from '@livekit/components-react';
+import { ExternalE2EEKeyProvider, Room } from 'livekit-client';
 import { useEffect, useState } from 'react';
 import { getRoomToken, leaveRoom } from '@/lib/comms';
 
 /**
- * A live LiveKit call (video or audio-only) for a comms_room the caller is
- * already a participant of. Mints a room-scoped token from the `livekit-token`
- * edge function, connects, and renders the LiveKit conference UI.
+ * A live LiveKit call (video or audio-only).
  *
- * v1: media is encrypted in transit (DTLS-SRTP). Full end-to-end media
- * encryption (SFU-blind) is the next step — see the E2EE key-provider wiring.
+ * When `e2eeKey` is supplied (DM/group calls — derived locally from the shared
+ * conversation key, never transmitted), the room is created with LiveKit SFrame
+ * end-to-end encryption, so the SFU cannot see the media. Without a key
+ * (roulette / public rooms), media is transport-encrypted (DTLS-SRTP) as before.
  */
 export function CallView({
   roomId,
   video = true,
+  e2eeKey,
   onClose,
 }: {
   roomId: string;
   video?: boolean;
+  e2eeKey?: string | null;
   onClose: () => void;
 }) {
   const [creds, setCreds] = useState<{ token: string; url: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [e2eeRoom, setE2eeRoom] = useState<Room | null>(null);
+  const [e2eeReady, setE2eeReady] = useState(!e2eeKey);
 
   // Fetch the access token for this room.
   useEffect(() => {
@@ -37,6 +42,40 @@ export function CallView({
       cancelled = true;
     };
   }, [roomId]);
+
+  // Build an SFrame-E2EE room before connecting, keyed by the shared secret.
+  useEffect(() => {
+    if (!e2eeKey) {
+      setE2eeRoom(null);
+      setE2eeReady(true);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const keyProvider = new ExternalE2EEKeyProvider();
+        const worker = new Worker(new URL('livekit-client/e2ee-worker', import.meta.url));
+        const room = new Room({ encryption: { keyProvider, worker } });
+        await keyProvider.setKey(e2eeKey);
+        await room.setE2EEEnabled(true);
+        if (cancelled) {
+          room.disconnect().catch(() => {});
+          worker.terminate();
+          return;
+        }
+        setE2eeRoom(room);
+        setE2eeReady(true);
+      } catch {
+        if (!cancelled) {
+          setError('Encrypted calls aren’t supported in this browser.');
+          setE2eeReady(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [e2eeKey]);
 
   // Leave only on a real end (hang-up / disconnect / close) — NOT on unmount,
   // which React StrictMode fires spuriously in dev and would kill the room.
@@ -62,12 +101,12 @@ export function CallView({
     );
   }
 
-  if (!creds) {
+  if (!creds || !e2eeReady) {
     return (
       <Shell>
         <div className="flex flex-col items-center gap-3 text-white/70">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-          Connecting…
+          {e2eeKey && !e2eeReady ? 'Securing call…' : 'Connecting…'}
         </div>
       </Shell>
     );
@@ -76,6 +115,7 @@ export function CallView({
   return (
     <div className="fixed inset-0 z-50 bg-black" data-lk-theme="default">
       <LiveKitRoom
+        room={e2eeRoom ?? undefined}
         token={creds.token}
         serverUrl={creds.url}
         connect

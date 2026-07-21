@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import {
   decryptBody,
+  deriveCallKey,
   encryptBody,
   ensureIdentity,
   establishConversationKey,
@@ -276,6 +277,13 @@ export async function createGroup(title: string, memberBeeIds: string[]): Promis
 }
 
 // ── rooms + 1:1 calls (LiveKit) ──
+
+/** Shared media key for an end-to-end-encrypted call in a conversation (null if
+ *  this device holds no conversation key yet → transport-only fallback). */
+export async function callE2eeKey(conversationId: string, roomId: string): Promise<string | null> {
+  const bee = await myBee();
+  return deriveCallKey(bee, conversationId, roomId);
+}
 
 /** Start a call room, optionally bound to a DM/group conversation. */
 export async function createCallRoom(

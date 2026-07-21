@@ -7,6 +7,7 @@ import { enablePush, pushPermission } from '@/lib/push';
 import {
   type CommsMessage,
   type Conversation,
+  callE2eeKey,
   conversationTitle,
   createCallRoom,
   createGroup,
@@ -72,7 +73,8 @@ export function CommsPage() {
       if (!active) return;
       try {
         const { roomId } = await createCallRoom(active.id, video ? 'video' : 'audio');
-        enterCall(roomId, video);
+        const key = await callE2eeKey(active.id, roomId).catch(() => null);
+        enterCall(roomId, video, key);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not start the call');
       }

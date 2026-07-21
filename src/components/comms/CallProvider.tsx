@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { joinRoom } from '@/lib/comms';
+import { callE2eeKey, joinRoom } from '@/lib/comms';
 import { registerPush } from '@/lib/push';
 import { CallView } from './CallView';
 
@@ -29,15 +29,17 @@ interface Incoming {
   roomId: string;
   title: string;
   video: boolean;
+  convId: string | null;
 }
 interface ActiveCall {
   roomId: string;
   video: boolean;
+  e2eeKey: string | null;
 }
 
 interface CallCtx {
   /** Drop into a call room the caller already created (via createCallRoom). */
-  startCall: (roomId: string, video?: boolean) => void;
+  startCall: (roomId: string, video?: boolean, e2eeKey?: string | null) => void;
   inCall: boolean;
 }
 
@@ -117,8 +119,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setIncoming(null);
   }, []);
 
-  const startCall = useCallback((roomId: string, video = true) => {
-    setActive({ roomId, video });
+  const startCall = useCallback((roomId: string, video = true, e2eeKey: string | null = null) => {
+    setActive({ roomId, video, e2eeKey });
     // Off-site alert: also ring the other members' registered devices.
     supabase?.functions.invoke('push-send', { body: { room_id: roomId } }).catch(() => {});
   }, []);
@@ -127,10 +129,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (!incoming) return;
     const roomId = incoming.roomId;
     const video = incoming.video;
+    const convId = incoming.convId;
     dismissIncoming();
     try {
       await joinRoom(roomId, 'speaker');
-      setActive({ roomId, video });
+      const e2eeKey = convId ? await callE2eeKey(convId, roomId).catch(() => null) : null;
+      setActive({ roomId, video, e2eeKey });
     } catch {
       setToast('Could not join the call');
       window.setTimeout(() => setToast(null), 4000);
@@ -171,13 +175,17 @@ export function CallProvider({ children }: { children: ReactNode }) {
             entity_id?: string;
             title?: string;
             body?: string;
+            url?: string;
           };
           if (n.type === 'call_incoming' && n.entity_id) {
             clearRing();
+            const convId =
+              typeof n.url === 'string' && n.url.startsWith('/comms/') ? n.url.slice(7) : null;
             setIncoming({
               roomId: n.entity_id,
               title: n.title || 'Incoming call',
               video: n.body !== 'audio',
+              convId: convId || null,
             });
             // Auto-miss after 35s of ringing.
             ringTimer.current = window.setTimeout(() => setIncoming(null), 35000);
@@ -215,6 +223,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
           key={active.roomId}
           roomId={active.roomId}
           video={active.video}
+          e2eeKey={active.e2eeKey}
           onClose={() => setActive(null)}
         />
       )}
