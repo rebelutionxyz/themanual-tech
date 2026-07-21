@@ -1,12 +1,19 @@
 import { MediaPicker } from '@/components/studio/MediaPicker';
+import { CallView } from '@/components/comms/CallView';
+import { RouletteView } from '@/components/comms/RouletteView';
 import { useAuth } from '@/lib/auth';
 import {
   type CommsMessage,
   type Conversation,
+  activeRoomForConversation,
   conversationTitle,
+  createCallRoom,
   createGroup,
+  endRoom,
   findBeeByHandle,
   hasUnread,
+  initComms,
+  joinRoom,
   leaveConversation,
   listConversations,
   listMessages,
@@ -15,6 +22,7 @@ import {
   sendMediaMessage,
   sendMessage,
   startDirect,
+  syncConversationKey,
 } from '@/lib/comms';
 import { assetUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
@@ -29,6 +37,7 @@ import {
   Send,
   Shuffle,
   Users,
+  Video,
 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -50,8 +59,42 @@ export function CommsPage() {
   const [messages, setMessages] = useState<CommsMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState<'dm' | 'group' | null>(null);
+  const [showRoulette, setShowRoulette] = useState(false);
+  const [call, setCall] = useState<{ roomId: string; video: boolean; host: boolean } | null>(null);
+  const [incomingRoom, setIncomingRoom] = useState<string | null>(null);
 
   const active = convos?.find((c) => c.id === conversationId) ?? null;
+
+  const startCall = useCallback(
+    async (video: boolean) => {
+      if (!active) return;
+      try {
+        const { roomId } = await createCallRoom(active.id);
+        setCall({ roomId, video, host: true });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not start the call');
+      }
+    },
+    [active],
+  );
+
+  const endCall = useCallback(() => {
+    setCall((c) => {
+      if (c?.host) endRoom(c.roomId).catch(() => {});
+      return null;
+    });
+  }, []);
+
+  const joinCall = useCallback(async () => {
+    if (!incomingRoom) return;
+    try {
+      await joinRoom(incomingRoom);
+      setCall({ roomId: incomingRoom, video: true, host: false });
+      setIncomingRoom(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not join the call');
+    }
+  }, [incomingRoom]);
 
   const loadConvos = useCallback(async () => {
     try {
@@ -89,6 +132,41 @@ export function CommsPage() {
     return () => clearInterval(t);
   }, [conversationId, loadMessages]);
 
+  // Publish this Bee's E2EE identity key on mount.
+  useEffect(() => {
+    if (bee) initComms(bee.id).catch(() => {});
+  }, [bee]);
+
+  // When a thread opens, make sure its encryption key is set up, then refresh.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the open conversation
+  useEffect(() => {
+    if (active) syncConversationKey(active).then(loadMessages).catch(() => {});
+  }, [active?.id, loadMessages]);
+
+  // Watch for a live call started by the other side of the open conversation.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the open conversation + call state
+  useEffect(() => {
+    if (!active || call) {
+      setIncomingRoom(null);
+      return;
+    }
+    let stop = false;
+    const check = async () => {
+      try {
+        const r = await activeRoomForConversation(active.id);
+        if (!stop) setIncomingRoom(r?.roomId ?? null);
+      } catch {
+        /* ignore */
+      }
+    };
+    check();
+    const t = setInterval(check, 3500);
+    return () => {
+      stop = true;
+      clearInterval(t);
+    };
+  }, [active?.id, call]);
+
   const openConversation = (id: string) => navigate(`/comms/${id}`);
 
   if (!bee) {
@@ -105,6 +183,22 @@ export function CommsPage() {
   return (
     <div className="mx-auto flex h-full max-w-6xl flex-col px-4 py-6 md:px-8">
       <CommsHeader />
+
+      {showRoulette && <RouletteView onClose={() => setShowRoulette(false)} />}
+      {call && <CallView key={call.roomId} roomId={call.roomId} video={call.video} onClose={endCall} />}
+
+      {incomingRoom && !call && (
+        <div className="-translate-x-1/2 fixed bottom-6 left-1/2 z-40 flex items-center gap-3 rounded-full bg-zinc-900 px-5 py-2.5 text-white shadow-xl">
+          <span className="animate-pulse font-semibold text-sm">📞 Incoming call</span>
+          <button
+            type="button"
+            onClick={joinCall}
+            className="rounded-full bg-green-500 px-4 py-1.5 font-bold text-sm text-white hover:bg-green-400"
+          >
+            Join
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
@@ -220,14 +314,15 @@ export function CommsPage() {
               >
                 <Radio size={10} /> Rooms · SOON
               </span>
-              <span
-                className="inline-flex flex-1 cursor-not-allowed items-center justify-center gap-1 rounded-md border border-dashed px-2 py-1.5 font-mono text-[10px] uppercase tracking-wider opacity-70"
-                style={{ borderColor: `${COMMS_COLOR}50`, color: COMMS_COLOR }}
-                title="Roulette — meet a random Bee, lands with the LiveKit rail"
-                data-size="meta"
+              <button
+                type="button"
+                onClick={() => setShowRoulette(true)}
+                className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border px-2 py-1.5 font-mono text-[10px] uppercase tracking-wider transition-colors hover:bg-cyan-50"
+                style={{ borderColor: `${COMMS_COLOR}80`, color: COMMS_COLOR }}
+                title="Roulette — meet a random Bee"
               >
-                <Shuffle size={10} /> Roulette · SOON
-              </span>
+                <Shuffle size={10} /> Roulette
+              </button>
             </div>
           </div>
         </div>
@@ -250,6 +345,7 @@ export function CommsPage() {
               conversation={active}
               messages={messages}
               myBeeId={bee.id}
+              onStartCall={() => startCall(true)}
               onBack={() => navigate('/comms')}
               onSent={() => {
                 loadMessages();
@@ -288,6 +384,7 @@ function Thread({
   conversation,
   messages,
   myBeeId,
+  onStartCall,
   onBack,
   onSent,
   onLeft,
@@ -295,6 +392,7 @@ function Thread({
   conversation: Conversation;
   messages: CommsMessage[];
   myBeeId: string;
+  onStartCall: () => void;
   onBack: () => void;
   onSent: () => void;
   onLeft: () => void;
@@ -322,6 +420,9 @@ function Thread({
       await sendMessage(conversation.id, body);
       setDraft('');
       onSent();
+    } catch (err) {
+      // e.g. "encryption still setting up" — keep the draft so they can retry
+      console.warn('comms send failed', err);
     } finally {
       setSending(false);
     }
@@ -345,6 +446,15 @@ function Thread({
           {conversation.participants.length}{' '}
           {conversation.participants.length === 1 ? 'Bee' : 'Bees'}
         </span>
+        <button
+          type="button"
+          onClick={onStartCall}
+          title="Start a video call"
+          aria-label="Start a video call"
+          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-cyan-50 hover:text-cyan-700"
+        >
+          <Video size={15} />
+        </button>
         {leaveArmed ? (
           <span className="flex flex-shrink-0 items-center gap-1">
             <button
@@ -401,7 +511,7 @@ function Thread({
                   @{handleFor(m.senderBeeId)}
                 </span>
               )}
-              {!m.deletedAt && m.contentType === 'media' && parseMediaPayload(m.body) ? (
+              {!m.deletedAt && !m.undecryptable && m.contentType === 'media' && parseMediaPayload(m.body) ? (
                 <MediaBubble payload={parseMediaPayload(m.body)!} mine={mine} />
               ) : (
                 <div
@@ -411,7 +521,13 @@ function Thread({
                   )}
                   style={mine ? { background: COMMS_COLOR } : undefined}
                 >
-                  {m.deletedAt ? <em className="opacity-60">message removed</em> : m.body}
+                  {m.deletedAt ? (
+                    <em className="opacity-60">message removed</em>
+                  ) : m.undecryptable ? (
+                    <em className="opacity-60">🔒 setting up encryption…</em>
+                  ) : (
+                    m.body
+                  )}
                 </div>
               )}
               <span className="mt-0.5 px-1 text-[10px] text-zinc-300">{timeAgo(m.createdAt)}</span>
