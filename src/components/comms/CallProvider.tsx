@@ -191,9 +191,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const dismissIncoming = useCallback(
     (reason: 'handled' | 'missed' = 'handled') => {
       clearRing();
-      clearCallNotifications();
       const cur = incomingRef.current;
-      if (cur && reason === 'missed') showToast(`Missed call from ${cur.from}`);
+      if (cur && reason === 'missed') {
+        showToast(`Missed call from ${cur.from}`);
+        // The only call notification we surface outside the app: a missed call.
+        showCallNotification('Missed call', `from ${cur.from}`);
+      } else {
+        clearCallNotifications();
+      }
       setIncoming(null);
     },
     [showToast],
@@ -287,15 +292,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
               video: n.body !== 'audio',
               convId: convId || null,
             });
-            // Also raise an OS-level notification (outside the browser, bottom
-            // of the screen) when COMMS isn't the focused tab — so the Bee is
-            // alerted from anywhere, not only when staring at this tab.
-            if (typeof document === 'undefined' || document.visibilityState !== 'visible') {
-              showCallNotification(
-                title,
-                n.body === 'audio' ? 'Incoming voice call' : 'Incoming video call',
-              );
-            }
             // Safety net: auto-miss a hair past the audible rings, in case the
             // ringer never ran (e.g. already in another call).
             ringTimer.current = window.setTimeout(() => dismissIncoming('missed'), RING_MISS_MS);

@@ -28,6 +28,7 @@ export interface CommsParticipant {
   name: string | null;
   lastReadAt: string | null;
   muted: boolean;
+  role: string; // 'owner' | 'member'
 }
 
 export interface Conversation {
@@ -36,6 +37,7 @@ export interface Conversation {
   title: string | null;
   createdBy: string | null;
   lastMessageAt: string | null;
+  membersCanAdd: boolean; // group setting: may non-owners add people?
   participants: CommsParticipant[];
 }
 
@@ -113,7 +115,7 @@ export async function listConversations(): Promise<Conversation[]> {
   const { data, error } = await req()
     .from('comms_conversations')
     .select(
-      'id, kind, title, created_by, last_message_at, comms_participants(bee_id, last_read_at, muted, bees(handle, name))',
+      'id, kind, title, created_by, last_message_at, members_can_add, comms_participants(bee_id, role, last_read_at, muted, bees(handle, name))',
     )
     .order('last_message_at', { ascending: false, nullsFirst: false });
   if (error) throw error;
@@ -123,6 +125,7 @@ export async function listConversations(): Promise<Conversation[]> {
     title: row.title,
     createdBy: row.created_by,
     lastMessageAt: row.last_message_at,
+    membersCanAdd: !!row.members_can_add,
     participants: (row.comms_participants ?? []).map((p: Row) => {
       const b = oneBee(p.bees);
       return {
@@ -131,6 +134,7 @@ export async function listConversations(): Promise<Conversation[]> {
         name: b?.name ?? null,
         lastReadAt: p.last_read_at,
         muted: !!p.muted,
+        role: p.role ?? 'member',
       };
     }),
   }));
@@ -301,6 +305,46 @@ export async function addGroupMember(conversationId: string, beeId: string): Pro
   } catch {
     /* best-effort — syncConversationKey retries on next open */
   }
+}
+
+/** Owner-only: set whether non-owner members may add people to a group. */
+export async function setGroupAddPolicy(conversationId: string, allowed: boolean): Promise<void> {
+  const { error } = await req().rpc('comms_group_set_add_policy', {
+    p_conversation_id: conversationId,
+    p_allowed: allowed,
+  });
+  if (error) throw error;
+}
+
+// ── follows (for the "Following" list + people pickers) ──
+
+export interface Follow {
+  beeId: string;
+  handle: string;
+  name: string | null;
+}
+
+/** Bees the current Bee follows, newest first. */
+export async function listFollows(): Promise<Follow[]> {
+  const me = await myBee();
+  const { data, error } = await req()
+    .from('bee_follows')
+    .select('followed_bee_id, created_at')
+    .eq('follower_bee_id', me)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  const rows = (data ?? []) as Row[];
+  const ids = Array.from(new Set(rows.map((r) => r.followed_bee_id).filter(Boolean)));
+  if (!ids.length) return [];
+  const { data: bs } = await req().from('bees').select('id, handle, name').in('id', ids);
+  const map = new Map<string, { handle: string; name: string | null }>();
+  for (const b of (bs ?? []) as Row[]) map.set(b.id, { handle: b.handle, name: b.name ?? null });
+  return rows
+    .map((r) => {
+      const b = map.get(r.followed_bee_id);
+      return b ? { beeId: r.followed_bee_id as string, handle: b.handle, name: b.name } : null;
+    })
+    .filter((x): x is Follow => x !== null);
 }
 
 // ── rooms + 1:1 calls (LiveKit) ──

@@ -7,6 +7,7 @@ import { enablePush, pushPermission } from '@/lib/push';
 import {
   type CommsMessage,
   type Conversation,
+  type Follow,
   callE2eeKey,
   conversationTitle,
   createCallRoom,
@@ -16,6 +17,7 @@ import {
   initComms,
   leaveConversation,
   listConversations,
+  listFollows,
   listMessages,
   markRead,
   parseMediaPayload,
@@ -64,9 +66,18 @@ export function CommsPage() {
   const [showRoulette, setShowRoulette] = useState(false);
   const [showRooms, setShowRooms] = useState(false);
   const [pushPerm, setPushPerm] = useState<ReturnType<typeof pushPermission>>(() => pushPermission());
+  const [filter, setFilter] = useState<'all' | 'dm' | 'group' | 'following'>('all');
+  const [follows, setFollows] = useState<Follow[] | null>(null);
   const { startCall: enterCall } = useCall();
 
   const active = convos?.find((c) => c.id === conversationId) ?? null;
+
+  const shown = (convos ?? []).filter(
+    (c) =>
+      filter === 'all' ||
+      (filter === 'dm' && c.kind === 'direct') ||
+      (filter === 'group' && c.kind === 'group'),
+  );
 
   const startCall = useCallback(
     async (video: boolean) => {
@@ -112,6 +123,15 @@ export function CommsPage() {
     return () => clearInterval(t);
   }, [loadConvos]);
 
+  // Load who I follow the first time the Following filter is opened.
+  useEffect(() => {
+    if (filter === 'following' && follows === null) {
+      listFollows()
+        .then(setFollows)
+        .catch(() => setFollows([]));
+    }
+  }, [filter, follows]);
+
   // Active thread: load + fast poll + mark read.
   useEffect(() => {
     if (!conversationId) return;
@@ -134,6 +154,16 @@ export function CommsPage() {
   }, [active?.id, loadMessages]);
 
   const openConversation = (id: string) => navigate(`/comms/${id}`);
+
+  const openDmWith = async (beeId: string) => {
+    try {
+      const id = await startDirect(beeId);
+      loadConvos();
+      openConversation(id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not start the DM');
+    }
+  };
 
   const deleteConversation = async (id: string) => {
     if (!window.confirm('Delete this conversation? It disappears from your chats.')) return;
@@ -203,6 +233,23 @@ export function CommsPage() {
             />
           </div>
 
+          <div className="flex gap-0.5 border-b border-zinc-100 p-1.5">
+            {(['all', 'dm', 'group', 'following'] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFilter(f)}
+                className={cn(
+                  'flex-1 rounded-md px-1 py-1 font-semibold text-[11px] transition-colors',
+                  filter === f ? 'text-white' : 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700',
+                )}
+                style={filter === f ? { background: COMMS_COLOR } : undefined}
+              >
+                {f === 'all' ? 'All' : f === 'dm' ? 'DMs' : f === 'group' ? 'Groups' : 'Following'}
+              </button>
+            ))}
+          </div>
+
           {composerOpen === 'dm' && (
             <StartDmForm
               onStarted={(id) => {
@@ -224,13 +271,18 @@ export function CommsPage() {
 
           <div className="min-h-0 flex-1 overflow-y-auto">
             {convos === null && <div className="p-4 text-sm text-zinc-400">Loading…</div>}
-            {convos !== null && convos.length === 0 && (
+            {filter === 'following' && <FollowingList follows={follows} onPick={openDmWith} />}
+            {filter !== 'following' && convos !== null && shown.length === 0 && (
               <div className="p-4 text-sm leading-relaxed text-zinc-400">
-                No conversations yet. Start a DM with a Bee handle — the water carries it from
-                there.
+                {filter === 'all'
+                  ? 'No conversations yet. Start a DM with a Bee handle — the water carries it from there.'
+                  : filter === 'dm'
+                    ? 'No direct messages yet.'
+                    : 'No group chats yet.'}
               </div>
             )}
-            {(convos ?? []).map((c) => {
+            {filter !== 'following' &&
+              shown.map((c) => {
               const unread = hasUnread(c, bee.id);
               const isActive = c.id === conversationId;
               return (
@@ -766,6 +818,46 @@ function StartGroupForm({ onStarted }: { onStarted: (conversationId: string) => 
         Create Group
       </button>
     </form>
+  );
+}
+
+/** People the Bee follows — tap to open (or start) a DM. */
+function FollowingList({
+  follows,
+  onPick,
+}: {
+  follows: Follow[] | null;
+  onPick: (beeId: string) => void;
+}) {
+  if (follows === null) return <div className="p-4 text-sm text-zinc-400">Loading…</div>;
+  if (!follows.length)
+    return (
+      <div className="p-4 text-sm leading-relaxed text-zinc-400">
+        You're not following anyone yet. Follow Bees and they'll show up here to start a chat.
+      </div>
+    );
+  return (
+    <>
+      {follows.map((f) => (
+        <button
+          key={f.beeId}
+          type="button"
+          onClick={() => onPick(f.beeId)}
+          className="flex w-full items-center gap-2.5 border-b border-zinc-50 px-3 py-2.5 text-left transition-colors hover:bg-zinc-50"
+        >
+          <span
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full font-semibold text-[13px] text-white"
+            style={{ background: COMMS_COLOR }}
+          >
+            {f.handle.slice(0, 1).toUpperCase()}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-medium text-[14px] text-zinc-700">@{f.handle}</span>
+            {f.name && <span className="block truncate text-[11px] text-zinc-400">{f.name}</span>}
+          </span>
+        </button>
+      ))}
+    </>
   );
 }
 
