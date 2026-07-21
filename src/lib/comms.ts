@@ -276,6 +276,33 @@ export async function createGroup(title: string, memberBeeIds: string[]): Promis
   return id;
 }
 
+/**
+ * Add a Bee to an existing group, then re-seal the conversation's E2EE content
+ * key to the (now larger) membership so the new member can read messages. The
+ * re-seal is best-effort — syncConversationKey retries when a thread opens, and
+ * a member who hasn't published their identity key yet is picked up then.
+ */
+export async function addGroupMember(conversationId: string, beeId: string): Promise<void> {
+  const { error } = await req().rpc('comms_group_add', {
+    p_conversation_id: conversationId,
+    p_bee_id: beeId,
+  });
+  if (error) throw error;
+  const bee = await myBee();
+  const ck = await getConversationKey(bee, conversationId).catch(() => null);
+  if (!ck) return; // we don't hold the key; whoever does re-seals on their next open
+  try {
+    const { data } = await req()
+      .from('comms_participants')
+      .select('bee_id')
+      .eq('conversation_id', conversationId);
+    const members = (data ?? []).map((r: Row) => r.bee_id as string);
+    if (members.length) await resealConversationKey(bee, conversationId, members);
+  } catch {
+    /* best-effort — syncConversationKey retries on next open */
+  }
+}
+
 // ── rooms + 1:1 calls (LiveKit) ──
 
 /** Shared media key for an end-to-end-encrypted call. OFF for now: LiveKit SFrame
