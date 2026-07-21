@@ -5,7 +5,7 @@ import {
   VideoConference,
   useRoomContext,
 } from '@livekit/components-react';
-import { ExternalE2EEKeyProvider, Room, RoomEvent } from 'livekit-client';
+import { DisconnectReason, ExternalE2EEKeyProvider, Room } from 'livekit-client';
 import { useEffect, useRef, useState } from 'react';
 import { getRoomToken, leaveRoom } from '@/lib/comms';
 
@@ -13,13 +13,12 @@ import { getRoomToken, leaveRoom } from '@/lib/comms';
  * A live LiveKit call (video or audio-only).
  *
  * PROVEN CONNECTION PATH: LiveKitRoom manages its own room for plain calls. We
- * only OBSERVE that room (via useRoomContext, inside <CallEndWatcher>) to end the
+ * only OBSERVE that room (via useRoomContext, in <CallEndWatcher>) to end the
  * call once everyone else has left — we never replace the room, which is what
- * previously regressed calls across devices.
+ * previously regressed calls.
  *
- * With `e2eeKey` (currently never set — E2EE calls are gated off in comms.ts) the
- * room is built with SFrame E2EE; without it, media is transport-encrypted
- * (DTLS-SRTP), which works in every browser.
+ * An UNEXPECTED disconnect (not us hanging up) surfaces its reason on-screen —
+ * a diagnostic for the iOS Safari drop.
  */
 export function CallView({
   roomId,
@@ -92,8 +91,8 @@ export function CallView({
     };
   }, [e2eeKey]);
 
-  // End on a real hang-up / disconnect / empty room — never on a bare unmount
-  // (StrictMode fires that spuriously in dev). Guarded against double-close.
+  // End on a real hang-up / empty room — never on a bare unmount (StrictMode
+  // fires that spuriously in dev). Guarded against double-close.
   const close = () => {
     if (closedRef.current) return;
     closedRef.current = true;
@@ -104,7 +103,7 @@ export function CallView({
   if (error) {
     return (
       <Shell>
-        <div className="text-center">
+        <div className="max-w-xs text-center">
           <p className="mb-4 text-red-300">{error}</p>
           <button
             type="button"
@@ -145,7 +144,13 @@ export function CallView({
         connect
         video={video}
         audio
-        onDisconnected={close}
+        onDisconnected={(reason) => {
+          if (closedRef.current) return; // we tore it down (End Call / other left)
+          // Unexpected drop (e.g. the iOS Safari disconnect) — show why, on-screen.
+          const name =
+            reason === undefined ? 'unknown' : (DisconnectReason[reason] ?? String(reason));
+          setError(`Call dropped — reason: ${name}. (Read this back to debug the drop.)`);
+        }}
         onError={(e) => setError(e.message)}
         style={{ height: '100%' }}
       >
@@ -159,42 +164,32 @@ export function CallView({
 
 /**
  * Ends this side once everyone else has left — the other person hanging up a
- * 1:1, or the last peer leaving a group. Observes LiveKit's own room via context
- * (never replaces it). A short grace period ignores momentary reconnect blips so
- * a stable call is never dropped by a hiccup. Public Rooms pass enabled=false.
+ * 1:1, or the last peer leaving a group. POLLS LiveKit's own room (via context)
+ * once a second rather than trusting participant events, which fire unreliably;
+ * it ends only after the room has been empty for ~2s (ignoring reconnect blips),
+ * and only after someone was actually here. Public Rooms pass enabled=false.
  */
 function CallEndWatcher({ enabled, onEmpty }: { enabled: boolean; onEmpty: () => void }) {
   const room = useRoomContext();
   const hadRemoteRef = useRef(false);
+  const emptyTicksRef = useRef(0);
   const onEmptyRef = useRef(onEmpty);
   onEmptyRef.current = onEmpty;
 
   useEffect(() => {
     if (!enabled || !room) return;
-    let grace: number | null = null;
-    const clearGrace = () => {
-      if (grace !== null) {
-        clearTimeout(grace);
-        grace = null;
-      }
-    };
-    const check = () => {
+    hadRemoteRef.current = room.remoteParticipants.size > 0;
+    emptyTicksRef.current = 0;
+    const id = window.setInterval(() => {
       if (room.remoteParticipants.size > 0) {
         hadRemoteRef.current = true;
-        clearGrace(); // (back) in company — cancel any pending end
-      } else if (hadRemoteRef.current && grace === null) {
-        // had company, now empty — end after a short grace period
-        grace = window.setTimeout(() => onEmptyRef.current(), 1500);
+        emptyTicksRef.current = 0;
+      } else if (hadRemoteRef.current) {
+        emptyTicksRef.current += 1;
+        if (emptyTicksRef.current >= 2) onEmptyRef.current(); // empty ~2s → end our side
       }
-    };
-    room.on(RoomEvent.ParticipantConnected, check);
-    room.on(RoomEvent.ParticipantDisconnected, check);
-    check();
-    return () => {
-      clearGrace();
-      room.off(RoomEvent.ParticipantConnected, check);
-      room.off(RoomEvent.ParticipantDisconnected, check);
-    };
+    }, 1000);
+    return () => clearInterval(id);
   }, [enabled, room]);
 
   return null;
