@@ -5,9 +5,18 @@ import {
   VideoConference,
   useRoomContext,
 } from '@livekit/components-react';
-import { DisconnectReason, ExternalE2EEKeyProvider, Room } from 'livekit-client';
+import { DisconnectReason, ExternalE2EEKeyProvider, Room, type RoomOptions } from 'livekit-client';
 import { useEffect, useRef, useState } from 'react';
 import { getRoomToken, leaveRoom } from '@/lib/comms';
+
+// Force H.264 so iPadOS / iOS Safari can hardware-decode remote video and encode
+// its own — VP8/VP9 frequently render as a black frame (remote) or freeze
+// (local) on Safari. H.264 is supported by every browser, so this is safe for
+// desktop/Chrome too. iOS video is genuinely finicky; a native app is the fully
+// reliable path, but this is the standard, high-probability fix.
+const ROOM_OPTIONS: RoomOptions = {
+  publishDefaults: { videoCodec: 'h264' },
+};
 
 /**
  * A live LiveKit call (video or audio-only).
@@ -138,6 +147,7 @@ export function CallView({
         End Call
       </button>
       <LiveKitRoom
+        options={ROOM_OPTIONS}
         room={e2eeRoom ?? undefined}
         token={creds.token}
         serverUrl={creds.url}
