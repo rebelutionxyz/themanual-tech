@@ -278,12 +278,15 @@ export async function createGroup(title: string, memberBeeIds: string[]): Promis
 // ── rooms + 1:1 calls (LiveKit) ──
 
 /** Start a call room, optionally bound to a DM/group conversation. */
-export async function createCallRoom(conversationId?: string): Promise<{ roomId: string; livekitRoom: string }> {
+export async function createCallRoom(
+  conversationId?: string,
+  mode: 'video' | 'audio' = 'video',
+): Promise<{ roomId: string; livekitRoom: string }> {
   const { data, error } = await req().rpc('comms_room_create', {
     p_kind: 'call',
     p_conversation_id: conversationId ?? null,
     p_atom_id: null,
-    p_title: null,
+    p_title: mode,
     p_is_public: null,
     p_max: null,
   });

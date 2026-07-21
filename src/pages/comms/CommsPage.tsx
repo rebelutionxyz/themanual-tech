@@ -29,10 +29,12 @@ import {
   LogOut,
   MessageCircle,
   Paperclip,
+  Phone,
   Plus,
   Radio,
   Send,
   Shuffle,
+  Trash2,
   Users,
   Video,
 } from 'lucide-react';
@@ -65,7 +67,7 @@ export function CommsPage() {
     async (video: boolean) => {
       if (!active) return;
       try {
-        const { roomId } = await createCallRoom(active.id);
+        const { roomId } = await createCallRoom(active.id, video ? 'video' : 'audio');
         enterCall(roomId, video);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not start the call');
@@ -122,6 +124,17 @@ export function CommsPage() {
   }, [active?.id, loadMessages]);
 
   const openConversation = (id: string) => navigate(`/comms/${id}`);
+
+  const deleteConversation = async (id: string) => {
+    if (!window.confirm('Delete this conversation? It disappears from your chats.')) return;
+    try {
+      await leaveConversation(id);
+      if (id === conversationId) navigate('/comms');
+      loadConvos();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not delete the conversation');
+    }
+  };
 
   if (!bee) {
     return (
@@ -200,12 +213,12 @@ export function CommsPage() {
               const unread = hasUnread(c, bee.id);
               const isActive = c.id === conversationId;
               return (
+                <div key={c.id} className="group relative">
                 <button
                   type="button"
-                  key={c.id}
                   onClick={() => openConversation(c.id)}
                   className={cn(
-                    'flex w-full items-center gap-2.5 border-b border-zinc-50 px-3 py-2.5 text-left transition-colors hover:bg-zinc-50',
+                    'flex w-full items-center gap-2.5 border-b border-zinc-50 px-3 py-2.5 pr-9 text-left transition-colors hover:bg-zinc-50',
                     isActive && 'bg-cyan-50/60',
                   )}
                 >
@@ -234,11 +247,21 @@ export function CommsPage() {
                   </span>
                   {unread && (
                     <span
-                      className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                      className="h-2.5 w-2.5 flex-shrink-0 rounded-full group-hover:hidden"
                       style={{ background: COMMS_COLOR }}
                     />
                   )}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => deleteConversation(c.id)}
+                  title="Delete this conversation"
+                  aria-label="Delete this conversation"
+                  className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-zinc-300 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                >
+                  <Trash2 size={14} />
+                </button>
+                </div>
               );
             })}
           </div>
@@ -286,6 +309,7 @@ export function CommsPage() {
               messages={messages}
               myBeeId={bee.id}
               onStartCall={() => startCall(true)}
+              onStartVoice={() => startCall(false)}
               onBack={() => navigate('/comms')}
               onSent={() => {
                 loadMessages();
@@ -325,6 +349,7 @@ function Thread({
   messages,
   myBeeId,
   onStartCall,
+  onStartVoice,
   onBack,
   onSent,
   onLeft,
@@ -333,6 +358,7 @@ function Thread({
   messages: CommsMessage[];
   myBeeId: string;
   onStartCall: () => void;
+  onStartVoice: () => void;
   onBack: () => void;
   onSent: () => void;
   onLeft: () => void;
@@ -394,6 +420,15 @@ function Thread({
           className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-cyan-50 hover:text-cyan-700"
         >
           <Video size={15} />
+        </button>
+        <button
+          type="button"
+          onClick={onStartVoice}
+          title="Start a voice call"
+          aria-label="Start a voice call"
+          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-cyan-50 hover:text-cyan-700"
+        >
+          <Phone size={15} />
         </button>
         {leaveArmed ? (
           <span className="flex flex-shrink-0 items-center gap-1">
@@ -636,7 +671,7 @@ function StartDmForm({ onStarted }: { onStarted: (conversationId: string) => voi
         value={handle}
         onChange={(e) => setHandle(e.target.value)}
         placeholder="@handle"
-        className="w-full rounded-md border border-zinc-200 px-2.5 py-1.5 text-[13px] outline-none focus:border-cyan-400"
+        className="w-full rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-[13px] text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-cyan-400"
       />
       {err && <p className="text-[11px] text-red-500">{err}</p>}
       <button
@@ -691,13 +726,13 @@ function StartGroupForm({ onStarted }: { onStarted: (conversationId: string) => 
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Group name"
-        className="w-full rounded-md border border-zinc-200 px-2.5 py-1.5 text-[13px] outline-none focus:border-cyan-400"
+        className="w-full rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-[13px] text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-cyan-400"
       />
       <input
         value={handles}
         onChange={(e) => setHandles(e.target.value)}
         placeholder="@handles, comma separated"
-        className="w-full rounded-md border border-zinc-200 px-2.5 py-1.5 text-[13px] outline-none focus:border-cyan-400"
+        className="w-full rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-[13px] text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-cyan-400"
       />
       {err && <p className="text-[11px] text-red-500">{err}</p>}
       <button

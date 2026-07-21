@@ -27,6 +27,7 @@ import { CallView } from './CallView';
 interface Incoming {
   roomId: string;
   title: string;
+  video: boolean;
 }
 interface ActiveCall {
   roomId: string;
@@ -122,10 +123,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const accept = useCallback(async () => {
     if (!incoming) return;
     const roomId = incoming.roomId;
+    const video = incoming.video;
     dismissIncoming();
     try {
       await joinRoom(roomId, 'speaker');
-      setActive({ roomId, video: true });
+      setActive({ roomId, video });
     } catch {
       setToast('Could not join the call');
       window.setTimeout(() => setToast(null), 4000);
@@ -161,10 +163,19 @@ export function CallProvider({ children }: { children: ReactNode }) {
           filter: `recipient_bee_id=eq.${bee.id}`,
         },
         (payload) => {
-          const n = payload.new as { type?: string; entity_id?: string; title?: string };
+          const n = payload.new as {
+            type?: string;
+            entity_id?: string;
+            title?: string;
+            body?: string;
+          };
           if (n.type === 'call_incoming' && n.entity_id) {
             clearRing();
-            setIncoming({ roomId: n.entity_id, title: n.title || 'Incoming call' });
+            setIncoming({
+              roomId: n.entity_id,
+              title: n.title || 'Incoming call',
+              video: n.body !== 'audio',
+            });
             // Auto-miss after 35s of ringing.
             ringTimer.current = window.setTimeout(() => setIncoming(null), 35000);
           } else if (n.type === 'call_declined') {
@@ -207,7 +218,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
             <span className="text-2xl">📞</span>
             <div className="min-w-0 flex-1">
               <div className="truncate font-semibold text-sm">{incoming.title}</div>
-              <div className="text-white/50 text-xs">Incoming call</div>
+              <div className="text-white/50 text-xs">
+                {incoming.video ? 'Incoming video call' : 'Incoming voice call'}
+              </div>
             </div>
             <button
               type="button"
