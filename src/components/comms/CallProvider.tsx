@@ -10,6 +10,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { joinRoom } from '@/lib/comms';
+import { registerPush } from '@/lib/push';
 import { CallView } from './CallView';
 
 /**
@@ -118,6 +119,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   const startCall = useCallback((roomId: string, video = true) => {
     setActive({ roomId, video });
+    // Off-site alert: also ring the other members' registered devices.
+    supabase?.functions.invoke('push-send', { body: { room_id: roomId } }).catch(() => {});
   }, []);
 
   const accept = useCallback(async () => {
@@ -196,6 +199,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (active && incoming && active.roomId === incoming.roomId) dismissIncoming();
   }, [active, incoming, dismissIncoming]);
+
+  // Register for off-site push alerts once signed in (silent until granted).
+  useEffect(() => {
+    if (bee) registerPush().catch(() => {});
+  }, [bee]);
 
   return (
     <Ctx.Provider value={{ startCall, inCall: !!active }}>

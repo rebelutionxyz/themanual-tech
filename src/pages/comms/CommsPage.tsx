@@ -2,6 +2,7 @@ import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useCall } from '@/components/comms/CallProvider';
 import { RouletteView } from '@/components/comms/RouletteView';
 import { useAuth } from '@/lib/auth';
+import { enablePush, pushPermission } from '@/lib/push';
 import {
   type CommsMessage,
   type Conversation,
@@ -59,6 +60,7 @@ export function CommsPage() {
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState<'dm' | 'group' | null>(null);
   const [showRoulette, setShowRoulette] = useState(false);
+  const [pushPerm, setPushPerm] = useState<ReturnType<typeof pushPermission>>(() => pushPermission());
   const { startCall: enterCall } = useCall();
 
   const active = convos?.find((c) => c.id === conversationId) ?? null;
@@ -150,6 +152,16 @@ export function CommsPage() {
   return (
     <div className="mx-auto flex h-full max-w-6xl flex-col px-4 py-6 md:px-8">
       <CommsHeader />
+
+      {pushPerm === 'default' && (
+        <button
+          type="button"
+          onClick={async () => setPushPerm(await enablePush())}
+          className="mb-3 w-full rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-left font-semibold text-[12px] text-cyan-800 transition-colors hover:bg-cyan-100"
+        >
+          🔔 Enable call alerts on this device — get notified when someone calls while the app's in the background.
+        </button>
+      )}
 
       {showRoulette && <RouletteView onClose={() => setShowRoulette(false)} />}
 
@@ -247,7 +259,7 @@ export function CommsPage() {
                   </span>
                   {unread && (
                     <span
-                      className="h-2.5 w-2.5 flex-shrink-0 rounded-full group-hover:hidden"
+                      className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
                       style={{ background: COMMS_COLOR }}
                     />
                   )}
@@ -257,7 +269,7 @@ export function CommsPage() {
                   onClick={() => deleteConversation(c.id)}
                   title="Delete this conversation"
                   aria-label="Delete this conversation"
-                  className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-zinc-300 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                  className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-zinc-500 transition hover:bg-red-50 hover:text-red-600"
                 >
                   <Trash2 size={14} />
                 </button>
