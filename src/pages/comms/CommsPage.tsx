@@ -196,6 +196,8 @@ export function CommsPage() {
     <div className="mx-auto flex h-full max-w-6xl flex-col px-4 py-6 md:px-8">
       <CommsHeader />
 
+      <AppleInstallBanner />
+
       {pushPerm === 'default' && (
         <button
           type="button"
@@ -1065,6 +1067,41 @@ function MembersPanel({
         );
       })}
       {err && <p className="px-1 text-[11px] text-red-500">{err}</p>}
+    </div>
+  );
+}
+
+/** iOS/iPadOS Safari only, when not installed: how to add COMMS to the Home
+ *  Screen (the only way Apple allows call alerts + ringing). Auto-hides once
+ *  installed (standalone). Dismissible. */
+function AppleInstallBanner() {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed || typeof navigator === 'undefined' || typeof window === 'undefined') return null;
+  const ua = navigator.userAgent;
+  const isIOS =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone =
+    window.matchMedia?.('(display-mode: standalone)').matches ||
+    (navigator as unknown as { standalone?: boolean }).standalone === true;
+  if (!isIOS || standalone) return null;
+  return (
+    <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+      <span className="text-base leading-none">📲</span>
+      <div className="flex-1 leading-relaxed">
+        <span className="font-semibold">Add COMMS to your Home Screen</span> to get call alerts and
+        ringing on this device: tap <span className="font-semibold">Share</span> →{' '}
+        <span className="font-semibold">Add to Home Screen</span>, open COMMS from that icon, then tap
+        “Enable call alerts.” Apple only allows call notifications for installed web apps.
+      </div>
+      <button
+        type="button"
+        onClick={() => setDismissed(true)}
+        aria-label="Dismiss"
+        className="flex-shrink-0 rounded p-0.5 text-amber-500 hover:text-amber-800"
+      >
+        <X size={14} />
+      </button>
     </div>
   );
 }
