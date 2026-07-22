@@ -231,6 +231,54 @@ export async function toggleReaction(messageId: string, emoji: string): Promise<
   if (error) throw error;
 }
 
+// ── typing indicators (ephemeral; Supabase Realtime broadcast — nothing stored) ──
+
+export interface TypingChannel {
+  sendTyping: () => void;
+  close: () => void;
+}
+
+/**
+ * Join a conversation's ephemeral "typing" channel. `onTyping` fires when another
+ * member types; `sendTyping()` broadcasts that I'm typing (throttled to ~1/2s).
+ * Pure pub/sub — no table, no storage, no E2EE impact.
+ */
+export function joinTyping(
+  conversationId: string,
+  me: { beeId: string; handle: string },
+  onTyping: (who: { beeId: string; handle: string }) => void,
+): TypingChannel | null {
+  if (!supabase) return null;
+  const client = supabase;
+  const channel = client.channel(`typing:${conversationId}`, {
+    config: { broadcast: { self: false } },
+  });
+  channel
+    .on('broadcast', { event: 'typing' }, (msg) => {
+      const p = (msg as { payload?: { beeId?: string; handle?: string } }).payload;
+      if (p?.beeId && p.beeId !== me.beeId) {
+        onTyping({ beeId: p.beeId, handle: p.handle ?? 'someone' });
+      }
+    })
+    .subscribe();
+  let last = 0;
+  return {
+    sendTyping: () => {
+      const now = Date.now();
+      if (now - last < 2000) return;
+      last = now;
+      channel.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { beeId: me.beeId, handle: me.handle },
+      });
+    },
+    close: () => {
+      client.removeChannel(channel);
+    },
+  };
+}
+
 // ── Media attachments (Creator Studio Library) ──
 // content_type='media', body = JSON payload — encrypted like any other body, so
 // the attachment pointer is sealed too. The media file itself lives in storage

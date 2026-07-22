@@ -8,6 +8,7 @@ import {
   type CommsMessage,
   type Conversation,
   type Follow,
+  type TypingChannel,
   addGroupMember,
   callE2eeKey,
   conversationTitle,
@@ -16,6 +17,7 @@ import {
   findBeeByHandle,
   hasUnread,
   initComms,
+  joinTyping,
   leaveConversation,
   listConversations,
   listFollows,
@@ -455,6 +457,8 @@ function Thread({
   const [addOpen, setAddOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [reactingId, setReactingId] = useState<string | null>(null);
+  const [typing, setTyping] = useState<{ handle: string; at: number } | null>(null);
+  const typingChanRef = useRef<TypingChannel | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const handleFor = (beeId: string) =>
     conversation.participants.find((p) => p.beeId === beeId)?.handle ?? 'bee';
@@ -465,6 +469,27 @@ function Thread({
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages.length]);
+
+  // Ephemeral typing channel for this conversation.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the conversation
+  useEffect(() => {
+    const myHandle = conversation.participants.find((p) => p.beeId === myBeeId)?.handle ?? 'someone';
+    const chan = joinTyping(conversation.id, { beeId: myBeeId, handle: myHandle }, (who) => {
+      setTyping({ handle: who.handle, at: Date.now() });
+    });
+    typingChanRef.current = chan;
+    return () => {
+      chan?.close();
+      typingChanRef.current = null;
+    };
+  }, [conversation.id, myBeeId]);
+
+  // Clear the typing note after a few seconds of quiet.
+  useEffect(() => {
+    if (!typing) return;
+    const t = window.setTimeout(() => setTyping(null), 3500);
+    return () => clearTimeout(t);
+  }, [typing]);
 
   const react = async (messageId: string, emoji: string) => {
     setReactingId(null);
@@ -710,6 +735,11 @@ function Thread({
         <div ref={endRef} />
       </div>
 
+      {typing && (
+        <div className="border-t border-zinc-50 px-3 py-1 text-[11px] text-zinc-400">
+          @{typing.handle} is typing…
+        </div>
+      )}
       <form onSubmit={submit} className="flex items-center gap-2 border-t border-zinc-100 p-2.5">
         <button
           type="button"
@@ -723,7 +753,10 @@ function Thread({
         </button>
         <input
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            typingChanRef.current?.sendTyping();
+          }}
           placeholder="Write it…"
           className="min-w-0 flex-1 rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 text-[14px] text-zinc-800 outline-none transition-colors placeholder:text-zinc-400 focus:border-cyan-400 focus:bg-white"
         />
