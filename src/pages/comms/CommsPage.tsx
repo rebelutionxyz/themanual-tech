@@ -23,6 +23,7 @@ import {
   markRead,
   parseMediaPayload,
   sendMediaMessage,
+  removeGroupMember,
   sendMessage,
   setGroupAddPolicy,
   startDirect,
@@ -45,6 +46,7 @@ import {
   UserPlus,
   Users,
   Video,
+  X,
 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -446,6 +448,7 @@ function Thread({
   const [leaveArmed, setLeaveArmed] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const handleFor = (beeId: string) =>
     conversation.participants.find((p) => p.beeId === beeId)?.handle ?? 'bee';
@@ -488,10 +491,24 @@ function Thread({
         <span className="truncate font-display text-[15px] font-bold text-zinc-800">
           {conversationTitle(conversation, myBeeId)}
         </span>
-        <span className="ml-auto text-[11px] text-zinc-400">
-          {conversation.participants.length}{' '}
-          {conversation.participants.length === 1 ? 'Bee' : 'Bees'}
-        </span>
+        {conversation.kind === 'group' ? (
+          <button
+            type="button"
+            onClick={() => setMembersOpen((v) => !v)}
+            title="Members"
+            className={cn(
+              'ml-auto rounded px-1 text-[11px] transition-colors hover:text-cyan-700',
+              membersOpen ? 'text-cyan-700' : 'text-zinc-400',
+            )}
+          >
+            {conversation.participants.length} Bees
+          </button>
+        ) : (
+          <span className="ml-auto text-[11px] text-zinc-400">
+            {conversation.participants.length}{' '}
+            {conversation.participants.length === 1 ? 'Bee' : 'Bees'}
+          </span>
+        )}
         <button
           type="button"
           onClick={onStartCall}
@@ -571,6 +588,15 @@ function Thread({
           isOwner={iAmOwner}
           onChanged={onSent}
           onClose={() => setAddOpen(false)}
+        />
+      )}
+
+      {membersOpen && (
+        <MembersPanel
+          conversation={conversation}
+          myBeeId={myBeeId}
+          isOwner={iAmOwner}
+          onChanged={onSent}
         />
       )}
 
@@ -981,6 +1007,64 @@ function AddMemberPanel({
           Let members (not just you) add people
         </label>
       )}
+    </div>
+  );
+}
+
+/** Roster popup opened from the header count. The owner can remove members. */
+function MembersPanel({
+  conversation,
+  myBeeId,
+  isOwner,
+  onChanged,
+}: {
+  conversation: Conversation;
+  myBeeId: string;
+  isOwner: boolean;
+  onChanged: () => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const remove = async (beeId: string) => {
+    setBusy(beeId);
+    setErr(null);
+    try {
+      await removeGroupMember(conversation.id, beeId);
+      onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not remove them');
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <div className="max-h-48 space-y-1 overflow-y-auto border-b border-zinc-100 bg-zinc-50/60 p-2">
+      {conversation.participants.map((p) => {
+        const isOwnerRow = p.role === 'owner';
+        const isMe = p.beeId === myBeeId;
+        return (
+          <div key={p.beeId} className="flex items-center gap-2 px-1 py-0.5">
+            <span className="min-w-0 flex-1 truncate text-[13px] text-zinc-700">
+              @{p.handle}
+              {isOwnerRow && <span className="ml-1.5 text-[10px] text-zinc-400">owner</span>}
+              {isMe && !isOwnerRow && <span className="ml-1.5 text-[10px] text-zinc-400">you</span>}
+            </span>
+            {isOwner && !isOwnerRow && !isMe && (
+              <button
+                type="button"
+                onClick={() => remove(p.beeId)}
+                disabled={busy === p.beeId}
+                title={`Remove @${p.handle}`}
+                aria-label={`Remove @${p.handle}`}
+                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        );
+      })}
+      {err && <p className="px-1 text-[11px] text-red-500">{err}</p>}
     </div>
   );
 }

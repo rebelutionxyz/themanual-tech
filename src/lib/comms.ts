@@ -316,6 +316,15 @@ export async function setGroupAddPolicy(conversationId: string, allowed: boolean
   if (error) throw error;
 }
 
+/** Owner-only: remove a member from a group. Their access ends immediately (RLS). */
+export async function removeGroupMember(conversationId: string, beeId: string): Promise<void> {
+  const { error } = await req().rpc('comms_group_remove', {
+    p_conversation_id: conversationId,
+    p_bee_id: beeId,
+  });
+  if (error) throw error;
+}
+
 // ── follows (for the "Following" list + people pickers) ──
 
 export interface Follow {
