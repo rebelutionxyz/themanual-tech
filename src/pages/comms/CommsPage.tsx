@@ -8,6 +8,7 @@ import {
   type CommsMessage,
   type Conversation,
   type Follow,
+  addGroupMember,
   callE2eeKey,
   conversationTitle,
   createCallRoom,
@@ -23,6 +24,7 @@ import {
   parseMediaPayload,
   sendMediaMessage,
   sendMessage,
+  setGroupAddPolicy,
   startDirect,
   syncConversationKey,
 } from '@/lib/comms';
@@ -40,6 +42,7 @@ import {
   Send,
   Shuffle,
   Trash2,
+  UserPlus,
   Users,
   Video,
 } from 'lucide-react';
@@ -442,9 +445,12 @@ function Thread({
   const [attachOpen, setAttachOpen] = useState(false);
   const [leaveArmed, setLeaveArmed] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const handleFor = (beeId: string) =>
     conversation.participants.find((p) => p.beeId === beeId)?.handle ?? 'bee';
+  const iAmOwner = conversation.participants.find((p) => p.beeId === myBeeId)?.role === 'owner';
+  const canAdd = conversation.kind === 'group' && (iAmOwner || conversation.membersCanAdd);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on new messages
   useEffect(() => {
@@ -504,6 +510,20 @@ function Thread({
         >
           <Phone size={15} />
         </button>
+        {canAdd && (
+          <button
+            type="button"
+            onClick={() => setAddOpen((v) => !v)}
+            title="Add someone to this group"
+            aria-label="Add someone to this group"
+            className={cn(
+              'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md transition-colors hover:bg-cyan-50 hover:text-cyan-700',
+              addOpen ? 'bg-cyan-50 text-cyan-700' : 'text-zinc-400',
+            )}
+          >
+            <UserPlus size={15} />
+          </button>
+        )}
         {leaveArmed ? (
           <span className="flex flex-shrink-0 items-center gap-1">
             <button
@@ -544,6 +564,15 @@ function Thread({
           </button>
         )}
       </div>
+
+      {addOpen && canAdd && (
+        <AddMemberPanel
+          conversation={conversation}
+          isOwner={iAmOwner}
+          onChanged={onSent}
+          onClose={() => setAddOpen(false)}
+        />
+      )}
 
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
         {messages.length === 0 && (
@@ -858,6 +887,101 @@ function FollowingList({
         </button>
       ))}
     </>
+  );
+}
+
+/** Add a Bee to a group + (owner only) the "let members add" switch. Compact. */
+function AddMemberPanel({
+  conversation,
+  isOwner,
+  onChanged,
+  onClose,
+}: {
+  conversation: Conversation;
+  isOwner: boolean;
+  onChanged: () => void;
+  onClose: () => void;
+}) {
+  const [handle, setHandle] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [allowMembers, setAllowMembers] = useState(conversation.membersCanAdd);
+
+  const add = async (e: FormEvent) => {
+    e.preventDefault();
+    const clean = handle.trim();
+    if (!clean || busy) return;
+    setBusy(true);
+    setErr(null);
+    setNote(null);
+    try {
+      const found = await findBeeByHandle(clean);
+      if (!found) {
+        setErr(`No Bee named @${clean.replace(/^@/, '')}`);
+        return;
+      }
+      await addGroupMember(conversation.id, found.id);
+      setHandle('');
+      setNote(`Added @${found.handle}`);
+      onChanged();
+    } catch (e2) {
+      setErr(e2 instanceof Error ? e2.message : 'Could not add them');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const togglePolicy = async () => {
+    const next = !allowMembers;
+    setAllowMembers(next);
+    try {
+      await setGroupAddPolicy(conversation.id, next);
+      onChanged();
+    } catch {
+      setAllowMembers(!next); // revert on failure
+    }
+  };
+
+  return (
+    <div className="space-y-2 border-b border-zinc-100 bg-zinc-50/60 p-2.5">
+      <form onSubmit={add} className="flex items-center gap-2">
+        <input
+          value={handle}
+          onChange={(e) => setHandle(e.target.value)}
+          placeholder="Add by @handle"
+          className="min-w-0 flex-1 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-[13px] text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-cyan-400"
+        />
+        <button
+          type="submit"
+          disabled={busy || !handle.trim()}
+          className="rounded-md px-3 py-1.5 text-[12px] font-bold text-white transition-opacity disabled:opacity-40"
+          style={{ background: COMMS_COLOR }}
+        >
+          Add
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-md border border-zinc-200 px-2 py-1.5 text-[12px] font-semibold text-zinc-500 hover:text-zinc-800"
+        >
+          Done
+        </button>
+      </form>
+      {err && <p className="text-[11px] text-red-500">{err}</p>}
+      {note && <p className="text-[11px] text-emerald-600">{note}</p>}
+      {isOwner && (
+        <label className="flex cursor-pointer items-center gap-2 text-[11px] text-zinc-500">
+          <input
+            type="checkbox"
+            checked={allowMembers}
+            onChange={togglePolicy}
+            className="accent-cyan-600"
+          />
+          Let members (not just you) add people
+        </label>
+      )}
+    </div>
   );
 }
 
