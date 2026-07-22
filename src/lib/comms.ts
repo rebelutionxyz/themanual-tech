@@ -7,6 +7,7 @@ import {
   establishConversationKey,
   getConversationKey,
   isEncryptedBody,
+  rekeyConversation,
   resealConversationKey,
 } from './e2ee';
 
@@ -101,9 +102,49 @@ export async function syncConversationKey(conversation: Conversation): Promise<v
     return;
   }
   if (conversation.createdBy === bee) {
-    await establishConversationKey(bee, conversation.id, members);
+    // Best-effort: mints only for a genuinely new conversation. If rows exist but
+    // can't be opened here (locked out), establish throws and the UI offers Reset.
+    try {
+      await establishConversationKey(bee, conversation.id, members);
+    } catch {
+      /* locked out — recover via resetConversationEncryption */
+    }
   }
   // else: another member holds the key and will seal to us on their next open.
+}
+
+/**
+ * Encryption state of a conversation ON THIS DEVICE:
+ *   'ok'      — we can read/send.
+ *   'locked'  — a key exists but this device can't open it (identity changed /
+ *               new device with no reseal yet). Offer "Reset encryption".
+ *   'pending' — no key row for us yet; a holder will seal to us shortly.
+ */
+export async function conversationKeyStatus(
+  conversation: Conversation,
+): Promise<'ok' | 'locked' | 'pending'> {
+  const bee = await myBee();
+  const ck = await getConversationKey(bee, conversation.id).catch(() => null);
+  if (ck) return 'ok';
+  const client = supabase;
+  if (!client) return 'pending';
+  const { count } = await client
+    .from('comms_conversation_keys')
+    .select('epoch', { count: 'exact', head: true })
+    .eq('bee_id', bee)
+    .eq('conversation_id', conversation.id);
+  return (count ?? 0) > 0 ? 'locked' : 'pending';
+}
+
+/**
+ * RECOVERY: reset a conversation's encryption key when no device can open it.
+ * Mints a fresh content key sealed to all current member devices. Messages sent
+ * before the reset become unreadable — surface a confirm before calling this.
+ */
+export async function resetConversationEncryption(conversation: Conversation): Promise<void> {
+  const bee = await myBee();
+  const members = conversation.participants.map((p) => p.beeId);
+  await rekeyConversation(bee, conversation.id, members);
 }
 
 /** A nested `bees(handle,name)` embed comes back as an object (to-one). */
@@ -587,12 +628,16 @@ export async function cancelRoulette(): Promise<void> {
 /** While waiting in the queue, poll for the room the matching partner created. */
 export async function pollRouletteMatch(): Promise<{ roomId: string; livekitRoom: string } | null> {
   const bee = await myBee();
+  // Only accept a FRESH match room. A match room is created the moment a partner
+  // arrives, so it's always seconds old; bounding to the last 60s means a stale
+  // 'live' room we never left can't be re-matched into an empty call.
   const { data, error } = await req()
     .from('comms_rooms')
-    .select('id, livekit_room, status, kind, comms_room_participants!inner(bee_id)')
+    .select('id, livekit_room, status, kind, started_at, comms_room_participants!inner(bee_id)')
     .eq('kind', 'roulette')
     .eq('status', 'live')
     .eq('comms_room_participants.bee_id', bee)
+    .gt('started_at', new Date(Date.now() - 60_000).toISOString())
     .order('started_at', { ascending: false })
     .limit(1);
   if (error) throw error;

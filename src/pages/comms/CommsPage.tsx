@@ -11,6 +11,7 @@ import {
   type TypingChannel,
   addGroupMember,
   callE2eeKey,
+  conversationKeyStatus,
   conversationTitle,
   createCallRoom,
   createGroup,
@@ -26,6 +27,7 @@ import {
   parseMediaPayload,
   sendMediaMessage,
   removeGroupMember,
+  resetConversationEncryption,
   sendMessage,
   setGroupAddPolicy,
   startDirect,
@@ -459,6 +461,8 @@ function Thread({
   const [reactingId, setReactingId] = useState<string | null>(null);
   const [typing, setTyping] = useState<{ handle: string; at: number } | null>(null);
   const typingChanRef = useRef<TypingChannel | null>(null);
+  const [keyState, setKeyState] = useState<'ok' | 'locked' | 'pending' | null>(null);
+  const [resetting, setResetting] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const handleFor = (beeId: string) =>
     conversation.participants.find((p) => p.beeId === beeId)?.handle ?? 'bee';
@@ -490,6 +494,31 @@ function Thread({
     const t = window.setTimeout(() => setTyping(null), 3500);
     return () => clearTimeout(t);
   }, [typing]);
+
+  // Encryption status on THIS device — drives the "Reset encryption" banner.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: also recheck as messages load
+  useEffect(() => {
+    let alive = true;
+    conversationKeyStatus(conversation)
+      .then((s) => alive && setKeyState(s))
+      .catch(() => alive && setKeyState(null));
+    return () => {
+      alive = false;
+    };
+  }, [conversation.id, messages.length]);
+
+  const resetEncryption = async () => {
+    setResetting(true);
+    try {
+      await resetConversationEncryption(conversation);
+      setKeyState('ok');
+      onSent();
+    } catch (err) {
+      console.warn('reset encryption failed', err);
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const react = async (messageId: string, emoji: string) => {
     setReactingId(null);
@@ -735,6 +764,23 @@ function Thread({
         <div ref={endRef} />
       </div>
 
+      {keyState === 'locked' && (
+        <div className="border-t border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+          <div className="font-semibold">This chat can’t be unlocked on this device</div>
+          <div className="mt-0.5 text-amber-800">
+            Your encryption key changed. Reset it to send again — messages sent before the reset may
+            become unreadable.
+          </div>
+          <button
+            type="button"
+            onClick={resetEncryption}
+            disabled={resetting}
+            className="mt-1.5 rounded-md bg-amber-600 px-3 py-1.5 font-semibold text-white text-xs hover:bg-amber-700 disabled:opacity-50"
+          >
+            {resetting ? 'Resetting…' : 'Reset encryption'}
+          </button>
+        </div>
+      )}
       {typing && (
         <div className="border-t border-zinc-50 px-3 py-1 text-[11px] text-zinc-400">
           @{typing.handle} is typing…
