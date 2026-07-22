@@ -41,6 +41,12 @@ export interface Conversation {
   participants: CommsParticipant[];
 }
 
+export interface ReactionSummary {
+  emoji: string;
+  count: number;
+  mine: boolean; // did the current Bee react with this emoji?
+}
+
 export interface CommsMessage {
   id: string;
   conversationId: string;
@@ -51,6 +57,7 @@ export interface CommsMessage {
   undecryptable: boolean; // encrypted but this device has no key yet
   createdAt: string;
   deletedAt: string | null;
+  reactions: ReactionSummary[];
 }
 
 function req() {
@@ -143,7 +150,9 @@ export async function listConversations(): Promise<Conversation[]> {
 export async function listMessages(conversationId: string, limit = 200): Promise<CommsMessage[]> {
   const { data, error } = await req()
     .from('comms_messages')
-    .select('id, conversation_id, sender_bee_id, body, content_type, is_encrypted, created_at, deleted_at')
+    .select(
+      'id, conversation_id, sender_bee_id, body, content_type, is_encrypted, created_at, deleted_at, comms_reactions(bee_id, emoji)',
+    )
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true })
     .limit(limit);
@@ -169,6 +178,14 @@ export async function listMessages(conversationId: string, limit = 200): Promise
         undecryptable = true;
       }
     }
+    const rrows = (m.comms_reactions ?? []) as { bee_id: string; emoji: string }[];
+    const byEmoji = new Map<string, { count: number; mine: boolean }>();
+    for (const r of rrows) {
+      const cur = byEmoji.get(r.emoji) ?? { count: 0, mine: false };
+      cur.count += 1;
+      if (bee && r.bee_id === bee) cur.mine = true;
+      byEmoji.set(r.emoji, cur);
+    }
     out.push({
       id: m.id,
       conversationId: m.conversation_id,
@@ -179,6 +196,7 @@ export async function listMessages(conversationId: string, limit = 200): Promise
       undecryptable,
       createdAt: m.created_at,
       deletedAt: m.deleted_at,
+      reactions: Array.from(byEmoji, ([emoji, v]) => ({ emoji, count: v.count, mine: v.mine })),
     });
   }
   return out;
@@ -205,6 +223,12 @@ export async function sendMessage(
   contentType: 'text' | 'media' = 'text',
 ): Promise<string> {
   return sendEncrypted(conversationId, body, contentType);
+}
+
+/** Add or remove my emoji reaction on a message (toggles). Emoji stays plaintext. */
+export async function toggleReaction(messageId: string, emoji: string): Promise<void> {
+  const { error } = await req().rpc('comms_react', { p_message_id: messageId, p_emoji: emoji });
+  if (error) throw error;
 }
 
 // ── Media attachments (Creator Studio Library) ──

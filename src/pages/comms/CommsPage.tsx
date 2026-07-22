@@ -28,6 +28,7 @@ import {
   setGroupAddPolicy,
   startDirect,
   syncConversationKey,
+  toggleReaction,
 } from '@/lib/comms';
 import { assetUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
@@ -42,6 +43,7 @@ import {
   Radio,
   Send,
   Shuffle,
+  SmilePlus,
   Trash2,
   UserPlus,
   Users,
@@ -58,6 +60,7 @@ import { useNavigate, useParams } from 'react-router-dom';
  * the LiveKit decision.
  */
 const COMMS_COLOR = '#0891B2';
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '🎉', '😮', '😢'];
 
 export function CommsPage() {
   const { bee } = useAuth();
@@ -451,6 +454,7 @@ function Thread({
   const [leaving, setLeaving] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [reactingId, setReactingId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const handleFor = (beeId: string) =>
     conversation.participants.find((p) => p.beeId === beeId)?.handle ?? 'bee';
@@ -461,6 +465,16 @@ function Thread({
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages.length]);
+
+  const react = async (messageId: string, emoji: string) => {
+    setReactingId(null);
+    try {
+      await toggleReaction(messageId, emoji);
+      onSent();
+    } catch (err) {
+      console.warn('react failed', err);
+    }
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -636,7 +650,60 @@ function Thread({
                   )}
                 </div>
               )}
-              <span className="mt-0.5 px-1 text-[10px] text-zinc-300">{timeAgo(m.createdAt)}</span>
+              <div
+                className={cn(
+                  'mt-0.5 flex items-center gap-1 px-1',
+                  mine ? 'flex-row-reverse' : 'flex-row',
+                )}
+              >
+                {m.reactions.map((r) => (
+                  <button
+                    key={r.emoji}
+                    type="button"
+                    onClick={() => react(m.id, r.emoji)}
+                    className={cn(
+                      'flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[11px] transition-colors',
+                      r.mine
+                        ? 'border-cyan-300 bg-cyan-50 text-cyan-800'
+                        : 'border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50',
+                    )}
+                  >
+                    <span>{r.emoji}</span>
+                    <span>{r.count}</span>
+                  </button>
+                ))}
+                {!m.deletedAt && (
+                  <button
+                    type="button"
+                    onClick={() => setReactingId((id) => (id === m.id ? null : m.id))}
+                    title="React"
+                    aria-label="React"
+                    className="flex h-5 w-5 items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+                  >
+                    <SmilePlus size={13} />
+                  </button>
+                )}
+                <span className="text-[10px] text-zinc-300">{timeAgo(m.createdAt)}</span>
+              </div>
+              {reactingId === m.id && (
+                <div
+                  className={cn(
+                    'mt-1 flex gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-1 shadow-sm',
+                    mine ? 'self-end' : 'self-start',
+                  )}
+                >
+                  {REACTION_EMOJIS.map((e) => (
+                    <button
+                      key={e}
+                      type="button"
+                      onClick={() => react(m.id, e)}
+                      className="text-[17px] leading-none transition-transform hover:scale-125"
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
