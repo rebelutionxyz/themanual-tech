@@ -58,6 +58,8 @@ export interface CommsMessage {
   undecryptable: boolean; // encrypted but this device has no key yet
   createdAt: string;
   deletedAt: string | null;
+  editedAt: string | null;
+  replyToId: string | null; // message this one replies to (same conversation)
   reactions: ReactionSummary[];
 }
 
@@ -192,7 +194,7 @@ export async function listMessages(conversationId: string, limit = 200): Promise
   const { data, error } = await req()
     .from('comms_messages')
     .select(
-      'id, conversation_id, sender_bee_id, body, content_type, is_encrypted, created_at, deleted_at, comms_reactions(bee_id, emoji)',
+      'id, conversation_id, sender_bee_id, body, content_type, is_encrypted, created_at, deleted_at, edited_at, reply_to_message_id, comms_reactions(bee_id, emoji)',
     )
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true })
@@ -237,13 +239,20 @@ export async function listMessages(conversationId: string, limit = 200): Promise
       undecryptable,
       createdAt: m.created_at,
       deletedAt: m.deleted_at,
+      editedAt: m.edited_at ?? null,
+      replyToId: m.reply_to_message_id ?? null,
       reactions: Array.from(byEmoji, ([emoji, v]) => ({ emoji, count: v.count, mine: v.mine })),
     });
   }
   return out;
 }
 
-async function sendEncrypted(conversationId: string, plaintext: string, contentType: string): Promise<string> {
+async function sendEncrypted(
+  conversationId: string,
+  plaintext: string,
+  contentType: string,
+  replyTo?: string | null,
+): Promise<string> {
   const bee = await myBee();
   const ck = await getConversationKey(bee, conversationId);
   if (!ck) throw new Error('Encryption is still setting up for this conversation — try again in a moment.');
@@ -253,6 +262,7 @@ async function sendEncrypted(conversationId: string, plaintext: string, contentT
     p_body: enc,
     p_content_type: contentType,
     p_is_encrypted: true,
+    p_reply_to: replyTo ?? null,
   });
   if (error) throw error;
   return (data as Row)?.message_id ?? '';
@@ -262,8 +272,29 @@ export async function sendMessage(
   conversationId: string,
   body: string,
   contentType: 'text' | 'media' = 'text',
+  replyTo?: string | null,
 ): Promise<string> {
-  return sendEncrypted(conversationId, body, contentType);
+  return sendEncrypted(conversationId, body, contentType, replyTo);
+}
+
+/** Edit one of my own messages: re-encrypt the new text under the conversation key. */
+export async function editMessage(
+  messageId: string,
+  conversationId: string,
+  newText: string,
+): Promise<void> {
+  const bee = await myBee();
+  const ck = await getConversationKey(bee, conversationId);
+  if (!ck) throw new Error('Encryption is still setting up for this conversation — try again in a moment.');
+  const enc = await encryptBody(ck, newText);
+  const { error } = await req().rpc('comms_edit_message', { p_message_id: messageId, p_body: enc });
+  if (error) throw error;
+}
+
+/** Unsend one of my own messages (soft-delete; clears the stored ciphertext). */
+export async function unsendMessage(messageId: string): Promise<void> {
+  const { error } = await req().rpc('comms_delete_message', { p_message_id: messageId });
+  if (error) throw error;
 }
 
 /** Add or remove my emoji reaction on a message (toggles). Emoji stays plaintext. */

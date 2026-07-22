@@ -15,6 +15,7 @@ import {
   conversationTitle,
   createCallRoom,
   createGroup,
+  editMessage,
   findBeeByHandle,
   hasUnread,
   initComms,
@@ -33,6 +34,7 @@ import {
   startDirect,
   syncConversationKey,
   toggleReaction,
+  unsendMessage,
 } from '@/lib/comms';
 import { assetUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
@@ -42,9 +44,11 @@ import {
   LogOut,
   MessageCircle,
   Paperclip,
+  Pencil,
   Phone,
   Plus,
   Radio,
+  Reply,
   Send,
   Shuffle,
   SmilePlus,
@@ -432,6 +436,15 @@ function CommsHeader() {
   );
 }
 
+/** Short one-line preview of a quoted message for the reply UI. */
+function quoteSnippet(m: CommsMessage): string {
+  if (m.deletedAt) return 'removed message';
+  if (m.undecryptable) return 'encrypted message';
+  if (m.contentType === 'media') return '📎 media';
+  const t = m.body.replace(/\s+/g, ' ').trim();
+  return t.length > 80 ? `${t.slice(0, 80)}…` : t;
+}
+
 function Thread({
   conversation,
   messages,
@@ -459,6 +472,11 @@ function Thread({
   const [addOpen, setAddOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [reactingId, setReactingId] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<CommsMessage | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [confirmDelId, setConfirmDelId] = useState<string | null>(null);
+  const [msgBusy, setMsgBusy] = useState(false);
   const [typing, setTyping] = useState<{ handle: string; at: number } | null>(null);
   const typingChanRef = useRef<TypingChannel | null>(null);
   const [keyState, setKeyState] = useState<'ok' | 'locked' | 'pending' | null>(null);
@@ -530,14 +548,44 @@ function Thread({
     }
   };
 
+  const saveEdit = async () => {
+    const text = editDraft.trim();
+    if (!text || !editingId) return;
+    setMsgBusy(true);
+    try {
+      await editMessage(editingId, conversation.id, text);
+      setEditingId(null);
+      setEditDraft('');
+      onSent();
+    } catch (err) {
+      console.warn('comms edit failed', err);
+    } finally {
+      setMsgBusy(false);
+    }
+  };
+
+  const unsend = async (messageId: string) => {
+    setMsgBusy(true);
+    try {
+      await unsendMessage(messageId);
+      setConfirmDelId(null);
+      onSent();
+    } catch (err) {
+      console.warn('comms unsend failed', err);
+    } finally {
+      setMsgBusy(false);
+    }
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const body = draft.trim();
     if (!body || sending) return;
     setSending(true);
     try {
-      await sendMessage(conversation.id, body);
+      await sendMessage(conversation.id, body, 'text', replyingTo?.id ?? null);
       setDraft('');
+      setReplyingTo(null);
       onSent();
     } catch (err) {
       // e.g. "encryption still setting up" — keep the draft so they can retry
@@ -678,14 +726,80 @@ function Thread({
         )}
         {messages.map((m) => {
           const mine = m.senderBeeId === myBeeId;
+          const parent = m.replyToId ? messages.find((x) => x.id === m.replyToId) : null;
           return (
-            <div key={m.id} className={cn('flex flex-col', mine ? 'items-end' : 'items-start')}>
+            <div
+              key={m.id}
+              id={`msg-${m.id}`}
+              className={cn('flex flex-col', mine ? 'items-end' : 'items-start')}
+            >
               {conversation.kind === 'group' && !mine && (
                 <span className="mb-0.5 px-1 text-[10px] font-semibold text-zinc-400">
                   @{handleFor(m.senderBeeId)}
                 </span>
               )}
-              {!m.deletedAt && !m.undecryptable && m.contentType === 'media' && parseMediaPayload(m.body) ? (
+              {parent && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    document
+                      .getElementById(`msg-${parent.id}`)
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  }
+                  className={cn(
+                    'mb-0.5 max-w-[78%] truncate rounded-lg border-l-2 border-cyan-300 bg-zinc-50 px-2 py-1 text-left text-[11px] text-zinc-500',
+                    mine ? 'self-end' : 'self-start',
+                  )}
+                >
+                  <span className="font-semibold">
+                    {parent.senderBeeId === myBeeId ? 'You' : `@${handleFor(parent.senderBeeId)}`}
+                  </span>{' '}
+                  {quoteSnippet(parent)}
+                </button>
+              )}
+              {editingId === m.id ? (
+                <div
+                  className={cn(
+                    'flex w-full max-w-[78%] flex-col gap-1',
+                    mine ? 'items-end' : 'items-start',
+                  )}
+                >
+                  <input
+                    value={editDraft}
+                    onChange={(e) => setEditDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveEdit();
+                      if (e.key === 'Escape') {
+                        setEditingId(null);
+                        setEditDraft('');
+                      }
+                    }}
+                    // biome-ignore lint/a11y/noAutofocus: focus the edit field when it opens
+                    autoFocus
+                    className="w-full rounded-xl border border-cyan-300 px-3 py-2 text-[14px] text-zinc-800 outline-none focus:border-cyan-500"
+                  />
+                  <div className="flex gap-2 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={saveEdit}
+                      disabled={msgBusy}
+                      className="font-semibold text-cyan-700 disabled:opacity-50"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(null);
+                        setEditDraft('');
+                      }}
+                      className="text-zinc-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : !m.deletedAt && !m.undecryptable && m.contentType === 'media' && parseMediaPayload(m.body) ? (
                 <MediaBubble payload={parseMediaPayload(m.body)!} mine={mine} />
               ) : (
                 <div
@@ -729,6 +843,17 @@ function Thread({
                 {!m.deletedAt && (
                   <button
                     type="button"
+                    onClick={() => setReplyingTo(m)}
+                    title="Reply"
+                    aria-label="Reply"
+                    className="flex h-5 w-5 items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+                  >
+                    <Reply size={13} />
+                  </button>
+                )}
+                {!m.deletedAt && (
+                  <button
+                    type="button"
                     onClick={() => setReactingId((id) => (id === m.id ? null : m.id))}
                     title="React"
                     aria-label="React"
@@ -737,8 +862,57 @@ function Thread({
                     <SmilePlus size={13} />
                   </button>
                 )}
-                <span className="text-[10px] text-zinc-300">{timeAgo(m.createdAt)}</span>
+                {mine && !m.deletedAt && !m.undecryptable && m.contentType !== 'media' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingId(m.id);
+                      setEditDraft(m.body);
+                    }}
+                    title="Edit"
+                    aria-label="Edit"
+                    className="flex h-5 w-5 items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                )}
+                {mine && !m.deletedAt && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelId((id) => (id === m.id ? null : m.id))}
+                    title="Unsend"
+                    aria-label="Unsend"
+                    className="flex h-5 w-5 items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-red-600"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+                <span className="text-[10px] text-zinc-300">
+                  {timeAgo(m.createdAt)}
+                  {m.editedAt && !m.deletedAt ? ' · edited' : ''}
+                </span>
               </div>
+              {confirmDelId === m.id && (
+                <div
+                  className={cn(
+                    'mt-1 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px]',
+                    mine ? 'self-end' : 'self-start',
+                  )}
+                >
+                  <span className="text-red-700">Unsend this message?</span>
+                  <button
+                    type="button"
+                    onClick={() => unsend(m.id)}
+                    disabled={msgBusy}
+                    className="font-semibold text-red-700 disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                  <button type="button" onClick={() => setConfirmDelId(null)} className="text-zinc-400">
+                    Cancel
+                  </button>
+                </div>
+              )}
               {reactingId === m.id && (
                 <div
                   className={cn(
@@ -784,6 +958,25 @@ function Thread({
       {typing && (
         <div className="border-t border-zinc-50 px-3 py-1 text-[11px] text-zinc-400">
           @{typing.handle} is typing…
+        </div>
+      )}
+      {replyingTo && (
+        <div className="flex items-center gap-2 border-t border-zinc-100 bg-zinc-50 px-3 py-1.5">
+          <div className="min-w-0 flex-1 border-l-2 border-cyan-400 pl-2">
+            <div className="text-[11px] font-semibold text-cyan-700">
+              Replying to{' '}
+              {replyingTo.senderBeeId === myBeeId ? 'yourself' : `@${handleFor(replyingTo.senderBeeId)}`}
+            </div>
+            <div className="truncate text-[11px] text-zinc-500">{quoteSnippet(replyingTo)}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReplyingTo(null)}
+            aria-label="Cancel reply"
+            className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700"
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
       <form onSubmit={submit} className="flex items-center gap-2 border-t border-zinc-100 p-2.5">
