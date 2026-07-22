@@ -1,4 +1,4 @@
-import {
+import { lazy, Suspense,
   createContext,
   useCallback,
   useContext,
@@ -11,7 +11,7 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { callE2eeKey, joinRoom, leaveRoom } from '@/lib/comms';
 import { clearCallNotifications, registerPush, showCallNotification } from '@/lib/push';
-import { CallView } from './CallView';
+const CallView = lazy(() => import('./CallView').then((m) => ({ default: m.CallView })));
 
 /**
  * Global call layer — mounted ONCE at the app root (App.tsx), so:
@@ -363,7 +363,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
       {/* Active call — rendered app-wide so it survives navigation. */}
       {active && (
-        <CallView
+        <Suspense fallback={null}>
+          <CallView
           key={active.roomId}
           roomId={active.roomId}
           video={active.video}
@@ -378,6 +379,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
             if (reason === 'no-answer') showToast(`No answer from ${who}`);
           }}
         />
+        </Suspense>
       )}
 
       {/* Incoming ring — appears anywhere on the site. */}

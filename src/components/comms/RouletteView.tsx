@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { cancelRoulette, enqueueRoulette, pollRouletteMatch } from '@/lib/comms';
-import { CallView } from './CallView';
+const CallView = lazy(() => import('./CallView').then((m) => ({ default: m.CallView })));
 
 /**
  * Roulette — enqueue for a random 1:1, get matched, drop into a call, and
@@ -71,7 +71,8 @@ export function RouletteView({ onClose }: { onClose: () => void }) {
   if (phase === 'incall' && roomId) {
     return (
       <div className="fixed inset-0 z-50">
-        <CallView
+        <Suspense fallback={null}>
+          <CallView
           key={roomId}
           roomId={roomId}
           video={mode === 'video'}
@@ -80,6 +81,7 @@ export function RouletteView({ onClose }: { onClose: () => void }) {
             setPhase('choose');
           }}
         />
+        </Suspense>
         <div className="-translate-x-1/2 fixed bottom-5 left-1/2 z-[60] flex gap-2">
           <button
             type="button"

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { createSpace, joinRoom, listSpaces, type Space } from '@/lib/comms';
-import { CallView } from './CallView';
+const CallView = lazy(() => import('./CallView').then((m) => ({ default: m.CallView })));
 
 /**
  * Rooms — live public voice spaces. Start one (you're the host) or drop into a
@@ -68,7 +68,8 @@ export function RoomsView({ onClose }: { onClose: () => void }) {
 
   if (phase === 'in' && roomId) {
     return (
-      <CallView
+      <Suspense fallback={null}>
+          <CallView
         key={roomId}
         roomId={roomId}
         video={false}
@@ -77,6 +78,7 @@ export function RoomsView({ onClose }: { onClose: () => void }) {
           setPhase('list');
         }}
       />
+        </Suspense>
     );
   }
 
