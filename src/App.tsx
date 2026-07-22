@@ -13,77 +13,77 @@ import {
 import { AstraProvider, useAstra } from '@/lib/astras/AstraContext';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { useUserRole } from '@/lib/useUserRole';
-import { AdvertisePage } from '@/pages/AdvertisePage';
-import { BlingsPage } from '@/pages/BlingsPage';
-import { BookmarksPage } from '@/pages/BookmarksPage';
-import { BusinessPage } from '@/pages/BusinessPage';
-import { CollectionPage } from '@/pages/CollectionPage';
-import { CollectionsIndexPage } from '@/pages/CollectionsIndexPage';
+const AdvertisePage = lazy(() => import('@/pages/AdvertisePage').then((m) => ({ default: m.AdvertisePage })));
+const BlingsPage = lazy(() => import('@/pages/BlingsPage').then((m) => ({ default: m.BlingsPage })));
+const BookmarksPage = lazy(() => import('@/pages/BookmarksPage').then((m) => ({ default: m.BookmarksPage })));
+const BusinessPage = lazy(() => import('@/pages/BusinessPage').then((m) => ({ default: m.BusinessPage })));
+const CollectionPage = lazy(() => import('@/pages/CollectionPage').then((m) => ({ default: m.CollectionPage })));
+const CollectionsIndexPage = lazy(() => import('@/pages/CollectionsIndexPage').then((m) => ({ default: m.CollectionsIndexPage })));
 import { ComingSoonPage } from '@/pages/ComingSoonPage';
-import { HandleSettingsPage } from '@/pages/HandleSettingsPage';
-import { HomePage } from '@/pages/HomePage';
+const HandleSettingsPage = lazy(() => import('@/pages/HandleSettingsPage').then((m) => ({ default: m.HandleSettingsPage })));
+const HomePage = lazy(() => import('@/pages/HomePage').then((m) => ({ default: m.HomePage })));
 import { LoginPage } from '@/pages/LoginPage';
-import { ManualPage } from '@/pages/ManualPage';
-import { MyHexPage } from '@/pages/MyHexPage';
-import { NexusPage } from '@/pages/NexusPage';
-import { NotificationsPage } from '@/pages/NotificationsPage';
-import { NucleusPage } from '@/pages/NucleusPage';
-import { PremiumPage } from '@/pages/PremiumPage';
-import { ProfilePage } from '@/pages/ProfilePage';
-import { RealmFeedPage } from '@/pages/RealmFeedPage';
-import { StudioPage } from '@/pages/StudioPage';
-import { SurfacePage } from '@/pages/SurfacePage';
-import { WavesPage } from '@/pages/WavesPage';
-import { BazaarBrowse } from '@/pages/bazaar/BazaarBrowse';
-import { BazaarListingDetail } from '@/pages/bazaar/BazaarListingDetail';
-import { BazaarNew } from '@/pages/bazaar/BazaarNew';
-import { BazaarOrders } from '@/pages/bazaar/BazaarOrders';
-import { CommsPage } from '@/pages/comms/CommsPage';
-import { CommunityLayout } from '@/pages/community/CommunityLayout';
-import { AtlasOraclePage } from '@/pages/dingleberry/AtlasOraclePage';
-import { CommandCenterPage } from '@/pages/dingleberry/CommandCenterPage';
-import { DingleberryLayout } from '@/pages/dingleberry/DingleberryLayout';
-import { DispatchAuthPage } from '@/pages/dingleberry/DispatchAuthPage';
-import { GoDarkMonitorPage } from '@/pages/dingleberry/GoDarkMonitorPage';
-import { InfraHealthPage } from '@/pages/dingleberry/InfraHealthPage';
-import { JusticeHandoffPage } from '@/pages/dingleberry/JusticeHandoffPage';
-import { KarmaCreditPage } from '@/pages/dingleberry/KarmaCreditPage';
-import { MemberMeshPage } from '@/pages/dingleberry/MemberMeshPage';
-import { ShillDetectionPage } from '@/pages/dingleberry/ShillDetectionPage';
-import { SourceVerificationPage } from '@/pages/dingleberry/SourceVerificationPage';
-import { ThreatInterceptionPage } from '@/pages/dingleberry/ThreatInterceptionPage';
-import { TransactionSecurityPage } from '@/pages/dingleberry/TransactionSecurityPage';
-import { EventPage } from '@/pages/events/EventPage';
-import { EventsPage } from '@/pages/events/EventsPage';
-import { BalancePage } from '@/pages/freedomblings/BalancePage';
-import { CharterPage } from '@/pages/freedomblings/CharterPage';
-import { CirculationPage } from '@/pages/freedomblings/CirculationPage';
-import { EarningPage } from '@/pages/freedomblings/EarningPage';
+const ManualPage = lazy(() => import('@/pages/ManualPage').then((m) => ({ default: m.ManualPage })));
+const MyHexPage = lazy(() => import('@/pages/MyHexPage').then((m) => ({ default: m.MyHexPage })));
+const NexusPage = lazy(() => import('@/pages/NexusPage').then((m) => ({ default: m.NexusPage })));
+const NotificationsPage = lazy(() => import('@/pages/NotificationsPage').then((m) => ({ default: m.NotificationsPage })));
+const NucleusPage = lazy(() => import('@/pages/NucleusPage').then((m) => ({ default: m.NucleusPage })));
+const PremiumPage = lazy(() => import('@/pages/PremiumPage').then((m) => ({ default: m.PremiumPage })));
+const ProfilePage = lazy(() => import('@/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
+const RealmFeedPage = lazy(() => import('@/pages/RealmFeedPage').then((m) => ({ default: m.RealmFeedPage })));
+const StudioPage = lazy(() => import('@/pages/StudioPage').then((m) => ({ default: m.StudioPage })));
+const SurfacePage = lazy(() => import('@/pages/SurfacePage').then((m) => ({ default: m.SurfacePage })));
+const WavesPage = lazy(() => import('@/pages/WavesPage').then((m) => ({ default: m.WavesPage })));
+const BazaarBrowse = lazy(() => import('@/pages/bazaar/BazaarBrowse').then((m) => ({ default: m.BazaarBrowse })));
+const BazaarListingDetail = lazy(() => import('@/pages/bazaar/BazaarListingDetail').then((m) => ({ default: m.BazaarListingDetail })));
+const BazaarNew = lazy(() => import('@/pages/bazaar/BazaarNew').then((m) => ({ default: m.BazaarNew })));
+const BazaarOrders = lazy(() => import('@/pages/bazaar/BazaarOrders').then((m) => ({ default: m.BazaarOrders })));
+const CommsPage = lazy(() => import('@/pages/comms/CommsPage').then((m) => ({ default: m.CommsPage })));
+const CommunityLayout = lazy(() => import('@/pages/community/CommunityLayout').then((m) => ({ default: m.CommunityLayout })));
+const AtlasOraclePage = lazy(() => import('@/pages/dingleberry/AtlasOraclePage').then((m) => ({ default: m.AtlasOraclePage })));
+const CommandCenterPage = lazy(() => import('@/pages/dingleberry/CommandCenterPage').then((m) => ({ default: m.CommandCenterPage })));
+const DingleberryLayout = lazy(() => import('@/pages/dingleberry/DingleberryLayout').then((m) => ({ default: m.DingleberryLayout })));
+const DispatchAuthPage = lazy(() => import('@/pages/dingleberry/DispatchAuthPage').then((m) => ({ default: m.DispatchAuthPage })));
+const GoDarkMonitorPage = lazy(() => import('@/pages/dingleberry/GoDarkMonitorPage').then((m) => ({ default: m.GoDarkMonitorPage })));
+const InfraHealthPage = lazy(() => import('@/pages/dingleberry/InfraHealthPage').then((m) => ({ default: m.InfraHealthPage })));
+const JusticeHandoffPage = lazy(() => import('@/pages/dingleberry/JusticeHandoffPage').then((m) => ({ default: m.JusticeHandoffPage })));
+const KarmaCreditPage = lazy(() => import('@/pages/dingleberry/KarmaCreditPage').then((m) => ({ default: m.KarmaCreditPage })));
+const MemberMeshPage = lazy(() => import('@/pages/dingleberry/MemberMeshPage').then((m) => ({ default: m.MemberMeshPage })));
+const ShillDetectionPage = lazy(() => import('@/pages/dingleberry/ShillDetectionPage').then((m) => ({ default: m.ShillDetectionPage })));
+const SourceVerificationPage = lazy(() => import('@/pages/dingleberry/SourceVerificationPage').then((m) => ({ default: m.SourceVerificationPage })));
+const ThreatInterceptionPage = lazy(() => import('@/pages/dingleberry/ThreatInterceptionPage').then((m) => ({ default: m.ThreatInterceptionPage })));
+const TransactionSecurityPage = lazy(() => import('@/pages/dingleberry/TransactionSecurityPage').then((m) => ({ default: m.TransactionSecurityPage })));
+const EventPage = lazy(() => import('@/pages/events/EventPage').then((m) => ({ default: m.EventPage })));
+const EventsPage = lazy(() => import('@/pages/events/EventsPage').then((m) => ({ default: m.EventsPage })));
+const BalancePage = lazy(() => import('@/pages/freedomblings/BalancePage').then((m) => ({ default: m.BalancePage })));
+const CharterPage = lazy(() => import('@/pages/freedomblings/CharterPage').then((m) => ({ default: m.CharterPage })));
+const CirculationPage = lazy(() => import('@/pages/freedomblings/CirculationPage').then((m) => ({ default: m.CirculationPage })));
+const EarningPage = lazy(() => import('@/pages/freedomblings/EarningPage').then((m) => ({ default: m.EarningPage })));
 // deferred → Sep build (EscrowPage.tsx + escrow.ts stay on disk, just unrouted)
-// import { EscrowPage } from '@/pages/freedomblings/EscrowPage';
-import { FreedomblingsLayout } from '@/pages/freedomblings/FreedomblingsLayout';
-import { GradationsPage } from '@/pages/freedomblings/GradationsPage';
-import { LedgerPage } from '@/pages/freedomblings/LedgerPage';
-import { LineagePage } from '@/pages/freedomblings/LineagePage';
-import { MovePage } from '@/pages/freedomblings/MovePage';
-import { OpenBooksPage } from '@/pages/freedomblings/OpenBooksPage';
-import { StandingPage } from '@/pages/freedomblings/StandingPage';
-import { CampaignPage } from '@/pages/give/CampaignPage';
-import { GivePage } from '@/pages/give/GivePage';
-import { GroupPage } from '@/pages/groups/GroupPage';
-import { GroupsPage } from '@/pages/groups/GroupsPage';
-import { IntelPage } from '@/pages/intel/IntelPage';
-import { NewThreadPage } from '@/pages/intel/NewThreadPage';
-import { ReportedPage } from '@/pages/intel/ReportedPage';
-import { ThreadPage } from '@/pages/intel/ThreadPage';
-import { ChannelPage } from '@/pages/pulse/ChannelPage';
-import { PulseHome } from '@/pages/pulse/PulseHome';
-import { WatchPage } from '@/pages/pulse/WatchPage';
-import { ImageEditorPage } from '@/pages/studio/ImageEditorPage';
-import { ResponseRecorderPage } from '@/pages/studio/ResponseRecorderPage';
-import { VideoEditorPage } from '@/pages/studio/VideoEditorPage';
+// const EscrowPage = lazy(() => import('@/pages/freedomblings/EscrowPage').then((m) => ({ default: m.EscrowPage })));
+const FreedomblingsLayout = lazy(() => import('@/pages/freedomblings/FreedomblingsLayout').then((m) => ({ default: m.FreedomblingsLayout })));
+const GradationsPage = lazy(() => import('@/pages/freedomblings/GradationsPage').then((m) => ({ default: m.GradationsPage })));
+const LedgerPage = lazy(() => import('@/pages/freedomblings/LedgerPage').then((m) => ({ default: m.LedgerPage })));
+const LineagePage = lazy(() => import('@/pages/freedomblings/LineagePage').then((m) => ({ default: m.LineagePage })));
+const MovePage = lazy(() => import('@/pages/freedomblings/MovePage').then((m) => ({ default: m.MovePage })));
+const OpenBooksPage = lazy(() => import('@/pages/freedomblings/OpenBooksPage').then((m) => ({ default: m.OpenBooksPage })));
+const StandingPage = lazy(() => import('@/pages/freedomblings/StandingPage').then((m) => ({ default: m.StandingPage })));
+const CampaignPage = lazy(() => import('@/pages/give/CampaignPage').then((m) => ({ default: m.CampaignPage })));
+const GivePage = lazy(() => import('@/pages/give/GivePage').then((m) => ({ default: m.GivePage })));
+const GroupPage = lazy(() => import('@/pages/groups/GroupPage').then((m) => ({ default: m.GroupPage })));
+const GroupsPage = lazy(() => import('@/pages/groups/GroupsPage').then((m) => ({ default: m.GroupsPage })));
+const IntelPage = lazy(() => import('@/pages/intel/IntelPage').then((m) => ({ default: m.IntelPage })));
+const NewThreadPage = lazy(() => import('@/pages/intel/NewThreadPage').then((m) => ({ default: m.NewThreadPage })));
+const ReportedPage = lazy(() => import('@/pages/intel/ReportedPage').then((m) => ({ default: m.ReportedPage })));
+const ThreadPage = lazy(() => import('@/pages/intel/ThreadPage').then((m) => ({ default: m.ThreadPage })));
+const ChannelPage = lazy(() => import('@/pages/pulse/ChannelPage').then((m) => ({ default: m.ChannelPage })));
+const PulseHome = lazy(() => import('@/pages/pulse/PulseHome').then((m) => ({ default: m.PulseHome })));
+const WatchPage = lazy(() => import('@/pages/pulse/WatchPage').then((m) => ({ default: m.WatchPage })));
+const ImageEditorPage = lazy(() => import('@/pages/studio/ImageEditorPage').then((m) => ({ default: m.ImageEditorPage })));
+const ResponseRecorderPage = lazy(() => import('@/pages/studio/ResponseRecorderPage').then((m) => ({ default: m.ResponseRecorderPage })));
+const VideoEditorPage = lazy(() => import('@/pages/studio/VideoEditorPage').then((m) => ({ default: m.VideoEditorPage })));
 import { useBranding } from '@/stores/useBranding';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { type Location, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 export default function App() {
@@ -187,6 +187,7 @@ function AppContent() {
           size to h-full and own their internal scroll (one scrollbar); tall
           standalone pages scroll here. min-h-0 lets inner scrollers engage. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
+        <Suspense fallback={null}>
         <Routes location={background ?? location}>
           {/* Front door (landing gate 2026-07-10) — astra-aware first, then:
             anonymous → login module · allowlisted OG → management (by
@@ -376,12 +377,14 @@ function AppContent() {
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+          </Suspense>
         {/* Popup layer — mounts only when a background location is present.
             One <Route> per popup; each wraps the SAME page component its
             canonical URL renders full-page, so parity is structural.
             Bookmarked stays a navigation (IntelPage saved-mode rides the
             shell's store state) — its dedicated popup is a later slice. */}
         {background && (
+          <Suspense fallback={null}>
           <Routes>
             <Route
               path="/bookmarks"
@@ -457,6 +460,7 @@ function AppContent() {
             />
             <Route path="*" element={null} />
           </Routes>
+          </Suspense>
         )}
       </div>
     </div>
