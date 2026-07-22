@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import {
+  computeSafetyNumber,
   decryptBody,
   deriveCallKey,
   encryptBody,
@@ -147,6 +148,16 @@ export async function resetConversationEncryption(conversation: Conversation): P
   const bee = await myBee();
   const members = conversation.participants.map((p) => p.beeId);
   await rekeyConversation(bee, conversation.id, members);
+}
+
+/**
+ * Safety number for this conversation — both sides compute the same value from
+ * all participants' device keys. Comparing it out-of-band detects a key swap /
+ * MITM. Changes when anyone adds or removes a device (re-verify then).
+ */
+export async function conversationSafetyNumber(conversation: Conversation): Promise<string> {
+  const beeIds = conversation.participants.map((p) => p.beeId);
+  return computeSafetyNumber(beeIds);
 }
 
 /** A nested `bees(handle,name)` embed comes back as an object (to-one). */

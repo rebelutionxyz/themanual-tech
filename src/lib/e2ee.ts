@@ -353,3 +353,33 @@ export async function importRecoveryCode(beeId: string, code: string): Promise<v
   ckCache.clear();
   await ensurePublished({ beeId, publicKey: pk, privateKey: sk });
 }
+
+// ── identity verification (safety number) ───────────────────────────────────
+/**
+ * A stable, comparable "safety number" derived from EVERY device key of the
+ * given Bees. Both sides compute the identical value from public data, so
+ * comparing it out-of-band (read it aloud / side by side) detects a
+ * man-in-the-middle or a server-side key swap: if the numbers match, the keys
+ * your messages are sealed to really belong to the other Bee(s). It changes
+ * whenever someone adds or removes a device — that's the signal to re-verify.
+ *
+ * Rendered as 6 space-separated 5-digit groups (Signal-style, shortened).
+ */
+export async function computeSafetyNumber(beeIds: string[]): Promise<string> {
+  const sodium = await S();
+  const { data, error } = await db()
+    .from('bee_keys')
+    .select('bee_id, public_key')
+    .in('bee_id', uniq(beeIds));
+  if (error) throw error;
+  // Canonical, order-independent: sort every (bee, key) pair, then hash.
+  const rows = (data ?? []).map((r) => `${r.bee_id}:${r.public_key}`).sort();
+  const digest = sodium.crypto_generichash(30, sodium.from_string(rows.join('|')), null);
+  const groups: string[] = [];
+  for (let i = 0; i < 30; i += 5) {
+    let n = 0;
+    for (let j = 0; j < 5; j++) n = (n * 256 + digest[i + j]) % 100000;
+    groups.push(String(n).padStart(5, '0'));
+  }
+  return groups.join(' ');
+}

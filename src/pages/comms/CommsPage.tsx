@@ -12,6 +12,7 @@ import {
   addGroupMember,
   callE2eeKey,
   conversationKeyStatus,
+  conversationSafetyNumber,
   conversationTitle,
   createCallRoom,
   createGroup,
@@ -55,6 +56,7 @@ import {
   Radio,
   Reply,
   Send,
+  ShieldCheck,
   Shuffle,
   SmilePlus,
   Trash2,
@@ -511,6 +513,8 @@ function Thread({
   const [leaving, setLeaving] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  const [safetyNum, setSafetyNum] = useState<string | null>(null);
   const [reactingId, setReactingId] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<CommsMessage | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -635,6 +639,19 @@ function Thread({
     }
   };
 
+  const openVerify = async () => {
+    const next = !verifyOpen;
+    setVerifyOpen(next);
+    if (next) {
+      setSafetyNum(null);
+      try {
+        setSafetyNum(await conversationSafetyNumber(conversation));
+      } catch {
+        setSafetyNum('unavailable');
+      }
+    }
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const body = draft.trim();
@@ -715,6 +732,18 @@ function Thread({
         >
           {muted ? <BellOff size={15} /> : <Bell size={15} />}
         </button>
+        <button
+          type="button"
+          onClick={openVerify}
+          title="Verify encryption (safety number)"
+          aria-label="Verify encryption"
+          className={cn(
+            'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md transition-colors hover:bg-cyan-50 hover:text-cyan-700',
+            verifyOpen ? 'bg-cyan-50 text-cyan-700' : 'text-zinc-400',
+          )}
+        >
+          <ShieldCheck size={15} />
+        </button>
         {canAdd && (
           <button
             type="button"
@@ -770,6 +799,21 @@ function Thread({
         )}
       </div>
 
+      {verifyOpen && (
+        <div className="border-b border-zinc-100 bg-zinc-50 px-3 py-3">
+          <div className="mb-1 flex items-center gap-1.5 text-[12px] font-semibold text-zinc-700">
+            <ShieldCheck size={14} className="text-cyan-600" /> Safety number
+          </div>
+          <div className="mb-2 break-all font-mono text-[13px] tracking-wide text-zinc-800">
+            {safetyNum ?? 'Computing…'}
+          </div>
+          <p className="text-[11px] leading-relaxed text-zinc-500">
+            Compare this with {conversationTitle(conversation, myBeeId)} — read it aloud or hold your
+            screens side by side. If it matches, no one is intercepting your keys. It changes when a
+            device is added or removed.
+          </p>
+        </div>
+      )}
       {addOpen && canAdd && (
         <AddMemberPanel
           conversation={conversation}
