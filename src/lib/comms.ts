@@ -676,6 +676,80 @@ export async function pollRouletteMatch(): Promise<{ roomId: string; livekitRoom
   return r ? { roomId: r.id, livekitRoom: r.livekit_room } : null;
 }
 
+// ── live updates (Supabase Realtime; postgres_changes, RLS-scoped) ──
+export interface RealtimeSub {
+  close: () => void;
+}
+
+/**
+ * Live updates for ONE conversation's thread — fires onChange on any message
+ * insert/edit/unsend or reaction change so the caller can refetch. RLS limits
+ * delivery to this member. Pass the auth token so Realtime applies RLS.
+ */
+export function subscribeConversation(
+  conversationId: string,
+  accessToken: string | null,
+  onChange: () => void,
+): RealtimeSub | null {
+  if (!supabase) return null;
+  const client = supabase;
+  if (accessToken) client.realtime.setAuth(accessToken);
+  const channel = client
+    .channel(`comms:thread:${conversationId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'comms_messages',
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      () => onChange(),
+    )
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'comms_reactions' }, () =>
+      onChange(),
+    )
+    .subscribe();
+  return {
+    close: () => {
+      client.removeChannel(channel);
+    },
+  };
+}
+
+/**
+ * Live updates for the conversation LIST — new messages anywhere I'm a member,
+ * read-state (for "Seen"/unread), and membership/title changes. RLS-scoped.
+ */
+export function subscribeConversationList(
+  accessToken: string | null,
+  onChange: () => void,
+): RealtimeSub | null {
+  if (!supabase) return null;
+  const client = supabase;
+  if (accessToken) client.realtime.setAuth(accessToken);
+  const channel = client
+    .channel('comms:list')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comms_messages' }, () =>
+      onChange(),
+    )
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'comms_messages' }, () =>
+      onChange(),
+    )
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'comms_participants' }, () =>
+      onChange(),
+    )
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'comms_conversations' }, () =>
+      onChange(),
+    )
+    .subscribe();
+  return {
+    close: () => {
+      client.removeChannel(channel);
+    },
+  };
+}
+
 export async function markRead(conversationId: string): Promise<void> {
   const { error } = await req().rpc('comms_mark_read', { p_conversation_id: conversationId });
   if (error) throw error;

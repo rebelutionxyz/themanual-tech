@@ -33,6 +33,8 @@ import {
   setConversationMuted,
   setGroupAddPolicy,
   startDirect,
+  subscribeConversation,
+  subscribeConversationList,
   syncConversationKey,
   toggleReaction,
   unsendMessage,
@@ -74,7 +76,7 @@ const COMMS_COLOR = '#0891B2';
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '🎉', '😮', '😢'];
 
 export function CommsPage() {
-  const { bee } = useAuth();
+  const { bee, session } = useAuth();
   const navigate = useNavigate();
   const { conversationId } = useParams<{ conversationId: string }>();
 
@@ -138,9 +140,19 @@ export function CommsPage() {
   // Conversation list: load + slow poll.
   useEffect(() => {
     loadConvos();
-    const t = setInterval(loadConvos, 12000);
-    return () => clearInterval(t);
-  }, [loadConvos]);
+    let timer: number | undefined;
+    const refresh = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(loadConvos, 200);
+    };
+    const sub = subscribeConversationList(session?.access_token ?? null, refresh);
+    const t = window.setInterval(loadConvos, 30000); // safety-net fallback
+    return () => {
+      window.clearTimeout(timer);
+      window.clearInterval(t);
+      sub?.close();
+    };
+  }, [loadConvos, session?.access_token]);
 
   // Load who I follow the first time the Following filter is opened.
   useEffect(() => {
@@ -151,15 +163,28 @@ export function CommsPage() {
     }
   }, [filter, follows]);
 
-  // Active thread: load + fast poll + mark read.
+  // Active thread: load + mark read + LIVE updates (Realtime), slow poll fallback.
   useEffect(() => {
     if (!conversationId) return;
     setMessages([]);
     loadMessages();
     markRead(conversationId).catch(() => {});
-    const t = setInterval(loadMessages, 4000);
-    return () => clearInterval(t);
-  }, [conversationId, loadMessages]);
+    let timer: number | undefined;
+    const refresh = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        loadMessages();
+        markRead(conversationId).catch(() => {}); // advance my read cursor → live "Seen"
+      }, 120);
+    };
+    const sub = subscribeConversation(conversationId, session?.access_token ?? null, refresh);
+    const t = window.setInterval(loadMessages, 20000); // safety-net fallback
+    return () => {
+      window.clearTimeout(timer);
+      window.clearInterval(t);
+      sub?.close();
+    };
+  }, [conversationId, loadMessages, session?.access_token]);
 
   // Publish this Bee's E2EE identity key on mount.
   useEffect(() => {
