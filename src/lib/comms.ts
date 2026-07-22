@@ -681,6 +681,15 @@ export async function markRead(conversationId: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Mute or unmute a conversation for me (suppresses my notifications for it). */
+export async function setConversationMuted(conversationId: string, muted: boolean): Promise<void> {
+  const { error } = await req().rpc('comms_set_mute', {
+    p_conversation_id: conversationId,
+    p_muted: muted,
+  });
+  if (error) throw error;
+}
+
 export async function leaveConversation(conversationId: string): Promise<void> {
   const { error } = await req().rpc('comms_leave', { p_conversation_id: conversationId });
   if (error) throw error;

@@ -30,6 +30,7 @@ import {
   removeGroupMember,
   resetConversationEncryption,
   sendMessage,
+  setConversationMuted,
   setGroupAddPolicy,
   startDirect,
   syncConversationKey,
@@ -40,6 +41,8 @@ import { assetUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import {
   ArrowLeft,
+  Bell,
+  BellOff,
   FileText,
   LogOut,
   MessageCircle,
@@ -436,6 +439,18 @@ function CommsHeader() {
   );
 }
 
+/** "Seen" label for my latest message, from other participants' last_read_at. */
+function seenLabel(conversation: Conversation, m: CommsMessage, myBeeId: string): string | null {
+  const others = conversation.participants.filter((p) => p.beeId !== myBeeId);
+  if (others.length === 0) return null;
+  const readers = others.filter(
+    (p) => p.lastReadAt && new Date(p.lastReadAt).getTime() >= new Date(m.createdAt).getTime(),
+  );
+  if (readers.length === 0) return null;
+  if (conversation.kind === 'direct') return 'Seen';
+  return readers.length === others.length ? 'Seen by all' : `Seen by ${readers.length}`;
+}
+
 /** Short one-line preview of a quoted message for the reply UI. */
 function quoteSnippet(m: CommsMessage): string {
   if (m.deletedAt) return 'removed message';
@@ -486,6 +501,12 @@ function Thread({
     conversation.participants.find((p) => p.beeId === beeId)?.handle ?? 'bee';
   const iAmOwner = conversation.participants.find((p) => p.beeId === myBeeId)?.role === 'owner';
   const canAdd = conversation.kind === 'group' && (iAmOwner || conversation.membersCanAdd);
+  const iAmMutedProp = conversation.participants.find((p) => p.beeId === myBeeId)?.muted ?? false;
+  const [muted, setMuted] = useState(iAmMutedProp);
+  const lastMineId = messages.reduce(
+    (acc, m) => (m.senderBeeId === myBeeId && !m.deletedAt ? m.id : acc),
+    null as string | null,
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on new messages
   useEffect(() => {
@@ -577,6 +598,18 @@ function Thread({
     }
   };
 
+  const toggleMute = async () => {
+    const next = !muted;
+    setMuted(next); // optimistic
+    try {
+      await setConversationMuted(conversation.id, next);
+      onSent();
+    } catch (err) {
+      console.warn('comms mute toggle failed', err);
+      setMuted(!next); // revert on failure
+    }
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const body = draft.trim();
@@ -644,6 +677,18 @@ function Thread({
           className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-cyan-50 hover:text-cyan-700"
         >
           <Phone size={15} />
+        </button>
+        <button
+          type="button"
+          onClick={toggleMute}
+          title={muted ? 'Unmute this chat' : 'Mute this chat'}
+          aria-label={muted ? 'Unmute this chat' : 'Mute this chat'}
+          className={cn(
+            'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md transition-colors hover:bg-cyan-50 hover:text-cyan-700',
+            muted ? 'text-amber-500' : 'text-zinc-400',
+          )}
+        >
+          {muted ? <BellOff size={15} /> : <Bell size={15} />}
         </button>
         {canAdd && (
           <button
@@ -727,6 +772,7 @@ function Thread({
         {messages.map((m) => {
           const mine = m.senderBeeId === myBeeId;
           const parent = m.replyToId ? messages.find((x) => x.id === m.replyToId) : null;
+          const seen = m.id === lastMineId ? seenLabel(conversation, m, myBeeId) : null;
           return (
             <div
               key={m.id}
@@ -892,6 +938,13 @@ function Thread({
                   {m.editedAt && !m.deletedAt ? ' · edited' : ''}
                 </span>
               </div>
+              {seen && (
+                <span
+                  className={cn('px-1 text-[10px] text-zinc-400', mine ? 'self-end' : 'self-start')}
+                >
+                  {seen}
+                </span>
+              )}
               {confirmDelId === m.id && (
                 <div
                   className={cn(
