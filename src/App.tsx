@@ -13,6 +13,9 @@ import {
 import { AstraProvider, useAstra } from '@/lib/astras/AstraContext';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { useUserRole } from '@/lib/useUserRole';
+import { useBranding } from '@/stores/useBranding';
+import { lazy, Suspense, useEffect } from 'react';
+import { type Location, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 const AdvertisePage = lazy(() => import('@/pages/AdvertisePage').then((m) => ({ default: m.AdvertisePage })));
 const BlingsPage = lazy(() => import('@/pages/BlingsPage').then((m) => ({ default: m.BlingsPage })));
 const BookmarksPage = lazy(() => import('@/pages/BookmarksPage').then((m) => ({ default: m.BookmarksPage })));
@@ -82,9 +85,6 @@ const WatchPage = lazy(() => import('@/pages/pulse/WatchPage').then((m) => ({ de
 const ImageEditorPage = lazy(() => import('@/pages/studio/ImageEditorPage').then((m) => ({ default: m.ImageEditorPage })));
 const ResponseRecorderPage = lazy(() => import('@/pages/studio/ResponseRecorderPage').then((m) => ({ default: m.ResponseRecorderPage })));
 const VideoEditorPage = lazy(() => import('@/pages/studio/VideoEditorPage').then((m) => ({ default: m.VideoEditorPage })));
-import { useBranding } from '@/stores/useBranding';
-import { lazy, Suspense, useEffect } from 'react';
-import { type Location, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 export default function App() {
   return (
