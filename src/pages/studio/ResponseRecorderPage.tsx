@@ -21,8 +21,10 @@ import {
   LayoutPanelLeft,
   Mic,
   MicOff,
+  Monitor,
   PictureInPicture2,
   Save,
+  Smartphone,
   Square,
   Video,
   X,
@@ -68,6 +70,8 @@ export function ResponseRecorderPage() {
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [result, setResult] = useState<Blob | null>(null);
+  /** 9:16 vertical output (TikTok/Reels/Shorts) vs 16:9 landscape. */
+  const [portrait, setPortrait] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
@@ -263,12 +267,12 @@ export function ResponseRecorderPage() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
-      canvas.width = 1280;
-      canvas.height = 720;
+      canvas.width = portrait ? 720 : 1280;
+      canvas.height = portrait ? 1280 : 720;
     }
     rafRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [draw]);
+  }, [draw, portrait]);
 
   useEffect(() => {
     if (!recording) return;
@@ -362,8 +366,8 @@ export function ResponseRecorderPage() {
         source: 'response_recorder',
         editOf: source?.id ?? null,
         durationSeconds: elapsed,
-        width: 1280,
-        height: 720,
+        width: portrait ? 720 : 1280,
+        height: portrait ? 1280 : 720,
       });
       setSavedMsg(`Saved to your Library as ${saved.fileName}`);
       setResult(null);
@@ -586,6 +590,20 @@ export function ResponseRecorderPage() {
             drag your bubble to place it
           </span>
         )}
+        <button
+          type="button"
+          onClick={() => setPortrait((v) => !v)}
+          disabled={recording || countdown !== null}
+          title={portrait ? 'Vertical 9:16 — tap for landscape' : 'Landscape 16:9 — tap for vertical (Shorts/Reels)'}
+          className={cn(
+            'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] disabled:opacity-40',
+            portrait
+              ? 'border-amber-300 bg-amber-50 text-amber-700'
+              : 'border-zinc-200 text-zinc-700 hover:bg-zinc-100',
+          )}
+        >
+          {portrait ? <Smartphone size={13} /> : <Monitor size={13} />} {portrait ? '9:16' : '16:9'}
+        </button>
         <button
           type="button"
           onClick={() => setMicOn((v) => !v)}

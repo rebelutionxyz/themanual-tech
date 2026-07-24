@@ -2,7 +2,18 @@ import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useAuth } from '@/lib/auth';
 import { type MediaAsset, assetUrl, formatDuration, saveBlobToLibrary } from '@/lib/media';
 import { cn } from '@/lib/utils';
-import { ArrowLeft, Circle, Film, Layers, Play, Save, Square, Waves } from 'lucide-react';
+import {
+  ArrowLeft,
+  Circle,
+  Film,
+  Layers,
+  Monitor,
+  Play,
+  Save,
+  Smartphone,
+  Square,
+  Waves,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -37,6 +48,7 @@ export function ComparePage() {
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [result, setResult] = useState<Blob | null>(null);
+  const [portrait, setPortrait] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -117,12 +129,12 @@ export function ComparePage() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
-      canvas.width = 1280;
-      canvas.height = 720;
+      canvas.width = portrait ? 720 : 1280;
+      canvas.height = portrait ? 1280 : 720;
     }
     rafRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [draw]);
+  }, [draw, portrait]);
 
   useEffect(() => {
     if (!recording) return;
@@ -200,8 +212,8 @@ export function ComparePage() {
         source: 'compare_lab',
         editOf: a?.id ?? null,
         durationSeconds: elapsed,
-        width: 1280,
-        height: 720,
+        width: portrait ? 720 : 1280,
+        height: portrait ? 1280 : 720,
       });
       setMsg(`Saved to your Library as ${saved.fileName}`);
       setResult(null);
@@ -324,6 +336,20 @@ export function ComparePage() {
         <span className="font-mono text-[11px] font-bold" style={{ color: ACCENT }}>
           B
         </span>
+        <button
+          type="button"
+          onClick={() => setPortrait((v) => !v)}
+          disabled={recording}
+          title={portrait ? 'Vertical 9:16 — tap for landscape' : 'Landscape 16:9 — tap for vertical'}
+          className={cn(
+            'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] disabled:opacity-40',
+            portrait
+              ? 'border-amber-300 bg-amber-50 text-amber-700'
+              : 'border-zinc-200 text-zinc-600 hover:bg-zinc-100',
+          )}
+        >
+          {portrait ? <Smartphone size={13} /> : <Monitor size={13} />} {portrait ? '9:16' : '16:9'}
+        </button>
         <button
           type="button"
           onClick={() => setSweep((v) => !v)}
