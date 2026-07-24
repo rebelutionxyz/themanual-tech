@@ -9,6 +9,8 @@ import {
 } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import { HoloCompositor } from '@/lib/holo';
+import { drawWordmarkStamp, fetchMyKits, resolveSkin } from '@/lib/skins';
+import type { BrandingConfig } from '@/lib/branding';
 import {
   ArrowLeft,
   Camera,
@@ -74,6 +76,10 @@ export function ResponseRecorderPage() {
   const [portrait, setPortrait] = useState(false);
   /* Teleprompter — DOM overlay above the stage; never captured (canvas records
      only itself). Script + speed live in session state. */
+  const [brandStamp, setBrandStamp] = useState(false);
+  const brandStampRef = useRef(false);
+  const brandKit = useRef<BrandingConfig | null>(null);
+  brandStampRef.current = brandStamp;
   const [promptOpen, setPromptOpen] = useState(false);
   const [promptText, setPromptText] = useState('');
   const [promptRun, setPromptRun] = useState(false);
@@ -180,6 +186,21 @@ export function ResponseRecorderPage() {
     if (track) track.enabled = micOn;
   }, [micOn]);
 
+  /* ───────────── brand kit for the watermark stamp ───────────── */
+
+  useEffect(() => {
+    if (!bee) return;
+    void fetchMyKits(bee.id).then(async (kits) => {
+      if (kits[0]) {
+        const { mergeBranding } = await import('@/lib/skins');
+        brandKit.current = mergeBranding(kits[0].branding);
+      } else {
+        const resolved = await resolveSkin('platform', null);
+        brandKit.current = resolved.branding;
+      }
+    });
+  }, [bee]);
+
   /* ───────────── HOLO (person cutout) lazy init ───────────── */
 
   useEffect(() => {
@@ -269,6 +290,9 @@ export function ResponseRecorderPage() {
           ctx.roundRect(px, py, pw, ph, 10);
           ctx.stroke();
         }
+      }
+      if (brandStampRef.current && brandKit.current) {
+        drawWordmarkStamp(ctx, w, h, brandKit.current);
       }
     }
     rafRef.current = requestAnimationFrame(draw);
@@ -646,6 +670,19 @@ export function ResponseRecorderPage() {
           )}
         >
           {portrait ? <Smartphone size={13} /> : <Monitor size={13} />} {portrait ? '9:16' : '16:9'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setBrandStamp((v) => !v)}
+          title="Stamp your brand kit's wordmark on the recording (bottom-right)"
+          className={cn(
+            'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px]',
+            brandStamp
+              ? 'border-amber-300 bg-amber-50 text-amber-700'
+              : 'border-zinc-200 text-zinc-700 hover:bg-zinc-100',
+          )}
+        >
+          ⬡ Brand
         </button>
         <button
           type="button"

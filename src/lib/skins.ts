@@ -176,3 +176,38 @@ export async function fetchAstraChoices(): Promise<
     displayName: r.display_name,
   }));
 }
+
+/**
+ * Stamp a brand-kit wordmark onto a recording canvas (bottom-right).
+ * Drawn ON canvas — captured in exports by design (the BRAND × Studio tie).
+ */
+export function drawWordmarkStamp(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  branding: BrandingConfig,
+): void {
+  const size = Math.max(16, Math.round(h * 0.032));
+  ctx.save();
+  ctx.font = `700 ${size}px system-ui, sans-serif`;
+  ctx.textBaseline = 'alphabetic';
+  const pre = branding.wordmarkPre ?? '';
+  const acc = branding.wordmarkAccent ?? '';
+  const post = branding.wordmarkPost ?? '';
+  const total = ctx.measureText(pre + acc + post).width;
+  const m = Math.round(h * 0.03);
+  let x = w - m - total;
+  const y = h - m;
+  ctx.shadowColor = 'rgba(0,0,0,0.65)';
+  ctx.shadowBlur = size * 0.35;
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(pre, x, y);
+  x += ctx.measureText(pre).width;
+  ctx.fillStyle = branding.accentHex || '#DC2626';
+  ctx.fillText(acc, x, y);
+  x += ctx.measureText(acc).width;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(post, x, y);
+  ctx.restore();
+}

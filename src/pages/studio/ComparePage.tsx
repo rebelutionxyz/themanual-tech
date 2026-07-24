@@ -1,6 +1,8 @@
 import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useAuth } from '@/lib/auth';
 import { type MediaAsset, assetUrl, formatDuration, saveBlobToLibrary } from '@/lib/media';
+import { drawWordmarkStamp, fetchMyKits, mergeBranding, resolveSkin } from '@/lib/skins';
+import type { BrandingConfig } from '@/lib/branding';
 import { cn } from '@/lib/utils';
 import {
   ArrowLeft,
@@ -49,6 +51,10 @@ export function ComparePage() {
   const [elapsed, setElapsed] = useState(0);
   const [result, setResult] = useState<Blob | null>(null);
   const [portrait, setPortrait] = useState(false);
+  const [brandStamp, setBrandStamp] = useState(false);
+  const brandStampRef = useRef(false);
+  const brandKit = useRef<BrandingConfig | null>(null);
+  brandStampRef.current = brandStamp;
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -66,6 +72,14 @@ export function ComparePage() {
   const startedAt = useRef(0);
   fadeRef.current = fade;
   sweepRef.current = sweep;
+
+  useEffect(() => {
+    if (!bee) return;
+    void fetchMyKits(bee.id).then(async (kits) => {
+      if (kits[0]) brandKit.current = mergeBranding(kits[0].branding);
+      else brandKit.current = (await resolveSkin('platform', null)).branding;
+    });
+  }, [bee]);
 
   const makeVideo = useCallback((asset: MediaAsset): HTMLVideoElement => {
     const el = document.createElement('video');
@@ -122,6 +136,9 @@ export function ComparePage() {
       };
       fit(vidA.current, 1);
       fit(vidB.current, f);
+      if (brandStampRef.current && brandKit.current) {
+        drawWordmarkStamp(ctx, w, h, brandKit.current);
+      }
     }
     rafRef.current = requestAnimationFrame(draw);
   }, []);
@@ -336,6 +353,19 @@ export function ComparePage() {
         <span className="font-mono text-[11px] font-bold" style={{ color: ACCENT }}>
           B
         </span>
+        <button
+          type="button"
+          onClick={() => setBrandStamp((v) => !v)}
+          title="Stamp your brand kit's wordmark on the recording"
+          className={cn(
+            'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px]',
+            brandStamp
+              ? 'border-amber-300 bg-amber-50 text-amber-700'
+              : 'border-zinc-200 text-zinc-600 hover:bg-zinc-100',
+          )}
+        >
+          ⬡ Brand
+        </button>
         <button
           type="button"
           onClick={() => setPortrait((v) => !v)}
