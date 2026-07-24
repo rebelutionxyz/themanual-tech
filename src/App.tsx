@@ -82,6 +82,11 @@ const ThreadPage = lazy(() => import('@/pages/intel/ThreadPage').then((m) => ({ 
 const ChannelPage = lazy(() => import('@/pages/pulse/ChannelPage').then((m) => ({ default: m.ChannelPage })));
 const PulseHome = lazy(() => import('@/pages/pulse/PulseHome').then((m) => ({ default: m.PulseHome })));
 const WatchPage = lazy(() => import('@/pages/pulse/WatchPage').then((m) => ({ default: m.WatchPage })));
+const BrandosophicLayout = lazy(() => import('@/pages/brandosophic/BrandosophicLayout').then((m) => ({ default: m.BrandosophicLayout })));
+const BrandosophicStudioPage = lazy(() => import('@/pages/brandosophic/BrandosophicStudioPage').then((m) => ({ default: m.BrandosophicStudioPage })));
+const BrandosophicBrandsPage = lazy(() => import('@/pages/brandosophic/BrandosophicBrandsPage').then((m) => ({ default: m.BrandosophicBrandsPage })));
+const BrandosophicNovasPage = lazy(() => import('@/pages/brandosophic/BrandosophicNovasPage').then((m) => ({ default: m.BrandosophicNovasPage })));
+const BrandosophicStorefrontPage = lazy(() => import('@/pages/brandosophic/BrandosophicStorefrontPage').then((m) => ({ default: m.BrandosophicStorefrontPage })));
 const ImageEditorPage = lazy(() => import('@/pages/studio/ImageEditorPage').then((m) => ({ default: m.ImageEditorPage })));
 const ResponseRecorderPage = lazy(() => import('@/pages/studio/ResponseRecorderPage').then((m) => ({ default: m.ResponseRecorderPage })));
 const VideoEditorPage = lazy(() => import('@/pages/studio/VideoEditorPage').then((m) => ({ default: m.VideoEditorPage })));
@@ -104,6 +109,7 @@ const ADMIN_SURFACE_PATHS = new Set(['/myhex', '/nexus', '/nucleus']);
 // the GlobalSidebar), so the global SiteHeader / ticker / toolbar are suppressed
 // here — the shell renders its own ticker. Other surfaces keep the legacy chrome.
 const COMMUNITY_PREFIXES = [
+  '/brandosophic',
   '/intel',
   '/unite',
   '/rule',
@@ -231,6 +237,17 @@ function AppContent() {
             /bees/:handle is deferred pending a bees-RLS migration (email +
             bling_balance are anon-readable; see feat/profile-public-view notes). */}
           <Route path="/bees/me" element={<Navigate to="/profile" replace />} />
+
+          {/* BRANDoSOPHIC — the brand-design Astra (MMF §25). Same white shell
+            family, its own menu set (Studio / Brands / Novas / Storefront /
+            Order Book). brandosophic.com resolves here via the astra registry;
+            /brandosophic works on any host. 2026-07-24. */}
+          <Route element={<BrandosophicLayout />}>
+            <Route path="/brandosophic" element={<BrandosophicStudioPage />} />
+            <Route path="/brandosophic/brands" element={<BrandosophicBrandsPage />} />
+            <Route path="/brandosophic/novas" element={<BrandosophicNovasPage />} />
+            <Route path="/brandosophic/storefront" element={<BrandosophicStorefrontPage />} />
+          </Route>
 
           {/* Community surfaces — ONE persistent white X-style shell (global
             sidebar + center scroller + cross-Astra right rail) mounted as a

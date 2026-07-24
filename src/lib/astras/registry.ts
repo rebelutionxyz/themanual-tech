@@ -4,10 +4,11 @@
 
 import type { AstraConfig } from './astra.types';
 import { atlasintelAstra } from './atlasintel';
-import { rebelutionFyiAstra } from './rebelution-fyi';
-import { atlasunitedAstra } from './atlasunited';
 import { atlasnationAstra } from './atlasnation';
+import { atlasunitedAstra } from './atlasunited';
+import { brandosophicAstra } from './brandosophic';
 import { miniwavesAstra } from './miniwaves';
+import { rebelutionFyiAstra } from './rebelution-fyi';
 
 export const ASTRA_REGISTRY: AstraConfig[] = [
   atlasintelAstra,
@@ -15,6 +16,7 @@ export const ASTRA_REGISTRY: AstraConfig[] = [
   atlasunitedAstra,
   atlasnationAstra,
   miniwavesAstra,
+  brandosophicAstra,
 ];
 
 /**
