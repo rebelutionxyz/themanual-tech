@@ -260,22 +260,27 @@ export function VideoEditorPage() {
         const size = Math.max(10, ov.size * h);
         ctx.font = `700 ${size}px system-ui, sans-serif`;
         ctx.textBaseline = 'top';
+        // Multi-line: the editor textarea allows newlines; render every line.
         const label = ov.url ? `${ov.text} 🔗` : ov.text;
-        const tw = ctx.measureText(label).width;
+        const lines = label.split('\n');
+        const lineH = size * 1.25;
+        let tw = 0;
+        for (const ln of lines) tw = Math.max(tw, ctx.measureText(ln).width);
         const x = ov.x * w;
         const y = ov.y * h;
+        const blockH = lineH * (lines.length - 1) + size * 1.2;
         if (ov.bg) {
           ctx.fillStyle = 'rgba(0,0,0,0.55)';
           const pad = size * 0.25;
-          ctx.fillRect(x - pad, y - pad, tw + pad * 2, size * 1.2 + pad * 2);
+          ctx.fillRect(x - pad, y - pad, tw + pad * 2, blockH + pad * 2);
         }
         ctx.fillStyle = ov.color;
-        ctx.fillText(label, x, y);
+        lines.forEach((ln, i) => ctx.fillText(ln, x, y + i * lineH));
         if (ov.id === selectedText && !playStateRef.current.exporting) {
           ctx.strokeStyle = ACCENT;
           ctx.lineWidth = Math.max(2, h / 300);
           ctx.setLineDash([6, 5]);
-          ctx.strokeRect(x - 6, y - 6, tw + 12, size * 1.2 + 12);
+          ctx.strokeRect(x - 6, y - 6, tw + 12, blockH + 12);
           ctx.setLineDash([]);
         }
       }
@@ -470,8 +475,11 @@ export function VideoEditorPage() {
       if (t < ov.startSec || t > ov.endSec) continue;
       const size = ov.size * canvas.height;
       ctx.font = `700 ${size}px system-ui, sans-serif`;
-      const tw = ctx.measureText(ov.url ? `${ov.text} 🔗` : ov.text).width / canvas.width;
-      const th = (size * 1.3) / canvas.height;
+      const hitLines = (ov.url ? `${ov.text} 🔗` : ov.text).split('\n');
+      let twpx = 0;
+      for (const ln of hitLines) twpx = Math.max(twpx, ctx.measureText(ln).width);
+      const tw = twpx / canvas.width;
+      const th = (size * 1.25 * (hitLines.length - 1) + size * 1.3) / canvas.height;
       if (
         fx >= ov.x - 0.01 &&
         fx <= ov.x + tw + 0.01 &&
