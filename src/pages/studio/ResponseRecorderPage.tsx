@@ -72,6 +72,16 @@ export function ResponseRecorderPage() {
   const [result, setResult] = useState<Blob | null>(null);
   /** 9:16 vertical output (TikTok/Reels/Shorts) vs 16:9 landscape. */
   const [portrait, setPortrait] = useState(false);
+  /* Teleprompter — DOM overlay above the stage; never captured (canvas records
+     only itself). Script + speed live in session state. */
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [promptText, setPromptText] = useState('');
+  const [promptRun, setPromptRun] = useState(false);
+  const [promptSpeed, setPromptSpeed] = useState(40); // px/sec
+  const promptRef = useRef<HTMLDivElement | null>(null);
+  const promptRaf = useRef(0);
+  const promptSpeedRef = useRef(40);
+  promptSpeedRef.current = promptSpeed;
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
@@ -270,6 +280,7 @@ export function ResponseRecorderPage() {
       canvas.width = portrait ? 720 : 1280;
       canvas.height = portrait ? 1280 : 720;
     }
+    cancelAnimationFrame(rafRef.current); // never let two loops survive a re-run
     rafRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafRef.current);
   }, [draw, portrait]);
@@ -279,6 +290,24 @@ export function ResponseRecorderPage() {
     const iv = setInterval(() => setElapsed((performance.now() - startedAt.current) / 1000), 250);
     return () => clearInterval(iv);
   }, [recording]);
+
+  /* ───────────── teleprompter scroll loop ───────────── */
+
+  useEffect(() => {
+    if (!promptRun) return;
+    let last = performance.now();
+    const step = (now: number) => {
+      const el = promptRef.current;
+      if (el) {
+        el.scrollTop += ((now - last) / 1000) * promptSpeedRef.current;
+        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 2) setPromptRun(false);
+      }
+      last = now;
+      promptRaf.current = requestAnimationFrame(step);
+    };
+    promptRaf.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(promptRaf.current);
+  }, [promptRun]);
 
   /* ───────────── record ───────────── */
 
@@ -347,6 +376,8 @@ export function ResponseRecorderPage() {
     startedAt.current = performance.now();
     setElapsed(0);
     setRecording(true);
+    if (promptRef.current) promptRef.current.scrollTop = 0;
+    setPromptRun(true);
     rec.start(500);
   }
 
@@ -540,6 +571,18 @@ export function ResponseRecorderPage() {
             summoning your hologram…
           </div>
         )}
+        {promptOpen && promptText.trim() && (
+          <div
+            ref={promptRef}
+            className="absolute inset-x-0 top-0 max-h-[42%] overflow-y-auto bg-gradient-to-b from-black/75 via-black/60 to-transparent px-[8%] py-4"
+            style={{ scrollbarWidth: 'none' }}
+          >
+            <p className="whitespace-pre-wrap text-center text-[22px] font-semibold leading-relaxed text-white/95">
+              {promptText}
+            </p>
+            <div className="h-24" />
+          </div>
+        )}
       </div>
 
       {/* Controls */}
@@ -579,10 +622,10 @@ export function ResponseRecorderPage() {
           </LayoutBtn>
           <LayoutBtn
             active={layout === 'camera'}
-            title="Camera only"
+            title="Solo — full screen of just you, no source video"
             onClick={() => setLayout('camera')}
           >
-            <Video size={14} /> Camera
+            <Video size={14} /> Solo
           </LayoutBtn>
         </div>
         {layout === 'pip' && source && (
@@ -603,6 +646,18 @@ export function ResponseRecorderPage() {
           )}
         >
           {portrait ? <Smartphone size={13} /> : <Monitor size={13} />} {portrait ? '9:16' : '16:9'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setPromptOpen((v) => !v)}
+          className={cn(
+            'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px]',
+            promptOpen
+              ? 'border-amber-300 bg-amber-50 text-amber-700'
+              : 'border-zinc-200 text-zinc-700 hover:bg-zinc-100',
+          )}
+        >
+          📜 Prompter
         </button>
         <button
           type="button"
@@ -638,6 +693,44 @@ export function ResponseRecorderPage() {
           )}
         </div>
       </div>
+
+      {promptOpen && (
+        <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3">
+          <textarea
+            value={promptText}
+            onChange={(e) => setPromptText(e.target.value)}
+            rows={3}
+            placeholder="Paste your script — it scrolls over the stage while you record (viewers never see it)."
+            className="w-full resize-y rounded-md border border-zinc-300 px-2 py-1.5 text-[12.5px] text-zinc-900 outline-none"
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (promptRef.current && !promptRun) promptRef.current.scrollTop = 0;
+                setPromptRun((v) => !v);
+              }}
+              className="rounded-md border border-zinc-200 px-2.5 py-1.5 text-[12px] text-zinc-700 hover:bg-zinc-100"
+            >
+              {promptRun ? 'Pause scroll' : 'Preview scroll'}
+            </button>
+            <span className="text-[11px] text-zinc-500">Speed</span>
+            <input
+              type="range"
+              min={15}
+              max={120}
+              value={promptSpeed}
+              onChange={(e) => setPromptSpeed(Number(e.target.value))}
+              className="w-40"
+              aria-label="Prompter speed"
+            />
+            <span className="font-mono text-[11px] text-zinc-400">{promptSpeed}px/s</span>
+            <span className="ml-auto text-[11px] text-zinc-400">
+              auto-starts with REC · not captured in the recording
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Result */}
       {result && resultUrl && (
