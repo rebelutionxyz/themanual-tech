@@ -23,6 +23,10 @@ interface NovaData {
     background_softness: number;
     lineage: string | null;
   } | null;
+  /** Doorways-as-lenses v1: the Nova's own OFFERs + INTEL threads (owner-based
+      today; nova_id-tagged content joins automatically when tagging ships). */
+  offers: { id: string; title: string; price_bling: number | null; listing_type: string | null; image_url: string | null }[];
+  threads: { id: string; title: string; created_at: string }[];
 }
 
 // The comb doorways a v1 Nova opens onto (community surfaces on this host).
@@ -117,6 +121,53 @@ export function NovaPage() {
             </Link>
           ))}
         </div>
+        {/* ── Lensed shelves: the Nova's own goods + voice ─────────── */}
+        {data.offers.length > 0 && (
+          <section className="mt-14 w-full text-left">
+            <h2 className="text-[11px] font-bold tracking-[0.25em]" style={{ color: accent }}>
+              OFFERS
+            </h2>
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {data.offers.map((o) => (
+                <Link
+                  key={o.id}
+                  to={`/bazaar/${o.id}`}
+                  className="rounded-xl border border-zinc-800 p-3 transition hover:border-zinc-600"
+                >
+                  {o.image_url && (
+                    <img
+                      src={o.image_url}
+                      alt=""
+                      className="mb-2 h-20 w-full rounded-lg object-cover"
+                    />
+                  )}
+                  <div className="truncate text-sm font-semibold text-zinc-100">{o.title}</div>
+                  {o.price_bling != null && (
+                    <div className="text-xs text-zinc-400">{o.price_bling} BLiNG!</div>
+                  )}
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+        {data.threads.length > 0 && (
+          <section className="mt-10 w-full text-left">
+            <h2 className="text-[11px] font-bold tracking-[0.25em]" style={{ color: accent }}>
+              FROM THE HIVE MIND
+            </h2>
+            <div className="mt-3 space-y-2">
+              {data.threads.map((t) => (
+                <Link
+                  key={t.id}
+                  to={`/intel/t/${t.id}`}
+                  className="block rounded-lg border border-zinc-800 px-4 py-3 text-sm text-zinc-200 transition hover:border-zinc-600"
+                >
+                  {t.title}
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
       </main>
 
       {/* ── The Birth Certificate ─────────────────────────────────── */}
