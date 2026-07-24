@@ -2,7 +2,7 @@ import { CommunityShell } from '@/components/shell/CommunityShell';
 import type { SidebarItem } from '@/components/shell/sidebarNav';
 import { type ResolvedSkin, resolveSkin } from '@/lib/skins';
 import { supabase } from '@/lib/supabase';
-import { Boxes, Hexagon, Lock, Palette, Store } from 'lucide-react';
+import { Boxes, Hexagon, Lock, Palette, Radio, Store } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
@@ -27,6 +27,9 @@ const ITEMS: SidebarItem[] = [
   { id: 'brands', label: 'My Brands', icon: Hexagon, to: '/brand/brands' },
   { id: 'novas', label: 'Novas', icon: Boxes, to: '/brand/novas' },
   { id: 'storefront', label: 'Storefront', icon: Store, to: '/brand/storefront' },
+  // BRAND/Broadcast — make it seen (autoposting/socials). Soon-tile per the
+  // BRAND-family frame (Butch, Jul 24); wired on Autopost day.
+  { id: 'broadcast', label: 'Broadcast', icon: Radio, soon: true },
   // Skin order book — deferred (§25.3). Rendered, locked, honest.
   { id: 'orderbook', label: 'Order Book', icon: Lock, soon: true, dividerAbove: true },
 ];
@@ -77,6 +80,7 @@ export function BrandosophicLayout() {
     <CommunityShell
       activeSurface="brand"
       accent={accent}
+      branding={skin?.branding}
       items={ITEMS}
       activeItemId={itemFromPath(location.pathname)}
       onSelect={onSelect}

@@ -41,6 +41,8 @@ interface CommunityShellProps {
   onSelect: (id: string) => void;
   /** Center content (the routed surface page). */
   children: ReactNode;
+  /** Astra/Nova skin branding — worn by the sidebar when provided (Block 3). */
+  branding?: import('@/lib/branding').BrandingConfig;
 }
 
 /**
@@ -56,6 +58,7 @@ export function CommunityShell({
   activeItemId,
   onSelect,
   children,
+  branding,
 }: CommunityShellProps) {
   // Default open on tablet+desktop, collapsed on mobile (<md). The manual
   // toggle overrides thereafter — this only seeds the initial state.
@@ -95,6 +98,7 @@ export function CommunityShell({
           onSelect={onSelect}
           collapsed={collapsed}
           onToggleCollapse={() => setCollapsed((v) => !v)}
+          brandingOverride={branding}
         />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col border-zinc-200 md:border-l">
           {/* TOP toolbar. (Selected-realm chips render inline in the surface

@@ -24,6 +24,9 @@ interface GlobalSidebarProps {
   onSelect: (id: string) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  /** Astra/Nova skin branding override — when set, the shell wears THIS skin's
+      wordmark + accent + logo instead of the platform brand (Block 3, Jul 24). */
+  brandingOverride?: import('@/lib/branding').BrandingConfig;
 }
 
 export function GlobalSidebar({
@@ -34,9 +37,12 @@ export function GlobalSidebar({
   onSelect,
   collapsed,
   onToggleCollapse,
+  brandingOverride,
 }: GlobalSidebarProps) {
-  // HQ-editable brand config (wordmark segments, accent, logo).
-  const branding = useBranding((s) => s.branding);
+  // HQ-editable brand config (wordmark segments, accent, logo); an astra/nova
+  // skin override wins when the surface family provides one.
+  const platformBranding = useBranding((s) => s.branding);
+  const branding = brandingOverride ?? platformBranding;
 
   // Hover-to-peek while collapsed — desktop/tablet pointer affordance only
   // (matchMedia '(hover: hover)' excludes touch, where the toggle drives state).
@@ -92,7 +98,7 @@ export function GlobalSidebar({
           <div className={cn('mb-3 flex items-center gap-1.5', shown ? 'flex-col' : 'px-1')}>
             {/* Static brand lockup — intentionally NOT a home link (2026-07-16). */}
             <div className="flex min-w-0 flex-1 items-center gap-2.5">
-              <RebelutionMark size={26} />
+              <RebelutionMark size={26} srcOverride={brandingOverride?.logoUrl || undefined} />
               {!shown && (
                 <span
                   className="truncate text-[19px] leading-none tracking-wide text-zinc-900"
@@ -196,8 +202,9 @@ export function GlobalSidebar({
  * never shows a broken image. `key` on the caller resets `broken` when the
  * configured URL changes.
  */
-function RebelutionMark({ size = 26 }: { size?: number }) {
-  const src = useBranding((s) => s.branding.logoUrl);
+function RebelutionMark({ size = 26, srcOverride }: { size?: number; srcOverride?: string }) {
+  const platformSrc = useBranding((s) => s.branding.logoUrl);
+  const src = srcOverride ?? platformSrc;
   const [broken, setBroken] = useState(false);
   // New URL → try again.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when src changes

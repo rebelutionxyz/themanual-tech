@@ -51,7 +51,7 @@ export function mergeBranding(raw: Partial<BrandingConfig> | null | undefined): 
   if (raw && typeof raw === 'object') {
     for (const k of Object.keys(out) as (keyof BrandingConfig)[]) {
       const v = raw[k];
-      if (typeof v === 'string' && v.length <= 300) out[k] = v;
+      if (typeof v === 'string' && v.length > 0 && v.length <= 300) out[k] = v;
     }
   }
   return out;

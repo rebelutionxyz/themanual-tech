@@ -280,7 +280,10 @@ function AstrasPanel({ registry }: { registry: ReturnType<typeof useAstraRegistr
               // internally and stay clickable regardless of off_grid status.
               // Anything with its own domain (Atlas*, TheHoneycomb.games) routes
               // out there ("coming soon" until that domain is live).
-              const internalSlug = !a.domain && a.linkRedirectSlug ? a.linkRedirectSlug : null;
+              // link_redirect_slug wins even when the Astra has its own domain —
+              // an Astra can be served by a live in-app surface before (or while)
+              // its domain is live (BRANDoSOPHIC → /brand, Jul 24).
+              const internalSlug = a.linkRedirectSlug ?? null;
               const externalDomain = !internalSlug && a.status === 'active' ? a.domain : null;
               const disabled = !internalSlug && !externalDomain;
               const hue = hashHue(a.slug);
