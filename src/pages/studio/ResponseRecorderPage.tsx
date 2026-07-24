@@ -76,6 +76,12 @@ export function ResponseRecorderPage() {
   const [portrait, setPortrait] = useState(false);
   /* Teleprompter — DOM overlay above the stage; never captured (canvas records
      only itself). Script + speed live in session state. */
+  /** Solo virtual backdrop: none | brand color | library image (HOLO inverse). */
+  const [backdrop, setBackdrop] = useState<'none' | 'brand' | 'image'>('none');
+  const backdropRef = useRef<'none' | 'brand' | 'image'>('none');
+  backdropRef.current = backdrop;
+  const backdropImg = useRef<HTMLImageElement | null>(null);
+  const [backdropPicker, setBackdropPicker] = useState(false);
   const [brandStamp, setBrandStamp] = useState(false);
   const brandStampRef = useRef(false);
   const brandKit = useRef<BrandingConfig | null>(null);
@@ -204,7 +210,7 @@ export function ResponseRecorderPage() {
   /* ───────────── HOLO (person cutout) lazy init ───────────── */
 
   useEffect(() => {
-    if (layout !== 'holo' || holo.current) return;
+    if ((layout !== 'holo' && backdrop === 'none') || holo.current) return;
     const h = new HoloCompositor();
     holo.current = h;
     h.init()
@@ -213,8 +219,9 @@ export function ResponseRecorderPage() {
         holo.current = null;
         setError('Holo mode could not load (model download blocked?) — pick another layout or retry.');
         setLayout('pip');
+        setBackdrop('none');
       });
-  }, [layout]);
+  }, [layout, backdrop]);
 
   /* ───────────── composite loop ───────────── */
 
@@ -257,7 +264,24 @@ export function ResponseRecorderPage() {
         // Voice-over: their video full screen; you're heard, not seen.
         drawFit(src, 0, 0, w, h);
       } else if (mode === 'camera' || !src) {
-        if (cam) drawFit(cam, 0, 0, w, h, true);
+        const bd = backdropRef.current;
+        if (bd !== 'none' && cam && holo.current?.ready) {
+          if (bd === 'image' && backdropImg.current?.complete) {
+            const img = backdropImg.current;
+            const iw = img.naturalWidth || 16;
+            const ih = img.naturalHeight || 9;
+            const scale = Math.max(w / iw, h / ih);
+            const sw = w / scale;
+            const sh = h / scale;
+            ctx.drawImage(img, (iw - sw) / 2, (ih - sh) / 2, sw, sh, 0, 0, w, h);
+          } else {
+            ctx.fillStyle = brandKit.current?.accentHex || '#6E1423';
+            ctx.fillRect(0, 0, w, h);
+          }
+          holo.current.drawPerson(ctx, cam, 0, 0, w, h);
+        } else if (cam) {
+          drawFit(cam, 0, 0, w, h, true);
+        }
       } else if (mode === 'side') {
         drawFit(src, 0, 0, w / 2, h);
         if (cam) drawFit(cam, w / 2, 0, w / 2, h, true);
@@ -657,6 +681,33 @@ export function ResponseRecorderPage() {
             drag your bubble to place it
           </span>
         )}
+        {layout === 'camera' && (
+          <div className="inline-flex rounded-md border border-zinc-200 bg-white p-0.5">
+            {(['none', 'brand', 'image'] as const).map((bd) => (
+              <button
+                key={bd}
+                type="button"
+                onClick={() => {
+                  if (bd === 'image') setBackdropPicker(true);
+                  setBackdrop(bd);
+                }}
+                className={cn(
+                  'rounded-sm px-2 py-1 text-[11.5px] font-medium',
+                  backdrop === bd ? 'bg-amber-50 font-semibold text-amber-700' : 'text-zinc-500 hover:text-zinc-900',
+                )}
+                title={
+                  bd === 'none'
+                    ? 'Real background'
+                    : bd === 'brand'
+                      ? 'Your brand color behind you (cutout)'
+                      : 'A library image behind you (cutout)'
+                }
+              >
+                {bd === 'none' ? 'Real BG' : bd === 'brand' ? 'Brand BG' : 'Image BG'}
+              </button>
+            ))}
+          </div>
+        )}
         <button
           type="button"
           onClick={() => setPortrait((v) => !v)}
@@ -814,6 +865,21 @@ export function ResponseRecorderPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {backdropPicker && (
+        <MediaPicker
+          kinds={['image']}
+          title="Pick a backdrop image"
+          onClose={() => setBackdropPicker(false)}
+          onPick={(a) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.src = assetUrl(a);
+            backdropImg.current = img;
+            setBackdropPicker(false);
+          }}
+        />
       )}
 
       {pickerOpen && (
