@@ -13,9 +13,9 @@ export const brandosophicAstra: AstraConfig = {
   wordmarkShort: 'BRAND',
   siteTitle: 'BRANDoSOPHIC · HONEYCOMB Brand Studio',
   tagline: 'Make it yours.',
-  primarySurface: 'brandosophic',
+  primarySurface: 'brand',
   constellation: 'honeycomb',
-  accent: '#C88A6B', // BRAND surface color (surfaces.ts slug 'brand')
+  accent: '#6E1423', // deep maroon (Butch, Jul 24) — matches the astra-owned skin row
   copyOverrides: {},
   promotionSlots: { ...DEFAULT_PROMOTION_SLOTS },
   defaultGeo: 'Global',

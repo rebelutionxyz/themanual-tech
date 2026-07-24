@@ -102,16 +102,26 @@ export function BrandosophicNovasPage() {
   };
 
   if (done) {
+    // The Nova's Birth Certificate (Butch, Jul 24) — the keeper.
     return (
       <div className="mx-auto max-w-2xl px-4 py-10">
-        <h1 className="text-xl font-bold text-zinc-900">Nova born 🐝</h1>
-        <p className="mt-2 text-sm text-zinc-600">
-          <span className="font-semibold">{displayName}</span> is registered as{' '}
-          <code className="rounded bg-zinc-100 px-1">{done.slug}</code> wearing its own skin —
-          lineage kept. Path routing serves it at{' '}
-          <code className="rounded bg-zinc-100 px-1">/n/{done.slug}</code> when the Nova renderer
-          lands (this wizard writes the registry today; the renderer is the next block).
-        </p>
+        <div className="rounded-2xl border-2 border-zinc-900 p-8 text-center">
+          <div className="text-[10px] font-bold tracking-[0.3em] text-zinc-400">
+            THE HONEYCOMB · NOVA REGISTRY
+          </div>
+          <h1 className="mt-3 text-2xl font-extrabold text-zinc-900">Birth Certificate</h1>
+          <p className="mt-4 text-lg font-bold text-zinc-900">{displayName}</p>
+          <p className="mt-1 text-sm text-zinc-500">
+            born this day · slug <code className="rounded bg-zinc-100 px-1">{done.slug}</code> ·
+            skin lineage kept
+          </p>
+          <a
+            href={`/n/${done.slug}`}
+            className="mt-6 inline-block rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-bold text-white"
+          >
+            VISIT /n/{done.slug}
+          </a>
+        </div>
         <button
           type="button"
           onClick={() => {
@@ -120,7 +130,7 @@ export function BrandosophicNovasPage() {
             setSlug('');
             setSlugTouched(false);
           }}
-          className="mt-6 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white"
+          className="mx-auto mt-6 block rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700"
         >
           Create another
         </button>
@@ -212,7 +222,7 @@ export function BrandosophicNovasPage() {
       <h2 className="mt-6 text-xs font-bold tracking-wide text-zinc-500">4 · SKIN</h2>
       <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {skins.map((s) => {
-          const accent = s.branding?.accentHex ?? '#C88A6B';
+          const accent = s.branding?.accentHex ?? '#6E1423';
           return (
             <button
               key={s.id}

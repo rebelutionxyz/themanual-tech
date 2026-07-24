@@ -1,6 +1,7 @@
 import { CommunityShell } from '@/components/shell/CommunityShell';
 import type { SidebarItem } from '@/components/shell/sidebarNav';
 import { type ResolvedSkin, resolveSkin } from '@/lib/skins';
+import { supabase } from '@/lib/supabase';
 import { Boxes, Hexagon, Lock, Palette, Store } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -12,6 +13,9 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 // Accent + chrome resolve from the live skin layer (skin_resolve).
 // ═════════════════════════════════════════════════════════════════════
 
+/** astra_registry.id for slug 'brandosophic' (prod). */
+const BRANDOSOPHIC_ASTRA_ID = '35283e63-c5a8-4376-bc7f-5db21323eb13';
+
 export interface BrandosophicOutletCtx {
   skin: ResolvedSkin;
   /** Re-resolve after an edit/clone so chrome follows the skin layer. */
@@ -19,18 +23,18 @@ export interface BrandosophicOutletCtx {
 }
 
 const ITEMS: SidebarItem[] = [
-  { id: 'studio', label: 'Studio', icon: Palette, to: '/brandosophic' },
-  { id: 'brands', label: 'My Brands', icon: Hexagon, to: '/brandosophic/brands' },
-  { id: 'novas', label: 'Novas', icon: Boxes, to: '/brandosophic/novas' },
-  { id: 'storefront', label: 'Storefront', icon: Store, to: '/brandosophic/storefront' },
+  { id: 'studio', label: 'Studio', icon: Palette, to: '/brand' },
+  { id: 'brands', label: 'My Brands', icon: Hexagon, to: '/brand/brands' },
+  { id: 'novas', label: 'Novas', icon: Boxes, to: '/brand/novas' },
+  { id: 'storefront', label: 'Storefront', icon: Store, to: '/brand/storefront' },
   // Skin order book — deferred (§25.3). Rendered, locked, honest.
   { id: 'orderbook', label: 'Order Book', icon: Lock, soon: true, dividerAbove: true },
 ];
 
 function itemFromPath(pathname: string): string {
-  if (pathname.startsWith('/brandosophic/brands')) return 'brands';
-  if (pathname.startsWith('/brandosophic/novas')) return 'novas';
-  if (pathname.startsWith('/brandosophic/storefront')) return 'storefront';
+  if (pathname.startsWith('/brand/brands')) return 'brands';
+  if (pathname.startsWith('/brand/novas')) return 'novas';
+  if (pathname.startsWith('/brand/storefront')) return 'storefront';
   return 'studio';
 }
 
@@ -40,12 +44,24 @@ export function BrandosophicLayout() {
   const [skin, setSkin] = useState<ResolvedSkin | null>(null);
 
   const load = useCallback(() => {
-    // Astra-owned skin first; server falls back to the platform default.
-    void resolveSkin('astra', null).then(setSkin);
+    // BRANDoSOPHIC's own astra skin (Deep Maroon row, Jul 24); server falls
+    // back to the platform default if it's ever archived.
+    void resolveSkin('astra', BRANDOSOPHIC_ASTRA_ID).then(setSkin);
   }, []);
   useEffect(() => {
     load();
   }, [load]);
+
+  // Analytics rail (append-only, fire-and-forget — page_view_log never throws).
+  useEffect(() => {
+    if (supabase) {
+      void supabase.rpc('page_view_log', {
+        p_path: location.pathname,
+        p_astra_slug: 'brandosophic',
+        p_referrer: document.referrer || null,
+      });
+    }
+  }, [location.pathname]);
 
   const onSelect = useCallback(
     (id: string) => {
@@ -59,7 +75,7 @@ export function BrandosophicLayout() {
 
   return (
     <CommunityShell
-      activeSurface="brandosophic"
+      activeSurface="brand"
       accent={accent}
       items={ITEMS}
       activeItemId={itemFromPath(location.pathname)}

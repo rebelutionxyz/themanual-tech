@@ -49,7 +49,7 @@ export function BrandosophicBrandsPage() {
 
       <div className="mt-5 space-y-3">
         {kits.map((k) => {
-          const accent = k.branding?.accentHex ?? '#C88A6B';
+          const accent = k.branding?.accentHex ?? '#6E1423';
           return (
             <div
               key={k.id}

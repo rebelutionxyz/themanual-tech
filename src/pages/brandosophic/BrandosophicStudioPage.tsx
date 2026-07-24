@@ -50,7 +50,7 @@ export function BrandosophicStudioPage() {
 
       <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {presets.map((p) => {
-          const accent = p.branding?.accentHex ?? '#C88A6B';
+          const accent = p.branding?.accentHex ?? '#6E1423';
           const sel = selected?.id === p.id;
           return (
             <button

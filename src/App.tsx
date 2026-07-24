@@ -82,6 +82,7 @@ const ThreadPage = lazy(() => import('@/pages/intel/ThreadPage').then((m) => ({ 
 const ChannelPage = lazy(() => import('@/pages/pulse/ChannelPage').then((m) => ({ default: m.ChannelPage })));
 const PulseHome = lazy(() => import('@/pages/pulse/PulseHome').then((m) => ({ default: m.PulseHome })));
 const WatchPage = lazy(() => import('@/pages/pulse/WatchPage').then((m) => ({ default: m.WatchPage })));
+const NovaPage = lazy(() => import('@/pages/nova/NovaPage').then((m) => ({ default: m.NovaPage })));
 const BrandosophicLayout = lazy(() => import('@/pages/brandosophic/BrandosophicLayout').then((m) => ({ default: m.BrandosophicLayout })));
 const BrandosophicStudioPage = lazy(() => import('@/pages/brandosophic/BrandosophicStudioPage').then((m) => ({ default: m.BrandosophicStudioPage })));
 const BrandosophicBrandsPage = lazy(() => import('@/pages/brandosophic/BrandosophicBrandsPage').then((m) => ({ default: m.BrandosophicBrandsPage })));
@@ -109,7 +110,7 @@ const ADMIN_SURFACE_PATHS = new Set(['/myhex', '/nexus', '/nucleus']);
 // the GlobalSidebar), so the global SiteHeader / ticker / toolbar are suppressed
 // here — the shell renders its own ticker. Other surfaces keep the legacy chrome.
 const COMMUNITY_PREFIXES = [
-  '/brandosophic',
+  '/brand',
   '/intel',
   '/unite',
   '/rule',
@@ -175,7 +176,8 @@ function AppContent() {
   const isCommunitySurface = COMMUNITY_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
-  const isChromeFree = CHROME_FREE_PATHS.has(pathname);
+  // /n/:slug Nova portals are chrome-free — each renders its own skinned world.
+  const isChromeFree = CHROME_FREE_PATHS.has(pathname) || pathname.startsWith('/n/');
   const hideGlobalChrome = isAdminSurface || isCommunitySurface || isChromeFree;
 
   return (
@@ -238,16 +240,23 @@ function AppContent() {
             bling_balance are anon-readable; see feat/profile-public-view notes). */}
           <Route path="/bees/me" element={<Navigate to="/profile" replace />} />
 
+          {/* Nova portals — /n/:slug, chrome-free, each wearing its own skin.
+            Public resolution via nova_resolve (SECDEF); Birth Certificate in
+            the footer. Block 2, 2026-07-24. */}
+          <Route path="/n/:slug" element={<NovaPage />} />
+
           {/* BRANDoSOPHIC — the brand-design Astra (MMF §25). Same white shell
             family, its own menu set (Studio / Brands / Novas / Storefront /
             Order Book). brandosophic.com resolves here via the astra registry;
             /brandosophic works on any host. 2026-07-24. */}
           <Route element={<BrandosophicLayout />}>
-            <Route path="/brandosophic" element={<BrandosophicStudioPage />} />
-            <Route path="/brandosophic/brands" element={<BrandosophicBrandsPage />} />
-            <Route path="/brandosophic/novas" element={<BrandosophicNovasPage />} />
-            <Route path="/brandosophic/storefront" element={<BrandosophicStorefrontPage />} />
+            <Route path="/brand" element={<BrandosophicStudioPage />} />
+            <Route path="/brand/brands" element={<BrandosophicBrandsPage />} />
+            <Route path="/brand/novas" element={<BrandosophicNovasPage />} />
+            <Route path="/brand/storefront" element={<BrandosophicStorefrontPage />} />
           </Route>
+          {/* Legacy alias — /brandosophic predates the /brand rename (Jul 24). */}
+          <Route path="/brandosophic/*" element={<Navigate to="/brand" replace />} />
 
           {/* Community surfaces — ONE persistent white X-style shell (global
             sidebar + center scroller + cross-Astra right rail) mounted as a

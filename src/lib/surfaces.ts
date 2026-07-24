@@ -202,7 +202,7 @@ export const SURFACES: SurfaceDef[] = [
     description: 'Official Rebelution merchandise and branded goods.',
     purpose: 'Platform-verified products. Every GET supports the movement. Curated storefronts.',
     icon: Store,
-    color: '#C88A6B',
+    color: '#6E1423',
     group: 'Commerce',
     tier: 2,
   },
