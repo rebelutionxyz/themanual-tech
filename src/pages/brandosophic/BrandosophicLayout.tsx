@@ -1,4 +1,5 @@
 import { CommunityShell } from '@/components/shell/CommunityShell';
+import { useAstra } from '@/lib/astras/AstraContext';
 import type { SidebarItem } from '@/components/shell/sidebarNav';
 import { type ResolvedSkin, resolveSkin } from '@/lib/skins';
 import { supabase } from '@/lib/supabase';
@@ -44,6 +45,10 @@ function itemFromPath(pathname: string): string {
 export function BrandosophicLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  // On brandosophic.com itself the comb's Astra dropdown is hidden — the domain
+  // IS the brand studio. On themanual.tech/brand it stays. (Butch, Jul 24.)
+  const activeAstra = useAstra();
+  const standalone = activeAstra?.slug === 'brandosophic';
   const [skin, setSkin] = useState<ResolvedSkin | null>(null);
 
   const load = useCallback(() => {
@@ -81,6 +86,7 @@ export function BrandosophicLayout() {
       activeSurface="brand"
       accent={accent}
       branding={skin?.branding}
+      hideAstraSwitcher={standalone}
       items={ITEMS}
       activeItemId={itemFromPath(location.pathname)}
       onSelect={onSelect}

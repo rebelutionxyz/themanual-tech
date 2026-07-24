@@ -8,6 +8,7 @@ import {
   saveBlobToLibrary,
 } from '@/lib/media';
 import { cn } from '@/lib/utils';
+import { HoloCompositor } from '@/lib/holo';
 import {
   ArrowLeft,
   Camera,
@@ -16,6 +17,7 @@ import {
   Download,
   EyeOff,
   Film,
+  Ghost,
   LayoutPanelLeft,
   Mic,
   MicOff,
@@ -40,7 +42,7 @@ const FILL = '#FAD15E';
 // (source: response_recorder, edit_of: the video you responded to).
 // ═════════════════════════════════════════════════════════════════════
 
-type Layout = 'pip' | 'side' | 'camera' | 'voice';
+type Layout = 'pip' | 'side' | 'camera' | 'voice' | 'holo';
 
 function pickMime(): string {
   const candidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
@@ -81,6 +83,9 @@ export function ResponseRecorderPage() {
   const startedAt = useRef(0);
   const layoutRef = useRef<Layout>('pip');
   layoutRef.current = layout;
+  /** HOLO — lazy ML person-cutout compositor (loads on first use). */
+  const holo = useRef<HoloCompositor | null>(null);
+  const [holoReady, setHoloReady] = useState(false);
   /** PiP bubble position as fractions of the available range (0–1). */
   const pipPos = useRef({ fx: 1, fy: 1 });
   const pipDrag = useRef<{ dx: number; dy: number } | null>(null);
@@ -161,6 +166,21 @@ export function ResponseRecorderPage() {
     if (track) track.enabled = micOn;
   }, [micOn]);
 
+  /* ───────────── HOLO (person cutout) lazy init ───────────── */
+
+  useEffect(() => {
+    if (layout !== 'holo' || holo.current) return;
+    const h = new HoloCompositor();
+    holo.current = h;
+    h.init()
+      .then(() => setHoloReady(true))
+      .catch(() => {
+        holo.current = null;
+        setError('Holo mode could not load (model download blocked?) — pick another layout or retry.');
+        setLayout('pip');
+      });
+  }, [layout]);
+
   /* ───────────── composite loop ───────────── */
 
   const draw = useCallback(() => {
@@ -208,6 +228,12 @@ export function ResponseRecorderPage() {
         if (cam) drawFit(cam, w / 2, 0, w / 2, h, true);
         ctx.fillStyle = '#18181b';
         ctx.fillRect(w / 2 - 2, 0, 4, h);
+      } else if (mode === 'holo') {
+        // HOLO — their video full screen; YOU, cut out, standing over it.
+        drawFit(src, 0, 0, w, h);
+        if (cam && holo.current?.ready) {
+          holo.current.drawPerson(ctx, cam, 0, 0, w, h);
+        }
       } else {
         // pip — source full, camera bubble wherever the Bee dragged it
         drawFit(src, 0, 0, w, h);
@@ -505,6 +531,11 @@ export function ResponseRecorderPage() {
             Waiting for camera…
           </div>
         )}
+        {layout === 'holo' && !holoReady && camReady && (
+          <div className="absolute bottom-3 left-3 rounded-full bg-black/70 px-3 py-1 text-[11.5px] text-zinc-200">
+            summoning your hologram…
+          </div>
+        )}
       </div>
 
       {/* Controls */}
@@ -533,6 +564,14 @@ export function ResponseRecorderPage() {
             onClick={() => setLayout('voice')}
           >
             <EyeOff size={14} /> Voice
+          </LayoutBtn>
+          <LayoutBtn
+            active={layout === 'holo'}
+            disabled={!source}
+            title="HOLO — you, cut out over their video. No green screen."
+            onClick={() => setLayout('holo')}
+          >
+            <Ghost size={14} /> Holo
           </LayoutBtn>
           <LayoutBtn
             active={layout === 'camera'}

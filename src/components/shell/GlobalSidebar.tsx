@@ -27,6 +27,10 @@ interface GlobalSidebarProps {
   /** Astra/Nova skin branding override — when set, the shell wears THIS skin's
       wordmark + accent + logo instead of the platform brand (Block 3, Jul 24). */
   brandingOverride?: import('@/lib/branding').BrandingConfig;
+  /** Hide the Astra dropdown — standalone astra domains (brandosophic.com)
+      don't cross-navigate the comb's astras. (Butch, Jul 24. The slot may
+      later host Workshop divisions instead.) */
+  hideAstraSwitcher?: boolean;
 }
 
 export function GlobalSidebar({
@@ -38,6 +42,7 @@ export function GlobalSidebar({
   collapsed,
   onToggleCollapse,
   brandingOverride,
+  hideAstraSwitcher,
 }: GlobalSidebarProps) {
   // HQ-editable brand config (wordmark segments, accent, logo); an astra/nova
   // skin override wins when the surface family provides one.
@@ -119,7 +124,7 @@ export function GlobalSidebar({
           </div>
 
           {/* Astra dropdown */}
-          {!shown && (
+          {!shown && !hideAstraSwitcher && (
             <AstraDropdown
               activeSurface={activeSurface}
               accent={accent}

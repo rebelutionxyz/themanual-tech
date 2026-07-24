@@ -220,7 +220,7 @@ function CreateCampaignForm() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={5}
-              placeholder="Tell the Hive what you're rallying support for…"
+              placeholder="Tell the Honeycomb what you're rallying support for…"
               className="w-full resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-400"
               style={{ fontSize: '14px', lineHeight: 1.5 }}
             />

@@ -153,7 +153,7 @@ export function NovaPage() {
         {data.threads.length > 0 && (
           <section className="mt-10 w-full text-left">
             <h2 className="text-[11px] font-bold tracking-[0.25em]" style={{ color: accent }}>
-              FROM THE HIVE MIND
+              FROM THE HONEYCOMB
             </h2>
             <div className="mt-3 space-y-2">
               {data.threads.map((t) => (
