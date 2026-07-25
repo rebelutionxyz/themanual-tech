@@ -76,6 +76,19 @@ export function ResponseRecorderPage() {
   const [portrait, setPortrait] = useState(false);
   /* Teleprompter — DOM overlay above the stage; never captured (canvas records
      only itself). Script + speed live in session state. */
+  /* Live captions (Block 13) — SpeechRecognition hears the MIC while recording
+     and burns your words onto the canvas (captured). Chrome-family engines only;
+     the toggle disables itself where unsupported. File-audio transcription for
+     the VideoEditor is a later, heavier block — not faked here. */
+  const [captionsOn, setCaptionsOn] = useState(false);
+  const captionsRef = useRef(false);
+  captionsRef.current = captionsOn;
+  const captionLine = useRef('');
+  const recogRef = useRef<{ stop: () => void } | null>(null);
+  const captionsSupported =
+    typeof window !== 'undefined' &&
+    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+
   /** Privacy camera filter — pixelate/blur/noir your feed (Butch, Jul 25). */
   const [camFilter, setCamFilter] = useState<'none' | 'pixel' | 'blur' | 'noir'>('none');
   const camFilterRef = useRef<'none' | 'pixel' | 'blur' | 'noir'>('none');
@@ -355,6 +368,38 @@ export function ResponseRecorderPage() {
           ctx.stroke();
         }
       }
+      if (captionsRef.current && captionLine.current) {
+        const text = captionLine.current;
+        const size = Math.max(18, Math.round(h * 0.042));
+        ctx.font = `600 ${size}px system-ui, sans-serif`;
+        // wrap to at most 2 lines from the tail
+        const maxW = w * 0.86;
+        const words = text.split(' ');
+        const lines: string[] = [];
+        let cur = '';
+        for (const wd of words) {
+          const t = cur ? `${cur} ${wd}` : wd;
+          if (ctx.measureText(t).width > maxW && cur) {
+            lines.push(cur);
+            cur = wd;
+          } else cur = t;
+        }
+        if (cur) lines.push(cur);
+        const shown = lines.slice(-2);
+        const lineH = size * 1.3;
+        const baseY = h - Math.round(h * 0.06) - (shown.length - 1) * lineH;
+        ctx.textAlign = 'center';
+        shown.forEach((ln, i) => {
+          const y = baseY + i * lineH;
+          const tw = ctx.measureText(ln).width;
+          ctx.fillStyle = 'rgba(0,0,0,0.65)';
+          const pad = size * 0.4;
+          ctx.fillRect(w / 2 - tw / 2 - pad, y - size, tw + pad * 2, lineH);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(ln, w / 2, y);
+        });
+        ctx.textAlign = 'start';
+      }
       if (brandStampRef.current && brandKit.current) {
         drawWordmarkStamp(ctx, w, h, brandKit.current);
       }
@@ -378,6 +423,63 @@ export function ResponseRecorderPage() {
     const iv = setInterval(() => setElapsed((performance.now() - startedAt.current) / 1000), 250);
     return () => clearInterval(iv);
   }, [recording]);
+
+  /* ───────────── live captions engine ───────────── */
+
+  useEffect(() => {
+    if (!recording || !captionsOn || !captionsSupported) {
+      recogRef.current?.stop();
+      recogRef.current = null;
+      captionLine.current = '';
+      return;
+    }
+    type RecogCtor = new () => {
+      continuous: boolean;
+      interimResults: boolean;
+      lang: string;
+      onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+      onend: (() => void) | null;
+      start: () => void;
+      stop: () => void;
+    };
+    const Ctor = (
+      window as unknown as { SpeechRecognition?: RecogCtor; webkitSpeechRecognition?: RecogCtor }
+    ).SpeechRecognition ??
+      (window as unknown as { webkitSpeechRecognition?: RecogCtor }).webkitSpeechRecognition;
+    if (!Ctor) return;
+    let alive = true;
+    const rec = new Ctor();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-US';
+    rec.onresult = (e) => {
+      const parts: string[] = [];
+      for (let i = 0; i < e.results.length; i++) parts.push(e.results[i][0]?.transcript ?? '');
+      captionLine.current = parts.join(' ').trim().slice(-140);
+    };
+    rec.onend = () => {
+      if (alive && captionsRef.current) {
+        try {
+          rec.start(); // engine times out on silence — keep it alive
+        } catch {
+          /* already running */
+        }
+      }
+    };
+    try {
+      rec.start();
+      recogRef.current = rec;
+    } catch {
+      /* engine refused; captions stay silent */
+    }
+    return () => {
+      alive = false;
+      rec.onend = null;
+      rec.stop();
+      recogRef.current = null;
+      captionLine.current = '';
+    };
+  }, [recording, captionsOn, captionsSupported]);
 
   /* ───────────── teleprompter scroll loop ───────────── */
 
@@ -788,6 +890,24 @@ export function ResponseRecorderPage() {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={() => setCaptionsOn((v) => !v)}
+          disabled={!captionsSupported}
+          title={
+            captionsSupported
+              ? 'Live captions — your speech burns in at the bottom while recording'
+              : 'Live captions need a Chrome-family browser'
+          }
+          className={cn(
+            'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] disabled:opacity-40',
+            captionsOn
+              ? 'border-amber-300 bg-amber-50 text-amber-700'
+              : 'border-zinc-200 text-zinc-700 hover:bg-zinc-100',
+          )}
+        >
+          CC
+        </button>
         <button
           type="button"
           onClick={() => setBrandStamp((v) => !v)}
