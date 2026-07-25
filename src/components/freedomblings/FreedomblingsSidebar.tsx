@@ -106,7 +106,7 @@ export function FreedomblingsSidebar({ onLaunch }: { onLaunch?: () => void }) {
       >
         <Mark size={24} />
         <div className="nm">
-          Freedom<b>BLiNGS</b>
+          Freedom<b>BLiNGs</b>
         </div>
         <LauncherGlyph />
       </button>

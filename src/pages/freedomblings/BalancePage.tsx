@@ -34,7 +34,7 @@ export function BalancePage({ mode = 'page' }: { mode?: 'page' | 'popup' }) {
   if (fb.status === 'signed-out') {
     return (
       <main className="app-main">
-        <div className="eyebrow">The Sovereign Ledger</div>
+        <div className="eyebrow">The Freedom Ledger</div>
         <div className="state-card">
           <h2>Sign in to open your Freedom Ledger</h2>
           <p>
@@ -52,7 +52,7 @@ export function BalancePage({ mode = 'page' }: { mode?: 'page' | 'popup' }) {
   if (fb.status === 'unavailable') {
     return (
       <main className="app-main">
-        <div className="eyebrow">The Sovereign Ledger</div>
+        <div className="eyebrow">The Freedom Ledger</div>
         <div className="state-card">
           <h2>Ledger unavailable</h2>
           <p>

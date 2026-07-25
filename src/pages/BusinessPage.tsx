@@ -34,7 +34,7 @@ const SECTIONS: BizSection[] = [
   {
     icon: Megaphone,
     title: 'Promotions console',
-    copy: 'Run contextual promotions through atlasADs: compose creative, pick slots, set your window. Review-before-live keeps the comb clean.',
+    copy: 'Run contextual promotions through atlasADs: compose creative, pick slots, set your window. Review-before-live keeps the HoneyComb clean.',
     to: '/promotion',
     linkLabel: 'Open Advertise',
   },

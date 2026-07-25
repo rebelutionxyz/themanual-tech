@@ -282,7 +282,7 @@ export const THREATS_ThreatInterception = [
     affected: 0,
     sample: [],
     plain:
-      'A borrowed-compute job tried to break its sandbox to join a botnet. Contained instantly — results are charitable and never touch platform ops, so no comb impact.',
+      'A borrowed-compute job tried to break its sandbox to join a botnet. Contained instantly — results are charitable and never touch platform ops, so no HoneyComb impact.',
     fix: 'Kill the job, flag the submitting node, tighten the seccomp profile.',
     justice: false,
   },
@@ -324,7 +324,7 @@ export const RINGS_ShillDetection = [
       ['Shared funding path', 0.7],
     ],
     oracle:
-      'A manufactured downline — 22 fake Bees funnelling affiliate weight to one upline. DingleBERRY froze the chain BEFORE affiliate_distribute could free a pool from the Well, so no fraudulent BLiNG! was minted. There’s no standing gate; this freeze is the affiliate-integrity mechanism.',
+      'A manufactured downline — 22 fake Bees funnelling affiliate weight to one upline. DingleBERRY froze the chain BEFORE affiliate_distribute could free a pool from the Well, so no fraudulent BLiNG! was FREE’d. There’s no standing gate; this freeze is the affiliate-integrity mechanism.',
   },
   {
     id: 'SHILL-0042',

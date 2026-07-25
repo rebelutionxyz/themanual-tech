@@ -9,8 +9,8 @@ const CONDITIONS = ['new', 'used', 'service', 'digital'];
 const LISTING_TYPES = ['offer']; // Phase-1: offer only
 const SORTS: { value: BazaarSort; label: string }[] = [
   { value: 'recent', label: 'Recent' },
-  { value: 'price_low', label: 'Price: Low → High' },
-  { value: 'price_high', label: 'Price: High → Low' },
+  { value: 'price_low', label: 'Amount: Low → High' },
+  { value: 'price_high', label: 'Amount: High → Low' },
 ];
 
 const SKELETON_KEYS = ['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5', 'sk6', 'sk7'];

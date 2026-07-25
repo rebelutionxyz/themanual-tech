@@ -188,7 +188,7 @@ export function BlingPopup({ onClose }: { onClose: () => void }) {
       // biome-ignore lint/a11y/useSemanticElements: native <dialog> needs imperative showModal(); this overlay is mounted declaratively
       role="dialog"
       aria-modal="true"
-      aria-label="BLiNG! — FreedomBLiNGS"
+      aria-label="BLiNG! — FreedomBLiNGs"
     >
       <div
         data-surface="freedomblings"

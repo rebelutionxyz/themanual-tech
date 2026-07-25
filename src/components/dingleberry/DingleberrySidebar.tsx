@@ -124,7 +124,7 @@ export function DingleberrySidebar() {
         </ul>
       </nav>
 
-      {/* Comb posture footer — static mock label */}
+      {/* Platform posture footer — static mock label */}
       <div className="mt-auto border-t border-border p-2">
         {expanded ? (
           <div className="rounded-md border border-border bg-bg-panel px-3 py-2">
@@ -134,7 +134,7 @@ export function DingleberrySidebar() {
                 className="font-mono uppercase text-text-muted"
                 style={{ fontSize: '9px', letterSpacing: '0.08em' }}
               >
-                Comb posture
+                Platform posture
               </span>
             </div>
             <div className="mt-1 font-serif font-bold text-text" style={{ fontSize: '15px', lineHeight: 1.1 }}>

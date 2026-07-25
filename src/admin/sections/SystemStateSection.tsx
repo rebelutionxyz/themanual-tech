@@ -6,9 +6,11 @@ const TEXT_PRIMARY = '#F0F0F5';
 const TEXT_MUTED = '#5A7BAA';
 const HEADER_TEXT = '#3A2400'; // high-contrast on honey gold
 
-// Hard cap from Lock 7 (federation-tier-1-scoping.md). Constant in code,
-// not stored in bling_system_state.
-const BLING_HARD_CAP = 11_222_333_222_111;
+// Hard cap (Economy v3, verified live 2026-07-25). Constant in code, not stored in
+// bling_system_state. BigInt, not a plain numeric literal: the value exceeds
+// Number.MAX_SAFE_INTEGER and a Number literal silently rounds it to …222,110.
+// Display via .toLocaleString().
+const BLING_HARD_CAP = 111_222_333_333_222_111n;
 
 interface State {
   beeCount: number | null;
@@ -109,7 +111,7 @@ export function SystemStateSection() {
           />
           <Metric label="Total supply" value={fmtAmount(state.totalSupply)} />
           <Metric label="Curve price" value={fmtAmount(state.mintPrice)} />
-          <Metric label="Hard cap" value={fmt(BLING_HARD_CAP)} />
+          <Metric label="Hard cap" value={BLING_HARD_CAP.toLocaleString()} />
         </div>
       </div>
     </div>

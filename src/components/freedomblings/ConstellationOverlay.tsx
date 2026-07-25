@@ -19,7 +19,7 @@ interface Astra {
 
 // Honest as of 2026-06: only TheMANUAL and DingleBERRY (operators) are live.
 const ASTRAS: Astra[] = [
-  { name: 'FreedomBLiNGS', role: 'BLiNG! · The Sovereign Ledger', status: 'here' },
+  { name: 'FreedomBLiNGs', role: 'BLiNG! · The Freedom Ledger', status: 'here' },
   { name: 'TheMANUAL', role: 'The knowledge spine', status: 'live', to: '/manual' },
   {
     name: 'DingleBERRY',
@@ -87,7 +87,7 @@ export function ConstellationOverlay({ onClose }: { onClose: () => void }) {
             <h2>The HoneyComb</h2>
             <p className="constel-sub">
               The Astras that share one honest, member-owned BLiNG! ledger. Step across — your
-              balance follows you across the comb.
+              balance follows you across the HoneyComb.
             </p>
           </div>
           <button type="button" className="constel-x" onClick={onClose} aria-label="Close">
@@ -101,7 +101,7 @@ export function ConstellationOverlay({ onClose }: { onClose: () => void }) {
         </div>
         <div className="constel-foot">
           <span className="seal" />
-          Your balance follows you across the comb — one honest, member-owned ledger.
+          Your balance follows you across the HoneyComb — one honest, member-owned ledger.
         </div>
       </div>
     </div>

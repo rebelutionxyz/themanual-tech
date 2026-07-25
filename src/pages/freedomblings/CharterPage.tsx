@@ -54,7 +54,7 @@ const ARTICLES: Article[] = [
   {
     n: 'VII',
     t: 'The commons answer to their keepers',
-    p: 'Shared treasuries are owned by their members and governed in the open — accountable to the comb that fills them, and to no one else.',
+    p: 'Shared treasuries are owned by their members and governed in the open — accountable to the Bees who fill them, and to no one else.',
   },
   {
     n: 'VIII',
@@ -73,7 +73,7 @@ export function CharterPage() {
         </div>
         <h1>The Charter</h1>
         <div className="sub">
-          The promises that bind FreedomBLiNGS — readable by every member, changeable by no one in
+          The promises that bind FreedomBLiNGs — readable by every member, changeable by no one in
           secret. This is the founding Charter, in force Jul 4, 2026.
         </div>
         <div className="charter-meta">
@@ -92,7 +92,7 @@ export function CharterPage() {
           <p>
             We, the members of the HoneyComb, hold this ledger in common — that value belongs to
             those who create it, that the record be honest, and that no one stand above the rules
-            all can read. This Charter binds the economy of FreedomBLiNGS, and binds it equally to
+            all can read. This Charter binds the economy of FreedomBLiNGs, and binds it equally to
             all.
           </p>
         </div>

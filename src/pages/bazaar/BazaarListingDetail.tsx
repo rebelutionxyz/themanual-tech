@@ -271,7 +271,7 @@ function PurchaseModal({ listing, onClose }: { listing: BazaarListing; onClose: 
       await bazaarPurchaseBling(listing.id);
       setState('done');
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Purchase failed');
+      setError(e instanceof Error ? e.message : 'GET failed');
       setState('confirm');
     }
   }
@@ -283,7 +283,7 @@ function PurchaseModal({ listing, onClose }: { listing: BazaarListing; onClose: 
       // biome-ignore lint/a11y/useSemanticElements: native <dialog> needs imperative showModal(); this overlay is mounted declaratively
       role="dialog"
       aria-modal="true"
-      aria-label="Confirm purchase"
+      aria-label="Confirm GET"
     >
       <div
         className="w-full max-w-sm rounded-xl bg-white p-5 shadow-2xl"

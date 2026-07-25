@@ -184,7 +184,7 @@ export function ShillDetectionPage() {
               Shill &amp; abuse detection
             </h1>
             <div className="text-text-silver" style={{ fontSize: 14.5, maxWidth: 540 }}>
-              Coordinated inauthentic behavior, caught across the whole comb — not one Astra at a time.
+              Coordinated inauthentic behavior, caught across the whole HoneyComb — not one Astra at a time.
             </div>
           </div>
           <div className="flex flex-wrap gap-[10px]">

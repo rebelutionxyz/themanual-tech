@@ -69,7 +69,7 @@ export function BazaarNew() {
     if (!condition) return setError('Choose a condition.');
     const price = Number(priceBling);
     if (!Number.isFinite(price) || price < 0.1) {
-      return setError('Price must be at least 0.1 BLiNG!.');
+      return setError('Amount must be at least 0.1 BLiNG!.');
     }
     const qty = Number(quantity);
     if (!Number.isInteger(qty) || qty < 1) {
@@ -186,7 +186,7 @@ export function BazaarNew() {
             </select>
           </Field>
 
-          <Field label="Price (BLiNG!)" required>
+          <Field label="Amount (BLiNG!)" required>
             <input
               className={INPUT_CLASS}
               type="number"

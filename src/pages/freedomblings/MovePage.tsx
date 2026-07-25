@@ -228,7 +228,7 @@ export function MovePage() {
 
   return (
     <main className="app-main">
-      <div className="eyebrow">Move value · the Sovereign Ledger</div>
+      <div className="eyebrow">Move value · the Freedom Ledger</div>
       {/* triad name (Give · Get · Offer) restored in Sep */}
       <h1 className="move-h1">Give</h1>
       <div className="move-sub">

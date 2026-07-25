@@ -96,7 +96,7 @@ export function SearchPanel({
         ) : loading && hits === null ? (
           <Hint>Searching…</Hint>
         ) : ordered.length === 0 ? (
-          <Hint>No matches across the comb.</Hint>
+          <Hint>No matches across the HoneyComb.</Hint>
         ) : (
           ordered.map((hit) => {
             const accent = popupAccent(hit.surface as CommunitySurface);

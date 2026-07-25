@@ -208,7 +208,7 @@ export function InfraHealthPage() {
               Platform &amp; infra health
             </h1>
             <div className="text-text-silver" style={{ fontSize: 14.5, maxWidth: 540 }}>
-              Up, degraded or down across the comb — <b>Spine</b>, the <b>Astras</b>, and the <b>mesh muscle</b>, in one
+              Up, degraded or down across the HoneyComb — <b>Spine</b>, the <b>Astras</b>, and the <b>mesh muscle</b>, in one
               read.
             </div>
           </div>

@@ -127,7 +127,7 @@ function EscrowCardView({ card, onRelease, onDispute }: CardProps) {
         <div className={`ec-state-line ${meta.cls}`}>
           {card.status === 'cancelled' && <>Refunded to {card.creatorLabel}.</>}
           {card.status === 'disputed' &&
-            "In dispute — the comb reviews this in the open. Release is paused until it's resolved."}
+            "In dispute — Bees review this in the open. Release is paused until it's resolved."}
           {card.status === 'expired' && 'Expired — the hold has lapsed.'}
         </div>
       )}
@@ -178,7 +178,7 @@ function EscrowCardView({ card, onRelease, onDispute }: CardProps) {
                 act(
                   'dispute',
                   onDispute,
-                  'Open a dispute on this escrow? The comb reviews it in the open and release is paused until it resolves.',
+                  'Open a dispute on this escrow? Bees review it in the open and release is paused until it resolves.',
                 )
               }
             >
@@ -311,7 +311,7 @@ export function EscrowPage() {
                 <div>
                   <div className="ns-k">Dispute in the open</div>
                   <div className="ns-d">
-                    If something's wrong, the comb reviews it transparently — no hidden arbiter.
+                    If something's wrong, Bees review it transparently — no hidden arbiter.
                   </div>
                 </div>
               </div>
