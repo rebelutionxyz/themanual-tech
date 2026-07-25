@@ -74,6 +74,9 @@ interface TextItem {
   color: string;
   bold: boolean;
   bg: string | null;
+  /** Arc text (Block 16): degrees of curve, -180..180; 0/undefined = straight.
+      Ported from the Jul 24 merch design engine's arc algorithm. */
+  curve?: number;
 }
 
 interface ShapeItem {
@@ -176,10 +179,47 @@ function overlayBBox(o: Overlay, ctx: CanvasRenderingContext2D): [number, number
   return [x, y, Math.abs(o.w), Math.abs(o.h)];
 }
 
+function drawArcText(ctx: CanvasRenderingContext2D, o: TextItem) {
+  const text = o.text.replace(/\n/g, ' ');
+  if (!text) return;
+  const chars = [...text];
+  const widths = chars.map((ch) => ctx.measureText(ch).width);
+  const total = widths.reduce((a, b) => a + b, 0);
+  const curve = o.curve ?? 0;
+  const theta = (Math.abs(curve) * Math.PI) / 180;
+  const R = Math.max(total / theta, o.size * 0.75);
+  const up = curve > 0;
+  const cx = o.x + total / 2;
+  const cy = up ? o.y + R : o.y - R;
+  let ang = up ? -Math.PI / 2 - theta / 2 : Math.PI / 2 + theta / 2;
+  const dir = up ? 1 : -1;
+  ctx.fillStyle = o.color;
+  const prevAlign = ctx.textAlign;
+  const prevBase = ctx.textBaseline;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = up ? 'top' : 'bottom';
+  for (let i = 0; i < chars.length; i++) {
+    const half = widths[i] / 2 / R;
+    ang += dir * half;
+    ctx.save();
+    ctx.translate(cx + R * Math.cos(ang), cy + R * Math.sin(ang));
+    ctx.rotate(ang + (up ? Math.PI / 2 : -Math.PI / 2));
+    ctx.fillText(chars[i], 0, 0);
+    ctx.restore();
+    ang += dir * half;
+  }
+  ctx.textAlign = prevAlign;
+  ctx.textBaseline = prevBase;
+}
+
 function drawOverlay(ctx: CanvasRenderingContext2D, o: Overlay) {
   if (o.type === 'text') {
     ctx.font = fontCss(o);
     ctx.textBaseline = 'top';
+    if (o.curve) {
+      drawArcText(ctx, o);
+      return;
+    }
     const lines = o.text.split('\n');
     const lineH = o.size * 1.25;
     if (o.bg) {
@@ -1082,6 +1122,21 @@ export function ImageEditorPage() {
                       />
                       Backing
                     </label>
+                  </div>
+                  <div className="mt-1.5">
+                    <span className="text-[11px] text-zinc-500">
+                      Curve {selected.curve ?? 0}°
+                    </span>
+                    <input
+                      type="range"
+                      min={-180}
+                      max={180}
+                      step={5}
+                      value={selected.curve ?? 0}
+                      onChange={(e) => patchSelected({ curve: Number(e.target.value) })}
+                      className="w-full accent-amber-500"
+                      aria-label="Curve text"
+                    />
                   </div>
                 </>
               )}
