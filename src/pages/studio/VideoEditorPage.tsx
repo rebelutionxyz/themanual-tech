@@ -376,6 +376,30 @@ export function VideoEditorPage() {
     recorderRef.current?.stop();
   }, [syncMedia]);
 
+  /* Block 14: thumbnail grabber — current preview frame → Library image. */
+  const [grabbing, setGrabbing] = useState(false);
+  async function grabFrame() {
+    const canvas = canvasRef.current;
+    if (!canvas || !bee || grabbing) return;
+    setGrabbing(true);
+    try {
+      const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
+      if (blob) {
+        await saveBlobToLibrary(bee.id, blob, {
+          fileName: `thumb-${Date.now()}.png`,
+          mimeType: 'image/png',
+          source: 'video_editor',
+          editOf: null,
+          durationSeconds: null,
+          width: canvas.width,
+          height: canvas.height,
+        });
+      }
+    } finally {
+      setGrabbing(false);
+    }
+  }
+
   function startExport() {
     if (clips.length === 0 || exporting) return;
     ensureAudioGraph();
@@ -597,6 +621,15 @@ export function VideoEditorPage() {
           <Film size={18} style={{ color: ACCENT }} /> Video Editor
         </h1>
         <div className="ml-auto flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => void grabFrame()}
+            disabled={clips.length === 0 || grabbing}
+            title="Grab the current frame as a thumbnail image in your Library"
+            className="flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-[12.5px] text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+          >
+            📸 {grabbing ? 'Saving…' : 'Frame'}
+          </button>
           <button
             type="button"
             onClick={startExport}
