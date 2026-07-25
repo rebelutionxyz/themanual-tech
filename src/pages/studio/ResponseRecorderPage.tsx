@@ -8,6 +8,7 @@ import {
   saveBlobToLibrary,
 } from '@/lib/media';
 import { cn } from '@/lib/utils';
+import { hintSeen, markHintSeen } from '@/lib/hints';
 import { HoloCompositor } from '@/lib/holo';
 import { drawWordmarkStamp, fetchMyKits, resolveSkin } from '@/lib/skins';
 import type { BrandingConfig } from '@/lib/branding';
@@ -133,6 +134,9 @@ export function ResponseRecorderPage() {
   /** PiP bubble position as fractions of the available range (0–1). */
   const pipPos = useRef({ fx: 1, fy: 1 });
   const pipDrag = useRef<{ dx: number; dy: number } | null>(null);
+  /** Discoverability (Block 20): pulse "drag me" on the bubble until the
+      Bee has dragged it once, ever, on this browser. */
+  const [pipHint, setPipHint] = useState(() => !hintSeen('pip_drag'));
 
   /* ───────────── load "respond to" source ───────────── */
 
@@ -721,6 +725,8 @@ export function ResponseRecorderPage() {
             if (x >= px && x <= px + pw && y >= py && y <= py + ph) {
               pipDrag.current = { dx: x - px, dy: y - py };
               e.currentTarget.setPointerCapture(e.pointerId);
+              markHintSeen('pip_drag');
+              setPipHint(false);
             }
           }}
           onPointerMove={(e) => {
@@ -769,6 +775,12 @@ export function ResponseRecorderPage() {
         {layout === 'holo' && !holoReady && camReady && (
           <div className="absolute bottom-3 left-3 rounded-full bg-black/70 px-3 py-1 text-[11.5px] text-zinc-200">
             summoning your hologram…
+          </div>
+        )}
+        {/* Drag-me hint — sits beside the bubble's home corner; dies on first grab. */}
+        {pipHint && layout === 'pip' && source && camReady && !recording && countdown === null && (
+          <div className="pointer-events-none absolute bottom-[26%] right-[3%] animate-pulse rounded-full bg-black/75 px-3 py-1.5 text-[11.5px] font-semibold text-white shadow-lg">
+            ✋ Drag your bubble anywhere
           </div>
         )}
         {promptOpen && promptText.trim() && (

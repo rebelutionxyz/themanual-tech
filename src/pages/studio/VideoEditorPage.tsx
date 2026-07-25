@@ -9,6 +9,7 @@ import {
   updateAssetMeta,
 } from '@/lib/media';
 import { cn } from '@/lib/utils';
+import { hintSeen, markHintSeen } from '@/lib/hints';
 import {
   ArrowLeft,
   Check,
@@ -114,6 +115,9 @@ export function VideoEditorPage() {
   });
   const recorderRef = useRef<MediaRecorder | null>(null);
   const dragText = useRef<{ id: string; dx: number; dy: number } | null>(null);
+  /** Discoverability (Block 20): pulse "drag me" on the preview until the
+      Bee has dragged a text once, ever, on this browser. */
+  const [textHint, setTextHint] = useState(() => !hintSeen('text_drag'));
 
   const duration = useMemo(() => clips.reduce((n, c) => n + clipLen(c), 0), [clips]);
   const selText = useMemo(
@@ -513,6 +517,8 @@ export function VideoEditorPage() {
         setSelectedText(ov.id);
         dragText.current = { id: ov.id, dx: fx - ov.x, dy: fy - ov.y };
         e.currentTarget.setPointerCapture(e.pointerId);
+        markHintSeen('text_drag');
+        setTextHint(false);
         return;
       }
     }
@@ -717,7 +723,7 @@ export function VideoEditorPage() {
       <div className="flex flex-col gap-3 lg:flex-row">
         {/* Preview + transport */}
         <div className="min-w-0 flex-1">
-          <div className="overflow-hidden rounded-lg border border-zinc-200 bg-black">
+          <div className="relative overflow-hidden rounded-lg border border-zinc-200 bg-black">
             <canvas
               ref={canvasRef}
               onPointerDown={onCanvasDown}
@@ -728,6 +734,12 @@ export function VideoEditorPage() {
               className="mx-auto block max-h-[58vh] w-full object-contain"
               style={{ touchAction: 'none' }}
             />
+            {/* Drag-me hint — near the text's birth corner; dies on first grab. */}
+            {textHint && texts.length > 0 && (
+              <div className="pointer-events-none absolute left-[8%] top-[16%] animate-pulse rounded-full bg-black/75 px-3 py-1.5 text-[11.5px] font-semibold text-white shadow-lg">
+                ✋ Drag your text anywhere — add as many as you want
+              </div>
+            )}
           </div>
           <div className="mt-2 flex items-center gap-2">
             <button
