@@ -21,7 +21,9 @@ import {
   createGroup,
   decryptMediaToObjectUrl,
   editMessage,
+  fetchMessagesPage,
   getLastSeen,
+  getMessagesByIds,
   getMyPresenceVisibility,
   getVerifiedSafetyNumber,
   findBeeByHandle,
@@ -34,10 +36,12 @@ import {
   listFollows,
   listMessages,
   listMyBlocks,
+  listPins,
   markRead,
   notifyMentions,
   presencePing,
   parseMediaPayload,
+  pinMessage,
   sendMediaMessage,
   removeGroupMember,
   resetConversationEncryption,
@@ -56,6 +60,7 @@ import {
   syncConversationKey,
   toggleReaction,
   unblockBee,
+  unpinMessage,
   unsendMessage,
 } from '@/lib/comms';
 import { assetUrl } from '@/lib/media';
@@ -75,10 +80,13 @@ import {
   Paperclip,
   Pencil,
   Phone,
+  Pin,
+  PinOff,
   Play,
   Plus,
   Radio,
   Reply,
+  Search,
   Send,
   ShieldCheck,
   Shuffle,
@@ -634,6 +642,14 @@ function Thread({
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [safetyNum, setSafetyNum] = useState<string | null>(null);
   const [reactingId, setReactingId] = useState<string | null>(null);
+  const [pins, setPins] = useState<{ messageId: string; pinnedBy: string; createdAt: string }[]>([]);
+  const [pinsOpen, setPinsOpen] = useState(false);
+  const [pinnedMsgs, setPinnedMsgs] = useState<CommsMessage[] | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState('');
+  const [searchBusy, setSearchBusy] = useState(false);
+  const [searchResults, setSearchResults] = useState<CommsMessage[] | null>(null);
+  const [flashId, setFlashId] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<CommsMessage | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
@@ -707,6 +723,100 @@ function Thread({
         )
         .slice(0, 5)
     : [];
+
+  // Pins: load on open, keep fresh on a light poll (comms_pins is realtime-published;
+  // the 20s poll is the safety net that matches the message poll).
+  useEffect(() => {
+    let live = true;
+    const load = () =>
+      listPins(conversation.id)
+        .then((ps) => {
+          if (live) setPins(ps);
+        })
+        .catch(() => {});
+    load();
+    const t = window.setInterval(load, 20000);
+    return () => {
+      live = false;
+      window.clearInterval(t);
+    };
+  }, [conversation.id]);
+
+  // Resolve pinned message bodies when the panel opens (some may be outside the
+  // loaded window — fetch those by id).
+  useEffect(() => {
+    if (!pinsOpen) return;
+    let live = true;
+    (async () => {
+      const wanted = pins.map((pn) => pn.messageId);
+      const have = new Map(messages.filter((m) => wanted.includes(m.id)).map((m) => [m.id, m]));
+      const missing = wanted.filter((id) => !have.has(id));
+      const fetched = missing.length
+        ? await getMessagesByIds(conversation.id, missing).catch(() => [])
+        : [];
+      for (const m of fetched) have.set(m.id, m);
+      const list = wanted
+        .map((id) => have.get(id))
+        .filter((m): m is CommsMessage => !!m);
+      if (live) setPinnedMsgs(list);
+    })();
+    return () => {
+      live = false;
+    };
+  }, [pinsOpen, pins, messages, conversation.id]);
+
+  const pinnedIds = new Set(pins.map((pn) => pn.messageId));
+  const togglePin = async (messageId: string, pinned: boolean) => {
+    try {
+      if (pinned) await unpinMessage(conversation.id, messageId);
+      else await pinMessage(conversation.id, messageId);
+      setPins(await listPins(conversation.id));
+    } catch (err) {
+      console.warn('pin toggle failed', err);
+    }
+  };
+
+  const jumpTo = (id: string) => {
+    const el = document.getElementById(`msg-${id}`);
+    if (!el) return false;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setFlashId(id);
+    window.setTimeout(() => setFlashId((f) => (f === id ? null : f)), 1600);
+    return true;
+  };
+
+  const runSearch = async () => {
+    const q = searchQ.trim().toLowerCase();
+    if (!q || searchBusy) return;
+    setSearchBusy(true);
+    setSearchResults(null);
+    try {
+      const all: CommsMessage[] = [];
+      let before: string | null = null;
+      for (let page = 0; page < 10; page++) {
+        const batch = await fetchMessagesPage(conversation.id, before, 200);
+        if (!batch.length) break;
+        all.unshift(...batch);
+        before = batch[0]?.createdAt ?? null;
+        if (batch.length < 200) break;
+      }
+      const now = Date.now();
+      const hits = all.filter(
+        (m) =>
+          !m.deletedAt &&
+          !m.undecryptable &&
+          m.contentType === 'text' &&
+          (!m.expiresAt || new Date(m.expiresAt).getTime() > now) &&
+          m.body.toLowerCase().includes(q),
+      );
+      setSearchResults(hits.slice(-100).reverse());
+    } catch (err) {
+      console.warn('search failed', err);
+      setSearchResults([]);
+    } finally {
+      setSearchBusy(false);
+    }
+  };
   const [muted, setMuted] = useState(iAmMutedProp);
   const visible = messages.filter((m) => !m.expiresAt || Date.parse(m.expiresAt) > nowTs);
   const lastMineId = visible.reduce(
@@ -1052,6 +1162,22 @@ function Thread({
         )}
         <button
           type="button"
+          onClick={() => {
+            setSearchOpen((v) => !v);
+            setSearchResults(null);
+            setSearchQ('');
+          }}
+          title="Search this conversation"
+          aria-label="Search this conversation"
+          className={cn(
+            'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md transition-colors hover:bg-cyan-50 hover:text-cyan-700',
+            searchOpen ? 'text-cyan-700' : 'text-zinc-400',
+          )}
+        >
+          <Search size={15} />
+        </button>
+        <button
+          type="button"
           onClick={onStartCall}
           title="Start a video call"
           aria-label="Start a video call"
@@ -1269,6 +1395,97 @@ function Thread({
         />
       )}
 
+      {searchOpen && (
+        <div className="border-b border-zinc-100 bg-zinc-50/70">
+          <div className="flex items-center gap-2 px-3 py-2">
+            <Search size={13} className="flex-shrink-0 text-zinc-400" />
+            <input
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  runSearch();
+                }
+              }}
+              placeholder="Search messages… (Enter)"
+              className="min-w-0 flex-1 rounded-md border border-zinc-200 bg-white px-2 py-1 text-[13px] text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-cyan-400"
+            />
+            <button
+              type="button"
+              onClick={runSearch}
+              disabled={searchBusy || !searchQ.trim()}
+              className="rounded-md px-2.5 py-1 text-[12px] font-bold text-white disabled:opacity-40"
+              style={{ background: COMMS_COLOR }}
+            >
+              {searchBusy ? 'Searching…' : 'Search'}
+            </button>
+          </div>
+          {searchResults !== null && (
+            <div className="max-h-44 overflow-y-auto border-t border-zinc-100">
+              {searchResults.length === 0 && (
+                <p className="px-3 py-2 text-[12px] text-zinc-400">No matches.</p>
+              )}
+              {searchResults.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => jumpTo(m.id)}
+                  className="flex w-full items-baseline gap-2 px-3 py-1.5 text-left transition-colors hover:bg-cyan-50"
+                >
+                  <span className="flex-shrink-0 text-[10px] text-zinc-400">
+                    {timeAgo(m.createdAt)}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-zinc-700">
+                    <span className="font-semibold text-zinc-500">@{handleFor(m.senderBeeId)}</span>{' '}
+                    {m.body}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {pins.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setPinsOpen((v) => !v)}
+          className="flex w-full items-center gap-1.5 border-b border-amber-100 bg-amber-50/70 px-3 py-1.5 text-left text-[11px] font-semibold text-amber-800 transition-colors hover:bg-amber-50"
+        >
+          <Pin size={11} className="flex-shrink-0" />
+          {pins.length} pinned {pins.length === 1 ? 'message' : 'messages'}
+          <span className="ml-auto font-normal text-amber-600">{pinsOpen ? 'hide' : 'view'}</span>
+        </button>
+      )}
+      {pinsOpen && (
+        <div className="max-h-44 overflow-y-auto border-b border-amber-100 bg-amber-50/40">
+          {pinnedMsgs === null && <p className="px-3 py-2 text-[12px] text-zinc-400">Loading…</p>}
+          {(pinnedMsgs ?? []).map((m) => (
+            <div key={m.id} className="flex items-baseline gap-2 px-3 py-1.5">
+              <button
+                type="button"
+                onClick={() => jumpTo(m.id)}
+                className="flex min-w-0 flex-1 items-baseline gap-2 text-left transition-colors hover:text-cyan-800"
+              >
+                <span className="flex-shrink-0 text-[10px] text-zinc-400">{timeAgo(m.createdAt)}</span>
+                <span className="min-w-0 flex-1 truncate text-[12px] text-zinc-700">
+                  <span className="font-semibold text-zinc-500">@{handleFor(m.senderBeeId)}</span>{' '}
+                  {m.deletedAt ? 'message removed' : m.contentType === 'text' ? m.body : '📎 media'}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => togglePin(m.id, true)}
+                title="Unpin"
+                aria-label="Unpin"
+                className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-amber-500 transition-colors hover:bg-amber-100 hover:text-amber-700"
+              >
+                <PinOff size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
         {visible.length === 0 && (
           <p className="pt-6 text-center text-sm text-zinc-300">
@@ -1287,7 +1504,11 @@ function Thread({
             <div
               key={m.id}
               id={`msg-${m.id}`}
-              className={cn('flex flex-col', mine ? 'items-end' : 'items-start')}
+              className={cn(
+                'flex flex-col rounded-lg transition-shadow',
+                mine ? 'items-end' : 'items-start',
+                flashId === m.id && 'ring-2 ring-cyan-300',
+              )}
             >
               {conversation.kind === 'group' && !mine && (
                 <span className="mb-0.5 px-1 text-[10px] font-semibold text-zinc-400">
@@ -1407,6 +1628,22 @@ function Thread({
                     className="flex h-5 w-5 items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
                   >
                     <Reply size={13} />
+                  </button>
+                )}
+                {!m.deletedAt && (
+                  <button
+                    type="button"
+                    onClick={() => togglePin(m.id, pinnedIds.has(m.id))}
+                    title={pinnedIds.has(m.id) ? 'Unpin' : 'Pin'}
+                    aria-label={pinnedIds.has(m.id) ? 'Unpin' : 'Pin'}
+                    className={cn(
+                      'flex h-5 w-5 items-center justify-center rounded-full transition-colors hover:bg-zinc-100',
+                      pinnedIds.has(m.id)
+                        ? 'text-amber-500 hover:text-amber-600'
+                        : 'text-zinc-300 hover:text-zinc-600',
+                    )}
+                  >
+                    {pinnedIds.has(m.id) ? <PinOff size={13} /> : <Pin size={13} />}
                   </button>
                 )}
                 {!m.deletedAt && (

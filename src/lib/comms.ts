@@ -206,22 +206,16 @@ export async function listConversations(): Promise<Conversation[]> {
   }));
 }
 
-export async function listMessages(conversationId: string, limit = 200): Promise<CommsMessage[]> {
-  const { data, error } = await req()
-    .from('comms_messages')
-    .select(
-      'id, conversation_id, sender_bee_id, body, content_type, is_encrypted, created_at, deleted_at, edited_at, expires_at, reply_to_message_id, comms_reactions(bee_id, emoji)',
-    )
-    .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: true })
-    .limit(limit);
-  if (error) throw error;
+const MESSAGE_COLUMNS =
+  'id, conversation_id, sender_bee_id, body, content_type, is_encrypted, created_at, deleted_at, edited_at, expires_at, reply_to_message_id, comms_reactions(bee_id, emoji)';
 
+/** Decrypt + shape raw message rows (shared by list, paging, and pins). */
+async function rowsToMessages(conversationId: string, rows: Row[]): Promise<CommsMessage[]> {
   const bee = await myBee().catch(() => null);
   const ck = bee ? await getConversationKey(bee, conversationId).catch(() => null) : null;
 
   const out: CommsMessage[] = [];
-  for (const m of (data ?? []) as Row[]) {
+  for (const m of rows) {
     let body: string = m.body ?? '';
     let undecryptable = false;
     if (m.is_encrypted && isEncryptedBody(m.body)) {
@@ -262,6 +256,55 @@ export async function listMessages(conversationId: string, limit = 200): Promise
     });
   }
   return out;
+}
+
+export async function listMessages(conversationId: string, limit = 200): Promise<CommsMessage[]> {
+  const { data, error } = await req()
+    .from('comms_messages')
+    .select(MESSAGE_COLUMNS)
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  if (error) throw error;
+  return rowsToMessages(conversationId, (data ?? []) as Row[]);
+}
+
+/**
+ * One page of history, walking BACKWARD from `before` (exclusive). Returns the
+ * page in ascending order; an empty/short page means the start was reached.
+ */
+export async function fetchMessagesPage(
+  conversationId: string,
+  before?: string | null,
+  limit = 200,
+): Promise<CommsMessage[]> {
+  let q = req()
+    .from('comms_messages')
+    .select(MESSAGE_COLUMNS)
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (before) q = q.lt('created_at', before);
+  const { data, error } = await q;
+  if (error) throw error;
+  const rows = ((data ?? []) as Row[]).slice().reverse();
+  return rowsToMessages(conversationId, rows);
+}
+
+/** Fetch + decrypt specific messages (pinned ones may be outside the loaded window). */
+export async function getMessagesByIds(
+  conversationId: string,
+  ids: string[],
+): Promise<CommsMessage[]> {
+  if (!ids.length) return [];
+  const { data, error } = await req()
+    .from('comms_messages')
+    .select(MESSAGE_COLUMNS)
+    .eq('conversation_id', conversationId)
+    .in('id', ids)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return rowsToMessages(conversationId, (data ?? []) as Row[]);
 }
 
 async function sendEncrypted(
@@ -1064,4 +1107,92 @@ export async function searchBees(
     .limit(8);
   if (error) throw error;
   return (data ?? []) as { id: string; handle: string; name: string | null }[];
+}
+
+
+// ── Pinned messages ──────────────────────────────────────────────────────────
+
+export type CommsPin = { messageId: string; pinnedBy: string; createdAt: string };
+
+export async function listPins(conversationId: string): Promise<CommsPin[]> {
+  const { data, error } = await req()
+    .from('comms_pins')
+    .select('message_id, pinned_by, created_at')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as { message_id: string; pinned_by: string; created_at: string }[]).map(
+    (r) => ({ messageId: r.message_id, pinnedBy: r.pinned_by, createdAt: r.created_at }),
+  );
+}
+
+export async function pinMessage(conversationId: string, messageId: string): Promise<void> {
+  const { error } = await req().rpc('comms_pin', {
+    p_conversation_id: conversationId,
+    p_message_id: messageId,
+  });
+  if (error) throw error;
+}
+
+export async function unpinMessage(conversationId: string, messageId: string): Promise<void> {
+  const { error } = await req().rpc('comms_unpin', {
+    p_conversation_id: conversationId,
+    p_message_id: messageId,
+  });
+  if (error) throw error;
+}
+
+// ── Room roles (host controls) ───────────────────────────────────────────────
+
+export type RoomParticipant = { beeId: string; handle: string; role: string };
+
+export async function setRoomRole(
+  roomId: string,
+  beeId: string,
+  role: 'speaker' | 'listener',
+): Promise<void> {
+  const { error } = await req().rpc('comms_room_set_role', {
+    p_room_id: roomId,
+    p_bee: beeId,
+    p_role: role,
+  });
+  if (error) throw error;
+}
+
+export async function listRoomParticipants(roomId: string): Promise<RoomParticipant[]> {
+  const { data, error } = await req()
+    .from('comms_room_participants')
+    .select('bee_id, role, left_at, bees(handle)')
+    .eq('room_id', roomId)
+    .is('left_at', null)
+    .order('joined_at', { ascending: true });
+  if (error) throw error;
+  type R = { bee_id: string; role: string; left_at: string | null; bees: { handle: string } | { handle: string }[] | null };
+  return ((data ?? []) as R[]).map((r) => ({
+    beeId: r.bee_id,
+    role: r.role,
+    handle: Array.isArray(r.bees) ? (r.bees[0]?.handle ?? 'bee') : (r.bees?.handle ?? 'bee'),
+  }));
+}
+
+/** Live room roster changes (join/leave/role) via the realtime publication. */
+export function subscribeRoomParticipants(
+  roomId: string,
+  onChange: () => void,
+): { close: () => void } | null {
+  if (!supabase) return null;
+  const client = supabase;
+  const channel = client
+    .channel(`room-parts:${roomId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'comms_room_participants', filter: `room_id=eq.${roomId}` },
+      onChange,
+    )
+    .subscribe();
+  return {
+    close: () => {
+      client.removeChannel(channel);
+    },
+  };
 }
