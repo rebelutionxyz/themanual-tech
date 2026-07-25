@@ -16,12 +16,14 @@ import {
   Download,
   Film,
   Link2,
+  Monitor,
   Music,
   Pause,
   Play,
   Plus,
   Save,
   Scissors,
+  Smartphone,
   Trash2,
   Type,
   X,
@@ -95,6 +97,9 @@ export function VideoEditorPage() {
   const [pickerOpen, setPickerOpen] = useState<'clip' | 'audio' | null>(null);
   const [exporting, setExporting] = useState<null | { at: number; total: number }>(null);
   const [exportResult, setExportResult] = useState<Blob | null>(null);
+  /** Vertical reframe (Block 21): render the whole edit 9:16 for Shorts/
+      Reels/TikTok — blur-padded, never letterboxed black. */
+  const [portrait, setPortrait] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
@@ -253,6 +258,18 @@ export function VideoEditorPage() {
       if (el.readyState >= 2) {
         const vw = el.videoWidth || 16;
         const vh = el.videoHeight || 9;
+        if (portrait) {
+          // Blur-pad reframe: blurred cover fill behind, sharp contain in
+          // front — the Shorts/Reels look, no black bars either axis.
+          const cover = Math.max(w / vw, h / vh);
+          const sw = w / cover;
+          const sh = h / cover;
+          ctx.filter = 'blur(42px)';
+          ctx.drawImage(el, (vw - sw) / 2, (vh - sh) / 2, sw, sh, 0, 0, w, h);
+          ctx.filter = 'none';
+          ctx.fillStyle = 'rgba(0,0,0,0.28)';
+          ctx.fillRect(0, 0, w, h);
+        }
         const scale = Math.min(w / vw, h / vh);
         const dw = vw * scale;
         const dh = vh * scale;
@@ -289,7 +306,7 @@ export function VideoEditorPage() {
         }
       }
     },
-    [clips, texts, selectedText, locate, getVideoEl],
+    [clips, texts, selectedText, locate, getVideoEl, portrait],
   );
 
   const syncMedia = useCallback(
@@ -449,7 +466,7 @@ export function VideoEditorPage() {
       const first = clips[0]?.asset;
       const links = texts.filter((t) => t.url).map((t) => `${t.text}: ${t.url}`);
       const saved = await saveBlobToLibrary(bee.id, exportResult, {
-        fileName: `${(first?.fileName ?? 'video').replace(/\.[a-z0-9]+$/i, '')}-edit.webm`,
+        fileName: `${(first?.fileName ?? 'video').replace(/\.[a-z0-9]+$/i, '')}-edit${portrait ? '-vertical' : ''}.webm`,
         mimeType: 'video/webm',
         source: 'video_editor',
         editOf: first?.id ?? null,
@@ -475,13 +492,19 @@ export function VideoEditorPage() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || clips.length === 0) return;
+    if (portrait) {
+      // Fixed 9:16 output frame; text x/y are fractions so overlays follow.
+      canvas.width = 720;
+      canvas.height = 1280;
+      return;
+    }
     const a = clips[0].asset;
     const w = a.width && a.width > 0 ? a.width : 1280;
     const h = a.height && a.height > 0 ? a.height : 720;
     const scale = Math.min(1, 1280 / w);
     canvas.width = Math.round(w * scale);
     canvas.height = Math.round(h * scale);
-  }, [clips]);
+  }, [clips, portrait]);
 
   /* ───────────── text overlay drag ───────────── */
 
@@ -627,6 +650,33 @@ export function VideoEditorPage() {
           <Film size={18} style={{ color: ACCENT }} /> Video Editor
         </h1>
         <div className="ml-auto flex items-center gap-1.5">
+          {/* Aspect: 16:9 ↔ 9:16 (Block 21) — same pair as the recorder. */}
+          <div className="inline-flex rounded-md border border-zinc-200 bg-white p-0.5">
+            <button
+              type="button"
+              onClick={() => setPortrait(false)}
+              disabled={exporting !== null}
+              title="Landscape 16:9"
+              className={cn(
+                'flex items-center gap-1 rounded-sm px-2 py-1 text-[12px] disabled:opacity-50',
+                !portrait ? 'bg-amber-50 font-semibold text-amber-700' : 'text-zinc-500 hover:text-zinc-900',
+              )}
+            >
+              <Monitor size={13} /> 16:9
+            </button>
+            <button
+              type="button"
+              onClick={() => setPortrait(true)}
+              disabled={exporting !== null}
+              title="Vertical 9:16 — Shorts/Reels/TikTok, blur-padded"
+              className={cn(
+                'flex items-center gap-1 rounded-sm px-2 py-1 text-[12px] disabled:opacity-50',
+                portrait ? 'bg-amber-50 font-semibold text-amber-700' : 'text-zinc-500 hover:text-zinc-900',
+              )}
+            >
+              <Smartphone size={13} /> 9:16
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => void grabFrame()}
