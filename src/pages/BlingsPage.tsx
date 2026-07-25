@@ -70,7 +70,7 @@ export function BlingsPage() {
             style={{ fontSize: '13px', lineHeight: '1.6' }}
           >
             FreedomBLiNGs lives at its own sovereign domain. Click below to
-            enter the live economy — earn, mint, send, escrow. Your Bee account
+            enter the live economy — earn, FREE, send, escrow. Your Bee account
             works there too.
           </p>
           <a

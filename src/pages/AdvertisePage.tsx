@@ -111,7 +111,7 @@ export function AdvertisePage() {
           <p className="flex-1 text-[13px] leading-relaxed text-zinc-500">
             The self-serve console for verified organizations: compose creative, pick a slot and
             contextual target, set your window and budget at a flat reach-scope rate — then
-            review-before-live keeps the comb clean. Opens with the fiat rail; see{' '}
+            review-before-live keeps the HoneyComb clean. Opens with the fiat rail; see{' '}
             <Link to="/business" className="underline" style={{ color: AD }}>
               Business
             </Link>{' '}

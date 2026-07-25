@@ -142,7 +142,7 @@ export function ProfilePage() {
         />
         <RankCard
           icon={<Crown size={16} />}
-          title="HoneyComb RiNG"
+          title="The RiNG"
           subtitle="9 levels · raw action count · cannot be bought"
           level={ring}
           max={8}

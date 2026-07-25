@@ -67,7 +67,7 @@ function getHeader(p: Posture): HeaderDef {
   if (p === 'secure')
     return {
       tone: 'secure',
-      word: 'The comb is secure.',
+      word: 'The HoneyComb is secure.',
       sub: 'All six surfaces nominal. Member mesh healthy. Astra is watching.',
       stats: [
         ['Transactions secured · 24h', '1.28M', 'secure'],

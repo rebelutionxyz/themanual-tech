@@ -25,7 +25,7 @@ const EARNED_FACETS = [
   },
   {
     k: 'The Ring is lifetime prestige',
-    d: 'A slow, standing record across the whole comb. It rises with what you give — never resets, never for sale.',
+    d: 'A slow, standing record across the whole HoneyComb. It rises with what you give — never resets, never for sale.',
   },
   {
     k: 'Earned, never bought',
@@ -55,7 +55,7 @@ export function StandingPage() {
           <h2>Sign in to see your standing</h2>
           <p>
             Your Rank, your Ring, and your identity are yours — held by you, earned by what you do.
-            Sign in to see where you stand in the comb.
+            Sign in to see where you stand in the HoneyComb.
           </p>
           <a className="signin" href="/login">
             <BMark fill /> Sign in
@@ -226,7 +226,7 @@ export function StandingPage() {
             <span className="sn-mark" />
             <p>
               <b>You hold your standing.</b> Your identity lives in your keys, not our database.
-              Carry it across the comb, and no one can lock you out — or let anyone in.
+              Carry it across the HoneyComb, and no one can lock you out — or let anyone in.
             </p>
           </div>
         </div>

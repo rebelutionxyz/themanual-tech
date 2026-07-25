@@ -17,7 +17,7 @@ export function WavesPage() {
   // 'The Manual' — that clobbered astra siteTitles (atlasintel.fyi bug class).
   useEffect(() => {
     const previous = document.title;
-    document.title = 'MiniWaves. In the Flow.';
+    document.title = 'MiNiWaVeS. In the Flow.';
     return () => {
       document.title = previous;
     };
@@ -32,7 +32,7 @@ export function WavesPage() {
     >
       <iframe
         src="/mini-waves-v92.html"
-        title="MiniWaves"
+        title="MiNiWaVeS"
         className="h-full w-full border-0"
         style={{
           display: 'block',

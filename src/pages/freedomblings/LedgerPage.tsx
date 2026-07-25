@@ -27,7 +27,7 @@ export function LedgerPage() {
   if (led.status === 'loading') {
     return (
       <main className="app-main">
-        <div className="eyebrow">The Sovereign Ledger</div>
+        <div className="eyebrow">The Freedom Ledger</div>
         <div className="feed-empty" style={{ marginTop: 16 }}>
           <span className="live-dot" /> Opening your ledger…
         </div>
@@ -38,7 +38,7 @@ export function LedgerPage() {
   if (led.status === 'signed-out') {
     return (
       <main className="app-main">
-        <div className="eyebrow">The Sovereign Ledger</div>
+        <div className="eyebrow">The Freedom Ledger</div>
         <div className="state-card">
           <h2>Sign in to read your ledger</h2>
           <p>
@@ -56,7 +56,7 @@ export function LedgerPage() {
   if (led.status === 'unavailable') {
     return (
       <main className="app-main">
-        <div className="eyebrow">The Sovereign Ledger</div>
+        <div className="eyebrow">The Freedom Ledger</div>
         <div className="state-card">
           <h2>Ledger unavailable</h2>
           <p>
@@ -76,7 +76,7 @@ export function LedgerPage() {
     <main className="app-main">
       <div className="ledger-top">
         <div>
-          <div className="eyebrow">The Sovereign Ledger</div>
+          <div className="eyebrow">The Freedom Ledger</div>
           <h1>The Ledger</h1>
           <div className="sub">
             Every movement of your BLiNG!, in the open — where it came from and where it went.

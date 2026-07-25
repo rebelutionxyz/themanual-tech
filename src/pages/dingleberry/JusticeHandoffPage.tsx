@@ -62,7 +62,7 @@ function RecordPreview() {
           </span>
         </div>
         <div className="mt-[5px] text-text-muted" style={{ fontSize: 12 }}>
-          Open-source package · Open-source supply chain · Comb-wide · 3 Astra
+          Open-source package · Open-source supply chain · HoneyComb-wide · 3 Astra
         </div>
       </div>
       {/* CaseCard stand-in */}
@@ -96,7 +96,7 @@ function RecordPreview() {
             <span>
               <b className="text-text-silver">0</b> testimony
             </span>
-            <span>Comb-wide · 3 Astra</span>
+            <span>HoneyComb-wide · 3 Astra</span>
             <span>
               <b className="text-text-silver">1,204</b> opted in
             </span>

@@ -8,7 +8,7 @@ import { useLineage } from '@/lib/freedomblings/lineage';
    +940 FREE'd, the per-level counts) are NOT shipped: genesis Bees honestly read
    empty (0 keepers, "0.000000" FREE'd, no upline). The Fibonacci weights
    (34·21·13·8·5) are frontend-held canon — bounded at 5, lifetime, producer-
-   gated. Growing the comb is productive action — never a pyramid, never pay-to-
+   gated. Growing the HoneyComb is productive action — never a pyramid, never pay-to-
    signup. The design's "Invite" write affordance is out of scope for this read
    slice and is omitted. CANON: no buy/sell/recruit. Honey-drop mark only. */
 
@@ -22,7 +22,7 @@ const LEVELS = [
     who: 'direct — your own invites',
   },
   { level: 2, name: 'Pathfinder', weight: 21, rel: 'Those they welcomed', who: 'second ring' },
-  { level: 3, name: 'Navigator', weight: 13, rel: 'Third ring', who: 'the comb widening' },
+  { level: 3, name: 'Navigator', weight: 13, rel: 'Third ring', who: 'the HoneyComb widening' },
   { level: 4, name: 'Pioneer', weight: 8, rel: 'Fourth ring', who: '' },
   { level: 5, name: 'Origin', weight: 5, rel: 'Fifth ring', who: 'the furthest reach' },
 ];
@@ -34,7 +34,7 @@ export function LineagePage() {
   if (lin.status === 'loading') {
     return (
       <main className="app-main">
-        <div className="eyebrow">Growing the comb is productive action</div>
+        <div className="eyebrow">Growing the HoneyComb is productive action</div>
         <div className="feed-empty" style={{ marginTop: 16 }}>
           <span className="live-dot" /> Opening your lineage…
         </div>
@@ -45,7 +45,7 @@ export function LineagePage() {
   if (lin.status === 'signed-out') {
     return (
       <main className="app-main">
-        <div className="eyebrow">Growing the comb is productive action</div>
+        <div className="eyebrow">Growing the HoneyComb is productive action</div>
         <div className="state-card">
           <h2>Sign in to see your lineage</h2>
           <p>
@@ -63,7 +63,7 @@ export function LineagePage() {
   if (lin.status === 'unavailable') {
     return (
       <main className="app-main">
-        <div className="eyebrow">Growing the comb is productive action</div>
+        <div className="eyebrow">Growing the HoneyComb is productive action</div>
         <div className="state-card">
           <h2>Lineage unavailable</h2>
           <p>
@@ -83,7 +83,7 @@ export function LineagePage() {
     <main className="app-main">
       <div className="commons-top">
         <div>
-          <div className="eyebrow">Growing the comb is productive action</div>
+          <div className="eyebrow">Growing the HoneyComb is productive action</div>
           <h1>Your lineage</h1>
           <div className="sub">
             When you welcome people and they thrive, value is FREE'd up your lineage on a Fibonacci
@@ -109,7 +109,7 @@ export function LineagePage() {
           <div className="ah-v num" style={{ color: 'var(--accent-deep)' }}>
             {freed}
           </div>
-          <div className="ah-s">as your comb grows &amp; thrives</div>
+          <div className="ah-s">as your HoneyComb grows &amp; thrives</div>
         </div>
         <div className="ah-item">
           <div className="ah-k">The curve</div>
@@ -172,7 +172,7 @@ export function LineagePage() {
 
       <div className="ledger-foot">
         <span className="seal" />
-        Lineage value is FREE'd for real, productive work done across your comb — never for merely
+        Lineage value is FREE'd for real, productive work done across your HoneyComb — never for merely
         signing people up. The weights are fixed (34·21·13·8·5) and bounded at five rings.
       </div>
     </main>

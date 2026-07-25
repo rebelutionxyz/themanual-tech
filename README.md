@@ -12,14 +12,14 @@ The master HoneyComb platform. 19 surfaces. One sovereign record.
 
 **TheManual.tech** is the master codebase for the HoneyComb ecosystem. It holds all 19 surfaces (BLiNG! · INTEL · UNITE · RULE · COMMS · CHAT · GIVE · PULSE · BAZAAR · BRAND · PROMOTION · PRIZE · MANUAL · SECURE · SAFE · PRODUCTION · EDU · VOTE · LEGAL) running on a shared data layer.
 
-Other pillars (FreedomBLiNGs.com, RebelUtion.app, fnulnu.xyz, etc.) are **clones of this codebase** pointed at the same database, with different default surfaces and skins. One codebase, many doors.
+Other astras (FreedomBLiNGs.com, RebelUtion.app, fnulnu.xyz, etc.) are **clones of this codebase** pointed at the same database, with different default surfaces and skins. One codebase, many doors.
 
 ### The Architecture
 
 - **The Manual** (5,997 atoms in 13 realms) is the canonical truth layer
 - Every other surface **gathers data for the Manual** and **displays it differently**
 - Any surface entity can live inside any other (compositional): an Event in a Group in a Forum thread
-- One shared Supabase database across all pillar domains
+- One shared Supabase database across all astra domains
 - Three skins (HoneyComb · Rebelution · AtlasNation) for visual variation
 
 ---
@@ -248,7 +248,7 @@ All surface pages render cleanly today. Tier 1 surfaces (Manual is the only full
 | 6 | RULE | Events | Social | 1 |
 | 7 | GIVE | Crowdfunding | Social | 1 |
 | 8 | PULSE | Live News Network | Social | 2 |
-| 9 | BAZAAR | Buy · Auction · Raffle | Commerce | 1 |
+| 9 | BAZAAR | Get · Auction · Raffle | Commerce | 1 |
 | 10 | BRAND | Rebelution Storefront | Commerce | 2 |
 | 11 | PRIZE | Private Gaming | Commerce | 2 |
 | 12 | PROMOTION | Advertising | Commerce | 2 |
@@ -269,10 +269,13 @@ Tier 2 = shell at launch, build over time
 ## Language Rules (LEGAL FIREWALL — do not violate)
 
 Nowhere in the UI or code should you use these fiat terms:
-- ❌ buy, sell, purchase, invest, trade, market, price, customer, payment
+- ❌ buy, sell, purchase, invest, trade, market, price, customer, payment, cash out, mint, investor, token holder
 
 Use sovereign vocabulary:
-- ✅ GET · GIVE · OFFER · WIN · EARN · RECEIVE · BANK · DONATE · REDEEM · MINT · SEND · ESCROW
+- ✅ GET · GIVE · OFFER · WIN · EARN · RECEIVE · BANK · DONATE · REDEEM · FREE · SEND · ESCROW
+
+Required replacements: Mint→Free · Buy→Get · Sell→Offer · Cash out→Offer on the order book ·
+Mint price→Freedom price / curve price · Customer→Bee · Investor→Bee · Token holder→Bee.
 
 Everything is a **DONATION**. This is not a style preference — it's a legal firewall to prevent securities framing of BLiNG!.
 
@@ -286,11 +289,11 @@ Use the `.bling` CSS class.
 
 ---
 
-## Cloning To Other Pillars
+## Cloning To Other Astras
 
-Future pillar domains (fnulnu.xyz, rebelution.app, freedomblings.com, etc.) clone this codebase with minor variations:
+Future astra domains (fnulnu.xyz, rebelution.app, freedomblings.com, etc.) clone this codebase with minor variations:
 
-1. Fork the repo (or copy it to a new GitHub repo per pillar domain)
+1. Fork the repo (or copy it to a new GitHub repo per astra domain)
 2. Point it at the **same Supabase database** (same env vars)
 3. Override `pillars` table entry for that domain:
    - `default_surface` — which surface shows first
@@ -319,13 +322,16 @@ When adding new surfaces:
 - 5 Power Fronts at bottom: UNITE & RULE · INVESTIGATE · THE NEW WORLD ORDER · PROSECUTE · THE DEEP STATE
 - Manual is canonical; other surfaces link to atoms via `entity_atom_links`
 - BLiNG! economy hard cap: 11,222,333,222,111
-- Bonding curve: $1 floor, +$0.01 per billion, $101 ceiling, 1% sell fee, free buys
+- Bonding-curve + order-book RPCs were dropped at the DB layer by Economy v3 (applied
+  Jun 2, 2026); the old curve parameters here no longer describe anything live. BLiNG! is
+  FREE'd from the Well via the sanctioned faucets — Drops, Drips, affiliate_distribute,
+  AtlasOracle credit, HoneyPOT. It is never bought and never sold.
 - Zero fees on Kindness · Productivity · Learning transactions
 - Bee-to-Bee transfer fee: 0.1%
-- Token creation fee: 1 BLiNG!
+- Creation fee: 1 BLiNG!
 - BLiNG! → USD: Stripe only (legal firewall)
-- BLiNG! Rank: 33 levels (Seed → Miracle, can be purchased)
-- HoneyComb RiNG: 9 levels (Seed → Queen, raw action count only, CANNOT be bought)
+- BLiNG! Rank: 33 levels (Seed → Miracle) — earned, never bought
+- The RiNG: 9 levels (Seed → Queen, raw action count only, CANNOT be bought)
 
 ---
 

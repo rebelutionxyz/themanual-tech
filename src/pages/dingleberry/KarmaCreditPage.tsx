@@ -294,7 +294,7 @@ export function KarmaCreditPage() {
               Karma Read
             </h1>
             <div className="text-text-silver" style={{ fontSize: 14, maxWidth: 560 }}>
-              A soft pull on any actor — like a soft credit check. The model scores trust live from comb signals,{' '}
+              A soft pull on any actor — like a soft credit check. The model scores trust live from HoneyComb signals,{' '}
               <b className="text-text">computes under encryption</b>, returns a band, and{' '}
               <b className="text-text">retains nothing</b>. It leaves no mark and doesn’t touch the member’s standing.
             </div>

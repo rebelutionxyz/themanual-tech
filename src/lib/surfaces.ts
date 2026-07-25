@@ -84,8 +84,8 @@ export const SURFACES: SurfaceDef[] = [
   },
   {
     slug: 'freedomblings',
-    name: 'FreedomBLiNGS',
-    function: 'The Sovereign Ledger',
+    name: 'FreedomBLiNGs',
+    function: 'The Freedom Ledger',
     description:
       'The economic heart of the HoneyComb — where your BLiNG! lives, is FREEd, and moves.',
     purpose:
@@ -186,7 +186,7 @@ export const SURFACES: SurfaceDef[] = [
   {
     slug: 'entertheprize',
     name: 'MARKETPLACE',
-    function: 'Buy · Auction · Raffle',
+    function: 'Get · Auction · Raffle',
     description: 'The marketplace. Offer goods, services, listings.',
     purpose:
       'Bees OFFER and GET. Physical goods, services, rentals, auctions, raffles. Honey flows.',
@@ -249,7 +249,7 @@ export const SURFACES: SurfaceDef[] = [
     slug: 'dingleberry',
     name: 'DingleBERRY',
     function: 'Security Command',
-    description: "The comb's immune system. Posture at a glance across six security surfaces.",
+    description: "The HoneyComb's immune system. Posture at a glance across six security surfaces.",
     purpose:
       'DingleBERRY watches the platform: infra health, transaction integrity, source verification, shill/abuse detection, dispatch authority, and threat interception. Funded by @combtreasury.defense.',
     icon: ShieldAlert,
