@@ -1,4 +1,5 @@
 import { useAuth } from '@/lib/auth';
+import { cutoutImage } from '@/lib/holo';
 import { type MediaAsset, assetUrl, getAsset, saveBlobToLibrary } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import {
@@ -650,6 +651,35 @@ export function ImageEditorPage() {
     setCropRect(null);
   }
 
+  /* Block 17 — background eraser/replace (HOLO's model on stills). */
+  const [erasing, setErasing] = useState(false);
+  async function eraseBackground(replaceWith: string | null) {
+    if (!base || erasing) return;
+    setErasing(true);
+    try {
+      const cut = await cutoutImage(base);
+      if (replaceWith) {
+        const c = document.createElement('canvas');
+        c.width = cut.width;
+        c.height = cut.height;
+        const ctx = c.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = replaceWith;
+          ctx.fillRect(0, 0, c.width, c.height);
+          ctx.drawImage(cut, 0, 0);
+        }
+        setBase(c);
+      } else {
+        setBase(cut);
+      }
+      setCropRect(null);
+    } catch {
+      /* model blocked — leave the image untouched */
+    } finally {
+      setErasing(false);
+    }
+  }
+
   function applyCrop() {
     if (!base || !cropRect) return;
     const [x, y, w, h] = cropRect.map(Math.round) as [number, number, number, number];
@@ -904,6 +934,18 @@ export function ImageEditorPage() {
           <span className="my-0.5 hidden h-px w-full bg-zinc-200 lg:block" />
           <ToolBtn active={adjustOpen} title="Adjust" onClick={() => setAdjustOpen((v) => !v)}>
             <SlidersHorizontal size={15} />
+          </ToolBtn>
+          <ToolBtn
+            title={erasing ? 'Cutting…' : 'Erase background (person cutout → transparent)'}
+            onClick={() => void eraseBackground(null)}
+          >
+            ✂️
+          </ToolBtn>
+          <ToolBtn
+            title="Replace background with white"
+            onClick={() => void eraseBackground('#ffffff')}
+          >
+            🧱
           </ToolBtn>
           <ToolBtn title="Rotate left" onClick={() => bakeTransform('ccw')}>
             <RotateCcw size={15} />

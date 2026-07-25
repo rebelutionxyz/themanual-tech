@@ -110,3 +110,64 @@ export class HoloCompositor {
     ctx.drawImage(this.work, (vw - sw) / 2, (vh - sh) / 2, sw, sh, dx, dy, dw, dh);
   }
 }
+
+let imageSegmenter: ImageSegmenter | null = null;
+let imageLoading: Promise<ImageSegmenter> | null = null;
+
+async function getImageSegmenter(): Promise<ImageSegmenter> {
+  if (imageSegmenter) return imageSegmenter;
+  if (!imageLoading) {
+    imageLoading = (async () => {
+      const vision = await import('@mediapipe/tasks-vision');
+      const files = await vision.FilesetResolver.forVisionTasks(WASM_BASE);
+      imageSegmenter = await vision.ImageSegmenter.createFromOptions(files, {
+        baseOptions: { modelAssetPath: MODEL_URL, delegate: 'GPU' },
+        runningMode: 'IMAGE',
+        outputConfidenceMasks: true,
+        outputCategoryMask: false,
+      });
+      return imageSegmenter;
+    })().catch((e) => {
+      imageLoading = null;
+      throw e;
+    });
+  }
+  return imageLoading;
+}
+
+/** Person-cutout of a still image → new canvas with transparent background. */
+export async function cutoutImage(source: HTMLCanvasElement): Promise<HTMLCanvasElement> {
+  const seg = await getImageSegmenter();
+  const res = seg.segment(source);
+  const cm = res.confidenceMasks?.[0];
+  const out = document.createElement('canvas');
+  out.width = source.width;
+  out.height = source.height;
+  const octx = out.getContext('2d');
+  if (!octx) {
+    res.close();
+    return source;
+  }
+  octx.drawImage(source, 0, 0);
+  if (cm) {
+    const arr = cm.getAsFloat32Array();
+    const mask = document.createElement('canvas');
+    mask.width = source.width;
+    mask.height = source.height;
+    const mctx = mask.getContext('2d');
+    if (mctx) {
+      const md = mctx.createImageData(mask.width, mask.height);
+      const px = md.data;
+      for (let i = 0; i < arr.length; i++) {
+        const c = arr[i];
+        px[i * 4 + 3] = c <= 0.35 ? 0 : c >= 0.65 ? 255 : (((c - 0.35) / 0.3) * 255) | 0;
+      }
+      mctx.putImageData(md, 0, 0);
+      octx.globalCompositeOperation = 'destination-in';
+      octx.drawImage(mask, 0, 0);
+      octx.globalCompositeOperation = 'source-over';
+    }
+  }
+  res.close();
+  return out;
+}
