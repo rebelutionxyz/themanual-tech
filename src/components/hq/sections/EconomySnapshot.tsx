@@ -3,7 +3,7 @@
 // Calls get_treasury_pots() for the OPS umbrella breakdown.
 //
 // Bonding curve canon (honeycomb-vocabulary-v1.md): $1 floor → +$0.01 per
-// 1B BLiNG! freed → $101 ceiling. Hard cap 11,222,333,222,111 BLiNG!.
+// 1B BLiNG! freed → $101 ceiling. Hard cap 111,222,333,333,222,111 BLiNG!.
 // `bling_system_state.freedom_price` is the authoritative live price; the
 // computed price is shown alongside as a sanity check.
 
@@ -22,7 +22,11 @@ interface Pot {
   balance: number;
 }
 
-const HARD_CAP = 11_222_333_222_111; // BLiNG! lifetime mint cap
+// BLiNG! lifetime cap. BigInt, not a plain numeric literal: 111,222,333,333,222,111
+// exceeds Number.MAX_SAFE_INTEGER (9,007,199,254,740,991) and a Number literal silently
+// rounds it to …222,110 — verified. Display via .toLocaleString(); convert with Number()
+// only at a ratio site, where float error is harmless.
+const HARD_CAP = 111_222_333_333_222_111n;
 const PRICE_FLOOR_USD = 1.0;
 const PRICE_CEILING_USD = 101.0;
 const PRICE_INCREMENT_USD_PER_BILLION = 0.01;
@@ -87,7 +91,7 @@ export function EconomySnapshot() {
     return () => { cancelled = true; };
   }, []);
 
-  const pctFreed = state ? (state.total_supply / HARD_CAP) * 100 : 0;
+  const pctFreed = state ? (state.total_supply / Number(HARD_CAP)) * 100 : 0;
   const computed = state ? computedPrice(state.total_supply) : PRICE_FLOOR_USD;
   const treasuryTotal = pots?.reduce((sum, p) => sum + p.balance, 0) ?? 0;
 
@@ -125,7 +129,7 @@ export function EconomySnapshot() {
             />
             <Metric
               label="Hard cap"
-              value={fmt(HARD_CAP)}
+              value={HARD_CAP.toLocaleString()}
               suffix="BLiNG!"
             />
             <Metric
