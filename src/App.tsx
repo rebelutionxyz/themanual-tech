@@ -89,6 +89,7 @@ const BrandosophicBrandsPage = lazy(() => import('@/pages/brandosophic/Brandosop
 const BrandosophicNovasPage = lazy(() => import('@/pages/brandosophic/BrandosophicNovasPage').then((m) => ({ default: m.BrandosophicNovasPage })));
 const BrandosophicStorefrontPage = lazy(() => import('@/pages/brandosophic/BrandosophicStorefrontPage').then((m) => ({ default: m.BrandosophicStorefrontPage })));
 const ComparePage = lazy(() => import('@/pages/studio/ComparePage').then((m) => ({ default: m.ComparePage })));
+const QrPage = lazy(() => import('@/pages/studio/QrPage').then((m) => ({ default: m.QrPage })));
 const ImageEditorPage = lazy(() => import('@/pages/studio/ImageEditorPage').then((m) => ({ default: m.ImageEditorPage })));
 const ResponseRecorderPage = lazy(() => import('@/pages/studio/ResponseRecorderPage').then((m) => ({ default: m.ResponseRecorderPage })));
 const VideoEditorPage = lazy(() => import('@/pages/studio/VideoEditorPage').then((m) => ({ default: m.VideoEditorPage })));
@@ -313,6 +314,7 @@ function AppContent() {
             <Route path="/studio/edit/video/:assetId" element={<VideoEditorPage />} />
             <Route path="/studio/record" element={<ResponseRecorderPage />} />
             <Route path="/studio/compare" element={<ComparePage />} />
+            <Route path="/studio/qr" element={<QrPage />} />
             <Route path="/premium" element={<PremiumPage />} />
             <Route path="/business" element={<BusinessPage />} />
             <Route path="/promotion" element={<AdvertisePage />} />
