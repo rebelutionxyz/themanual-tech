@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { cancelRoulette, enqueueRoulette, pollRouletteMatch } from '@/lib/comms';
+import { cancelRoulette, enqueueRoulette, getRoomStatus, pollRouletteMatch } from '@/lib/comms';
+import { supabase } from '@/lib/supabase';
 const CallView = lazy(() => import('./CallView').then((m) => ({ default: m.CallView })));
 
 /**
@@ -14,7 +15,10 @@ export function RouletteView({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<'video' | 'audio'>('video');
   const [roomId, setRoomId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hadCall, setHadCall] = useState(false);
   const pollRef = useRef<number | null>(null);
+  const phaseRef = useRef<Phase>('choose');
+  phaseRef.current = phase;
 
   const stopPoll = () => {
     if (pollRef.current) {
@@ -33,6 +37,7 @@ export function RouletteView({ onClose }: { onClose: () => void }) {
       if (res.matched && res.roomId) {
         setRoomId(res.roomId);
         setPhase('incall');
+        setHadCall(true);
         return;
       }
       // No partner waiting — poll until someone matches us.
@@ -44,6 +49,7 @@ export function RouletteView({ onClose }: { onClose: () => void }) {
             stopPoll();
             setRoomId(match.roomId);
             setPhase('incall');
+            setHadCall(true);
           }
         } catch {
           /* keep polling */
@@ -68,6 +74,43 @@ export function RouletteView({ onClose }: { onClose: () => void }) {
   // Clean up the poll if the component goes away.
   useEffect(() => () => stopPoll(), []);
 
+  // Partner-left detector: the server ends a roulette room the moment EITHER
+  // side leaves (any exit path). Watch the room row (realtime + a poll safety
+  // net); the abandoned side auto-requeues → "Finding the next Bee…".
+  useEffect(() => {
+    if (phase !== 'incall' || !roomId) return;
+    let live = true;
+    const requeue = () => {
+      if (!live || phaseRef.current !== 'incall') return;
+      start(mode);
+    };
+    const check = async () => {
+      try {
+        const status = await getRoomStatus(roomId);
+        if (status && status !== 'live') requeue();
+      } catch {
+        /* keep watching */
+      }
+    };
+    const t = window.setInterval(check, 4000);
+    const channel = supabase
+      ?.channel(`roulette-room:${roomId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'comms_rooms', filter: `id=eq.${roomId}` },
+        (payload) => {
+          const status = (payload.new as { status?: string })?.status;
+          if (status && status !== 'live') requeue();
+        },
+      )
+      .subscribe();
+    return () => {
+      live = false;
+      window.clearInterval(t);
+      if (channel) supabase?.removeChannel(channel);
+    };
+  }, [phase, roomId, mode, start]);
+
   if (phase === 'incall' && roomId) {
     return (
       <div className="fixed inset-0 z-50">
@@ -77,12 +120,15 @@ export function RouletteView({ onClose }: { onClose: () => void }) {
           roomId={roomId}
           video={mode === 'video'}
           onClose={() => {
+            // Only MY deliberate exit lands here while in-call; the Next-flow
+            // teardown fires this too, after phase already moved — ignore that.
+            if (phaseRef.current !== 'incall') return;
             setRoomId(null);
             setPhase('choose');
           }}
         />
         </Suspense>
-        <div className="-translate-x-1/2 fixed bottom-5 left-1/2 z-[60] flex gap-2">
+        <div className="-translate-x-1/2 fixed bottom-24 left-1/2 z-[60] flex gap-2">
           <button
             type="button"
             onClick={() => start(mode)}
@@ -133,7 +179,7 @@ export function RouletteView({ onClose }: { onClose: () => void }) {
 
         {phase === 'searching' && (
           <div className="space-y-4">
-            <p className="text-white/70">Finding a Bee…</p>
+            <p className="text-white/70">{hadCall ? 'Finding the next Bee…' : 'Finding a Bee…'}</p>
             <div className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-white/20 border-t-white" />
             <button
               type="button"

@@ -25,14 +25,25 @@ export interface NotificationItem {
 }
 
 function mapRow(row: Record<string, unknown>): NotificationItem {
+  let type = String(row.type ?? '');
+  let title = String(row.title ?? '');
+  let body: string | null = (row.body as string) ?? null;
+  // `call_incoming` rows are the ring TRANSPORT (the live modal consumes them);
+  // answered/declined ones are deleted server-side, so any row still here by
+  // the time an inbox reads it is, by definition, a missed call. Render it so.
+  if (type === 'call_incoming') {
+    type = 'missed_call';
+    title = `Missed call from ${title.replace(/ is calling$/, '')}`;
+    body = null; // was the call-mode hint (video|audio) — transport, not display
+  }
   return {
     id: Number(row.id),
     actorBeeId: (row.actor_bee_id as string) ?? null,
-    type: String(row.type ?? ''),
+    type,
     entityType: (row.entity_type as string) ?? null,
     entityId: (row.entity_id as string) ?? null,
-    title: String(row.title ?? ''),
-    body: (row.body as string) ?? null,
+    title,
+    body,
     url: (row.url as string) ?? null,
     isRead: Boolean(row.is_read),
     createdAt: String(row.created_at ?? ''),

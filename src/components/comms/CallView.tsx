@@ -174,6 +174,12 @@ export function CallView({
         audio
         onDisconnected={(reason) => {
           if (closedRef.current) return; // we tore it down (End Call / other left)
+          if (reason === DisconnectReason.CLIENT_INITIATED) {
+            // The Bee tapped LiveKit's own leave button in the control bar — a
+            // deliberate hang-up, not a drop. Close cleanly, no error screen.
+            close();
+            return;
+          }
           // Unexpected drop (e.g. the iOS Safari disconnect) — show why, on-screen.
           const name =
             reason === undefined ? 'unknown' : (DisconnectReason[reason] ?? String(reason));

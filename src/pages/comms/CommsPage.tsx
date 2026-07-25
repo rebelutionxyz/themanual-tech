@@ -246,18 +246,22 @@ export function CommsPage() {
     if (bee) reloadBlocks();
   }, [bee, reloadBlocks]);
 
-  // Presence: heartbeat my last-seen, join the live online channel.
+  // Presence: heartbeat my last-seen and load my visibility once.
   useEffect(() => {
     if (!bee) return;
     getMyPresenceVisibility().then(setPresenceVisible).catch(() => {});
     presencePing().catch(() => {});
     const t = window.setInterval(() => presencePing().catch(() => {}), 60000);
-    const chan = joinOnlinePresence(bee.id, setOnline);
-    return () => {
-      window.clearInterval(t);
-      chan.close();
-    };
+    return () => window.clearInterval(t);
   }, [bee]);
+
+  // Live online channel — rejoined when the eye toggles, so invisible mode
+  // really is invisible: we watch the channel but never announce ourselves.
+  useEffect(() => {
+    if (!bee) return;
+    const chan = joinOnlinePresence(bee.id, setOnline, presenceVisible);
+    return () => chan.close();
+  }, [bee, presenceVisible]);
 
   // Last-seen for my DM peers (only bees who share presence come back).
   useEffect(() => {

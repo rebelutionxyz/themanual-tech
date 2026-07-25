@@ -467,30 +467,23 @@ export function parseMediaPayload(body: string): CommsMediaPayload | null {
 
 const VOICE_BUCKET = 'creator-media'; // storage policy allows library/{beeId}/* inserts
 
-// The bucket's MIME allowlist (creator_studio_media_v1b) carries no
-// 'application/octet-stream', so declaring the sealed blob as octet-stream got the
-// upload bounced 415. The ciphertext is instead declared under the recorded audio
-// type, which IS allowlisted; the authoritative mime rides the encrypted payload
-// for playback either way. MediaRecorder hands back params like ';codecs=opus' —
-// strip them, and fall back to audio/webm for anything unexpected.
-const VOICE_UPLOAD_TYPES = new Set([
-  'audio/webm',
-  'audio/mp4',
-  'audio/aac',
-  'audio/mpeg',
-  'audio/ogg',
-  'audio/wav',
-  'audio/x-wav',
-  'audio/flac',
-  'audio/x-m4a',
-]);
+/** Record → seal → upload → send. Returns the message id. */
+// The creator-media bucket's allowlist (creator_studio_media_v1b) carries no
+// 'application/octet-stream', so declaring the sealed blob as octet-stream got
+// the upload bounced with a 415 — voice notes were dead on arrival. The
+// ciphertext is instead declared under the RECORDED audio type, which is
+// allowlisted; the true native mime rides inside the encrypted payload for
+// playback either way. MediaRecorder hands back params like ';codecs=opus' —
+// strip them, and anything unexpected falls back to audio/webm.
+// (Fix authored by Claude Code post-review, mirrored here so whole-file
+// snapshots never clobber it.)
+const VOICE_UPLOAD_TYPES = new Set(['audio/webm', 'audio/mp4']);
 
 function voiceUploadType(mime: string): string {
   const base = (mime.split(';')[0] ?? '').trim().toLowerCase();
   return VOICE_UPLOAD_TYPES.has(base) ? base : 'audio/webm';
 }
 
-/** Record → seal → upload → send. Returns the message id. */
 export async function sendVoiceMessage(
   conversationId: string,
   audio: Blob,
@@ -1077,6 +1070,7 @@ export async function getLastSeen(beeIds: string[]): Promise<Map<string, string>
 export function joinOnlinePresence(
   myBeeId: string,
   onChange: (online: Set<string>) => void,
+  announce = true,
 ): { close: () => void } {
   if (!supabase) return { close: () => {} };
   const client = supabase;
@@ -1087,7 +1081,8 @@ export function joinOnlinePresence(
     .on('presence', { event: 'join' }, emit)
     .on('presence', { event: 'leave' }, emit)
     .subscribe((status) => {
-      if (status === 'SUBSCRIBED') channel.track({ at: Date.now() });
+      // Invisible mode: still WATCH who's online, just never announce myself.
+      if (status === 'SUBSCRIBED' && announce) channel.track({ at: Date.now() });
     });
   return {
     close: () => {
@@ -1217,4 +1212,15 @@ export function subscribeRoomParticipants(
       client.removeChannel(channel);
     },
   };
+}
+
+/** Current status of a room ('live' | 'ended' | …) — RLS lets participants read it. */
+export async function getRoomStatus(roomId: string): Promise<string | null> {
+  const { data, error } = await req()
+    .from('comms_rooms')
+    .select('status')
+    .eq('id', roomId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as { status: string } | null)?.status ?? null;
 }
