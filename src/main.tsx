@@ -9,8 +9,14 @@ import './styles/freedomblings.css';
 
 // A mid-session redeploy invalidates the previous build's chunk URLs; a lazy
 // route or dynamic import then 404s and the page dies black. Vite emits this
-// event for exactly that case — reload once to pick up the fresh index.
-// (Session-scoped guard prevents a reload loop if the network itself is down.)
+// event for exactly that case — reload to pick up the fresh index.
+//
+// Rate-limited: at most one auto-reload per 15 seconds. The event fires per
+// failed import attempt (not on a timer), so a persistently broken deploy gets
+// one reload, then stays put until the next attempt outside the window.
+//
+// preventDefault() is deliberately first and unconditional — a raw unhandled
+// rejection during the cooldown helps nobody. Don't move it below the guard.
 window.addEventListener('vite:preloadError', (event) => {
   event.preventDefault();
   const KEY = 'hc_chunk_reload_at';

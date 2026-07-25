@@ -778,7 +778,43 @@ the half-done failure.
 | `main` vs `origin/main` pre-merge | ✅ both `5c27ae5`, no drift, instance #1 idle |
 | Push | ✅ `5c27ae5..0f94e80` |
 
-## Deploy — SHA-confirmed, ⚠️ content NOT verified
+## Deploy — ✅ RESOLVED: SHA-confirmed *and* content-confirmed
+
+> **Resolved 2026-07-25.** Butch ran the marker check from the chat session's sandbox
+> against the full served bundle `assets/index-UkEJmzNY.js`:
+>
+> | Marker | Expected | Count |
+> |---|---|---|
+> | `Get · Auction · Raffle` | present | **1** |
+> | `MiniWaves · HONEYCOMB Motion Flow` | present | **1** |
+> | `111222333333222111` | present | **1** |
+> | `Buy · Auction · Raffle` | absent | **0** |
+> | `MiNiWaVeS` | absent | **0** |
+> | `The Sovereign Ledger` | absent | **0** |
+>
+> **The firewall sweep is content-confirmed live.** Every positive present, every
+> negative gone.
+>
+> ### Standing procedure locked from this (2026-07-25)
+>
+> **Code reports SHA + Railway status; the chat session confirms content markers via
+> curl from its own sandbox.** Code cannot do the marker check — two independent
+> blockers, both hit here:
+>
+> 1. `curl` denied in every form, so the live chunk filename is unobtainable — WebFetch
+>    strips `<script>`/`<link>` tags from HTML, and no unhashed file lists asset names
+>    (no Vite manifest; `sw.js` has no precache refs).
+> 2. **WebFetch truncates large bundles — it is not a grep.** Asked about the live
+>    ~200 KB `index-UkEJmzNY.js`, it returned ABSENT for all six markers above, i.e. it
+>    was wrong on all six; it had seen only the head of the file. The lone hit was
+>    `vite:preloadError` from Vite's own preload helper near the top, which is what
+>    exposed the truncation. **A WebFetch "ABSENT" on a large bundle is inconclusive,
+>    never negative.** Reporting one as negative would have raised a false alarm that
+>    the firewall fixes had not shipped.
+>
+> The original blocked-state write-up is kept below unedited as the audit record.
+
+---
 
 Railway, via `gh`:
 
@@ -810,4 +846,9 @@ Then WebFetch that chunk and grep: `Get · Auction · Raffle` (present),
 `MiNiWaVeS` (absent), `111222333333222111` (present), `The Sovereign Ledger` (absent).
 All three positive markers are confirmed present in the local `index-BaQf3ykA.js`.
 
-*`logs/` remains untracked; this report was never committed.*
+*Status correction (2026-07-25): this report **is** tracked in git. It was committed as
+`0b20095` — whose message reads "canon(brand): correct MiniWaves casing in root CLAUDE.md"
+but whose only content is this file. The actual root-CLAUDE.md fix lives at
+`HONEYCOMB/CLAUDE.md`, outside this repo, and was not in that commit. Earlier statements in
+this report that the file is untracked or uncommitted (see the Phase-2 footer above)
+described the state at the time of writing and are superseded by this note.*
