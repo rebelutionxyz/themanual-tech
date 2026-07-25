@@ -1,14 +1,18 @@
+import { useAuth } from '@/lib/auth';
 import {
   type MediaAsset,
+  type MediaFolder,
   type MediaKind,
   assetUrl,
   formatBytes,
   formatDuration,
+  listFolders,
   listLibrary,
+  uploadToLibrary,
 } from '@/lib/media';
 import { cn } from '@/lib/utils';
-import { FileText, Film, Image as ImageIcon, Music, Search, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { FileText, Film, Folder, Image as ImageIcon, Music, Search, Upload, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 const ACCENT = '#D97706';
@@ -39,22 +43,48 @@ export function MediaPicker({
   onClose: () => void;
   onPick: (asset: MediaAsset) => void;
 }) {
+  const { bee } = useAuth();
   const [kind, setKind] = useState<MediaKind>(kinds[0]);
   const [search, setSearch] = useState('');
   const [assets, setAssets] = useState<MediaAsset[] | null>(null);
+  const [folders, setFolders] = useState<MediaFolder[]>([]);
+  /** undefined = all folders · string = that folder. */
+  const [folderId, setFolderId] = useState<string | undefined>(undefined);
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    listFolders()
+      .then(setFolders)
+      .catch(() => setFolders([]));
+  }, []);
 
   useEffect(() => {
     setAssets(null);
     const t = setTimeout(
       () => {
-        listLibrary({ kind, search: search.trim() || undefined, sort: 'newest' })
+        listLibrary({ kind, folderId, search: search.trim() || undefined, sort: 'newest' })
           .then(setAssets)
           .catch(() => setAssets([]));
       },
       search ? 250 : 0,
     );
     return () => clearTimeout(t);
-  }, [kind, search]);
+  }, [kind, search, folderId]);
+
+  async function handleUpload(file: File) {
+    if (!bee || uploading) return;
+    setUploading(true);
+    setUploadErr(null);
+    try {
+      const saved = await uploadToLibrary(bee.id, file, folderId ?? null);
+      onPick(saved); // picked the moment it lands — the flow the picker is for
+    } catch (e) {
+      setUploadErr(e instanceof Error ? e.message : 'Upload failed');
+      setUploading(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -118,7 +148,63 @@ export function MediaPicker({
               className="w-full rounded-md border border-zinc-200 bg-white py-1.5 pl-7 pr-2 text-[12px] text-zinc-900 outline-none focus:border-honey/60"
             />
           </div>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={!bee || uploading}
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-semibold text-white disabled:opacity-50"
+            style={{ background: ACCENT }}
+          >
+            <Upload size={12} /> {uploading ? 'Uploading…' : 'Upload'}
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void handleUpload(f);
+              e.target.value = '';
+            }}
+          />
         </div>
+
+        {(folders.length > 0 || uploadErr) && (
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-zinc-100 px-4 py-2">
+            {folders.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setFolderId(undefined)}
+                  className={cn(
+                    'rounded-full border px-2.5 py-1 text-[11px]',
+                    folderId === undefined
+                      ? 'border-amber-300 bg-amber-50 font-semibold text-amber-700'
+                      : 'border-zinc-200 text-zinc-600 hover:bg-zinc-100',
+                  )}
+                >
+                  All
+                </button>
+                {folders.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setFolderId(f.id)}
+                    className={cn(
+                      'flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px]',
+                      folderId === f.id
+                        ? 'border-amber-300 bg-amber-50 font-semibold text-amber-700'
+                        : 'border-zinc-200 text-zinc-600 hover:bg-zinc-100',
+                    )}
+                  >
+                    <Folder size={10} /> {f.name}
+                  </button>
+                ))}
+              </>
+            )}
+            {uploadErr && <span className="text-[11px] text-red-600">{uploadErr}</span>}
+          </div>
+        )}
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {assets === null ? (
