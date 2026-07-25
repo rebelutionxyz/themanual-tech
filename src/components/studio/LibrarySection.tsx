@@ -100,6 +100,10 @@ interface UploadItem {
   error?: string;
 }
 
+/** Internal drag payload (Block 18) — asset ids being dragged toward a
+    folder. Distinct from 'Files' so OS-file uploads keep their own lane. */
+const ASSET_DRAG_MIME = 'application/x-comb-assets';
+
 export function LibrarySection({ beeId }: { beeId: string }) {
   const [tab, setTab] = useState<KindTab>('all');
   const [folderId, setFolderId] = useState<string | null>(null);
@@ -121,6 +125,8 @@ export function LibrarySection({ beeId }: { beeId: string }) {
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [dragOver, setDragOver] = useState(0);
+  // Folder currently hovered by an asset drag: false = none, null = Library root.
+  const [dropTarget, setDropTarget] = useState<string | null | false>(false);
 
   const fileInput = useRef<HTMLInputElement>(null);
   const searching = search.trim().length > 0;
@@ -287,6 +293,46 @@ export function LibrarySection({ beeId }: { beeId: string }) {
       setError(e instanceof Error ? e.message : 'Move failed');
     }
   }
+
+  /* ───────────── drag assets into folders (Block 18) ───────────── */
+
+  // Dragging a selected tile carries the whole selection; an unselected
+  // tile travels alone. Payload is ids only — the drop side re-loads.
+  const onAssetDragStart = (e: React.DragEvent, id: string) => {
+    const ids = selected.has(id) ? [...selected] : [id];
+    e.dataTransfer.setData(ASSET_DRAG_MIME, JSON.stringify(ids));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  async function dropAssetsOn(e: React.DragEvent, target: string | null) {
+    const raw = e.dataTransfer.getData(ASSET_DRAG_MIME);
+    setDropTarget(false);
+    if (!raw) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      const ids = JSON.parse(raw) as string[];
+      await moveAssets(ids, target);
+      clearSelection();
+      load();
+      refreshMeta();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Move failed');
+    }
+  }
+
+  /** Spread onto any element that should accept dropped assets. */
+  const folderDropProps = (target: string | null) => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (e.dataTransfer.types.includes(ASSET_DRAG_MIME)) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setDropTarget(target);
+      }
+    },
+    onDragLeave: () => setDropTarget((t) => (t === target ? false : t)),
+    onDrop: (e: React.DragEvent) => void dropAssetsOn(e, target),
+  });
 
   /* ───────────── folders ───────────── */
 
@@ -539,9 +585,11 @@ export function LibrarySection({ beeId }: { beeId: string }) {
           <button
             type="button"
             onClick={() => setFolderId(null)}
+            {...folderDropProps(null)}
             className={cn(
               'rounded px-1.5 py-0.5 hover:bg-zinc-100',
               folderId === null ? 'font-semibold text-zinc-900' : 'text-zinc-500',
+              dropTarget === null && 'bg-amber-50 ring-1 ring-amber-400',
             )}
           >
             Library
@@ -552,9 +600,11 @@ export function LibrarySection({ beeId }: { beeId: string }) {
               <button
                 type="button"
                 onClick={() => setFolderId(f.id)}
+                {...folderDropProps(f.id)}
                 className={cn(
                   'rounded px-1.5 py-0.5 hover:bg-zinc-100',
                   folderId === f.id ? 'font-semibold text-zinc-900' : 'text-zinc-500',
+                  dropTarget === f.id && 'bg-amber-50 ring-1 ring-amber-400',
                 )}
               >
                 {f.name}
@@ -725,7 +775,13 @@ export function LibrarySection({ beeId }: { beeId: string }) {
               key={f.id}
               type="button"
               onClick={() => setFolderId(f.id)}
-              className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-zinc-300 hover:bg-zinc-50"
+              {...folderDropProps(f.id)}
+              className={cn(
+                'flex items-center gap-2 rounded-lg border bg-white px-3 py-2.5 text-left transition-colors hover:border-zinc-300 hover:bg-zinc-50',
+                dropTarget === f.id
+                  ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-300/60'
+                  : 'border-zinc-200',
+              )}
             >
               <Folder size={16} style={{ color: ACCENT }} className="flex-shrink-0" />
               <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-zinc-800">
@@ -760,6 +816,8 @@ export function LibrarySection({ beeId }: { beeId: string }) {
               selected={selected.has(a.id)}
               onSelect={() => toggleSelect(a.id)}
               onOpen={() => setDrawer(a)}
+              draggable={!inTrash}
+              onDragStart={(e) => onAssetDragStart(e, a.id)}
             />
           ))}
         </ul>
@@ -772,6 +830,8 @@ export function LibrarySection({ beeId }: { beeId: string }) {
               selected={selected.has(a.id)}
               onSelect={() => toggleSelect(a.id)}
               onOpen={() => setDrawer(a)}
+              draggable={!inTrash}
+              onDragStart={(e) => onAssetDragStart(e, a.id)}
             />
           ))}
         </ul>
@@ -995,17 +1055,24 @@ function AssetCard({
   selected,
   onSelect,
   onOpen,
+  draggable,
+  onDragStart,
 }: {
   asset: MediaAsset;
   selected: boolean;
   onSelect: () => void;
   onOpen: () => void;
+  draggable?: boolean;
+  onDragStart?: (e: React.DragEvent) => void;
 }) {
   return (
     <li
+      draggable={draggable}
+      onDragStart={onDragStart}
       className={cn(
         'group relative overflow-hidden rounded-lg border bg-white transition-shadow hover:shadow-md',
         selected ? 'border-amber-400 ring-2 ring-amber-300/50' : 'border-zinc-200',
+        draggable && 'cursor-grab active:cursor-grabbing',
       )}
     >
       <button type="button" onClick={onOpen} className="block w-full text-left">
@@ -1048,17 +1115,24 @@ function AssetRow({
   selected,
   onSelect,
   onOpen,
+  draggable,
+  onDragStart,
 }: {
   asset: MediaAsset;
   selected: boolean;
   onSelect: () => void;
   onOpen: () => void;
+  draggable?: boolean;
+  onDragStart?: (e: React.DragEvent) => void;
 }) {
   return (
     <li
+      draggable={draggable}
+      onDragStart={onDragStart}
       className={cn(
         'flex items-center gap-3 rounded-lg border bg-white px-3 py-2',
         selected ? 'border-amber-400 ring-1 ring-amber-300/50' : 'border-zinc-200',
+        draggable && 'cursor-grab active:cursor-grabbing',
       )}
     >
       <input
