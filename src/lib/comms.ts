@@ -467,6 +467,29 @@ export function parseMediaPayload(body: string): CommsMediaPayload | null {
 
 const VOICE_BUCKET = 'creator-media'; // storage policy allows library/{beeId}/* inserts
 
+// The bucket's MIME allowlist (creator_studio_media_v1b) carries no
+// 'application/octet-stream', so declaring the sealed blob as octet-stream got the
+// upload bounced 415. The ciphertext is instead declared under the recorded audio
+// type, which IS allowlisted; the authoritative mime rides the encrypted payload
+// for playback either way. MediaRecorder hands back params like ';codecs=opus' —
+// strip them, and fall back to audio/webm for anything unexpected.
+const VOICE_UPLOAD_TYPES = new Set([
+  'audio/webm',
+  'audio/mp4',
+  'audio/aac',
+  'audio/mpeg',
+  'audio/ogg',
+  'audio/wav',
+  'audio/x-wav',
+  'audio/flac',
+  'audio/x-m4a',
+]);
+
+function voiceUploadType(mime: string): string {
+  const base = (mime.split(';')[0] ?? '').trim().toLowerCase();
+  return VOICE_UPLOAD_TYPES.has(base) ? base : 'audio/webm';
+}
+
 /** Record → seal → upload → send. Returns the message id. */
 export async function sendVoiceMessage(
   conversationId: string,
@@ -479,14 +502,13 @@ export async function sendVoiceMessage(
   if (!ck) throw new Error('Encryption is still setting up for this conversation — try again in a moment.');
   const plain = new Uint8Array(await audio.arrayBuffer());
   const sealed = await encryptBytes(ck, plain);
+  const uploadType = voiceUploadType(mime);
   // .slice() re-packs into a fresh, exactly-sized ArrayBuffer for the Blob.
-  const cipherBlob = new Blob([sealed.slice().buffer as ArrayBuffer], {
-    type: 'application/octet-stream',
-  });
+  const cipherBlob = new Blob([sealed.slice().buffer as ArrayBuffer], { type: uploadType });
   const path = `library/${bee}/vm-${crypto.randomUUID()}.bin`;
   const { error: upErr } = await req()
     .storage.from(VOICE_BUCKET)
-    .upload(path, cipherBlob, { contentType: 'application/octet-stream', upsert: false });
+    .upload(path, cipherBlob, { contentType: uploadType, upsert: false });
   if (upErr) throw new Error(upErr.message);
   const url = req().storage.from(VOICE_BUCKET).getPublicUrl(path).data.publicUrl;
   const payload: CommsMediaPayload = {
