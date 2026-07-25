@@ -137,6 +137,9 @@ export function CommsPage() {
   const [online, setOnline] = useState<Set<string>>(new Set());
   const [lastSeen, setLastSeen] = useState<Map<string, string>>(new Map());
   const [presenceVisible, setPresenceVisible] = useState(true);
+  // Until the stored eye setting has loaded, presenceVisible is only a default —
+  // announcing on it would flash an invisible Bee online on every mount.
+  const [visibilityLoaded, setVisibilityLoaded] = useState(false);
   const { startCall: enterCall } = useCall();
 
   const active = convos?.find((c) => c.id === conversationId) ?? null;
@@ -249,7 +252,10 @@ export function CommsPage() {
   // Presence: heartbeat my last-seen and load my visibility once.
   useEffect(() => {
     if (!bee) return;
-    getMyPresenceVisibility().then(setPresenceVisible).catch(() => {});
+    getMyPresenceVisibility()
+      .then(setPresenceVisible)
+      .catch(() => {})
+      .finally(() => setVisibilityLoaded(true));
     presencePing().catch(() => {});
     const t = window.setInterval(() => presencePing().catch(() => {}), 60000);
     return () => window.clearInterval(t);
@@ -257,11 +263,13 @@ export function CommsPage() {
 
   // Live online channel — rejoined when the eye toggles, so invisible mode
   // really is invisible: we watch the channel but never announce ourselves.
+  // Held until the stored setting lands, or an invisible Bee would announce
+  // once on the default before the correction arrives.
   useEffect(() => {
-    if (!bee) return;
+    if (!bee || !visibilityLoaded) return;
     const chan = joinOnlinePresence(bee.id, setOnline, presenceVisible);
     return () => chan.close();
-  }, [bee, presenceVisible]);
+  }, [bee, presenceVisible, visibilityLoaded]);
 
   // Last-seen for my DM peers (only bees who share presence come back).
   useEffect(() => {

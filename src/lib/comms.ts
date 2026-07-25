@@ -467,7 +467,6 @@ export function parseMediaPayload(body: string): CommsMediaPayload | null {
 
 const VOICE_BUCKET = 'creator-media'; // storage policy allows library/{beeId}/* inserts
 
-/** Record → seal → upload → send. Returns the message id. */
 // The creator-media bucket's allowlist (creator_studio_media_v1b) carries no
 // 'application/octet-stream', so declaring the sealed blob as octet-stream got
 // the upload bounced with a 415 — voice notes were dead on arrival. The
@@ -484,6 +483,7 @@ function voiceUploadType(mime: string): string {
   return VOICE_UPLOAD_TYPES.has(base) ? base : 'audio/webm';
 }
 
+/** Record → seal → upload → send. Returns the message id. */
 export async function sendVoiceMessage(
   conversationId: string,
   audio: Blob,

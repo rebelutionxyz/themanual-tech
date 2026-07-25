@@ -33,7 +33,9 @@ function mapRow(row: Record<string, unknown>): NotificationItem {
   // the time an inbox reads it is, by definition, a missed call. Render it so.
   if (type === 'call_incoming') {
     type = 'missed_call';
-    title = `Missed call from ${title.replace(/ is calling$/, '')}`;
+    // Same tolerant strip CallProvider uses on the ring title, so a stray
+    // casing or double space can't leave "Missed call from @bee is calling".
+    title = `Missed call from ${title.replace(/\s+is calling$/i, '')}`;
     body = null; // was the call-mode hint (video|audio) — transport, not display
   }
   return {

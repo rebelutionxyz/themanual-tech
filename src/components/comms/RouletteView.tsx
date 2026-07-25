@@ -80,8 +80,13 @@ export function RouletteView({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (phase !== 'incall' || !roomId) return;
     let live = true;
+    // Realtime and the 4s poll both watch the same room row, and phaseRef only
+    // catches up on the next render — so without this latch a slow UPDATE can
+    // land right behind the poll and enqueue us twice for one abandonment.
+    let requeued = false;
     const requeue = () => {
-      if (!live || phaseRef.current !== 'incall') return;
+      if (!live || requeued || phaseRef.current !== 'incall') return;
+      requeued = true;
       start(mode);
     };
     const check = async () => {
