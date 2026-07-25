@@ -25,6 +25,12 @@ import { getRoomToken, leaveRoom } from '@/lib/comms';
 // path, but this is the standard high-probability fix.
 const ROOM_OPTIONS: RoomOptions = {
   publishDefaults: { videoCodec: 'h264', simulcast: false },
+  // A calls app must NOT treat tab-hide as hang-up. livekit-client defaults
+  // this to true and listens for pagehide/freeze — which iOS fires on screen
+  // lock or a brief app switch, so an outgoing call died the moment the
+  // caller's phone dimmed (seen live: iPhone 12 caller, 2026-07-25). With
+  // false, brief hides ride LiveKit's reconnect instead of disconnecting.
+  disconnectOnPageLeave: false,
 };
 
 // Cap capture at VGA/24fps. iPad/iOS Safari freezes or blacks out its own
@@ -68,6 +74,40 @@ export function CallView({
   const [e2eeRoom, setE2eeRoom] = useState<Room | null>(null);
   const [e2eeReady, setE2eeReady] = useState(!e2eeKey);
   const closedRef = useRef(false);
+
+  // Screen wake lock while in a call, so iOS auto-lock can't kill it. Wake
+  // locks are released by the browser whenever the page hides; the
+  // visibilitychange listener re-acquires on return. Fully feature-detected.
+  useEffect(() => {
+    type Sentinel = { release: () => Promise<void> };
+    type WakeLockApi = { request: (type: 'screen') => Promise<Sentinel> };
+    const wakeLock = (navigator as Navigator & { wakeLock?: WakeLockApi }).wakeLock;
+    if (!wakeLock) return;
+    let sentinel: Sentinel | null = null;
+    let live = true;
+    const acquire = () => {
+      wakeLock
+        .request('screen')
+        .then((sl) => {
+          if (!live) {
+            sl.release().catch(() => {});
+            return;
+          }
+          sentinel = sl;
+        })
+        .catch(() => {}); // denied (low battery, etc.) — never fatal
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') acquire();
+    };
+    acquire();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      live = false;
+      document.removeEventListener('visibilitychange', onVisibility);
+      sentinel?.release().catch(() => {});
+    };
+  }, []);
 
   // Fetch the access token for this room.
   useEffect(() => {
