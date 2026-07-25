@@ -76,6 +76,11 @@ export function ResponseRecorderPage() {
   const [portrait, setPortrait] = useState(false);
   /* Teleprompter — DOM overlay above the stage; never captured (canvas records
      only itself). Script + speed live in session state. */
+  /** Privacy camera filter — pixelate/blur/noir your feed (Butch, Jul 25). */
+  const [camFilter, setCamFilter] = useState<'none' | 'pixel' | 'blur' | 'noir'>('none');
+  const camFilterRef = useRef<'none' | 'pixel' | 'blur' | 'noir'>('none');
+  camFilterRef.current = camFilter;
+  const pixelCanvas = useRef<HTMLCanvasElement | null>(null);
   /** Solo virtual backdrop: none | brand color | library image (HOLO inverse). */
   const [backdrop, setBackdrop] = useState<'none' | 'brand' | 'image'>('none');
   const backdropRef = useRef<'none' | 'brand' | 'image'>('none');
@@ -237,6 +242,41 @@ export function ResponseRecorderPage() {
       const src = srcVideo.current;
       const mode = layoutRef.current;
 
+      const drawCam = (
+        el: HTMLVideoElement,
+        dx: number,
+        dy: number,
+        dw: number,
+        dh: number,
+      ) => {
+        const f = camFilterRef.current;
+        if (f === 'pixel') {
+          // downscale → upscale with smoothing off = chunky anonymity
+          if (!pixelCanvas.current) pixelCanvas.current = document.createElement('canvas');
+          const pc = pixelCanvas.current;
+          const cells = 28;
+          pc.width = cells;
+          pc.height = Math.max(2, Math.round((cells * dh) / dw));
+          const pctx = pc.getContext('2d');
+          if (pctx && el.readyState >= 2) {
+            const vw = el.videoWidth || 16;
+            const vh = el.videoHeight || 9;
+            const scale = Math.max(pc.width / vw, pc.height / vh);
+            const sw = pc.width / scale;
+            const sh = pc.height / scale;
+            pctx.drawImage(el, (vw - sw) / 2, (vh - sh) / 2, sw, sh, 0, 0, pc.width, pc.height);
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(pc, dx, dy, dw, dh);
+            ctx.imageSmoothingEnabled = true;
+          }
+          return;
+        }
+        if (f === 'blur') ctx.filter = `blur(${Math.max(8, dw / 55)}px)`;
+        else if (f === 'noir') ctx.filter = 'grayscale(1) contrast(1.35) brightness(0.9)';
+        drawFit(el, dx, dy, dw, dh, true);
+        ctx.filter = 'none';
+      };
+
       const drawFit = (
         el: HTMLVideoElement,
         dx: number,
@@ -280,11 +320,11 @@ export function ResponseRecorderPage() {
           }
           holo.current.drawPerson(ctx, cam, 0, 0, w, h);
         } else if (cam) {
-          drawFit(cam, 0, 0, w, h, true);
+          drawCam(cam, 0, 0, w, h);
         }
       } else if (mode === 'side') {
         drawFit(src, 0, 0, w / 2, h);
-        if (cam) drawFit(cam, w / 2, 0, w / 2, h, true);
+        if (cam) drawCam(cam, w / 2, 0, w / 2, h);
         ctx.fillStyle = '#18181b';
         ctx.fillRect(w / 2 - 2, 0, 4, h);
       } else if (mode === 'holo') {
@@ -308,7 +348,7 @@ export function ResponseRecorderPage() {
           ctx.beginPath();
           ctx.roundRect(px, py, pw, ph, 10);
           ctx.clip();
-          drawFit(cam, px, py, pw, ph, true);
+          drawCam(cam, px, py, pw, ph);
           ctx.restore();
           ctx.beginPath();
           ctx.roundRect(px, py, pw, ph, 10);
@@ -722,6 +762,32 @@ export function ResponseRecorderPage() {
         >
           {portrait ? <Smartphone size={13} /> : <Monitor size={13} />} {portrait ? '9:16' : '16:9'}
         </button>
+        <div className="inline-flex rounded-md border border-zinc-200 bg-white p-0.5">
+          {(['none', 'pixel', 'blur', 'noir'] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setCamFilter(f)}
+              title={
+                f === 'none'
+                  ? 'No filter'
+                  : f === 'pixel'
+                    ? 'Pixelate your camera — face never shown'
+                    : f === 'blur'
+                      ? 'Blur your camera'
+                      : 'High-contrast black & white'
+              }
+              className={cn(
+                'rounded-sm px-2 py-1 text-[11.5px] font-medium capitalize',
+                camFilter === f
+                  ? 'bg-amber-50 font-semibold text-amber-700'
+                  : 'text-zinc-500 hover:text-zinc-900',
+              )}
+            >
+              {f === 'none' ? '🎭 Off' : f}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           onClick={() => setBrandStamp((v) => !v)}
