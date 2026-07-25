@@ -73,7 +73,7 @@ export function GradationsPage() {
           <div className="eyebrow">Membership in the HoneyComb</div>
           <h1>Honey Gradations</h1>
           <div className="sub">
-            Choose how deep you tend the HoneyComb. Membership unlocks reach and tools.
+            Choose how deeply you tend the HoneyComb. Membership unlocks reach and tools.
           </div>
         </div>
         <div className="commons-tags">

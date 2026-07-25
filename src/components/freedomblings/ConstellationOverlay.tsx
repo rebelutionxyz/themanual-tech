@@ -28,7 +28,7 @@ const ASTRAS: Astra[] = [
     to: '/dingleberry',
   },
   { name: 'FreedomNETWORK', role: 'The Live News Network', status: 'soon' },
-  { name: 'MiNiWaVeS', role: 'Mini Waves · your tasks', status: 'soon' },
+  { name: 'MiniWaves', role: 'Mini Waves · your tasks', status: 'soon' },
   { name: 'BLiNGster', role: 'The games arena', status: 'soon' },
   { name: 'TheWORKSHOP', role: 'Clone-mode workshop', status: 'soon' },
 ];

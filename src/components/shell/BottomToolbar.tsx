@@ -223,7 +223,7 @@ function TasksPopup({ onClose }: { onClose: () => void }) {
       // biome-ignore lint/a11y/useSemanticElements: native <dialog> needs imperative showModal(); this overlay is mounted declaratively
       role="dialog"
       aria-modal="true"
-      aria-label="Tasks — MiNiWaVeS"
+      aria-label="Tasks — MiniWaves"
     >
       <div
         className="relative m-auto h-[92dvh] w-full max-w-6xl overflow-hidden rounded-2xl shadow-2xl"
@@ -240,7 +240,7 @@ function TasksPopup({ onClose }: { onClose: () => void }) {
         </button>
         <iframe
           src="/mini-waves-v92.html"
-          title="MiNiWaVeS"
+          title="MiniWaves"
           className="h-full w-full border-0"
           style={{ display: 'block', background: '#030508' }}
           sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"

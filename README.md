@@ -321,7 +321,7 @@ When adding new surfaces:
 - 13 Realms in flow order: Body · Mind · Spirit · Nature · Home · Craft · Play · Gear · Work · Money · Tech · World · Power
 - 5 Power Fronts at bottom: UNITE & RULE · INVESTIGATE · THE NEW WORLD ORDER · PROSECUTE · THE DEEP STATE
 - Manual is canonical; other surfaces link to atoms via `entity_atom_links`
-- BLiNG! economy hard cap: 11,222,333,222,111
+- BLiNG! economy hard cap: 111,222,333,333,222,111
 - Bonding-curve + order-book RPCs were dropped at the DB layer by Economy v3 (applied
   Jun 2, 2026); the old curve parameters here no longer describe anything live. BLiNG! is
   FREE'd from the Well via the sanctioned faucets — Drops, Drips, affiliate_distribute,

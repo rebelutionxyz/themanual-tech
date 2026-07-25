@@ -39,7 +39,7 @@ const ARTICLES: Article[] = [
   {
     n: 'IV',
     t: 'You hold your own standing',
-    p: 'Your balance and your standing are sovereign and self-held — recoverable through the guardians of your HoneyComb, never gated by a company.',
+    p: 'Your balance and your standing are sovereign and self-held — recoverable through the guardians of your comb, never gated by a company.',
   },
   {
     n: 'V',
@@ -54,7 +54,7 @@ const ARTICLES: Article[] = [
   {
     n: 'VII',
     t: 'The commons answer to their keepers',
-    p: 'Shared treasuries are owned by their members and governed in the open — accountable to the HoneyComb that fills them, and to no one else.',
+    p: 'Shared treasuries are owned by their members and governed in the open — accountable to the Bees who fill them, and to no one else.',
   },
   {
     n: 'VIII',

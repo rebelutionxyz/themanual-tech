@@ -50,7 +50,7 @@ function checksFor(layer: string, n: MeshNode): [string, Tone, string][] {
     ['Sandbox integrity', bad ? 'watch' : 'secure', bad ? '1 escape blocked' : 'intact'],
     ['Job isolation', 'secure', 'seccomp + cgroup'],
     ['Botnet-hijack watch', bad ? 'watch' : 'secure', bad ? 'job killed · flagged' : 'clean'],
-    ['HoneyComb impact', 'secure', 'none — results charitable'],
+    ['Platform impact', 'secure', 'none — results charitable'],
   ];
 }
 

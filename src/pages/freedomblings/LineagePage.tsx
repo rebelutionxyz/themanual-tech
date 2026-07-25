@@ -22,7 +22,7 @@ const LEVELS = [
     who: 'direct — your own invites',
   },
   { level: 2, name: 'Pathfinder', weight: 21, rel: 'Those they welcomed', who: 'second ring' },
-  { level: 3, name: 'Navigator', weight: 13, rel: 'Third ring', who: 'the HoneyComb widening' },
+  { level: 3, name: 'Navigator', weight: 13, rel: 'Third ring', who: 'the circle widening' },
   { level: 4, name: 'Pioneer', weight: 8, rel: 'Fourth ring', who: '' },
   { level: 5, name: 'Origin', weight: 5, rel: 'Fifth ring', who: 'the furthest reach' },
 ];
@@ -109,7 +109,7 @@ export function LineagePage() {
           <div className="ah-v num" style={{ color: 'var(--accent-deep)' }}>
             {freed}
           </div>
-          <div className="ah-s">as your HoneyComb grows &amp; thrives</div>
+          <div className="ah-s">as your comb grows &amp; thrives</div>
         </div>
         <div className="ah-item">
           <div className="ah-k">The curve</div>
@@ -172,7 +172,7 @@ export function LineagePage() {
 
       <div className="ledger-foot">
         <span className="seal" />
-        Lineage value is FREE'd for real, productive work done across your HoneyComb — never for merely
+        Lineage value is FREE'd for real, productive work done across your comb — never for merely
         signing people up. The weights are fixed (34·21·13·8·5) and bounded at five rings.
       </div>
     </main>
