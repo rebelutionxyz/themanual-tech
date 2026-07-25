@@ -1,4 +1,4 @@
-import _sodium from 'libsodium-wrappers-sumo';
+import type _sodium from 'libsodium-wrappers-sumo';
 import { supabase } from './supabase';
 
 /**
@@ -33,7 +33,14 @@ import { supabase } from './supabase';
 
 let sodiumReady: Promise<typeof _sodium> | null = null;
 async function S() {
-  if (!sodiumReady) sodiumReady = _sodium.ready.then(() => _sodium);
+  // Lazy-load libsodium (~250 kB gzip of wasm+glue) on first crypto use, so it
+  // stays OUT of the first-paint bundle. Every caller already awaits S().
+  if (!sodiumReady) {
+    sodiumReady = import('libsodium-wrappers-sumo').then(async (mod) => {
+      await mod.default.ready;
+      return mod.default;
+    });
+  }
   return sodiumReady;
 }
 function db() {
