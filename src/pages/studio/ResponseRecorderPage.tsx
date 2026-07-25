@@ -290,6 +290,16 @@ export function ResponseRecorderPage() {
         ctx.filter = 'none';
       };
 
+      // Privacy filter → HOLO cutout options, so pixel/blur/noir compose
+      // with backdrops and Holo mode instead of vanishing there (Block 19).
+      const personOpts = (dw: number): { filter?: string; pixelCells?: number } | undefined => {
+        const f = camFilterRef.current;
+        if (f === 'pixel') return { pixelCells: 28 };
+        if (f === 'blur') return { filter: `blur(${Math.max(8, dw / 55)}px)` };
+        if (f === 'noir') return { filter: 'grayscale(1) contrast(1.35) brightness(0.9)' };
+        return undefined;
+      };
+
       const drawFit = (
         el: HTMLVideoElement,
         dx: number,
@@ -331,7 +341,7 @@ export function ResponseRecorderPage() {
             ctx.fillStyle = brandKit.current?.accentHex || '#6E1423';
             ctx.fillRect(0, 0, w, h);
           }
-          holo.current.drawPerson(ctx, cam, 0, 0, w, h);
+          holo.current.drawPerson(ctx, cam, 0, 0, w, h, personOpts(w));
         } else if (cam) {
           drawCam(cam, 0, 0, w, h);
         }
@@ -344,7 +354,7 @@ export function ResponseRecorderPage() {
         // HOLO — their video full screen; YOU, cut out, standing over it.
         drawFit(src, 0, 0, w, h);
         if (cam && holo.current?.ready) {
-          holo.current.drawPerson(ctx, cam, 0, 0, w, h);
+          holo.current.drawPerson(ctx, cam, 0, 0, w, h, personOpts(w));
         }
       } else {
         // pip — source full, camera bubble wherever the Bee dragged it

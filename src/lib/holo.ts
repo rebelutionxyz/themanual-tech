@@ -42,6 +42,7 @@ async function getSegmenter(): Promise<ImageSegmenter> {
 export class HoloCompositor {
   private work = document.createElement('canvas');
   private mask = document.createElement('canvas');
+  private pixel: HTMLCanvasElement | null = null;
   private maskData: ImageData | null = null;
   private seg: ImageSegmenter | null = null;
   private lastTs = 0;
@@ -52,7 +53,12 @@ export class HoloCompositor {
     this.ready = true;
   }
 
-  /** Draw the person-only cutout of `cam`, cover-fit into (dx,dy,dw,dh). */
+  /**
+   * Draw the person-only cutout of `cam`, cover-fit into (dx,dy,dw,dh).
+   * opts (Block 19): privacy filters compose with the cutout — `filter` is a
+   * canvas filter string (blur/noir), `pixelCells` mosaics the cutout while
+   * keeping its alpha, so you can be a chunky ghost on a brand backdrop.
+   */
   drawPerson(
     ctx: CanvasRenderingContext2D,
     cam: HTMLVideoElement,
@@ -60,6 +66,7 @@ export class HoloCompositor {
     dy: number,
     dw: number,
     dh: number,
+    opts?: { filter?: string; pixelCells?: number },
   ): void {
     const seg = this.seg;
     if (!seg || cam.readyState < 2) return;
@@ -107,7 +114,27 @@ export class HoloCompositor {
     const scale = Math.max(dw / vw, dh / vh);
     const sw = dw / scale;
     const sh = dh / scale;
-    ctx.drawImage(this.work, (vw - sw) / 2, (vh - sh) / 2, sw, sh, dx, dy, dw, dh);
+    const sx = (vw - sw) / 2;
+    const sy = (vh - sh) / 2;
+    if (opts?.pixelCells) {
+      // Mosaic the cutout: downscale (alpha rides along) → upscale, smoothing
+      // off. Transparent background stays transparent — chunky person only.
+      if (!this.pixel) this.pixel = document.createElement('canvas');
+      const pc = this.pixel;
+      pc.width = opts.pixelCells;
+      pc.height = Math.max(2, Math.round((opts.pixelCells * dh) / dw));
+      const pctx = pc.getContext('2d');
+      if (!pctx) return;
+      pctx.clearRect(0, 0, pc.width, pc.height);
+      pctx.drawImage(this.work, sx, sy, sw, sh, 0, 0, pc.width, pc.height);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(pc, dx, dy, dw, dh);
+      ctx.imageSmoothingEnabled = true;
+      return;
+    }
+    if (opts?.filter) ctx.filter = opts.filter;
+    ctx.drawImage(this.work, sx, sy, sw, sh, dx, dy, dw, dh);
+    if (opts?.filter) ctx.filter = 'none';
   }
 }
 
