@@ -5,53 +5,77 @@ import { RoomsView } from '@/components/comms/RoomsView';
 import { useAuth } from '@/lib/auth';
 import { enablePush, pushPermission } from '@/lib/push';
 import {
+  type CommsMediaPayload,
   type CommsMessage,
   type Conversation,
   type Follow,
   type TypingChannel,
   addGroupMember,
+  blockBee,
   callE2eeKey,
+  clearVerifiedSafetyNumber,
   conversationKeyStatus,
   conversationSafetyNumber,
   conversationTitle,
   createCallRoom,
   createGroup,
+  decryptMediaToObjectUrl,
   editMessage,
+  getLastSeen,
+  getMyPresenceVisibility,
+  getVerifiedSafetyNumber,
   findBeeByHandle,
   hasUnread,
   initComms,
+  joinOnlinePresence,
   joinTyping,
   leaveConversation,
   listConversations,
   listFollows,
   listMessages,
+  listMyBlocks,
   markRead,
+  notifyMentions,
+  presencePing,
   parseMediaPayload,
   sendMediaMessage,
   removeGroupMember,
   resetConversationEncryption,
   sendMessage,
+  reportBee,
+  searchBees,
+  sendVoiceMessage,
   setConversationMuted,
+  setDisappearing,
+  setPresenceVisibility,
   setGroupAddPolicy,
   startDirect,
+  storeVerifiedSafetyNumber,
   subscribeConversation,
   subscribeConversationList,
   syncConversationKey,
   toggleReaction,
+  unblockBee,
   unsendMessage,
 } from '@/lib/comms';
 import { assetUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import {
   ArrowLeft,
+  Ban,
   Bell,
   BellOff,
+  Eye,
+  EyeOff,
   FileText,
+  Flag,
   LogOut,
   MessageCircle,
+  Mic,
   Paperclip,
   Pencil,
   Phone,
+  Play,
   Plus,
   Radio,
   Reply,
@@ -59,6 +83,7 @@ import {
   ShieldCheck,
   Shuffle,
   SmilePlus,
+  Timer,
   Trash2,
   UserPlus,
   Users,
@@ -76,6 +101,15 @@ import { useNavigate, useParams } from 'react-router-dom';
  */
 const COMMS_COLOR = '#0891B2';
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '🎉', '😮', '😢'];
+/** Disappearing-messages presets — one compact segmented control (Off = timer cleared). */
+const DISAPPEAR_OPTIONS: { label: string; seconds: number | null }[] = [
+  { label: 'Off', seconds: null },
+  { label: '1h', seconds: 3_600 },
+  { label: '24h', seconds: 86_400 },
+  { label: '7d', seconds: 604_800 },
+];
+/** Voice notes auto-stop here — keeps files small on mobile. */
+const VOICE_MAX_SECONDS = 120;
 
 export function CommsPage() {
   const { bee, session } = useAuth();
@@ -91,6 +125,10 @@ export function CommsPage() {
   const [pushPerm, setPushPerm] = useState<ReturnType<typeof pushPermission>>(() => pushPermission());
   const [filter, setFilter] = useState<'all' | 'dm' | 'group' | 'following'>('all');
   const [follows, setFollows] = useState<Follow[] | null>(null);
+  const [myBlocks, setMyBlocks] = useState<Set<string>>(new Set());
+  const [online, setOnline] = useState<Set<string>>(new Set());
+  const [lastSeen, setLastSeen] = useState<Map<string, string>>(new Map());
+  const [presenceVisible, setPresenceVisible] = useState(true);
   const { startCall: enterCall } = useCall();
 
   const active = convos?.find((c) => c.id === conversationId) ?? null;
@@ -193,6 +231,50 @@ export function CommsPage() {
     if (bee) initComms(bee.id).catch(() => {});
   }, [bee]);
 
+  const reloadBlocks = useCallback(() => {
+    listMyBlocks().then(setMyBlocks).catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (bee) reloadBlocks();
+  }, [bee, reloadBlocks]);
+
+  // Presence: heartbeat my last-seen, join the live online channel.
+  useEffect(() => {
+    if (!bee) return;
+    getMyPresenceVisibility().then(setPresenceVisible).catch(() => {});
+    presencePing().catch(() => {});
+    const t = window.setInterval(() => presencePing().catch(() => {}), 60000);
+    const chan = joinOnlinePresence(bee.id, setOnline);
+    return () => {
+      window.clearInterval(t);
+      chan.close();
+    };
+  }, [bee]);
+
+  // Last-seen for my DM peers (only bees who share presence come back).
+  useEffect(() => {
+    if (!bee || !convos?.length) return;
+    const peers = Array.from(
+      new Set(
+        convos
+          .filter((c) => c.kind === 'direct')
+          .map((c) => c.participants.find((pp) => pp.beeId !== bee.id)?.beeId)
+          .filter((x): x is string => !!x),
+      ),
+    );
+    if (peers.length) getLastSeen(peers).then(setLastSeen).catch(() => {});
+  }, [bee, convos]);
+
+  const togglePresenceVisibility = async () => {
+    const next = !presenceVisible;
+    setPresenceVisible(next);
+    try {
+      await setPresenceVisibility(next);
+    } catch {
+      setPresenceVisible(!next);
+    }
+  };
+
   // When a thread opens, make sure its encryption key is set up, then refresh.
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the open conversation
   useEffect(() => {
@@ -279,6 +361,24 @@ export function CommsPage() {
               active={composerOpen === 'group'}
               onClick={() => setComposerOpen(composerOpen === 'group' ? null : 'group')}
             />
+            <button
+              type="button"
+              onClick={togglePresenceVisibility}
+              title={
+                presenceVisible
+                  ? 'Bees can see when you are online — tap to go invisible'
+                  : 'You appear offline to other Bees — tap to show presence'
+              }
+              aria-label="Toggle online visibility"
+              className={cn(
+                'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border transition-colors',
+                presenceVisible
+                  ? 'border-zinc-200 text-zinc-500 hover:border-cyan-300 hover:text-cyan-700'
+                  : 'border-amber-200 bg-amber-50 text-amber-600',
+              )}
+            >
+              {presenceVisible ? <Eye size={14} /> : <EyeOff size={14} />}
+            </button>
           </div>
 
           <div className="flex gap-0.5 border-b border-zinc-100 p-1.5">
@@ -356,10 +456,16 @@ export function CommsPage() {
                   <span className="min-w-0 flex-1">
                     <span
                       className={cn(
-                        'block truncate text-[14px]',
+                        'flex items-center gap-1.5 truncate text-[14px]',
                         unread ? 'font-bold text-zinc-900' : 'font-medium text-zinc-600',
                       )}
                     >
+                      {c.kind === 'direct' &&
+                        online.has(
+                          c.participants.find((pp) => pp.beeId !== bee.id)?.beeId ?? '',
+                        ) && (
+                          <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" />
+                        )}
                       {conversationTitle(c, bee.id)}
                     </span>
                     <span className="block text-[11px] text-zinc-400">
@@ -430,6 +536,10 @@ export function CommsPage() {
               conversation={active}
               messages={messages}
               myBeeId={bee.id}
+              myBlocks={myBlocks}
+              onBlocksChanged={reloadBlocks}
+              online={online}
+              lastSeen={lastSeen}
               onStartCall={() => startCall(true)}
               onStartVoice={() => startCall(false)}
               onBack={() => navigate('/comms')}
@@ -491,6 +601,10 @@ function Thread({
   conversation,
   messages,
   myBeeId,
+  myBlocks,
+  onBlocksChanged,
+  online,
+  lastSeen,
   onStartCall,
   onStartVoice,
   onBack,
@@ -500,6 +614,10 @@ function Thread({
   conversation: Conversation;
   messages: CommsMessage[];
   myBeeId: string;
+  myBlocks: Set<string>;
+  onBlocksChanged: () => void;
+  online: Set<string>;
+  lastSeen: Map<string, string>;
   onStartCall: () => void;
   onStartVoice: () => void;
   onBack: () => void;
@@ -525,14 +643,73 @@ function Thread({
   const typingChanRef = useRef<TypingChannel | null>(null);
   const [keyState, setKeyState] = useState<'ok' | 'locked' | 'pending' | null>(null);
   const [resetting, setResetting] = useState(false);
+  // Safety-number verification memory (device-local): unverified → verified → changed.
+  const [snState, setSnState] = useState<'unknown' | 'unverified' | 'verified' | 'changed'>(
+    'unknown',
+  );
+  // Disappearing-messages timer (shared setting; optimistic local copy).
+  const [timerOpen, setTimerOpen] = useState(false);
+  const [ttl, setTtl] = useState<number | null>(conversation.disappearSeconds);
+  const [ttlBusy, setTtlBusy] = useState(false);
+  // Voice-note recording.
+  const [recState, setRecState] = useState<'idle' | 'recording' | 'uploading'>('idle');
+  const [recElapsed, setRecElapsed] = useState(0);
+  const [recError, setRecError] = useState<string | null>(null);
+  const recRef = useRef<{
+    recorder: MediaRecorder;
+    stream: MediaStream;
+    chunks: Blob[];
+    mime: string;
+    tick: number;
+    startedAt: number;
+    intent: 'send' | 'cancel';
+  } | null>(null);
+  // Ticks every 30s so expired (disappearing) messages vanish between sweeps.
+  const [nowTs, setNowTs] = useState(() => Date.now());
   const endRef = useRef<HTMLDivElement>(null);
   const handleFor = (beeId: string) =>
     conversation.participants.find((p) => p.beeId === beeId)?.handle ?? 'bee';
   const iAmOwner = conversation.participants.find((p) => p.beeId === myBeeId)?.role === 'owner';
   const canAdd = conversation.kind === 'group' && (iAmOwner || conversation.membersCanAdd);
   const iAmMutedProp = conversation.participants.find((p) => p.beeId === myBeeId)?.muted ?? false;
+  const dmPeer =
+    conversation.kind === 'direct'
+      ? conversation.participants.find((p) => p.beeId !== myBeeId)
+      : undefined;
+  const peerBlocked = !!dmPeer && myBlocks.has(dmPeer.beeId);
+  const toggleBlock = async (beeId: string, blocked: boolean) => {
+    try {
+      if (blocked) await unblockBee(beeId);
+      else await blockBee(beeId);
+      onBlocksChanged();
+    } catch (err) {
+      console.warn('block toggle failed', err);
+    }
+  };
+  const doReport = async (beeId: string, handle: string) => {
+    const reason = window.prompt(`Report @${handle} — what happened?`);
+    if (reason === null) return;
+    try {
+      await reportBee(beeId, reason, conversation.id);
+      window.alert('Report sent. Thank you.');
+    } catch (err) {
+      console.warn('report failed', err);
+    }
+  };
+  const mentionMatch =
+    conversation.kind === 'group' && recState === 'idle' ? draft.match(/@(\w*)$/) : null;
+  const mentionOptions = mentionMatch
+    ? conversation.participants
+        .filter(
+          (p) =>
+            p.beeId !== myBeeId &&
+            p.handle.toLowerCase().startsWith(mentionMatch[1].toLowerCase()),
+        )
+        .slice(0, 5)
+    : [];
   const [muted, setMuted] = useState(iAmMutedProp);
-  const lastMineId = messages.reduce(
+  const visible = messages.filter((m) => !m.expiresAt || Date.parse(m.expiresAt) > nowTs);
+  const lastMineId = visible.reduce(
     (acc, m) => (m.senderBeeId === myBeeId && !m.deletedAt ? m.id : acc),
     null as string | null,
   );
@@ -562,6 +739,55 @@ function Thread({
     const t = window.setTimeout(() => setTyping(null), 3500);
     return () => clearTimeout(t);
   }, [typing]);
+
+  // Compute the safety number when the thread opens and compare it with the
+  // value this device verified earlier — 'changed' drives the warning strip.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the conversation
+  useEffect(() => {
+    let alive = true;
+    setSafetyNum(null);
+    setSnState('unknown');
+    conversationSafetyNumber(conversation)
+      .then((sn) => {
+        if (!alive) return;
+        setSafetyNum(sn);
+        const stored = getVerifiedSafetyNumber(myBeeId, conversation.id);
+        setSnState(!stored ? 'unverified' : stored === sn ? 'verified' : 'changed');
+      })
+      .catch(() => {
+        if (alive) setSafetyNum('unavailable');
+      });
+    return () => {
+      alive = false;
+    };
+  }, [conversation.id, myBeeId]);
+
+  // The disappear timer is a shared conversation setting — track prop updates.
+  useEffect(() => {
+    setTtl(conversation.disappearSeconds);
+  }, [conversation.disappearSeconds]);
+
+  // Re-filter expired messages every 30s (the server sweep runs every 5 min).
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTs(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Never leave the mic running when the thread unmounts.
+  useEffect(
+    () => () => {
+      const entry = recRef.current;
+      if (!entry) return;
+      recRef.current = null;
+      entry.intent = 'cancel';
+      try {
+        entry.recorder.stop();
+      } catch {
+        /* already stopped */
+      }
+    },
+    [],
+  );
 
   // Encryption status on THIS device — drives the "Reset encryption" banner.
   // biome-ignore lint/correctness/useExhaustiveDependencies: also recheck as messages load
@@ -639,17 +865,116 @@ function Thread({
     }
   };
 
-  const openVerify = async () => {
-    const next = !verifyOpen;
-    setVerifyOpen(next);
-    if (next) {
-      setSafetyNum(null);
-      try {
-        setSafetyNum(await conversationSafetyNumber(conversation));
-      } catch {
-        setSafetyNum('unavailable');
-      }
+  const openVerify = () => setVerifyOpen((v) => !v);
+
+  const markVerified = () => {
+    if (!safetyNum || safetyNum === 'unavailable') return;
+    storeVerifiedSafetyNumber(myBeeId, conversation.id, safetyNum);
+    setSnState('verified');
+  };
+
+  const unverify = () => {
+    clearVerifiedSafetyNumber(myBeeId, conversation.id);
+    setSnState('unverified');
+  };
+
+  const chooseTtl = async (seconds: number | null) => {
+    if (ttlBusy || seconds === ttl) return;
+    const prev = ttl;
+    setTtl(seconds); // optimistic
+    setTtlBusy(true);
+    try {
+      await setDisappearing(conversation.id, seconds);
+      onSent();
+    } catch (err) {
+      console.warn('set disappearing failed', err);
+      setTtl(prev);
+    } finally {
+      setTtlBusy(false);
     }
+  };
+
+  const stopRecording = (send: boolean) => {
+    const entry = recRef.current;
+    if (!entry) return;
+    entry.intent = send ? 'send' : 'cancel';
+    recRef.current = null;
+    try {
+      entry.recorder.stop();
+    } catch {
+      /* already stopped */
+    }
+  };
+
+  const startRecording = async () => {
+    if (recState !== 'idle') return;
+    setRecError(null);
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setRecError('Microphone permission is needed for voice messages.');
+      return;
+    }
+    // Prefer mp4/aac — it plays back on EVERY device (iPhone/iPad Safari can't
+    // play webm/opus on older iOS versions, and voice notes cross devices).
+    // Browsers that can't record mp4 (e.g. Firefox) fall back to webm.
+    const preferred = ['audio/mp4', 'audio/aac', 'audio/webm;codecs=opus', 'audio/webm'].find(
+      (t) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t),
+    );
+    let recorder: MediaRecorder;
+    try {
+      recorder = preferred
+        ? new MediaRecorder(stream, { mimeType: preferred })
+        : new MediaRecorder(stream);
+    } catch {
+      for (const t of stream.getTracks()) t.stop();
+      setRecError('Voice recording is not supported in this browser.');
+      return;
+    }
+    const entry = {
+      recorder,
+      stream,
+      chunks: [] as Blob[],
+      mime: preferred || recorder.mimeType || 'audio/mp4',
+      tick: 0,
+      startedAt: Date.now(),
+      intent: 'cancel' as 'send' | 'cancel',
+    };
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) entry.chunks.push(e.data);
+    };
+    recorder.onstop = () => {
+      for (const t of entry.stream.getTracks()) t.stop();
+      window.clearInterval(entry.tick);
+      const secs = Math.round((Date.now() - entry.startedAt) / 1000);
+      if (entry.intent !== 'send' || secs < 1 || entry.chunks.length === 0) {
+        setRecState('idle');
+        setRecElapsed(0);
+        return;
+      }
+      const blob = new Blob(entry.chunks, { type: entry.mime });
+      setRecState('uploading');
+      sendVoiceMessage(conversation.id, blob, entry.mime, secs)
+        .then(() => onSent())
+        .catch((err) => {
+          console.warn('voice send failed', err);
+          setRecError('Could not send the voice message — try again.');
+        })
+        .finally(() => {
+          setRecState('idle');
+          setRecElapsed(0);
+        });
+    };
+    recRef.current = entry;
+    setRecElapsed(0);
+    setRecState('recording');
+    recorder.start(1000);
+    entry.tick = window.setInterval(() => {
+      const secs = Math.round((Date.now() - entry.startedAt) / 1000);
+      setRecElapsed(secs);
+      if (secs >= VOICE_MAX_SECONDS) stopRecording(true);
+    }, 500);
   };
 
   const submit = async (e: FormEvent) => {
@@ -658,7 +983,14 @@ function Thread({
     if (!body || sending) return;
     setSending(true);
     try {
-      await sendMessage(conversation.id, body, 'text', replyingTo?.id ?? null);
+      const id = await sendMessage(conversation.id, body, 'text', replyingTo?.id ?? null);
+      if (conversation.kind === 'group' && id) {
+        const esc = (h: string) => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const mentioned = conversation.participants
+          .filter((p) => p.beeId !== myBeeId && new RegExp(`@${esc(p.handle)}\\b`, 'i').test(body))
+          .map((p) => p.beeId);
+        if (mentioned.length) notifyMentions(conversation.id, id, mentioned).catch(() => {});
+      }
       setDraft('');
       setReplyingTo(null);
       onSent();
@@ -697,10 +1029,26 @@ function Thread({
             {conversation.participants.length} Bees
           </button>
         ) : (
-          <span className="ml-auto text-[11px] text-zinc-400">
-            {conversation.participants.length}{' '}
-            {conversation.participants.length === 1 ? 'Bee' : 'Bees'}
-          </span>
+          <button
+            type="button"
+            onClick={() => setMembersOpen((v) => !v)}
+            title="Conversation info"
+            className={cn(
+              'ml-auto flex items-center gap-1 rounded px-1 text-[11px] transition-colors hover:text-cyan-700',
+              membersOpen ? 'text-cyan-700' : 'text-zinc-400',
+            )}
+          >
+            {dmPeer && online.has(dmPeer.beeId) ? (
+              <>
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                online
+              </>
+            ) : dmPeer && lastSeen.get(dmPeer.beeId) ? (
+              `last seen ${timeAgo(lastSeen.get(dmPeer.beeId) as string)}`
+            ) : (
+              `${conversation.participants.length} ${conversation.participants.length === 1 ? 'Bee' : 'Bees'}`
+            )}
+          </button>
         )}
         <button
           type="button"
@@ -739,10 +1087,28 @@ function Thread({
           aria-label="Verify encryption"
           className={cn(
             'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md transition-colors hover:bg-cyan-50 hover:text-cyan-700',
-            verifyOpen ? 'bg-cyan-50 text-cyan-700' : 'text-zinc-400',
+            verifyOpen
+              ? 'bg-cyan-50 text-cyan-700'
+              : snState === 'verified'
+                ? 'text-emerald-600'
+                : snState === 'changed'
+                  ? 'text-amber-500'
+                  : 'text-zinc-400',
           )}
         >
           <ShieldCheck size={15} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setTimerOpen((v) => !v)}
+          title="Disappearing messages"
+          aria-label="Disappearing messages"
+          className={cn(
+            'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md transition-colors hover:bg-cyan-50 hover:text-cyan-700',
+            timerOpen ? 'bg-cyan-50 text-cyan-700' : ttl ? 'text-cyan-600' : 'text-zinc-400',
+          )}
+        >
+          <Timer size={15} />
         </button>
         {canAdd && (
           <button
@@ -799,6 +1165,22 @@ function Thread({
         )}
       </div>
 
+      {snState === 'changed' && (
+        <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-[11.5px] text-amber-900">
+          <span className="min-w-0 flex-1">
+            Safety number changed — a device was added or replaced. Compare again before trusting
+            this chat.
+          </span>
+          <button
+            type="button"
+            onClick={() => setVerifyOpen(true)}
+            className="flex-shrink-0 font-semibold text-amber-800 underline"
+          >
+            Review
+          </button>
+        </div>
+      )}
+
       {verifyOpen && (
         <div className="border-b border-zinc-100 bg-zinc-50 px-3 py-3">
           <div className="mb-1 flex items-center gap-1.5 text-[12px] font-semibold text-zinc-700">
@@ -807,10 +1189,62 @@ function Thread({
           <div className="mb-2 break-all font-mono text-[13px] tracking-wide text-zinc-800">
             {safetyNum ?? 'Computing…'}
           </div>
+          <div className="mb-2 flex items-center gap-2">
+            {snState === 'verified' ? (
+              <>
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-700">
+                  Verified ✓
+                </span>
+                <button
+                  type="button"
+                  onClick={unverify}
+                  className="text-[10.5px] text-zinc-400 underline hover:text-zinc-600"
+                >
+                  Unverify
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={markVerified}
+                disabled={!safetyNum || safetyNum === 'unavailable'}
+                className="rounded-md bg-cyan-600 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-cyan-700 disabled:opacity-50"
+              >
+                {snState === 'changed' ? 'Verify the new number' : 'Mark as verified'}
+              </button>
+            )}
+          </div>
           <p className="text-[11px] leading-relaxed text-zinc-500">
             Compare this with {conversationTitle(conversation, myBeeId)} — read it aloud or hold your
-            screens side by side. If it matches, no one is intercepting your keys. It changes when a
-            device is added or removed.
+            screens side by side. If it matches, no one is intercepting your keys. Mark it verified
+            and this device will warn you if it ever changes.
+          </p>
+        </div>
+      )}
+
+      {timerOpen && (
+        <div className="border-b border-zinc-100 bg-zinc-50 px-3 py-3">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-zinc-700">
+            <Timer size={14} className="text-cyan-600" /> Disappearing messages
+          </div>
+          <div className="inline-flex overflow-hidden rounded-lg border border-zinc-200 bg-white">
+            {DISAPPEAR_OPTIONS.map((o) => (
+              <button
+                key={o.label}
+                type="button"
+                onClick={() => chooseTtl(o.seconds)}
+                disabled={ttlBusy}
+                className={cn(
+                  'px-3 py-1.5 text-[12px] font-semibold transition-colors disabled:opacity-50',
+                  ttl === o.seconds ? 'bg-cyan-600 text-white' : 'text-zinc-600 hover:bg-zinc-50',
+                )}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+            New messages vanish for everyone after this long. Applies to messages sent from now on.
           </p>
         </div>
       )}
@@ -829,18 +1263,25 @@ function Thread({
           myBeeId={myBeeId}
           isOwner={iAmOwner}
           onChanged={onSent}
+          myBlocks={myBlocks}
+          onBlockToggle={toggleBlock}
+          onReport={doReport}
         />
       )}
 
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
-        {messages.length === 0 && (
+        {visible.length === 0 && (
           <p className="pt-6 text-center text-sm text-zinc-300">
             No messages yet — say the first thing.
           </p>
         )}
-        {messages.map((m) => {
+        {visible.map((m) => {
           const mine = m.senderBeeId === myBeeId;
           const parent = m.replyToId ? messages.find((x) => x.id === m.replyToId) : null;
+          const media =
+            !m.deletedAt && !m.undecryptable && m.contentType === 'media'
+              ? parseMediaPayload(m.body)
+              : null;
           const seen = m.id === lastMineId ? seenLabel(conversation, m, myBeeId) : null;
           return (
             <div
@@ -914,8 +1355,10 @@ function Thread({
                     </button>
                   </div>
                 </div>
-              ) : !m.deletedAt && !m.undecryptable && m.contentType === 'media' && parseMediaPayload(m.body) ? (
-                <MediaBubble payload={parseMediaPayload(m.body)!} mine={mine} />
+              ) : media?.enc && media.kind === 'audio' ? (
+                <VoiceBubble payload={media} conversationId={conversation.id} mine={mine} />
+              ) : media ? (
+                <MediaBubble payload={media} mine={mine} />
               ) : (
                 <div
                   className={cn(
@@ -929,7 +1372,7 @@ function Thread({
                   ) : m.undecryptable ? (
                     <em className="opacity-60">🔒 setting up encryption…</em>
                   ) : (
-                    m.body
+                    renderMentions(m.body)
                   )}
                 </div>
               )}
@@ -1101,36 +1544,121 @@ function Thread({
           </button>
         </div>
       )}
+      {mentionOptions.length > 0 && !peerBlocked && (
+        <div className="flex flex-wrap gap-1 border-t border-zinc-100 bg-zinc-50 px-2.5 py-1.5">
+          {mentionOptions.map((p) => (
+            <button
+              key={p.beeId}
+              type="button"
+              onClick={() => setDraft((d) => d.replace(/@\w*$/, `@${p.handle} `))}
+              className="rounded-full border border-cyan-200 bg-white px-2 py-0.5 text-[12px] font-semibold text-cyan-800 transition-colors hover:bg-cyan-50"
+            >
+              @{p.handle}
+            </button>
+          ))}
+        </div>
+      )}
+      {peerBlocked && (
+        <div className="flex items-center gap-2 border-t border-amber-100 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+          <Ban size={13} className="flex-shrink-0" />
+          <span className="min-w-0 flex-1">
+            You've blocked @{dmPeer?.handle} — messaging is off.
+          </span>
+          <button
+            type="button"
+            onClick={() => dmPeer && toggleBlock(dmPeer.beeId, true)}
+            className="flex-shrink-0 font-semibold text-amber-900 underline"
+          >
+            Unblock
+          </button>
+        </div>
+      )}
+      {!peerBlocked && recError && (
+        <div className="border-t border-red-100 bg-red-50 px-3 py-1 text-[11px] text-red-700">
+          {recError}
+        </div>
+      )}
+      {!peerBlocked && (
       <form onSubmit={submit} className="flex items-center gap-2 border-t border-zinc-100 p-2.5">
-        <button
-          type="button"
-          onClick={() => setAttachOpen(true)}
-          disabled={sending}
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-zinc-200 text-zinc-500 transition-colors hover:border-cyan-300 hover:text-cyan-700 disabled:opacity-40"
-          aria-label="Attach from your Library"
-          title="Attach from your Library"
-        >
-          <Paperclip size={15} />
-        </button>
-        <input
-          value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            typingChanRef.current?.sendTyping();
-          }}
-          placeholder="Write it…"
-          className="min-w-0 flex-1 rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 text-[14px] text-zinc-800 outline-none transition-colors placeholder:text-zinc-400 focus:border-cyan-400 focus:bg-white"
-        />
-        <button
-          type="submit"
-          disabled={sending || !draft.trim()}
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40"
-          style={{ background: COMMS_COLOR }}
-          aria-label="Send"
-        >
-          <Send size={15} />
-        </button>
+        {recState === 'idle' ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setAttachOpen(true)}
+              disabled={sending}
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-zinc-200 text-zinc-500 transition-colors hover:border-cyan-300 hover:text-cyan-700 disabled:opacity-40"
+              aria-label="Attach from your Library"
+              title="Attach from your Library"
+            >
+              <Paperclip size={15} />
+            </button>
+            <input
+              value={draft}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                typingChanRef.current?.sendTyping();
+              }}
+              placeholder="Write it…"
+              className="min-w-0 flex-1 rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 text-[14px] text-zinc-800 outline-none transition-colors placeholder:text-zinc-400 focus:border-cyan-400 focus:bg-white"
+            />
+            {draft.trim() ? (
+              <button
+                type="submit"
+                disabled={sending}
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40"
+                style={{ background: COMMS_COLOR }}
+                aria-label="Send"
+              >
+                <Send size={15} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={startRecording}
+                disabled={sending}
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40"
+                style={{ background: COMMS_COLOR }}
+                aria-label="Record a voice message"
+                title="Record a voice message"
+              >
+                <Mic size={15} />
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => stopRecording(false)}
+              disabled={recState === 'uploading'}
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-zinc-200 text-zinc-500 transition-colors hover:border-red-300 hover:text-red-600 disabled:opacity-40"
+              aria-label="Cancel recording"
+              title="Cancel recording"
+            >
+              <X size={15} />
+            </button>
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-[13px] text-red-700">
+              <span className="h-2 w-2 flex-shrink-0 animate-pulse rounded-full bg-red-500" />
+              <span className="font-semibold tabular-nums">{fmtClock(recElapsed)}</span>
+              <span className="truncate text-red-500">
+                {recState === 'uploading' ? 'Sending…' : 'Recording…'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => stopRecording(true)}
+              disabled={recState === 'uploading'}
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40"
+              style={{ background: COMMS_COLOR }}
+              aria-label="Send voice message"
+              title="Send voice message"
+            >
+              <Send size={15} />
+            </button>
+          </>
+        )}
       </form>
+      )}
 
       {attachOpen && (
         <MediaPicker
@@ -1151,6 +1679,77 @@ function Thread({
         />
       )}
     </>
+  );
+}
+
+/**
+ * E2EE voice note. The stored file is ciphertext; tapping fetches it, decrypts
+ * it under the conversation key on-device, and plays it. Lazy on purpose —
+ * nothing is downloaded until the listener asks (mobile data first).
+ */
+function VoiceBubble({
+  payload,
+  conversationId,
+  mine,
+}: {
+  payload: CommsMediaPayload;
+  conversationId: string;
+  mine: boolean;
+}) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
+  useEffect(
+    () => () => {
+      if (src) URL.revokeObjectURL(src);
+    },
+    [src],
+  );
+  const load = async () => {
+    if (state === 'loading' || src) return;
+    setState('loading');
+    try {
+      setSrc(await decryptMediaToObjectUrl(conversationId, payload));
+      setState('idle');
+    } catch (err) {
+      console.warn('voice decrypt failed', err);
+      setState('error');
+    }
+  };
+  return (
+    <div
+      className={cn(
+        'max-w-[78%] rounded-2xl px-3 py-2',
+        mine ? 'rounded-br-md bg-cyan-50' : 'rounded-bl-md bg-zinc-100',
+      )}
+    >
+      {src ? (
+        // biome-ignore lint/a11y/useMediaCaption: voice notes have no caption track
+        <audio controls autoPlay src={src} className="h-9 w-56 max-w-full" />
+      ) : (
+        <button
+          type="button"
+          onClick={load}
+          className={cn(
+            'flex items-center gap-2 text-[13px] font-semibold',
+            state === 'error' ? 'text-red-600' : 'text-cyan-800',
+          )}
+        >
+          <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-cyan-600 text-white">
+            {state === 'loading' ? (
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+            ) : (
+              <Play size={13} />
+            )}
+          </span>
+          <span className="truncate">
+            {state === 'error'
+              ? 'Could not decrypt — tap to retry'
+              : `Voice message${payload.dur ? ` · ${fmtClock(payload.dur)}` : ''}`}
+          </span>
+          <span className="text-[10px] font-normal">🔒</span>
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -1238,6 +1837,35 @@ function StartDmForm({ onStarted }: { onStarted: (conversationId: string) => voi
   const [handle, setHandle] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [results, setResults] = useState<{ id: string; handle: string; name: string | null }[]>([]);
+
+  // Live directory search — any Bee, not just follows.
+  useEffect(() => {
+    const q = handle.trim().replace(/^@/, '');
+    if (!q) {
+      setResults([]);
+      return;
+    }
+    const t = window.setTimeout(() => {
+      searchBees(q)
+        .then(setResults)
+        .catch(() => setResults([]));
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [handle]);
+
+  const pick = async (beeId: string) => {
+    if (busy) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      onStarted(await startDirect(beeId));
+    } catch (e2) {
+      setErr(e2 instanceof Error ? e2.message : 'Could not start the DM');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -1265,6 +1893,22 @@ function StartDmForm({ onStarted }: { onStarted: (conversationId: string) => voi
         placeholder="@handle"
         className="w-full rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-[13px] text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-cyan-400"
       />
+      {results.length > 0 && (
+        <div className="max-h-40 space-y-0.5 overflow-y-auto">
+          {results.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => pick(r.id)}
+              disabled={busy}
+              className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-[13px] text-zinc-700 transition-colors hover:bg-cyan-50 disabled:opacity-40"
+            >
+              <span className="font-semibold text-cyan-800">@{r.handle}</span>
+              {r.name && <span className="truncate text-[11px] text-zinc-400">{r.name}</span>}
+            </button>
+          ))}
+        </div>
+      )}
       {err && <p className="text-[11px] text-red-500">{err}</p>}
       <button
         type="submit"
@@ -1480,11 +2124,17 @@ function MembersPanel({
   myBeeId,
   isOwner,
   onChanged,
+  myBlocks,
+  onBlockToggle,
+  onReport,
 }: {
   conversation: Conversation;
   myBeeId: string;
   isOwner: boolean;
   onChanged: () => void;
+  myBlocks: Set<string>;
+  onBlockToggle: (beeId: string, blocked: boolean) => void;
+  onReport: (beeId: string, handle: string) => void;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -1512,7 +2162,34 @@ function MembersPanel({
               {isOwnerRow && <span className="ml-1.5 text-[10px] text-zinc-400">owner</span>}
               {isMe && !isOwnerRow && <span className="ml-1.5 text-[10px] text-zinc-400">you</span>}
             </span>
-            {isOwner && !isOwnerRow && !isMe && (
+            {!isMe && (
+              <button
+                type="button"
+                onClick={() => onReport(p.beeId, p.handle)}
+                title={`Report @${p.handle}`}
+                aria-label={`Report @${p.handle}`}
+                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded text-zinc-400 transition-colors hover:bg-amber-50 hover:text-amber-600"
+              >
+                <Flag size={12} />
+              </button>
+            )}
+            {!isMe && (
+              <button
+                type="button"
+                onClick={() => onBlockToggle(p.beeId, myBlocks.has(p.beeId))}
+                title={myBlocks.has(p.beeId) ? `Unblock @${p.handle}` : `Block @${p.handle}`}
+                aria-label={myBlocks.has(p.beeId) ? `Unblock @${p.handle}` : `Block @${p.handle}`}
+                className={cn(
+                  'flex h-6 w-6 flex-shrink-0 items-center justify-center rounded transition-colors',
+                  myBlocks.has(p.beeId)
+                    ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                    : 'text-zinc-400 hover:bg-red-50 hover:text-red-600',
+                )}
+              >
+                <Ban size={12} />
+              </button>
+            )}
+            {conversation.kind === 'group' && isOwner && !isOwnerRow && !isMe && (
               <button
                 type="button"
                 onClick={() => remove(p.beeId)}
@@ -1564,6 +2241,31 @@ function AppleInstallBanner() {
         <X size={14} />
       </button>
     </div>
+  );
+}
+
+/** 75 → "1:15" — recording elapsed + voice-note duration labels. */
+function fmtClock(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = Math.max(0, totalSeconds % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/** Style @handle tokens inside a message body (works on both bubble colors). */
+function renderMentions(text: string): React.ReactNode {
+  const parts = text.split(/(@\w+)/g);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    /^@\w+$/.test(part) ? (
+      <span
+        key={`${i}-${part}`}
+        className="font-semibold underline decoration-current/40 underline-offset-2"
+      >
+        {part}
+      </span>
+    ) : (
+      part
+    ),
   );
 }
 

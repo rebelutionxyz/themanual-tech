@@ -2,8 +2,10 @@ import { supabase } from './supabase';
 import {
   computeSafetyNumber,
   decryptBody,
+  decryptBytes,
   deriveCallKey,
   encryptBody,
+  encryptBytes,
   ensureIdentity,
   establishConversationKey,
   getConversationKey,
@@ -40,6 +42,7 @@ export interface Conversation {
   createdBy: string | null;
   lastMessageAt: string | null;
   membersCanAdd: boolean; // group setting: may non-owners add people?
+  disappearSeconds: number | null; // per-chat auto-delete timer (null = off)
   participants: CommsParticipant[];
 }
 
@@ -60,6 +63,7 @@ export interface CommsMessage {
   createdAt: string;
   deletedAt: string | null;
   editedAt: string | null;
+  expiresAt: string | null; // disappearing-messages deadline (server sweeps; client hides)
   replyToId: string | null; // message this one replies to (same conversation)
   reactions: ReactionSummary[];
 }
@@ -176,7 +180,7 @@ export async function listConversations(): Promise<Conversation[]> {
   const { data, error } = await req()
     .from('comms_conversations')
     .select(
-      'id, kind, title, created_by, last_message_at, members_can_add, comms_participants(bee_id, role, last_read_at, muted, bees(handle, name))',
+      'id, kind, title, created_by, last_message_at, members_can_add, disappear_seconds, comms_participants(bee_id, role, last_read_at, muted, bees(handle, name))',
     )
     .order('last_message_at', { ascending: false, nullsFirst: false });
   if (error) throw error;
@@ -187,6 +191,7 @@ export async function listConversations(): Promise<Conversation[]> {
     createdBy: row.created_by,
     lastMessageAt: row.last_message_at,
     membersCanAdd: !!row.members_can_add,
+    disappearSeconds: (row.disappear_seconds as number | null) ?? null,
     participants: (row.comms_participants ?? []).map((p: Row) => {
       const b = oneBee(p.bees);
       return {
@@ -205,7 +210,7 @@ export async function listMessages(conversationId: string, limit = 200): Promise
   const { data, error } = await req()
     .from('comms_messages')
     .select(
-      'id, conversation_id, sender_bee_id, body, content_type, is_encrypted, created_at, deleted_at, edited_at, reply_to_message_id, comms_reactions(bee_id, emoji)',
+      'id, conversation_id, sender_bee_id, body, content_type, is_encrypted, created_at, deleted_at, edited_at, expires_at, reply_to_message_id, comms_reactions(bee_id, emoji)',
     )
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true })
@@ -251,6 +256,7 @@ export async function listMessages(conversationId: string, limit = 200): Promise
       createdAt: m.created_at,
       deletedAt: m.deleted_at,
       editedAt: m.edited_at ?? null,
+      expiresAt: m.expires_at ?? null,
       replyToId: m.reply_to_message_id ?? null,
       reactions: Array.from(byEmoji, ([emoji, v]) => ({ emoji, count: v.count, mine: v.mine })),
     });
@@ -371,6 +377,12 @@ export interface CommsMediaPayload {
   url: string;
   kind: 'image' | 'video' | 'audio' | 'document';
   name: string;
+  /** True when the FILE bytes are sealed under the conversation key (voice notes). */
+  enc?: boolean;
+  /** Original mime type, needed to play back a decrypted blob. */
+  mime?: string;
+  /** Duration in whole seconds (voice notes), for the bubble label. */
+  dur?: number;
 }
 
 /** Send a Library asset into a conversation as an inline (encrypted) media message. */
@@ -390,12 +402,80 @@ export function parseMediaPayload(body: string): CommsMediaPayload | null {
       /^https?:\/\//i.test(p.url) &&
       (p.kind === 'image' || p.kind === 'video' || p.kind === 'audio' || p.kind === 'document')
     ) {
-      return { url: p.url, kind: p.kind, name: typeof p.name === 'string' ? p.name : 'attachment' };
+      return {
+        url: p.url,
+        kind: p.kind,
+        name: typeof p.name === 'string' ? p.name : 'attachment',
+        enc: p.enc === true,
+        mime: typeof p.mime === 'string' ? p.mime : undefined,
+        dur: typeof p.dur === 'number' && Number.isFinite(p.dur) ? p.dur : undefined,
+      };
     }
     return null;
   } catch {
     return null;
   }
+}
+
+// ── voice messages (E2EE at the FILE level, unlike Library attachments) ──
+// The recorded audio is sealed under the conversation content key BEFORE upload,
+// so storage holds only ciphertext; the (also encrypted) message body carries the
+// pointer + mime + duration. Recipients fetch, decrypt locally, and play.
+
+const VOICE_BUCKET = 'creator-media'; // storage policy allows library/{beeId}/* inserts
+
+/** Record → seal → upload → send. Returns the message id. */
+export async function sendVoiceMessage(
+  conversationId: string,
+  audio: Blob,
+  mime: string,
+  durationSeconds: number,
+): Promise<string> {
+  const bee = await myBee();
+  const ck = await getConversationKey(bee, conversationId);
+  if (!ck) throw new Error('Encryption is still setting up for this conversation — try again in a moment.');
+  const plain = new Uint8Array(await audio.arrayBuffer());
+  const sealed = await encryptBytes(ck, plain);
+  // .slice() re-packs into a fresh, exactly-sized ArrayBuffer for the Blob.
+  const cipherBlob = new Blob([sealed.slice().buffer as ArrayBuffer], {
+    type: 'application/octet-stream',
+  });
+  const path = `library/${bee}/vm-${crypto.randomUUID()}.bin`;
+  const { error: upErr } = await req()
+    .storage.from(VOICE_BUCKET)
+    .upload(path, cipherBlob, { contentType: 'application/octet-stream', upsert: false });
+  if (upErr) throw new Error(upErr.message);
+  const url = req().storage.from(VOICE_BUCKET).getPublicUrl(path).data.publicUrl;
+  const payload: CommsMediaPayload = {
+    url,
+    kind: 'audio',
+    name: 'Voice message',
+    enc: true,
+    mime,
+    dur: Math.max(1, Math.round(durationSeconds)),
+  };
+  return sendEncrypted(conversationId, JSON.stringify(payload), 'media');
+}
+
+/**
+ * Fetch an E2EE media file, decrypt it under the conversation key, and return an
+ * object URL for playback. Caller must URL.revokeObjectURL when done.
+ */
+export async function decryptMediaToObjectUrl(
+  conversationId: string,
+  payload: CommsMediaPayload,
+): Promise<string> {
+  const bee = await myBee();
+  const ck = await getConversationKey(bee, conversationId);
+  if (!ck) throw new Error('no conversation key on this device');
+  const res = await fetch(payload.url);
+  if (!res.ok) throw new Error(`fetch failed (${res.status})`);
+  const sealed = new Uint8Array(await res.arrayBuffer());
+  const plain = await decryptBytes(ck, sealed);
+  const blob = new Blob([plain.slice().buffer as ArrayBuffer], {
+    type: payload.mime || 'audio/webm',
+  });
+  return URL.createObjectURL(blob);
 }
 
 /** Idempotent: returns the existing 1:1 conversation when one exists. */
@@ -766,6 +846,57 @@ export async function markRead(conversationId: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Set (or clear) this conversation's disappearing-messages timer, for everyone.
+ * Applies to messages sent AFTER the change (Signal semantics): the server stamps
+ * each new message's expires_at at send time; a cron sweep deletes expired rows
+ * and clients hide them immediately. null = off.
+ */
+export async function setDisappearing(
+  conversationId: string,
+  seconds: number | null,
+): Promise<void> {
+  const { error } = await req().rpc('comms_set_disappearing', {
+    p_conversation_id: conversationId,
+    p_seconds: seconds,
+  });
+  if (error) throw error;
+}
+
+// ── safety-number verification memory (device-local, like Signal) ──
+// Storing the verified number in localStorage lets us show a persistent
+// "verified ✓" and — the important part — WARN when the number later changes
+// (someone's device set changed, or a key was swapped). Nothing leaves the device.
+
+function snKey(myBeeId: string, conversationId: string): string {
+  return `hc_sn_verified:${myBeeId}:${conversationId}`;
+}
+export function getVerifiedSafetyNumber(myBeeId: string, conversationId: string): string | null {
+  try {
+    return localStorage.getItem(snKey(myBeeId, conversationId));
+  } catch {
+    return null;
+  }
+}
+export function storeVerifiedSafetyNumber(
+  myBeeId: string,
+  conversationId: string,
+  safetyNumber: string,
+): void {
+  try {
+    localStorage.setItem(snKey(myBeeId, conversationId), safetyNumber);
+  } catch {
+    /* storage may be unavailable (private mode) — verification just won't persist */
+  }
+}
+export function clearVerifiedSafetyNumber(myBeeId: string, conversationId: string): void {
+  try {
+    localStorage.removeItem(snKey(myBeeId, conversationId));
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Mute or unmute a conversation for me (suppresses my notifications for it). */
 export async function setConversationMuted(conversationId: string, muted: boolean): Promise<void> {
   const { error } = await req().rpc('comms_set_mute', {
@@ -808,4 +939,129 @@ export function conversationTitle(conv: Conversation, myBeeId: string | undefine
   const others = conv.participants.filter((p) => p.beeId !== myBeeId);
   if (!others.length) return conv.title || 'Conversation';
   return others.map((p) => `@${p.handle}`).join(', ');
+}
+
+// ── Blocks & reports ─────────────────────────────────────────────────────────
+
+/** Bee ids I have blocked (RLS: only my own rows are visible). */
+export async function listMyBlocks(): Promise<Set<string>> {
+  const { data, error } = await req().from('comms_blocks').select('blocked_bee_id');
+  if (error) throw error;
+  return new Set(((data ?? []) as { blocked_bee_id: string }[]).map((r) => r.blocked_bee_id));
+}
+
+export async function blockBee(beeId: string): Promise<void> {
+  const { error } = await req().rpc('comms_block', { p_bee: beeId });
+  if (error) throw error;
+}
+
+export async function unblockBee(beeId: string): Promise<void> {
+  const { error } = await req().rpc('comms_unblock', { p_bee: beeId });
+  if (error) throw error;
+}
+
+export async function reportBee(
+  beeId: string,
+  reason: string,
+  conversationId?: string | null,
+): Promise<void> {
+  const { error } = await req().rpc('comms_report', {
+    p_bee: beeId,
+    p_reason: reason,
+    p_conversation_id: conversationId ?? null,
+  });
+  if (error) throw error;
+}
+
+// ── Presence ─────────────────────────────────────────────────────────────────
+
+/** Heartbeat — my "last seen" (call on load + every ~60s while the tab is open). */
+export async function presencePing(): Promise<void> {
+  const { error } = await req().rpc('bee_presence_ping');
+  if (error) throw error;
+}
+
+export async function setPresenceVisibility(show: boolean): Promise<void> {
+  const { error } = await req().rpc('bee_set_presence_visibility', { p_show: show });
+  if (error) throw error;
+}
+
+export async function getMyPresenceVisibility(): Promise<boolean> {
+  const { data, error } = await req().rpc('bee_get_my_presence');
+  if (error) throw error;
+  const row = (data as { show_presence: boolean }[] | null)?.[0];
+  return row?.show_presence ?? true;
+}
+
+/** last_seen_at for the given bees — only those who share presence (and no block edge). */
+export async function getLastSeen(beeIds: string[]): Promise<Map<string, string>> {
+  if (!beeIds.length) return new Map();
+  const { data, error } = await req().rpc('bee_get_presence', { p_bee_ids: beeIds });
+  if (error) throw error;
+  const map = new Map<string, string>();
+  for (const r of (data ?? []) as { bee_id: string; last_seen_at: string }[]) {
+    map.set(r.bee_id, r.last_seen_at);
+  }
+  return map;
+}
+
+/**
+ * Live "who's online" via Realtime presence. The callback receives the full set
+ * of online bee ids on every change. Ephemeral — nothing is stored.
+ */
+export function joinOnlinePresence(
+  myBeeId: string,
+  onChange: (online: Set<string>) => void,
+): { close: () => void } {
+  if (!supabase) return { close: () => {} };
+  const client = supabase;
+  const channel = client.channel('comms-online', { config: { presence: { key: myBeeId } } });
+  const emit = () => onChange(new Set(Object.keys(channel.presenceState())));
+  channel
+    .on('presence', { event: 'sync' }, emit)
+    .on('presence', { event: 'join' }, emit)
+    .on('presence', { event: 'leave' }, emit)
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') channel.track({ at: Date.now() });
+    });
+  return {
+    close: () => {
+      client.removeChannel(channel);
+    },
+  };
+}
+
+// ── Mentions ─────────────────────────────────────────────────────────────────
+
+/** Ping specific participants that they were @mentioned (server re-validates). */
+export async function notifyMentions(
+  conversationId: string,
+  messageId: string,
+  beeIds: string[],
+): Promise<void> {
+  if (!beeIds.length) return;
+  const { error } = await req().rpc('comms_mention_notify', {
+    p_conversation_id: conversationId,
+    p_message_id: messageId,
+    p_bee_ids: beeIds,
+  });
+  if (error) throw error;
+}
+
+// ── Directory search ─────────────────────────────────────────────────────────
+
+/** Find bees by (partial) handle — powers start-a-chat-with-anyone. */
+export async function searchBees(
+  q: string,
+): Promise<{ id: string; handle: string; name: string | null }[]> {
+  const clean = q.trim().replace(/^@/, '').toLowerCase().replace(/[%_]/g, '');
+  if (!clean) return [];
+  const { data, error } = await req()
+    .from('bees')
+    .select('id, handle, name')
+    .ilike('handle', `%${clean}%`)
+    .order('handle')
+    .limit(8);
+  if (error) throw error;
+  return (data ?? []) as { id: string; handle: string; name: string | null }[];
 }

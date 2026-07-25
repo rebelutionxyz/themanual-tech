@@ -334,6 +334,31 @@ export async function decryptBody(ck: Uint8Array, body: string): Promise<string>
   return sodium.to_string(pt);
 }
 
+// ── binary encrypt / decrypt (E2EE media files, e.g. voice messages) ────────
+/**
+ * Seal raw bytes under the conversation content key: nonce‖ciphertext, no
+ * prefix/base64 (this is a FILE, not a message body). The ciphertext is what
+ * gets uploaded to storage — the server and anyone with the URL see only noise.
+ */
+export async function encryptBytes(ck: Uint8Array, bytes: Uint8Array): Promise<Uint8Array> {
+  const sodium = await S();
+  const nonce = sodium.randombytes_buf(sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES);
+  const ct = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(bytes, null, null, nonce, ck);
+  const packed = new Uint8Array(nonce.length + ct.length);
+  packed.set(nonce, 0);
+  packed.set(ct, nonce.length);
+  return packed;
+}
+
+/** Open nonce‖ciphertext produced by encryptBytes. Throws when the key is wrong. */
+export async function decryptBytes(ck: Uint8Array, packed: Uint8Array): Promise<Uint8Array> {
+  const sodium = await S();
+  const npub = sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
+  const nonce = packed.slice(0, npub);
+  const ct = packed.slice(npub);
+  return sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(null, ct, null, nonce, ck);
+}
+
 // ── recovery code (move identity to a new device) ───────────────────────────
 /** Export the secret key as an offline recovery code. Show once; user stores it. */
 export async function exportRecoveryCode(beeId: string): Promise<string> {
