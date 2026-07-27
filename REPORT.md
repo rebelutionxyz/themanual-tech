@@ -5,6 +5,102 @@ Newest pass first.
 
 ---
 
+## OPS16 — EVENING SWEEP: the token rewire era committed (2026-07-27) — **COMMITTED, PUSH PARKED**
+
+**Lane:** ops · **Scope:** oracle · **Dispatch:** 5f7bb83a-c693-40dc-ba07-e60089ca2a2d
+**Authorization:** GIT AMENDMENT (`CLAUDE.md` R7) — explicit SWEEP dispatch, gates encoded below.
+
+### 0. Headline
+
+One commit, `TheMANUAL.tech` only. **`720c5a9`** — 8 files, +1325 / −308. Tree is **0-entry clean**
+post-commit and **1 ahead of `origin/main`, 0 behind**. Push not fired; command in §4.
+
+### 1. Manifest and gates
+
+8 paths. Every gate passed:
+
+| Gate | Result |
+|---|---|
+| `backups/` · `*.env*` · `settings.local.json` · `node_modules/` · `.next/` · `verify-out/` · `*.dump` | **clean** |
+| Any file > 1 MB | **clean** — largest is `REPORT.md` at 171,111 B |
+| Any deletion (`D`) or rename (`R`) | **clean** — all `M` or `??` |
+| Secret-shaped strings (`eyJ…`, `sk-ant-…`, `sb_secret_…`, `sb_publishable_…`, `whsec_…`, `sk_live_…`, assigned service-role key) | **clean** — zero hits across all 8 |
+
+Stage-and-verify: all 8 staged by name, `git diff --cached --name-only` diffed against the manifest
+— **identical, 8/8**. No reset needed.
+
+```
+ M REPORT.md
+ M src/components/AtlasOracleWalletBadge.tsx
+ M src/lib/atlasoracle/client.ts
+ M src/lib/atlasoracle/tokens.ts
+ M src/pages/oracle/OraclePage.tsx
+ M supabase/functions/atlasoracle-route/index.ts
+?? docs/atlasoracle-media-provider-matrix-2026-07-27.md
+?? src/lib/atlasoracle/useOracleTokens.ts
+```
+
+### 2. Root repo — dispatch's claim verified, and an OPS14 leftover closed
+
+The dispatch said the root repo had no edits this stretch. **Confirmed:** `HONEYCOMB` is 0-entry
+clean and **0 ahead / 0 behind** `origin/main`.
+
+Worth recording because it closes an open item: OPS14 §3 named four uncommitted root-repo canon
+files (`atlasoracle-canonical-cache.md` and `bling-ledger-interface.md` in both mirror locations)
+as deliberate leftovers, and recommended a canon-lane sweep. **That happened** — they are in
+`8459592` ("canon: retire cost_bling from oracle examples", DOCS3) and pushed. No root-lane
+follow-up is outstanding.
+
+Also visible from the log: `4c4ee4b` (OPS14) and `08c0f79` (DOCS3) are no longer ahead of origin, so
+the OPS14 push parked for Butch **has been completed**. Only tonight's commit is unpushed.
+
+### 3. FRONT17's outstanding done-test — still open, as of this sweep
+
+The dispatch asked me to record whether FRONT17's final done-test (a seeded standard directive
+rendering cost and a decremented balance in the badge) has been closed. **It has not.** Ledger
+state for bee `2b66f641-0a0c-46ce-bbaa-70cf61793364`:
+
+| entry_type | amount_tokens | directive_id | created_at |
+|---|---|---|---|
+| `grant` | 1000.000000 | — | 2026-07-27 19:39:24Z |
+
+Balance **1000.000000**, entry_count **1**. The lead's seed is there; **no debit row exists**, so no
+paid directive has been run as that Bee. The test remains one badge click away, exactly as the
+dispatch describes. Not a blocker for this commit — the code is committed either way, and the test
+verifies rendering, not correctness of the ledger (which OPS15 §8 already proved end-to-end).
+
+### 4. Push — parked for Butch
+
+```
+cd C:\Users\Butch\Documents\HONEYCOMB\TheMANUAL.tech
+git push origin main          # 720c5a9
+```
+
+Nothing pending, nothing queued. **Same standing caveat as OPS14 §5: pushing triggers the Railway
+deploy**, and this commit carries FRONT17 frontend changes that I did not write and have not
+compiled — `npm run build` was not run (§6). A local build before pushing remains the sensible move.
+
+### 5. Done-tests
+
+| Requirement | Result |
+|---|---|
+| Tree clean post-commit except deliberate leftovers, named | **PASS** — `TheMANUAL.tech` 0 entries; root 0 entries. **No leftovers this sweep.** |
+| Push parked-with-note or completed-by-Butch | **PARKED** — §4 |
+| *(implicit)* manifest = staged | **PASS** — 8 = 8, diffed identical |
+| *(implicit)* zero secret-shaped strings | **PASS** — zero hits |
+
+### 6. Could not verify
+
+- **That `720c5a9` builds.** `npm run build` not run — the workspace rule forbids building while a
+  dev server is up and I could not establish whether one is running. This commit contains FRONT17
+  frontend work I neither authored nor compiled. **Highest-value check before pushing.**
+- **That the badge renders the new token fields correctly.** FRONT17's own done-test (§3) is the
+  thing that would prove it, and it is unrun.
+- **Whether `docs/atlasoracle-media-provider-matrix-2026-07-27.md` (DOCS4) is complete.** Committed
+  as a manifest path; I did not review another lane's deliverable for content.
+
+---
+
 ## FRONT17 — badge + console speak Oracle Tokens (2026-07-27) — **DONE, one done-test blocked on a seed I am not authorized to make**
 
 **Lane:** front · **Scope:** oracle · **Dispatch:** 584fa927-4cb9-45d7-8ec3-bdc62cf96eef
