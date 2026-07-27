@@ -1,0 +1,28 @@
+{
+  "_comment": "OPS17 Mission Control v1 config. NO SECRETS IN THIS FILE. The DB password comes from %APPDATA%\\postgresql\\pgpass.conf via psql -w, exactly as the ops rail already does. Host/port/user/db are already public in CLAUDE.md and are connection coordinates, not credentials.",
+  "port": 7317,
+  "psql": "C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe",
+  "db": {
+    "host": "aws-1-us-east-1.pooler.supabase.com",
+    "port": "5432",
+    "user": "postgres.anxmqiehpyznifqgskzc",
+    "name": "postgres"
+  },
+  "staleClaimWarnMinutes": 45,
+  "staleClaimAlertMinutes": 90,
+  "reportHeadlines": 12,
+  "terminal": {
+    "exe": "wt.exe",
+    "shellArgs": ["cmd", "/k", "claude"]
+  },
+  "folders": [
+    { "label": "TheMANUAL.tech",   "path": "C:\\Users\\Butch\\Documents\\HONEYCOMB\\TheMANUAL.tech" },
+    { "label": "HONEYCOMB (root)", "path": "C:\\Users\\Butch\\Documents\\HONEYCOMB" },
+    { "label": "atlasJUSTICE.org", "path": "C:\\Users\\Butch\\Documents\\HONEYCOMB\\atlasJUSTICE.org" },
+    { "label": "AtlasORACLE.to",   "path": "C:\\Users\\Butch\\Documents\\HONEYCOMB\\AtlasORACLE.to" },
+    { "label": "TheWORKSHOP.to",   "path": "C:\\Users\\Butch\\Documents\\HONEYCOMB\\TheWORKSHOP.to" },
+    { "label": "AtlasVOTE.org",    "path": "C:\\Users\\Butch\\Documents\\HONEYCOMB\\AtlasVOTE.org" },
+    { "label": "DingleBERRY.tech", "path": "C:\\Users\\Butch\\Documents\\HONEYCOMB\\DingleBERRY.tech" },
+    { "label": "FreedomBLiNGS.com","path": "C:\\Users\\Butch\\Documents\\HONEYCOMB\\FreedomBLiNGS.com" }
+  ]
+}
