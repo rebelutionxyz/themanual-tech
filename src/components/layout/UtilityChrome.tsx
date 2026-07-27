@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Bell, MessageCircle, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { SearchModal } from './SearchModal';
+import { AtlasOracleWalletBadge } from '@/components/AtlasOracleWalletBadge';
 import { cn } from '@/lib/utils';
 
 /**
@@ -22,7 +23,14 @@ import { cn } from '@/lib/utils';
  */
 export function UtilityChrome() {
   const { bee } = useAuth();
+  const { pathname } = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
+
+  // Astra attribution for AtlasOracle directives. The first path segment IS
+  // the Astra slug for every registered surface; on unregistered paths the
+  // router falls back to `themanual` server-side, so a wrong guess costs a log
+  // line, not a failed directive.
+  const astraSlug = pathname.split('/').filter(Boolean)[0] ?? 'themanual';
 
   const notificationCount = 0;
   const messageCount = 0;
@@ -90,6 +98,12 @@ export function UtilityChrome() {
 
         {/* 6. BLiNG! pill removed from the black shell 2026-07-16 (Butch) —
             the Sovereign Ledger stays reachable at /freedomblings. */}
+
+        {/* 6b. AtlasOracle wallet badge — the AI Astra's spine presence. Self-
+            hides for signed-out visitors. Denominated in Oracle Tokens, not
+            BLiNG!, so it does not reinstate the pill removed above. */}
+        <AtlasOracleWalletBadge astraSlug={astraSlug} />
+
 
         {/* 7. Profile-avatar: avatar on right, handle reveals on hover */}
         {bee ? (

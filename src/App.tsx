@@ -79,6 +79,9 @@ const IntelPage = lazy(() => import('@/pages/intel/IntelPage').then((m) => ({ de
 const NewThreadPage = lazy(() => import('@/pages/intel/NewThreadPage').then((m) => ({ default: m.NewThreadPage })));
 const ReportedPage = lazy(() => import('@/pages/intel/ReportedPage').then((m) => ({ default: m.ReportedPage })));
 const ThreadPage = lazy(() => import('@/pages/intel/ThreadPage').then((m) => ({ default: m.ThreadPage })));
+// AtlasOracle console (the AI Astra). Distinct from AtlasOraclePage above,
+// which is the DingleBERRY security-copilot demo screen at /dingleberry/oracle.
+const OraclePage = lazy(() => import('@/pages/oracle/OraclePage').then((m) => ({ default: m.OraclePage })));
 const ChannelPage = lazy(() => import('@/pages/pulse/ChannelPage').then((m) => ({ default: m.ChannelPage })));
 const PulseHome = lazy(() => import('@/pages/pulse/PulseHome').then((m) => ({ default: m.PulseHome })));
 const WatchPage = lazy(() => import('@/pages/pulse/WatchPage').then((m) => ({ default: m.WatchPage })));
@@ -393,6 +396,10 @@ function AppContent() {
               wrapper contradicted it (fnulnu hardcoded vs is_admin on the
               actual admin Bee) and made /hq unreachable. Removed 2026-07-16. */}
             <Route path="/hq" element={<HQControlRoom />} />
+            {/* AtlasOracle console (AI Astra). MUST stay ahead of /:slug or the
+              catch-all SurfacePage swallows it. Not to be confused with
+              /dingleberry/oracle, which is the DingleBERRY copilot demo. */}
+            <Route path="/oracle" element={<OraclePage />} />
             <Route path="/groups" element={<ManualGroupsPlaceholder />} />
             <Route path="/cart" element={<CartPlaceholder />} />
             <Route path="/api/docs" element={<OpenAPIDocs />} />

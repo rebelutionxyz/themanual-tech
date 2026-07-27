@@ -1,12 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import {
+  DIRECTIVE_CATEGORIES,
+  type DirectiveCategory,
+  type Tier,
+  isMocked,
+} from '@/lib/atlasoracle/client';
+import { useOracleDirective } from '@/lib/atlasoracle/useOracleDirective';
+import { TIER_RATES, readOracleTokenBalance } from '@/lib/atlasoracle/tokens';
 
 // AtlasOracle wallet badge.
 //
-// Mounts in any Astra spine. Three visual states drive presentation:
+// Mounts in every Astra spine via UtilityChrome. Three visual states drive
+// presentation:
 //   idle           — ambient, awaits a tap
 //   working        — directive is in-flight to the router
 //   response-ready — fresh routed response is available
@@ -15,14 +24,12 @@ import { cn } from '@/lib/utils';
 // centered modal; on mobile (< sm) the same surface fills the viewport as
 // a slide-up sheet.
 //
-// Language firewall: copy uses GIVE / SEND / EARN / GET vocabulary only.
-// No buy / sell / purchase / trade / market / customer / mint in any string.
-
-type Tier = 'free' | 'standard' | 'frontier';
-
-type DirectiveCategory =
-  | 'scaffold' | 'draft' | 'integrate' | 'refactor' | 'analyze'
-  | 'classify' | 'translate' | 'estimate' | 'correlate' | 'suggest';
+// Economics (Butch ruling 2026-07-27): denominated in Oracle Tokens. No BLiNG!
+// figure and no escrow control appears on this surface.
+//
+// Language firewall: copy uses GET / GIVE / SEND / EARN / FREE vocabulary only.
+// The banned-vocabulary list lives in CLAUDE.md; every string here was swept
+// against it.
 
 export interface SurfacedAction {
   label: string;
@@ -32,28 +39,17 @@ export interface SurfacedAction {
 
 export interface AtlasOracleWalletBadgeProps {
   astraSlug: string;
-  canonPaths?: string[];
   surfacedActions?: SurfacedAction[];
   novaSlug?: string;
   defaultTier?: Tier;
   className?: string;
 }
 
-type BadgeState = 'idle' | 'working' | 'response-ready';
-
-interface RouteResponse {
-  response: string;
-  provider: string;
-  cost_bling: number;
-  latency_ms: number;
-  directive_id: string;
-}
-
 const DEFAULT_TIER: Tier = 'free';
+const DEFAULT_CATEGORY: DirectiveCategory = 'suggest';
 
 export function AtlasOracleWalletBadge({
   astraSlug,
-  canonPaths,
   surfacedActions = [],
   novaSlug,
   defaultTier = DEFAULT_TIER,
@@ -61,67 +57,43 @@ export function AtlasOracleWalletBadge({
 }: AtlasOracleWalletBadgeProps) {
   const { bee } = useAuth();
   const [open, setOpen] = useState(false);
-  const [state, setState] = useState<BadgeState>('idle');
   const [directive, setDirective] = useState('');
   const [tier, setTier] = useState<Tier>(defaultTier);
-  const [response, setResponse] = useState<RouteResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [category, setCategory] = useState<DirectiveCategory>(DEFAULT_CATEGORY);
+  const [tokenNotice, setTokenNotice] = useState(false);
 
-  // TODO: read live BLiNG! balance from ledger when the wallet query is
-  // exposed (UtilityChrome currently stubs this at 0). For now we surface
-  // a placeholder only when the Bee is signed in.
-  const blingBalance = bee ? 0 : null;
+  const {
+    state, response, preview, failure,
+    send, confirm, cancelConfirm, reset,
+  } = useOracleDirective();
+
+  const tokens = readOracleTokenBalance(!!bee);
+
+  const badgeState =
+    state === 'working' ? 'working'
+      : state === 'response-ready' ? 'response-ready'
+        : 'idle';
 
   const canSubmit = useMemo(
-    () => directive.trim().length > 0 && state !== 'working' && !!supabase,
+    () => directive.trim().length > 0 && state !== 'working',
     [directive, state],
   );
 
   const submit = useCallback(
-    async (text: string, category: DirectiveCategory = 'analyze') => {
-      if (!supabase) {
-        setError('AtlasOracle is unavailable — Supabase client not configured.');
-        return;
-      }
-      setError(null);
-      setResponse(null);
-      setState('working');
-
-      const { data, error: invokeErr } = await supabase.functions.invoke<RouteResponse>(
-        'atlasoracle-route',
-        {
-          body: {
-            directive: text,
-            tier,
-            astra_slug: astraSlug,
-            nova_slug: novaSlug,
-            canon_paths: canonPaths,
-            directive_category: category,
-          },
-        },
-      );
-
-      if (invokeErr || !data) {
-        setError(invokeErr?.message ?? 'Routing returned no response');
-        setState('idle');
-        return;
-      }
-
-      setResponse(data);
-      setState('response-ready');
+    (text: string, cat: DirectiveCategory) => {
+      void send(text, { tier, category: cat, astraSlug });
     },
-    [astraSlug, canonPaths, novaSlug, tier],
+    [send, tier, astraSlug],
   );
 
   const close = useCallback(() => {
     setOpen(false);
-    // Reset to idle after the user dismisses a finished directive.
+    setTokenNotice(false);
     if (state === 'response-ready') {
-      setState('idle');
-      setResponse(null);
+      reset();
       setDirective('');
     }
-  }, [state]);
+  }, [state, reset]);
 
   // ESC dismisses the surface.
   useEffect(() => {
@@ -135,18 +107,20 @@ export function AtlasOracleWalletBadge({
 
   if (!bee) return null;
 
+  const tierRate = TIER_RATES.find((r) => r.tier === tier);
+
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        title="AtlasOracle"
+        title={`AtlasOracle · ${tokens.reason}`}
         aria-label="Open AtlasOracle"
         className={cn(
           'flex items-center gap-2 rounded-full border bg-bg-elevated px-2.5 py-1 transition-colors',
-          state === 'idle' && 'border-honey/40 hover:border-honey/70',
-          state === 'working' && 'border-honey/70 animate-pulse',
-          state === 'response-ready' && 'border-kettle-sourced/70',
+          badgeState === 'idle' && 'border-honey/40 hover:border-honey/70',
+          badgeState === 'working' && 'border-honey/70 animate-pulse',
+          badgeState === 'response-ready' && 'border-kettle-sourced/70',
           className,
         )}
       >
@@ -156,14 +130,14 @@ export function AtlasOracleWalletBadge({
         >
           A⊕O
         </span>
-        {blingBalance !== null && (
-          <span
-            className="bling font-mono tracking-wide text-text-silver"
-            style={{ fontSize: '11.5px' }}
-          >
-            {blingBalance.toLocaleString()}
-          </span>
-        )}
+        {/* Oracle Token balance. Renders an em dash until the ledger ships —
+            a zero here would read as an empty wallet rather than no wallet. */}
+        <span
+          className="font-mono tracking-wide text-text-silver"
+          style={{ fontSize: '11.5px' }}
+        >
+          {tokens.balance === null ? '—' : tokens.balance.toLocaleString()}
+        </span>
       </button>
 
       {open && (
@@ -200,18 +174,64 @@ export function AtlasOracleWalletBadge({
               </button>
             </div>
 
-            {surfacedActions.length > 0 && state !== 'response-ready' && (
+            {isMocked() && (
+              <div
+                className="rounded-md border border-honey/50 bg-honey/10 px-3 py-2 text-honey"
+                style={{ fontSize: '11.5px' }}
+              >
+                MOCK MODE — no provider is called and nothing is spent.
+              </div>
+            )}
+
+            {/* Oracle Tokens strip: balance + the GET control (stubbed). */}
+            <div
+              className="flex flex-wrap items-center gap-3 rounded-md border border-border-bright bg-panel-2 px-3 py-2"
+              style={{ fontSize: '11.5px' }}
+            >
+              <span className="text-text-silver">
+                Oracle Tokens ·{' '}
+                <span className="font-mono text-text">
+                  {tokens.balance === null ? '—' : tokens.balance.toLocaleString()}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setTokenNotice((v) => !v)}
+                aria-expanded={tokenNotice}
+                className="rounded-md border border-border-bright px-2 py-0.5 text-text-silver transition-colors hover:border-honey/70 hover:text-text"
+              >
+                GET Oracle Tokens
+              </button>
+              <Link
+                to="/oracle"
+                onClick={close}
+                className="ml-auto text-text-silver underline decoration-dotted underline-offset-2 transition-colors hover:text-honey"
+              >
+                console
+              </Link>
+            </div>
+
+            {tokenNotice && (
+              <div
+                className="rounded-md border border-border-bright bg-bg p-3 text-text-silver"
+                style={{ fontSize: '12px' }}
+              >
+                The Oracle Token flow is not live yet — the token design is still
+                open, so there is nothing to hand you here. The free tier routes
+                today at no token cost.
+              </div>
+            )}
+
+            {surfacedActions.length > 0 && state === 'idle' && (
               <div className="flex flex-wrap gap-2">
                 {surfacedActions.map((a) => (
                   <button
                     key={a.label}
                     type="button"
-                    disabled={state === 'working'}
-                    onClick={() => submit(a.directive, a.category ?? 'analyze')}
+                    onClick={() => submit(a.directive, a.category ?? DEFAULT_CATEGORY)}
                     className={cn(
                       'rounded-full border border-border-bright bg-panel-2 px-3 py-1 text-text-silver transition-colors',
                       'hover:border-honey/70 hover:text-text',
-                      state === 'working' && 'opacity-50',
                     )}
                     style={{ fontSize: '12.5px' }}
                   >
@@ -221,7 +241,7 @@ export function AtlasOracleWalletBadge({
               </div>
             )}
 
-            {state !== 'response-ready' && (
+            {(state === 'idle' || state === 'working') && (
               <>
                 <textarea
                   value={directive}
@@ -233,7 +253,7 @@ export function AtlasOracleWalletBadge({
                   style={{ fontSize: '13px' }}
                 />
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <label
                     htmlFor="atlasoracle-tier"
                     className="text-text-silver"
@@ -254,10 +274,30 @@ export function AtlasOracleWalletBadge({
                     <option value="frontier">frontier</option>
                   </select>
 
+                  <label
+                    htmlFor="atlasoracle-category"
+                    className="text-text-silver"
+                    style={{ fontSize: '12px' }}
+                  >
+                    Kind
+                  </label>
+                  <select
+                    id="atlasoracle-category"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value as DirectiveCategory)}
+                    disabled={state === 'working'}
+                    className="rounded-md border border-border-bright bg-panel-2 px-2 py-1 text-text"
+                    style={{ fontSize: '12px' }}
+                  >
+                    {DIRECTIVE_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+
                   <button
                     type="button"
                     disabled={!canSubmit}
-                    onClick={() => submit(directive)}
+                    onClick={() => submit(directive, category)}
                     className={cn(
                       'ml-auto rounded-md border border-honey/60 bg-honey/10 px-3 py-1 font-semibold text-honey transition-colors',
                       'hover:border-honey/90 hover:bg-honey/20',
@@ -268,16 +308,75 @@ export function AtlasOracleWalletBadge({
                     {state === 'working' ? 'Routing…' : 'SEND'}
                   </button>
                 </div>
+
+                {tierRate && (
+                  <p className="text-text-silver" style={{ fontSize: '11px' }}>
+                    {tierRate.model} ·{' '}
+                    {tierRate.ratePlaceholder === null
+                      ? 'FREE'
+                      : `~${tierRate.ratePlaceholder} Oracle Tokens (provisional)`}
+                  </p>
+                )}
               </>
             )}
 
-            {error && (
+            {/* Confirm-cost gate. The router returns a preview instead of routing
+                when its estimate clears the confirm threshold; nothing is spent
+                until the Bee accepts. */}
+            {state === 'awaiting-confirm' && preview && (
+              <div className="flex flex-col gap-3 rounded-md border border-honey/60 bg-honey/10 p-3">
+                <p className="text-text" style={{ fontSize: '12.5px' }}>
+                  This directive is estimated at{' '}
+                  <span className="font-mono font-semibold">{preview.estimatedCost}</span>{' '}
+                  Oracle Tokens on {preview.provider}. Confirm to route it.
+                </p>
+                <p className="text-text-silver" style={{ fontSize: '11px' }}>
+                  est. {preview.estimatedInputTokens.toLocaleString()} in ·{' '}
+                  {preview.estimatedOutputTokens.toLocaleString()} out
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void confirm()}
+                    className="rounded-md border border-honey/60 bg-honey/20 px-3 py-1 font-semibold text-honey transition-colors hover:border-honey/90"
+                    style={{ fontSize: '12.5px' }}
+                  >
+                    CONFIRM
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelConfirm}
+                    className="rounded-md border border-border-bright px-3 py-1 text-text-silver transition-colors hover:text-text"
+                    style={{ fontSize: '12.5px' }}
+                  >
+                    cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {failure && (
               <div
-                className="rounded-md border border-kettle-unsourced/60 bg-kettle-unsourced/10 p-3 text-text"
+                className="flex flex-col gap-2 rounded-md border border-kettle-unsourced/60 bg-kettle-unsourced/10 p-3 text-text"
                 style={{ fontSize: '12.5px' }}
                 role="alert"
               >
-                {error}
+                <span>{failure.message}</span>
+                {failure.action === 'fund' && (
+                  <button
+                    type="button"
+                    onClick={() => setTokenNotice(true)}
+                    className="self-start rounded-md border border-border-bright px-2 py-0.5 text-text-silver transition-colors hover:border-honey/70 hover:text-text"
+                    style={{ fontSize: '11.5px' }}
+                  >
+                    GET Oracle Tokens
+                  </button>
+                )}
+                {failure.action === 'retry-later' && failure.retryAfterSeconds && (
+                  <span className="text-text-silver" style={{ fontSize: '11.5px' }}>
+                    Try again in about {failure.retryAfterSeconds}s.
+                  </span>
+                )}
               </div>
             )}
 
@@ -294,13 +393,14 @@ export function AtlasOracleWalletBadge({
                   style={{ fontSize: '11.5px' }}
                 >
                   <span>provider · {response.provider}</span>
-                  <span>cost · {response.cost_bling} BLiNG!</span>
-                  <span>latency · {response.latency_ms}ms</span>
+                  <span>
+                    tokens · {response.tokens.input.toLocaleString()} in /{' '}
+                    {response.tokens.output.toLocaleString()} out
+                  </span>
                   <button
                     type="button"
                     onClick={() => {
-                      setState('idle');
-                      setResponse(null);
+                      reset();
                       setDirective('');
                     }}
                     className="ml-auto rounded-md border border-border-bright px-2 py-0.5 text-text-silver transition-colors hover:border-honey/70 hover:text-text"

@@ -16,6 +16,10 @@
 //   - standard  → claude-sonnet-4-6, cost-shape pricing (0.5 / 1.0 / 2.0 BLiNG!)
 //   - frontier  → claude-opus-4-7, base 5 + surcharges, cap 50, preview > 10
 //
+// OPS11 (2026-07-27): standard and frontier are GATED OFF at PAID_TIERS_ENABLED
+// and return 503 before any provider call — see the const's comment below. The
+// pricing machinery under them is left intact and unexercised.
+//
 // Rate caps (per rate-cap-pricing.md §5.1) enforced server-side via
 // atlasoracle_check_rate_caps RPC.
 //
@@ -46,10 +50,33 @@ type Category = typeof ALLOWED_CATEGORIES[number];
 const ALLOWED_TIERS = ['free', 'standard', 'frontier'] as const;
 type Tier = typeof ALLOWED_TIERS[number];
 
+// Model pins (OPS12, 2026-07-27). Prices re-verified live against
+// platform.claude.com/docs/en/about-claude/models/overview.md on the day:
+//   free      claude-haiku-4-5  $1 / $5    — still CURRENT, not swapped
+//   standard  claude-sonnet-5   $3 / $15, intro $2 / $10 through 2026-08-31
+//   frontier  claude-opus-5     $5 / $25   — price-neutral vs the 4.7 it replaces
+// claude-sonnet-4-6 and claude-opus-4-7 are both listed Legacy as of that date.
+// Reversal is a one-line revert of this map.
+//
+// ⚠ PREREQUISITE BEFORE FLIPPING PAID_TIERS_ENABLED — do not skip. ⚠
+// This router sends NO `thinking` parameter. On the models being replaced that
+// meant no thinking. On BOTH replacements it does not:
+//   Opus 4.7 / Sonnet 4.6 — omitting `thinking` ⇒ thinking OFF
+//   Opus 5   / Sonnet 5   — omitting `thinking` ⇒ ADAPTIVE THINKING ON, and
+//                           `effort` defaults to `high` on the Claude API
+// max_tokens caps thinking + response text TOGETHER, and TIER_MAX_TOKENS is
+// tight (standard 1500, frontier 5000). A Sonnet 5 call at effort=high can
+// spend most of 1500 on thinking and return truncated or empty content — which
+// this router reports as `provider_empty_content`, a 502, after paying for the
+// tokens. Sonnet 5 also uses the Opus-4.7-generation tokenizer (~30% more
+// tokens for the same text), so estimateInputTokens() drifts further low.
+// Whoever re-enables paid tiers must first set `thinking` and
+// `output_config.effort` explicitly and re-baseline TIER_MAX_TOKENS.
+// Latent only: both paid tiers are gated off, so nothing here is live today.
 const TIER_PROVIDER_MODEL: Record<Tier, string> = {
   free:     'claude-haiku-4-5',
-  standard: 'claude-sonnet-4-6',
-  frontier: 'claude-opus-4-7',
+  standard: 'claude-sonnet-5',
+  frontier: 'claude-opus-5',
 };
 
 // Default expected output tokens by tier — used in cost estimation.
@@ -66,6 +93,19 @@ const TIER_MAX_TOKENS: Record<Tier, number> = {
   standard: 1500,
   frontier: 5000,
 };
+
+// ─── Paid-tier kill switch (OPS11, 2026-07-27). ───
+//
+// atlasoracle_debit cannot currently succeed: it writes two bling_transactions
+// legs sharing one source_ref, against a unique index on (source_ref) WHERE
+// source_type='atlasoracle_directive'. Every standard / frontier directive
+// therefore called Anthropic (real spend), failed the debit, discarded the
+// model's response and returned 500 — pure waste, with the spend invisible.
+//
+// Until the billing path is rebuilt on Oracle Tokens, paid tiers are refused
+// BEFORE any provider call. Flip this to true to re-enable; nothing else here
+// is economics logic and the debit / credit RPCs are deliberately untouched.
+const PAID_TIERS_ENABLED = false;
 
 const FRONTIER_PREVIEW_THRESHOLD_BLING = 10.0;
 const ACTUAL_OVERAGE_WARN_RATIO = 1.25;
@@ -182,6 +222,18 @@ Deno.serve(async (req) => {
       return errorResponse(`tier must be one of: ${ALLOWED_TIERS.join(', ')}`);
     }
     tier = body.tier as Tier;
+  }
+
+  // ─── Paid-tier guard (OPS11). ───
+  // Refused as early as tier is known — ahead of the rate-cap RPC, the astra
+  // lookup, the escrow pre-check, the directive row insert and, above all, the
+  // provider call. Zero spend, zero orphan rows. Free tier is untouched.
+  if (!PAID_TIERS_ENABLED && tier !== 'free') {
+    console.log('atlasoracle-route paid tier refused', { bee_id: beeId, tier });
+    return jsonResponse({
+      error: 'tier_unavailable',
+      message: 'paid tiers temporarily offline',
+    }, 503);
   }
 
   // Category (default 'suggest').
@@ -372,7 +424,10 @@ Deno.serve(async (req) => {
   } catch (err) {
     const latencyMs = Date.now() - startedAt;
     const msg = err instanceof Error ? err.message : 'network failure';
-    await markFailed(service, directiveId, latencyMs, `provider_network: ${msg}`);
+    await markFailed(
+      service, directiveId, latencyMs, `provider_network: ${msg}`,
+      { providerModel },
+    );
     console.error('atlasoracle-route provider network error', {
       directive_id: directiveId, message: msg,
     });
@@ -385,7 +440,9 @@ Deno.serve(async (req) => {
     try { providerBodyText = await providerResponse.text(); }
     catch { providerBodyText = '<unreadable>'; }
     const sanitized = `provider_http_${providerResponse.status}`;
-    await markFailed(service, directiveId, latencyMs, sanitized);
+    await markFailed(
+      service, directiveId, latencyMs, sanitized, { providerModel },
+    );
     console.error('atlasoracle-route provider http error', {
       directive_id: directiveId,
       status: providerResponse.status,
@@ -399,31 +456,42 @@ Deno.serve(async (req) => {
     payload = await providerResponse.json();
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'unknown parse error';
-    await markFailed(service, directiveId, latencyMs, `provider_parse: ${msg}`);
+    await markFailed(
+      service, directiveId, latencyMs, `provider_parse: ${msg}`,
+      { providerModel },
+    );
     console.error('atlasoracle-route provider parse error', {
       directive_id: directiveId, message: msg,
     });
     return errorResponse('Provider response malformed', 502);
   }
 
-  const responseText = (payload.content ?? [])
-    .filter((block) => block.type === 'text' && typeof block.text === 'string')
-    .map((block) => block.text!)
-    .join('\n');
-  if (responseText.length === 0) {
-    await markFailed(service, directiveId, latencyMs, 'provider_empty_content');
-    console.error('atlasoracle-route provider empty content', {
-      directive_id: directiveId,
-    });
-    return errorResponse('Provider returned empty content', 502);
-  }
-
+  // Usage is read BEFORE the empty-content check (OPS11) — the provider has
+  // already billed us by this point, so the token counts must be available to
+  // every failure path below, not just the success path.
   const usage = payload.usage ?? {};
   const inputTokens  = usage.input_tokens  ?? 0;
   const outputTokens = usage.output_tokens ?? 0;
   const cachedTokens =
     (usage.cache_creation_input_tokens ?? 0)
     + (usage.cache_read_input_tokens ?? 0);
+  const spendTelemetry: FailureTelemetry = {
+    providerModel, inputTokens, outputTokens, cachedTokens,
+  };
+
+  const responseText = (payload.content ?? [])
+    .filter((block) => block.type === 'text' && typeof block.text === 'string')
+    .map((block) => block.text!)
+    .join('\n');
+  if (responseText.length === 0) {
+    await markFailed(
+      service, directiveId, latencyMs, 'provider_empty_content', spendTelemetry,
+    );
+    console.error('atlasoracle-route provider empty content', {
+      directive_id: directiveId,
+    });
+    return errorResponse('Provider returned empty content', 502);
+  }
 
   // ─── Charge-the-lesser cost. ───
   const actualCostBling = calculateCostBling(tier, inputTokens, outputTokens);
@@ -458,7 +526,9 @@ Deno.serve(async (req) => {
     );
     if (debitErr) {
       const msg = debitErr.message ?? 'debit failed';
-      await markFailed(service, directiveId, latencyMs, `debit: ${msg}`);
+      await markFailed(
+        service, directiveId, latencyMs, `debit: ${msg}`, spendTelemetry,
+      );
       console.error('atlasoracle-route debit failed', {
         directive_id: directiveId, message: msg,
       });
@@ -474,11 +544,18 @@ Deno.serve(async (req) => {
   }
 
   // ─── Finalize directive row. ───
+  //
+  // cost_bling WRITE-STOP (DB7, 2026-07-27). This UPDATE no longer persists
+  // cost_bling. The column is `NOT NULL DEFAULT 0`, so rows simply keep the 0
+  // the INSERT gave them — no null risk, no behavior change (every row in the
+  // table already reads 0.000000). finalCostBling is still computed, still
+  // logged, and still returned in the HTTP body: the router keeps reporting
+  // cost, it just stops persisting it. This is step one of the retirement;
+  // the column DROP is a separate dispatch and must not ride along blind.
   const { error: finalizeErr } = await service
     .from('atlasoracle_directives')
     .update({
       provider_selected: providerModel,
-      cost_bling: finalCostBling,
       latency_ms: latencyMs,
       input_tokens: inputTokens,
       output_tokens: outputTokens,
@@ -525,22 +602,53 @@ Deno.serve(async (req) => {
   });
 });
 
+// Spend telemetry carried onto the failure path (OPS11). Every field is
+// optional: a directive that died before reaching the provider writes none of
+// them, so a null column keeps meaning "never got that far" rather than
+// "unknown".
+interface FailureTelemetry {
+  providerModel?: string;
+  inputTokens?:   number;
+  outputTokens?:  number;
+  cachedTokens?:  number;
+}
+
 async function markFailed(
   // deno-lint-ignore no-explicit-any
   service: any,
   directiveId: string,
   latencyMs: number,
   errorMessage: string,
+  telemetry?: FailureTelemetry,
 ): Promise<void> {
+  // Before OPS11 a directive that called Anthropic and then died — the debit
+  // defect being the live case — recorded null tokens and null provider, so
+  // real provider spend was invisible to the platform. cost_bling stays 0 on
+  // this path deliberately: the Bee was not charged, and inventing a charge
+  // here would be an economics change, which this pass is forbidden to make.
+  const patch: Record<string, unknown> = {
+    status: 'failed',
+    success: false,
+    latency_ms: latencyMs,
+    error_message: errorMessage,
+    completed_at: new Date().toISOString(),
+  };
+  if (telemetry?.providerModel !== undefined) {
+    patch.provider_selected = telemetry.providerModel;
+  }
+  if (telemetry?.inputTokens !== undefined) {
+    patch.input_tokens = telemetry.inputTokens;
+  }
+  if (telemetry?.outputTokens !== undefined) {
+    patch.output_tokens = telemetry.outputTokens;
+  }
+  if (telemetry?.cachedTokens !== undefined) {
+    patch.cached_tokens = telemetry.cachedTokens;
+  }
+
   const { error } = await service
     .from('atlasoracle_directives')
-    .update({
-      status: 'failed',
-      success: false,
-      latency_ms: latencyMs,
-      error_message: errorMessage,
-      completed_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq('id', directiveId);
   if (error) {
     console.error('atlasoracle-route markFailed update error', {

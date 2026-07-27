@@ -55,10 +55,15 @@ Deno.serve(async (req) => {
 
   const sb = serviceClient();
 
+  // cost_bling dropped from the select list (DB7, 2026-07-27). It was the last
+  // code-side read of the column and would have failed hard the moment the
+  // column is dropped. Every row in the table reads 0.000000, so nothing of
+  // value leaves the response. This function is not currently deployed; the
+  // fix lands now so the DROP is pure DDL with no callsite left to trip over.
   const { data, error, count } = await sb
     .from('atlasoracle_directives')
     .select(
-      'id, astra_id, nova_id, directive_category, tier, provider_selected, cost_bling, latency_ms, success, created_at',
+      'id, astra_id, nova_id, directive_category, tier, provider_selected, latency_ms, success, created_at',
       { count: 'exact' },
     )
     .eq('bee_id', auth.userId)

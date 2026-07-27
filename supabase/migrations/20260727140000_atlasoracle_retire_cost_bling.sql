@@ -1,0 +1,102 @@
+-- =============================================================================
+-- Migration 20260727140000 — retire atlasoracle_directives.cost_bling
+-- =============================================================================
+-- Date:    2026-07-27
+-- Author:  Code (Claude Opus 5) — pass DB7, lane db, scope oracle
+-- Source:  shared/canon/honeycomb-economic-constitution-2026-06-07.md §"Oracle"
+--          shared/canon/economic-model-lock-2026-06-07.md (retirement, [PARKED])
+--          ORACLE_MF v0.5 ruling 2 (no BLiNG! transactions for ORACLE)
+--          Dispatch DB7 (REWRITTEN), rail 2026-07-27
+--
+-- =============================================================================
+-- STATUS: **APPLIED to production 2026-07-27** — pass DB9, under the MIGRATION
+--         AMENDMENT (Butch, 2026-07-27) written into CLAUDE.md R7 that day.
+-- =============================================================================
+--
+-- Applied via the pgpass psql path. Result: BEGIN / ALTER TABLE / COMMIT.
+-- Post-apply verification (information_schema): cost_bling ABSENT,
+-- atlasoracle_directives at 16 columns (was 17), all 5 existing rows intact.
+-- Live proof: one free-tier directive fired post-drop
+-- (ece29d6a-b5e6-4e2c-964c-0206ed703505) returned HTTP 200 and finalized
+-- cleanly — status=success, success=t, provider=claude-haiku-4-5,
+-- 1641 in / 5 out / 0 cached, latency 1078 ms — proving the finalize UPDATE
+-- succeeds against the 16-column table.
+--
+-- PRECONDITIONS, all verified GREEN before the apply:
+--
+--   1. The write-stop was DEPLOYED, not merely committed. `atlasoracle-route`
+--      was live at **version 15** (bundle sha256 9e3fa58eedd8c8dd…), whose
+--      finalize UPDATE does not reference cost_bling. Confirmed by reading the
+--      deployed artifact back, not by trusting a report. Had this run while
+--      v14 was live, every successful directive would have failed its finalize
+--      UPDATE and been left `pending` forever — which is why the ordering was
+--      enforced rather than assumed.
+--
+--   2. `atlasoracle-log` carried no cost_bling in its select list (fixed in
+--      DB7; function was not deployed at the time).
+--
+--   3. `_shared/atlasoracle/audit-log.ts` no longer carries costBling (fixed
+--      in DB7). Nothing imports it.
+--
+-- PRE-FLIGHT VERIFIED 2026-07-27 (read-only, against production):
+--   * pg_depend: ZERO objects depend on the column.
+--   * pg_views:  ZERO views reference it.
+--   * pg_proc:   ZERO routines reference it (information_schema.routines,
+--                routine_definition ILIKE '%cost_bling%' → 0 rows).
+--   * Constraints on the table: 3 FKs, PK, and three CHECKs on
+--     directive_category / status / tier. NONE touches cost_bling.
+--   * Indexes: pkey, (bee_id, created_at DESC), (astra_id, created_at DESC).
+--     NONE includes cost_bling.
+--   * Data at risk: NONE. All 3 rows in the table read 0.000000, and the
+--     column has never held a non-zero value — both paid tiers have failed at
+--     the debit step since inception, so no charge was ever recorded.
+--
+-- BLAST RADIUS: one column on one table, no dependents. Reversible in the
+-- narrow sense (the column can be re-added) but NOT in the data sense — there
+-- is no data to lose, which is precisely why the retirement is safe now.
+--
+-- ROLLBACK:
+--   ALTER TABLE public.atlasoracle_directives
+--       ADD COLUMN IF NOT EXISTS cost_bling numeric(24,6) NOT NULL DEFAULT 0;
+--   Restores shape exactly; historical values were all 0 and stay 0.
+--
+-- WHY THE COLUMN GOES:
+--   Canon retired BLiNG! from the Oracle loop on 2026-06-07 (economic
+--   constitution: "BLiNG! exits the Oracle loop; atlasoracle_directives
+--   .cost_bling is retired"), and ORACLE_MF v0.5 ruling 2 superseded the
+--   escrow economy outright in favour of Oracle Tokens. The column is the last
+--   schema-level trace of an economy the platform has already abandoned.
+--   Leaving it invites new code to write to it.
+--
+-- WHAT THIS MIGRATION DOES NOT DO:
+--   * Does not touch the six atlasoracle_* RPCs, bling_pots, or
+--     bling_transactions. ORACLE_MF v0.5 OPEN-7 (legacy escrow disposition) is
+--     Butch's ruling and is explicitly untouched here.
+--   * Does not touch any other column on this table.
+--   * Does not fix the atlasoracle_debit unique-index defect. That defect is
+--     what makes the column permanently zero; it dies with the escrow economy,
+--     not with a patch.
+-- =============================================================================
+
+BEGIN;
+
+-- Idempotent: IF EXISTS makes a re-run a no-op rather than an error.
+ALTER TABLE public.atlasoracle_directives
+    DROP COLUMN IF EXISTS cost_bling;
+
+COMMIT;
+
+-- =============================================================================
+-- VERIFICATION (run after apply; expects zero rows)
+-- =============================================================================
+-- SELECT column_name
+--   FROM information_schema.columns
+--  WHERE table_schema = 'public'
+--    AND table_name   = 'atlasoracle_directives'
+--    AND column_name  = 'cost_bling';
+--
+-- And confirm nothing else moved — expects 16 columns, was 17:
+-- SELECT count(*)
+--   FROM information_schema.columns
+--  WHERE table_schema = 'public' AND table_name = 'atlasoracle_directives';
+-- =============================================================================

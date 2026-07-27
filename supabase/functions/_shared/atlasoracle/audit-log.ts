@@ -8,6 +8,12 @@
 // Content-leak posture: there is NO directive_text / response_text field
 // in DirectiveMetadata. If you find yourself wanting to add one, stop and
 // re-read whitepaper.md §"NO retention of directives or responses."
+//
+// cost_bling WRITE-STOP (DB7, 2026-07-27): costBling removed from both the
+// interface and the INSERT, so this helper cannot resurrect the write after
+// the column is dropped. NOTE — nothing imports this module today;
+// atlasoracle-route writes atlasoracle_directives inline. It is kept in step
+// with the retirement rather than left as a landmine for whoever wires it up.
 
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
@@ -24,7 +30,6 @@ export interface DirectiveMetadata {
   directiveCategory: DirectiveCategory;
   tier: Tier;
   providerSelected: string | null;
-  costBling: number;
   latencyMs: number | null;
   success: boolean;
 }
@@ -46,7 +51,6 @@ export async function logDirective(
       directive_category: metadata.directiveCategory,
       tier: metadata.tier,
       provider_selected: metadata.providerSelected,
-      cost_bling: metadata.costBling,
       latency_ms: metadata.latencyMs,
       success: metadata.success,
     })
