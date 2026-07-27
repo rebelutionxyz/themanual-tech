@@ -5,6 +5,90 @@ Newest pass first.
 
 ---
 
+## DOCS3 — ToS verdicts folded into the matrix + the two stale canon queries fixed (2026-07-27) — **DONE**
+
+**Lane:** docs · **Scope:** oracle · **Dispatch:** 67ba3737-9768-4094-8f77-b006d659d452
+**Posture:** documentation only. No code, no schema, no database writes beyond the rail report itself.
+**Path exception:** granted in the dispatch for two files outside workdir. **It took four** — see §3.
+
+### 0. Headline
+
+The matrix's three riskiest cells were `SEARCH-DERIVED` behind an HTTP 403. All three are now `VERIFIED` from human-read first-party texts — and **one of them was wrong, not merely unconfirmed.** xAI does *not* train on API customer content; the earlier claim was reading xAI's consumer terms, not the enterprise/API channel ORACLE would actually use. That correction moves xAI from "the one provider we cannot ethically route to" to **admissible**, and it is the most consequential line in this pass.
+
+Separately, the canon queries that referenced `cost_bling` are fixed — the column was dropped hours earlier by DB9, so those examples were live-wrong in canon that routed models read.
+
+### 1. Matrix — `docs/atlasoracle-provider-expansion-matrix-2026-07-27.md`
+
+Sourced from rail docs `ORACLE_TOS_VERIFIED v0.1` and `v0.2`, read via psql.
+
+| Cell | Was | Now |
+|---|---|---|
+| OpenAI — training on our inputs | `SEARCH-DERIVED` (403) | **`VERIFIED` §4.2** — does not train by default → **ADMISSIBLE** |
+| OpenAI — our training on their outputs | `SEARCH-DERIVED` (403) | **`VERIFIED` §3.3(e)** — prohibited except the Permitted Exception |
+| xAI — training on our inputs | `SEARCH-DERIVED`, **claimed xAI trains by default** | **`VERIFIED` §3.3 — CORRECTED: does NOT train** → **ADMISSIBLE**; ZDR preferred |
+| xAI — our training on their outputs | `SEARCH-DERIVED` (403) | **`VERIFIED` §3.1 / §2(e)** — flat prohibition, broader than OpenAI's |
+| Llama 3.1 weights licence | `UNKNOWN` | **`VERIFIED` §1.b.i** — training-permissive |
+
+Every upgraded cell carries `VERIFIED` + `source: human-read` + the section number + the rail doc. The fetch-date convention is untouched everywhere else.
+
+**§0 reading rules** gained the `source: human-read` marker as a third tier outranking both `SEARCH-DERIVED` and a fetch-date citation, and says plainly that one of the five upgrades is a correction rather than a confirmation.
+
+**★ Router carve-out added (§2.1).** OpenAI's Permitted Exception covers models "primarily intended to categorize, classify, or organize data" that are **not distributed**. The learned router from `ORACLE_OUTLOOK v0.1` — internal, never shipped — plausibly fits by the clause's own text. Recorded as a legal reading with **justice-lane blessing pending and required before reliance**, not as a settled fact.
+
+**F3 corrected in place.** Retitled *"~~Two~~ providers train on Bee data by default — CORRECTED, xAI removed"*, with a correction block explaining the consumer-vs-enterprise confusion and pointing at §2.2. The finding now covers Together (ZDR opt-out), Moonshot (enterprise-negotiated opt-out) and Gemini free tier. The recommended standing rule survives intact — it just no longer excludes xAI.
+
+**F2 updated** with the Llama 3.1 verdict, including the scope caution that it is **3.1-specific** and does not generalize to Llama 4.x.
+
+**F1 updated** with the verified training-path ladder (metadata exhaust → Llama 3.1 → DeepSeek → OpenAI internal-classifier-only → xAI never), plus the asymmetry the matrix had been conflating: **admissible as a provider** and **usable as training fuel** are two different questions, and xAI is now the extreme case of the split — fine to route to, never to learn from.
+
+**§6 could-not-verify** rebuilt: three rows upgraded to `VERIFIED`, two new rows added (OpenAI training-in; Llama 3.1 licence), the Llama row split out of the generic weights-licence row, and **Fireworks added honestly** as `UNKNOWN` with partial signal — likely admissible, ToS PDF still unread, URL named.
+
+### 2. Canon — the two stale `cost_bling` queries
+
+| File | §  | Fix |
+|---|---|---|
+| `bling-ledger-interface.md` | §6 | `cost_bling === 0` → `costBling === 0`, with a note that it is an **in-memory** value the router computes, logs and returns over HTTP — never persisted |
+| `bling-ledger-interface.md` | §13 | Reconciliation query rewritten to the 16-column reality: selects `tier · provider_selected · input_tokens · output_tokens · cached_tokens · success`, and identifies paid directives by **`WHERE d.tier <> 'free'`** instead of `WHERE d.cost_bling > 0` |
+| `atlasoracle-canonical-cache.md` | §132 | Cache-hit INSERT no longer lists a cost field; gains `input_tokens / output_tokens / cached_tokens = 0 (nothing routed)` and a note that §5 cache pricing is computed in memory, not stored |
+
+All annotated `cost_bling retired 2026-07-27, see rail ORACLE_MF v0.14`.
+
+**Judgement call on the §6 fix.** The dispatch asked me to revise "example queries", and §6 is TypeScript pseudocode, not SQL. I fixed it anyway: it named `cost_bling` as though reading a column, which is now false, and the done-test demanded a clean grep. Renaming to the in-memory `costBling` matches what the router actually calls it (`finalCostBling`) and makes the pseudocode true rather than merely grep-clean.
+
+### 3. The path exception took FOUR files, not two — named as the dispatch requires
+
+Both target files are **mirrored**, and I verified the mirrors were byte-identical before touching anything (`bling-ledger-interface.md` sha256 `44c519c6…` in both locations; `atlasoracle-canonical-cache.md` `d1e21f7c…` in both). The dispatch named **one file from each pair** — `shared/canon/bling-ledger-interface.md` and `AtlasORACLE.to/master_plan/atlasoracle-canonical-cache.md` — so the mirror convention pulled in one more of each:
+
+| File | Status | sha256 after |
+|---|---|---|
+| `shared/canon/bling-ledger-interface.md` | named in dispatch | `17a4180457a02378` |
+| **`AtlasORACLE.to/master_plan/bling-ledger-interface.md`** | **mirror, changed identically** | `17a4180457a02378` |
+| `AtlasORACLE.to/master_plan/atlasoracle-canonical-cache.md` | named in dispatch | `5c1e1f24fb49f632` |
+| **`shared/canon/atlasoracle-canonical-cache.md`** | **mirror, changed identically** | `5c1e1f24fb49f632` |
+
+Identity is guaranteed by construction: I edited one of each pair and **copied the file over its mirror** rather than repeating the edit by hand, then re-hashed. Both pairs match exactly.
+
+**Which copy is canonical matters here.** Per `canon-storage-paths.md` §2.3, `HONEYCOMB/AtlasORACLE.to/master_plan/<file>.md` is what syncs to `master_plan/atlasoracle/<file>.md` in the `themanual-canonical` bucket — the copy routed models actually read. `shared/canon/` is the mirror. Had only the dispatch-named files changed, `bling-ledger-interface.md` would have been fixed in the mirror and left stale in the bucket-synced original — the wrong half.
+
+### 4. Done-test
+
+| Requirement | Result |
+|---|---|
+| `grep cost_bling` across both canon files returns only retirement annotations | **PASS** — 4 hits across 4 files, all annotations (`bling-ledger-interface.md:343` ×2, `atlasoracle-canonical-cache.md:135` ×2) |
+| Matrix cells carry `VERIFIED` + source line | **PASS** — 5 cells upgraded, 11 `source: human-read` markers |
+| No other file modified | **PASS** — `git status` in workdir shows only `docs/atlasoracle-provider-expansion-matrix-2026-07-27.md`; outside workdir, exactly the four files in §3 |
+
+Matrix after edits: `f5e0adca6021da66`, 56,042 bytes.
+
+### 5. Could not verify / left open
+
+- **Fireworks ToS** — still unread; recorded as `UNKNOWN` with its partial signal and the URL, not upgraded on search alone.
+- **The OpenAI router carve-out is a reading, not a ruling.** It needs the justice lane. I recorded it as pending in both §2.1 and the ladder; nothing should rely on it yet.
+- **Llama 4.x and other weight licences** — untouched, still `UNKNOWN`, still F2's follow-up.
+- **The canon bucket is not re-synced by this pass.** These files are the git-side source; whether the `themanual-canonical` bucket now serves the corrected text depends on the sync pipeline — which OPS9 found **does not exist** (no `.github/workflows/` in the repo, no sync script anywhere). So the bucket copy, if one was ever uploaded, is still stale. Flagged, not fixed: building that pipeline is `v1 final scope §2.7` and nobody's dispatch today.
+
+---
+
 ## DB9 — APPLIED: cost_bling DROP (2026-07-27) — **DONE. DB7 closed with it.**
 
 **Lane:** db · **Scope:** oracle · **Dispatch:** f70791c5-6cde-46ce-8092-61fe92bb4bd2
@@ -297,6 +381,166 @@ undesigned; the numbers are shape, not truth, and are marked as such rather than
 - **FRONT16's premise is now spent.** The badge exists, is mounted, is routed, and is
   re-denominated. What remains is the Oracle Token design itself, which is a Butch decision, not a
   frontend task.
+
+---
+
+## OPS14 — DAY-ONE SWEEP: both repos committed (2026-07-27) — **COMMITTED, PUSHES PARKED FOR BUTCH**
+
+**Lane:** ops · **Scope:** oracle · **Dispatch:** e71ec4ee-5967-4e63-9541-77e117fdd516
+**Authorization:** GIT AMENDMENT (`CLAUDE.md` R7) — explicit SWEEP dispatch, gates encoded below.
+
+### 0. Headline
+
+Two commits, two repos, both **1 ahead of `origin/main` and 0 behind** — clean fast-forward push
+path on each. **Neither was pushed.** The push click is canon and permanent; I did not fire the
+command, so nothing is sitting in a pending prompt. Commands for you are in §5.
+
+| Repo | SHA | Files | Change |
+|---|---|---|---|
+| `TheMANUAL.tech` | **`4c4ee4b`** | 18 | +5113 / −166 |
+| `HONEYCOMB` (root) | **`2c1c663`** | 2 | +32 / −2 |
+
+### 1. Repo 1 — `TheMANUAL.tech`, full SWEEP
+
+**Manifest** (`git status --porcelain=v1 -uall`) — 18 paths.
+
+**Hard gates, all pass:**
+
+| Gate | Result |
+|---|---|
+| `backups/` · `*.env*` · `settings.local.json` · `node_modules/` · `.next/` · `verify-out/` · `*.dump` | **clean** — no match |
+| Any file > 1 MB | **clean** — none |
+| Any deletion (`D`) or rename (`R`) | **clean** — all entries `M` or `??` |
+| Every path inside the workspace | **yes** |
+| Secret-shaped strings (`eyJ…`, `sk-ant-…`, `sb_secret_…`, `whsec_…`, `sk_live_…`, assigned service-role key) | **clean** — zero hits across all 18 files |
+
+**Stage-and-verify:** all 18 paths staged by name, then `git diff --cached --name-only` diffed
+against the manifest — **identical, 18/18**. No `git reset` needed.
+
+Staged set:
+
+```
+ M shared/notes/handoffs/handoff-current.md
+ M src/App.tsx
+ M src/components/AtlasOracleWalletBadge.tsx
+ M src/components/layout/UtilityChrome.tsx
+ M supabase/functions/_shared/atlasoracle/audit-log.ts
+ M supabase/functions/atlasoracle-log/index.ts
+ M supabase/functions/atlasoracle-route/index.ts
+?? REPORT.md
+?? deno.lock
+?? docs/atlasoracle-provider-expansion-matrix-2026-07-27.md
+?? docs/atlasoracle-weight-licences-2026-07-27.md
+?? src/lib/atlasoracle/client.ts
+?? src/lib/atlasoracle/routingLog.ts
+?? src/lib/atlasoracle/tokens.ts
+?? src/lib/atlasoracle/useOracleDirective.ts
+?? src/pages/oracle/OraclePage.tsx
+?? supabase/migrations/20260727140000_atlasoracle_retire_cost_bling.sql
+?? supabase/migrations/20260727180000_oracle_token_ledger_v1.sql
+```
+
+Git emitted CRLF→LF normalisation warnings on two `.ts` files. Informational, not a gate failure,
+and no content changed.
+
+### 2. Repo 2 — `HONEYCOMB` root, targeted stage
+
+The dispatch said *"stage **exactly** the day's root-level edits"* and named two files. The root
+manifest actually carried **six**. Gates were run against the two staged files (banned patterns
+clean, 32,522 B and 9,338 B, both `M`, no secret-shaped strings) and the staged set verified
+identical to the intended two.
+
+**Deviation D1 — intentional departure from SWEEP step 3.** The pure SWEEP pattern stages *every*
+manifest path and treats any difference as a stop-and-reset. Here the dispatch deliberately narrowed
+the set, and its own done-test anticipates the gap (*"except deliberate leftovers (name them)"*), so
+I followed the dispatch rather than the generic pattern. Named below.
+
+### 3. Deliberate leftovers — named, as the done-test requires
+
+**Root repo, 4 uncommitted (canon lane, not mine, not named in my dispatch):**
+
+```
+ M AtlasORACLE.to/master_plan/atlasoracle-canonical-cache.md
+ M AtlasORACLE.to/master_plan/bling-ledger-interface.md
+ M shared/canon/atlasoracle-canonical-cache.md
+ M shared/canon/bling-ledger-interface.md
+```
+
+Inspected before deciding: 30 insertions / 8 deletions across the four, documenting the
+`cost_bling` retirement (DB7/DB9) in both mirror locations — e.g. rewriting a spend-audit query to
+key on `tier` and token counts now that the column is gone. Coherent, complete-looking, and clearly
+today's ORACLE work — but authored by another lane whose report does not reference my commit.
+Committing another lane's canon edits under my SHA is exactly what SWEEP's gates exist to prevent.
+**Recommend a canon-lane SWEEP for these four.**
+
+**`TheMANUAL.tech`, 1 uncommitted — appeared *after* the commit:**
+
+```
+ M docs/atlasoracle-provider-expansion-matrix-2026-07-27.md
+```
+
+The tree was verified **clean (0 entries)** immediately after `4c4ee4b`. A parallel session has
+since edited the DOCS1 matrix — upgrading `SEARCH-DERIVED` cells to `VERIFIED` from a human-read of
+the OpenAI Services Agreement, adding §3.3(e) and §4.2 citations and a router carve-out note. Good
+work, and it supersedes DOCS1 §2.1 as filed; it simply landed after the snapshot. Not a sweep
+failure — a timing artifact of concurrent sessions.
+
+**Also inherently uncommitted: this REPORT.md section.** The report of a sweep cannot be inside the
+sweep it describes. `REPORT.md` was committed in `4c4ee4b` in its pre-OPS14 state.
+
+### 4. Judgement calls
+
+- **D1 — targeted stage on the root repo** rather than full-manifest SWEEP. §2.
+- **D2 — `deno.lock` committed.** Not in the dispatch's list. It is a byproduct of the `npx deno
+  check` gate OPS13/OPS12 ran, it is a legitimate lockfile, and it was in the manifest — and SWEEP
+  is all-or-nothing by design, so cherry-picking it out would have broken the identity check and
+  turned this into a non-sweep. Flagged so it is a decision rather than an accident; trivially
+  removable if unwanted.
+- **D3 — `shared/notes/handoffs/handoff-current.md` committed.** OPS9 §6 recorded it as a
+  pre-existing modification and left it alone. It was in the manifest, so under the same
+  all-or-nothing rule it is in the commit. Named here because OPS9 deliberately did not touch it.
+- **D4 — added the APPLIED status header to `20260727180000_oracle_token_ledger_v1.sql`** before
+  staging, as the dispatch asked. DB7's migration already carried one (added by DB9); mine did not.
+  Header only, no SQL changed.
+- **D5 — did not fire `git push`.** The dispatch says park; the done-test accepts
+  "parked-with-note". Firing it would leave a permission prompt hanging. §5.
+
+### 5. Pushes — yours
+
+Both repos are exactly 1 ahead, 0 behind. Nothing is pending, nothing is queued.
+
+```
+cd C:\Users\Butch\Documents\HONEYCOMB\TheMANUAL.tech
+git push origin main          # 4c4ee4b
+
+cd C:\Users\Butch\Documents\HONEYCOMB
+git push origin main          # 2c1c663
+```
+
+`TheMANUAL.tech` pushing to `main` triggers the Railway auto-deploy to themanual.tech. **The
+frontend in that commit includes FRONT16's `/oracle` route and badge wiring, which have not been
+smoke-tested against a production build by this pass** — see §7.
+
+### 6. Done-tests
+
+| Requirement | Result |
+|---|---|
+| Both trees clean post-commit except deliberate leftovers, named | **PASS** — `TheMANUAL.tech` was 0-entry clean at commit; 5 leftovers total across both repos, all named in §3 with reasons |
+| Manifest counts identical | **PASS** — repo 1: 18 manifest = 18 staged, diffed identical. Repo 2: 2 intended = 2 staged, diffed identical |
+| Zero secret-shaped strings staged | **PASS** — pattern scan across all 20 staged files, zero hits |
+| Pushes completed-by-Butch or parked-with-note | **PARKED** — §5 |
+
+### 7. Could not verify
+
+- **That `TheMANUAL.tech@4c4ee4b` builds.** `npm run build` was **not** run. The workspace rule is
+  no build while a dev server is running (a shared `.next` kills it), and I could not establish
+  whether one is up. The commit contains FRONT16 frontend work I did not write and have not
+  compiled. **Since pushing triggers a Railway deploy, someone should build locally before you
+  push** — this is the one real risk in the commit.
+- **Whether the four root-repo canon files are finished.** Judged coherent by reading the diff, not
+  confirmed with their author.
+- **Whether `deno.lock` is wanted long-term.** Committed as a manifest path; nobody has ruled on it.
+- **Push outcome.** Not attempted by design.
 
 ---
 

@@ -13,10 +13,19 @@ Zero prices in this document come from model memory. Where a first-party page wa
 (403, 404, or an unparseable PDF), the cell says `UNKNOWN` and names the blocker — it does not
 get filled from a blog, a reseller, or a recollection.
 
-Three cells are marked `SEARCH-DERIVED` rather than `UNKNOWN`: the first-party page returned 403
+Some cells are marked `SEARCH-DERIVED` rather than `UNKNOWN`: the first-party page returned 403
 to the fetcher, but the quoted language was returned consistently by search against the
 first-party domain. Those are flagged inline and should be re-read by a human before anything
 depends on them.
+
+**`VERIFIED` + `source: human-read` (added 2026-07-27).** A third marker now outranks both. Where
+a first-party text was blocked to the fetcher but read in full by a human, the cell is upgraded to
+`VERIFIED` and carries `source: human-read` plus the section number and the rail doc it came from.
+This pass upgraded five such cells from the rail docs `ORACLE_TOS_VERIFIED v0.1` and `v0.2`
+(OpenAI training-in and training-out, xAI training-in and training-out, Llama 3.1 weights licence).
+**One of those upgrades is a correction, not a confirmation** — see §2.2 and F3: xAI does *not*
+train on API customer content, and the earlier claim that it did was reading the consumer terms.
+The fetch-date convention is unchanged for every other cell.
 
 All prices are USD per 1,000,000 tokens ("MTok") unless stated otherwise. Prices exclude tax.
 
@@ -113,18 +122,34 @@ services, except under a narrow "Permitted Exception" covering models primarily 
 categorize, classify, or organize data (embeddings, classifiers) that are **not distributed or
 made commercially available to third parties**, and fine-tuning of OpenAI-provided models.
 
-> `SEARCH-DERIVED` — <https://openai.com/policies/services-agreement/> and
-> <https://openai.com/policies/may-2025-business-terms/> both returned **HTTP 403** to the
-> fetcher. The restriction above was returned consistently by search against those first-party
-> URLs. **Re-read by a human before relying on it.**
+> `VERIFIED` — upgraded from `SEARCH-DERIVED` 2026-07-27. **source: human-read** — full
+> first-party text of the OpenAI Services Agreement (effective 2026-01-01, business/API terms)
+> read by Butch and filed to the rail as `ORACLE_TOS_VERIFIED v0.1`. The 403 that blocked the
+> fetcher is bypassed by the human-read path; the clause language above is confirmed, and the
+> specific citation is **§3.3(e)** for the training restriction and Permitted Exception.
 
 For AtlasORACLE the practical read is: OpenAI output can be used to *serve* Bee directives, but
-cannot feed any HONEYCOMB-trained model that ships to Bees. The classifier carve-out is
-non-distributable, so it does not cover an Astra-facing feature.
+cannot feed any HONEYCOMB-trained model that ships to Bees.
 
-**OpenAI's use of your data:** does **not** train on API inputs/outputs by default. Abuse-monitoring
-logs retained up to 30 days; Zero Data Retention available to approved customers.
+**★ ROUTER CARVE-OUT (new, v0.1 §OPENAI).** The Permitted Exception covers models "primarily
+intended to categorize, classify, or organize data" that are **not distributed or made
+commercially available to third parties**. The learned ROUTER proposed in `ORACLE_OUTLOOK v0.1` —
+an internal classifier that categorizes directives and selects a provider, never shipped to
+anyone — **plausibly fits that text**. A general AtlasORACLE chatbot trained on OpenAI outputs
+stays clearly prohibited (it competes). The distinction is real but it is a legal reading, not a
+settled fact: **justice-lane confirmation is pending and required before reliance.** Nothing on
+the current board depends on it.
+
+**OpenAI's use of your data:** does **not** train on API inputs/outputs by default —
+`VERIFIED` at **§4.2** (OpenAI will not use Customer Content to develop or improve services absent
+explicit customer agreement), **source: human-read**, `ORACLE_TOS_VERIFIED v0.1`. **ADMISSIBLE**
+under the ratified standing rule. Abuse-monitoring logs retained up to 30 days; Zero Data
+Retention available to approved customers.
 Source: <https://developers.openai.com/api/docs/guides/your-data>, fetched 2026-07-27.
+
+Also recorded from the human-read text, not previously in this matrix: mandatory
+arbitration + class-action waiver; 30-day content deletion on termination; usage policies bar
+safety-testing without approval and licensed-profession advice without professional involvement.
 
 ---
 
@@ -153,25 +178,34 @@ tokens in the request"* — this is a cliff, not a marginal rate.
 | `grok-build-0.1` (<200k) | 256k | $1.00 | $2.00 | $0.20 |
 | `grok-build-0.1` (≥200k) | 256k | $2.00 | $4.00 | $0.40 |
 
-**Training verdict: PROHIBITED.**
-xAI's Acceptable Use Policy prohibits using the Service or any Output to develop machine learning
-models or related AI services that compete with xAI. The Enterprise terms separately prohibit
-using any Service to help develop, or help provide to a third party, any product or service
-similar to or competitive with any Service.
+**Training verdict: PROHIBITED — and broader than OpenAI's.**
+**§3.1** flatly prohibits using Output to train the Customer's or its providers' ML/AI models.
+There is **no competing-models qualifier and no Permitted Exception** — unlike OpenAI, this bars
+even an internal, never-distributed classifier. **§2(e)** separately bars distilling model
+behaviour. **xAI outputs are not fuel, for anything, ever.** **§2(b)** also bars using the Service
+to help develop competitive products; routing *to* Grok is not competing *with* Grok, but that
+reading wants a justice blessing before it is leaned on.
 
-> `SEARCH-DERIVED` — <https://x.ai/legal/terms-of-service> and
-> <https://x.ai/legal/terms-of-service-enterprise> both returned **HTTP 403** to the fetcher.
-> Language above returned consistently by search against those first-party URLs.
-> **Re-read by a human before relying on it.** The AUP at
-> <https://x.ai/legal/acceptable-use-policy> is the page to read first.
+> `VERIFIED` — upgraded from `SEARCH-DERIVED` 2026-07-27. **source: human-read** — full
+> first-party text of the xAI **Enterprise ToS, last updated 2026-05-12** (API/business channel)
+> read by Butch and filed to the rail as `ORACLE_TOS_VERIFIED v0.1`. The 403 that blocked the
+> fetcher is bypassed by the human-read path.
 
-**xAI's use of your data — flag.** Search against xAI's own terms indicates xAI takes a perpetual,
-worldwide, royalty-free licence to use inputs and outputs for business purposes **including model
-training**, applying by default unless the account opts out in settings. If that holds on a direct
-read, **xAI is the only provider in this matrix that trains on your data by default with an
-account-settings opt-out rather than a contractual one.** For a platform whose thesis is that Bees
-own what they give, this needs an explicit decision before any Bee directive text crosses the xAI
-boundary. `SEARCH-DERIVED` — verify directly.
+**xAI's use of your data — CORRECTION, the earlier flag was wrong.**
+**§3.3: xAI shall not use User Content to train foundation / LLM / AI systems.** The API and
+enterprise channel — the only channel AtlasORACLE would ever use — **does not train on customer
+content**, so **xAI is ADMISSIBLE under the ratified standing rule.**
+
+The previous entry here, and cross-cutting finding **F3**, claimed xAI "trains on your data by
+default." That was `SEARCH-DERIVED` and it matched the **consumer** terms, which do grant a broad
+content licence with a logged-in training election and full rights when logged out. Those terms
+govern grok.com and the apps — not the API. **The correction is now the canon reading; F3's xAI
+row is superseded.**
+
+Two real cautions survive the correction: the non-ZDR default **retains User Content up to 30
+days** and permits creation of **De-Identified Data for any lawful purpose**; **ZDR mode**
+(transient only, ~1 hr max) is available self-serve and is **the preferred posture** for any Bee
+directive text crossing the xAI boundary.
 
 ---
 
@@ -767,20 +801,59 @@ HONEYCOMB ever intends to train its own model, the provider choice made now dete
 that is legally available later.** That is a strategic call for OG HUMAN, and it should be made
 before the pool is wired, not after.
 
+> **F1 UPDATE 2026-07-27 — the training-path ladder, verified rungs only.** Folded from rail
+> `ORACLE_TOS_VERIFIED v0.1 + v0.2`. Ranked cleanest first:
+>
+> 1. **ORACLE metadata exhaust** — proprietary, unconditionally clean, no third party's terms
+>    apply at all (`ORACLE_OUTLOOK v0.1`).
+> 2. **Llama 3.1 outputs** — `VERIFIED` permissive; burden-free for an internal, non-distributed
+>    model (F2 update).
+> 3. **DeepSeek outputs** — permissive per this matrix's own first-party fetch (§2.4).
+> 4. **OpenAI outputs** — **internal classifier only**, via the §3.3(e) Permitted Exception,
+>    **pending justice blessing** (§2.1).
+> 5. **xAI outputs** — **never.** §3.1 is a flat prohibition with no carve-out (§2.2).
+>
+> Note the asymmetry this makes explicit: xAI is now **admissible as a provider** (it does not
+> train on our inputs) while being **the most restricted source of fuel** (we may not train on its
+> outputs at all). Those are two different questions and the matrix previously conflated them.
+
 **F2 — The neutral-host route dissolves most of F1.** Open-weight models (gpt-oss, Llama, Qwen,
 Ministral, Mistral Small) run on Groq/Together/Fireworks are governed by the *weights licence*, not
 the inference host's ToS. This is the clean path to a training-permissive posture without picking
 a fight with anyone's terms. **Caveat:** the specific licence for each weight set was not verified
 this pass — `UNKNOWN`, and it is the single most important follow-up in this document.
 
-**F3 — Two providers train on Bee data by default.** xAI (opt-out in account settings,
-`SEARCH-DERIVED`) and Together AI (opt-out via ZDR). Moonshot trains by default with opt-out only
-via negotiated enterprise agreement. Gemini's **free tier** trains and permits human review. For a
-platform whose thesis is "take out the greed, reward giving," routing a Bee's directive text into a
-default-train tier is a consent question that current canon does not answer. **Recommend a
-standing rule: no Bee directive text to any provider that trains by default, regardless of price.**
-That rule alone eliminates the Gemini free tier, and makes ZDR activation a hard precondition for
-Together.
+> **F2 UPDATE 2026-07-27 — the first weights licence is now `VERIFIED`, and it is permissive.**
+> **source: human-read** — full **Llama 3.1 Community License** (release 2024-07-23) read by
+> Butch, filed to the rail as `ORACLE_TOS_VERIFIED v0.2`. **§1.b.i expressly permits using Llama
+> Materials or their Outputs to "create, train, fine tune, or otherwise improve an AI model."**
+> Conditions attach **only on distribution** (name must begin "Llama", display "Built with Llama",
+> ship the licence + NOTICE attribution). **A model trained on Llama outputs that is never
+> distributed carries effectively no naming or attribution burden** — this is the clean-fuel path
+> for the internal router, with none of the carve-out gymnastics OpenAI's §3.3(e) requires. §2's
+> 700M-MAU commercial gate is irrelevant at our scale; §5(c) is standard patent-peace.
+> **SCOPE CAUTION:** this verdict is **Llama 3.1 specific**. Later Llama releases carry their own
+> licences and each needs its own read — do not generalize to Llama 4.x.
+> Separately, the **Llama Acceptable Use Policy** (`v0.1`) governs routing *conduct* if we serve
+> Llama: no weapons/CSAM/deception, must disclose AI-system dangers to end users, no unlicensed
+> professional practice.
+
+**F3 — ~~Two~~ providers train on Bee data by default. — CORRECTED 2026-07-27, xAI removed.**
+
+> **CORRECTION.** The xAI claim in this finding was `SEARCH-DERIVED` and **wrong for the channel
+> that matters.** It matched xAI's **consumer** terms; the **Enterprise/API ToS §3.3** (human-read,
+> `ORACLE_TOS_VERIFIED v0.1`) says xAI **shall not** use User Content to train foundation/LLM/AI
+> systems. **xAI API is ADMISSIBLE under the standing rule below.** See §2.2 for the full corrected
+> entry. Residual caution, not training: non-ZDR default retains User Content up to 30 days and
+> permits De-Identified Data creation — **ZDR is the preferred posture.**
+
+The finding as it now stands: **Together AI** (opt-out via ZDR), **Moonshot** (trains by default,
+opt-out only via negotiated enterprise agreement), and **Gemini's free tier** (trains and permits
+human review). For a platform whose thesis is "take out the greed, reward giving," routing a Bee's
+directive text into a default-train tier is a consent question that current canon does not answer.
+**Recommend a standing rule: no Bee directive text to any provider that trains by default,
+regardless of price.** That rule eliminates the Gemini free tier and makes ZDR activation a hard
+precondition for Together. It no longer excludes xAI.
 
 **F4 — Groq is the cleanest candidate on rights.** No training on inputs or outputs, no default
 retention, self-serve ZDR with no approval gate, US data location, and open weights whose licence
@@ -807,9 +880,11 @@ Per R6, stated explicitly rather than papered over.
 
 | Item | Status | Blocker |
 |---|---|---|
-| OpenAI competing-model restriction, exact text | `SEARCH-DERIVED` | `openai.com/policies/services-agreement/` → HTTP 403 |
-| xAI competing-model restriction, exact text | `SEARCH-DERIVED` | `x.ai/legal/terms-of-service` and `.../-enterprise` → HTTP 403 |
-| xAI default training-on-inputs licence | `SEARCH-DERIVED` | same 403 |
+| OpenAI competing-model restriction, exact text | **`VERIFIED` 2026-07-27** | ~~403~~ — **source: human-read**, Services Agreement §3.3(e), rail `ORACLE_TOS_VERIFIED v0.1` |
+| OpenAI training-on-inputs default | **`VERIFIED` 2026-07-27** | **source: human-read**, §4.2 — does not train; ADMISSIBLE |
+| xAI competing-model restriction, exact text | **`VERIFIED` 2026-07-27** | ~~403~~ — **source: human-read**, Enterprise ToS §3.1 / §2(e) / §2(b), rail `ORACLE_TOS_VERIFIED v0.1` |
+| xAI default training-on-inputs licence | **`VERIFIED` 2026-07-27 — earlier entry CORRECTED** | **source: human-read**, Enterprise ToS §3.3 — API does **not** train; the old claim matched the consumer terms |
+| Llama 3.1 weights licence, training + derivative terms | **`VERIFIED` 2026-07-27** | **source: human-read**, Community License §1.b.i, rail `ORACLE_TOS_VERIFIED v0.2` — permissive; Llama 3.1 **only** |
 | xAI rate limits / min spend / free tier | `UNKNOWN` | not attempted this pass |
 | Fireworks output ownership + training terms | `UNKNOWN` | ToS is a Sanity-hosted PDF; text streams unparseable |
 | Gemini free-tier per-model RPM/TPM/RPD | `UNKNOWN` | docs defer to `aistudio.google.com/rate-limit` (login required) |
@@ -818,7 +893,8 @@ Per R6, stated explicitly rather than papered over.
 | Qwen / Model Studio training terms | `UNKNOWN` | Alibaba Cloud Model Studio ToS not read |
 | Qwen / Model Studio rate limits, min spend | `UNKNOWN` | not attempted this pass |
 | Qwen open-weight licence text, per release | `UNKNOWN` | not attempted — **highest-value follow-up (F2)** |
-| gpt-oss / Llama / Ministral weight licences | `UNKNOWN` | not attempted — **same follow-up (F2)** |
+| gpt-oss / Ministral weight licences | `UNKNOWN` | not attempted — **same follow-up (F2)**. Llama **3.1** is now `VERIFIED` (row above); later Llama releases remain `UNKNOWN` |
+| Fireworks training / retention posture | `UNKNOWN` — partial signal only | ToS PDF still unread by a human. Live search 2026-07-27 (privacy page + monitor summaries) suggests no training on API inputs absent opt-in and zero retention for open models → **likely** ADMISSIBLE. Output-ownership + output-training clauses still need the PDF: <https://fireworks.ai/terms-of-service> |
 | Together AI rate limits / min spend / free tier | `UNKNOWN` | not attempted this pass |
 | Groq Developer-plan minimum spend | `UNKNOWN` | not disclosed in Groq's rate-limit docs |
 | Streaming for Google, Mistral, Qwen, Together, Fireworks, Groq | `SEARCH-DERIVED` | OpenAI-wire-compatible by documentation, not individually re-verified |
