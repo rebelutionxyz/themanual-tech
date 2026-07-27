@@ -14,18 +14,49 @@
 // the router: `directive_category` is not the accepted name (`category` is),
 // so every directive was filed under the server default 'suggest' regardless
 // of what the Bee picked. Fixed here.
+//
+// RESPONSE SHAPE is pinned to the OPS15 contract (Oracle Tokens). `cost_bling`,
+// `estimated_cost_bling` and the escrow fields are GONE from the router and
+// gone from here:
+//
+//   200 success  { directive_id, response, cost_tokens, balance_after_tokens,
+//                  provider, tier, tokens:{input,output,cached} }
+//   200 preview  { cost_preview:true, tier, provider, estimated_cost_tokens,
+//                  estimated_input_tokens, estimated_output_tokens,
+//                  action:'confirm_cost', hint }
+//   402          { error, required_tokens, available_tokens, action:'get_tokens' }
+//   429          { error, retry_after_seconds, caps_hit }
+//
+// Read against the deployed source 2026-07-27 (FRONT17), not assumed from the
+// dispatch text.
 
 import { supabase } from '@/lib/supabase';
 
 export type Tier = 'free' | 'standard' | 'frontier';
 
 export type DirectiveCategory =
-  | 'scaffold' | 'draft' | 'integrate' | 'refactor' | 'analyze'
-  | 'classify' | 'translate' | 'estimate' | 'correlate' | 'suggest';
+  | 'scaffold'
+  | 'draft'
+  | 'integrate'
+  | 'refactor'
+  | 'analyze'
+  | 'classify'
+  | 'translate'
+  | 'estimate'
+  | 'correlate'
+  | 'suggest';
 
 export const DIRECTIVE_CATEGORIES: DirectiveCategory[] = [
-  'scaffold', 'draft', 'integrate', 'refactor', 'analyze',
-  'classify', 'translate', 'estimate', 'correlate', 'suggest',
+  'scaffold',
+  'draft',
+  'integrate',
+  'refactor',
+  'analyze',
+  'classify',
+  'translate',
+  'estimate',
+  'correlate',
+  'suggest',
 ];
 
 /** Successful routed directive. */
@@ -35,8 +66,16 @@ export interface RouteSuccess {
   response: string;
   provider: string;
   tier: Tier;
-  /** Router still reports this field as `cost_bling`; token ledger is undesigned. */
-  costRaw: number;
+  /** Oracle Tokens charged for this directive. 0 on the free tier. */
+  costTokens: number;
+  /**
+   * Oracle Token balance AFTER the debit, straight from the router — the
+   * authoritative post-directive figure. Surfaces let this drive the running
+   * balance rather than re-querying, so the number a Bee sees is the number the
+   * ledger wrote. null when the router did not report one (free tier, which
+   * never debits and never reads a balance).
+   */
+  balanceAfterTokens: number | null;
   tokens: { input: number; output: number; cached: number };
 }
 
@@ -45,16 +84,19 @@ export interface RouteSuccess {
  * estimate clears its confirm threshold, and expects the same call again with
  * confirm_cost: true.
  *
- * KNOWN-UNREACHABLE as deployed (verified OPS10): the frontier estimate is a
- * constant 6.5 against a threshold of 10, so the router never emits this
- * branch today. The gate is implemented here anyway — it is the contract, and
- * a threshold or estimate change server-side turns it on with no UI work.
+ * REACHABLE as of OPS15 — this reverses OPS10's "known-unreachable" note, which
+ * was true of the old BLiNG! pricing (constant 6.5 estimate vs a threshold of
+ * 10). Against the live token rates the frontier estimate scales with directive
+ * length: cost ≈ 580.51 + 0.11 × (directive tokens), threshold 700, so anything
+ * past roughly 1,090 directive tokens — about 4,300 characters — trips the gate.
+ * A pasted document hits it easily. This is a live control, not dead code.
  */
 export interface RoutePreview {
   kind: 'preview';
   tier: Tier;
   provider: string;
-  estimatedCost: number;
+  /** Estimated Oracle Tokens for the directive the Bee is about to confirm. */
+  estimatedCostTokens: number;
   estimatedInputTokens: number;
   estimatedOutputTokens: number;
 }
@@ -64,8 +106,11 @@ export interface RouteFailure {
   kind: 'error';
   message: string;
   status: number | null;
-  action: 'fund' | 'retry-later' | 'none';
+  action: 'get-tokens' | 'retry-later' | 'none';
   retryAfterSeconds?: number;
+  /** 402 only — what the directive needed, and what the Bee actually holds. */
+  requiredTokens?: number;
+  availableTokens?: number;
 }
 
 export type RouteResult = RouteSuccess | RoutePreview | RouteFailure;
@@ -97,18 +142,20 @@ function mockResult(args: InvokeArgs): RouteResult {
     return {
       kind: 'preview',
       tier: args.tier,
-      provider: 'claude-opus-4-7',
-      estimatedCost: 12.5,
-      estimatedInputTokens: 42_000,
-      estimatedOutputTokens: 5_000,
+      provider: 'claude-opus-5',
+      estimatedCostTokens: 855.5,
+      estimatedInputTokens: 4_141,
+      estimatedOutputTokens: 16_282,
     };
   }
   if (probe.startsWith('!fund')) {
     return {
       kind: 'error',
-      message: 'Not enough Oracle Tokens to route this directive.',
+      message: 'Insufficient Oracle Tokens.',
       status: 402,
-      action: 'fund',
+      action: 'get-tokens',
+      requiredTokens: 580.51,
+      availableTokens: 12.5,
     };
   }
   if (probe.startsWith('!cap')) {
@@ -133,12 +180,16 @@ function mockResult(args: InvokeArgs): RouteResult {
     kind: 'response',
     directiveId: `mock-${Math.random().toString(36).slice(2, 10)}`,
     response: `[MOCK — no provider was called]\n\ntier: ${args.tier} · category: ${args.category}\n\nEcho of your directive:\n${args.directive}`,
-    provider: args.tier === 'free'
-      ? 'claude-haiku-4-5'
-      : args.tier === 'standard' ? 'claude-sonnet-4-6' : 'claude-opus-4-7',
+    provider:
+      args.tier === 'free'
+        ? 'claude-haiku-4-5'
+        : args.tier === 'standard'
+          ? 'claude-sonnet-5'
+          : 'claude-opus-5',
     tier: args.tier,
-    costRaw: args.tier === 'free' ? 0 : 2,
-    tokens: { input: 1637, output: 43, cached: 0 },
+    costTokens: args.tier === 'free' ? 0 : args.tier === 'standard' ? 1.0668 : 2.667,
+    balanceAfterTokens: args.tier === 'free' ? null : 498.9332,
+    tokens: { input: 1637, output: 43, cached: 2_256 },
   };
 }
 
@@ -167,8 +218,20 @@ async function unwrapError(err: unknown): Promise<RouteFailure> {
   const message =
     typeof payload.error === 'string' ? payload.error : `Routing failed (${res.status}).`;
 
-  if (res.status === 402 || payload.action === 'fund_escrow') {
-    return { kind: 'error', message, status: res.status, action: 'fund' };
+  // 402 = not enough Oracle Tokens. The router names the gap explicitly
+  // (`required_tokens` / `available_tokens`), so the UI can say how short the
+  // Bee is rather than just that they are short.
+  if (res.status === 402 || payload.action === 'get_tokens') {
+    const required = payload.required_tokens;
+    const available = payload.available_tokens;
+    return {
+      kind: 'error',
+      message,
+      status: res.status,
+      action: 'get-tokens',
+      requiredTokens: typeof required === 'number' ? required : undefined,
+      availableTokens: typeof available === 'number' ? available : undefined,
+    };
   }
   if (res.status === 429) {
     const retry = payload.retry_after_seconds;
@@ -220,7 +283,7 @@ export async function invokeDirective(args: InvokeArgs): Promise<RouteResult> {
       kind: 'preview',
       tier: (d.tier as Tier) ?? args.tier,
       provider: String(d.provider ?? ''),
-      estimatedCost: Number(d.estimated_cost_bling ?? 0),
+      estimatedCostTokens: Number(d.estimated_cost_tokens ?? 0),
       estimatedInputTokens: Number(d.estimated_input_tokens ?? 0),
       estimatedOutputTokens: Number(d.estimated_output_tokens ?? 0),
     };
@@ -233,7 +296,13 @@ export async function invokeDirective(args: InvokeArgs): Promise<RouteResult> {
     response: String(d.response ?? ''),
     provider: String(d.provider ?? ''),
     tier: (d.tier as Tier) ?? args.tier,
-    costRaw: Number(d.cost_bling ?? 0),
+    costTokens: Number(d.cost_tokens ?? 0),
+    // Absent on the free tier, which never debits. `?? null` rather than `?? 0`
+    // so the UI can tell "no balance was touched" from "balance is now zero".
+    balanceAfterTokens:
+      d.balance_after_tokens === null || d.balance_after_tokens === undefined
+        ? null
+        : Number(d.balance_after_tokens),
     tokens: {
       input: Number(tokens.input ?? 0),
       output: Number(tokens.output ?? 0),

@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Sparkles } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
-import { cn } from '@/lib/utils';
 import {
   DIRECTIVE_CATEGORIES,
   type DirectiveCategory,
   type Tier,
   isMocked,
 } from '@/lib/atlasoracle/client';
-import { useOracleDirective } from '@/lib/atlasoracle/useOracleDirective';
-import { TIER_RATES, readOracleTokenBalance } from '@/lib/atlasoracle/tokens';
 import { type RoutingLogEntry, fetchRoutingLog } from '@/lib/atlasoracle/routingLog';
+import { formatTokens } from '@/lib/atlasoracle/tokens';
+import { useOracleDirective } from '@/lib/atlasoracle/useOracleDirective';
+import { useOracleTokens } from '@/lib/atlasoracle/useOracleTokens';
+import { useAuth } from '@/lib/auth';
+import { cn } from '@/lib/utils';
+import { Sparkles } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 
 /**
  * AtlasOracle console — themanual.tech/oracle.
@@ -36,7 +37,7 @@ export function OraclePage() {
   const { state, response, preview, failure, send, confirm, cancelConfirm, reset } =
     useOracleDirective();
 
-  const tokens = readOracleTokenBalance(!!bee);
+  const { balance: tokens, rates, applyBalanceAfter } = useOracleTokens(bee?.id ?? null);
 
   const [log, setLog] = useState<{
     loaded: boolean;
@@ -65,13 +66,18 @@ export function OraclePage() {
     void loadLog();
   }, [loadLog]);
 
-  // A completed directive adds a row — refresh so the log never lies.
+  // A completed directive adds a row and moves the balance — refresh the log,
+  // and take the post-debit balance straight from the router's response so the
+  // running total matches the ledger without a second round trip.
   useEffect(() => {
-    if (state === 'response-ready') void loadLog();
-  }, [state, loadLog]);
+    if (state !== 'response-ready') return;
+    void loadLog();
+    if (response) applyBalanceAfter(response.balanceAfterTokens);
+  }, [state, loadLog, response, applyBalanceAfter]);
 
   const canSubmit = directive.trim().length > 0 && state !== 'working';
-  const tierRate = TIER_RATES.find((r) => r.tier === tier);
+  const tierRate = rates.find((r) => r.tier === tier);
+  const balanceLabel = tokens.balance === null ? '—' : formatTokens(tokens.balance);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -83,9 +89,9 @@ export function OraclePage() {
           <div>
             <h1 className="font-display text-2xl font-semibold text-text">AtlasOracle</h1>
             <p className="mt-1 text-text-silver" style={{ fontSize: '13px' }}>
-              Send a directive. AtlasOracle routes it to a provider against this
-              platform's canon and hands the answer straight back to you — the
-              directive and the response are never stored.
+              Send a directive. AtlasOracle routes it to a provider against this platform's canon
+              and hands the answer straight back to you — the directive and the response are never
+              stored.
             </p>
           </div>
         </header>
@@ -95,9 +101,9 @@ export function OraclePage() {
             className="rounded-md border border-honey/50 bg-honey/10 px-3 py-2 text-honey"
             style={{ fontSize: '12px' }}
           >
-            MOCK MODE — no provider is called and nothing is spent. Directives
-            beginning <code>!preview</code>, <code>!fund</code>, <code>!cap</code> or{' '}
-            <code>!fail</code> exercise the other response shapes.
+            MOCK MODE — no provider is called and nothing is spent. Directives beginning{' '}
+            <code>!preview</code>, <code>!fund</code>, <code>!cap</code> or <code>!fail</code>{' '}
+            exercise the other response shapes.
           </div>
         )}
 
@@ -117,11 +123,9 @@ export function OraclePage() {
           </h2>
           <div className="flex flex-wrap items-center gap-4 rounded-lg border border-border-bright bg-bg-elevated p-4">
             <div>
-              <div className="font-mono text-2xl text-text">
-                {tokens.balance === null ? '—' : tokens.balance.toLocaleString()}
-              </div>
+              <div className="font-mono text-2xl text-text">{balanceLabel}</div>
               <div className="text-text-silver" style={{ fontSize: '11.5px' }}>
-                {tokens.reason}
+                {tokens.status === 'live' ? 'available to route with' : tokens.reason}
               </div>
             </div>
             <button
@@ -139,9 +143,9 @@ export function OraclePage() {
               className="rounded-md border border-border-bright bg-panel-2 p-3 text-text-silver"
               style={{ fontSize: '12.5px' }}
             >
-              The Oracle Token flow is not live yet — the token design is still
-              open, so there is nothing to hand you here. The free tier routes
-              today at no token cost.
+              Your balance above is live and directives are charged against it. What there is not
+              yet is a way to GET more — how Oracle Tokens are offered has not been ruled on, so
+              this control has nothing to hand you. The free tier routes today at no token cost.
             </p>
           )}
         </section>
@@ -157,17 +161,28 @@ export function OraclePage() {
                 <tr>
                   <th className="px-3 py-2 text-left font-medium">Tier</th>
                   <th className="px-3 py-2 text-left font-medium">Provider</th>
-                  <th className="px-3 py-2 text-left font-medium">Rate</th>
+                  <th className="px-3 py-2 text-left font-medium">In / 1M</th>
+                  <th className="px-3 py-2 text-left font-medium">Out / 1M</th>
                   <th className="px-3 py-2 text-left font-medium">Note</th>
                 </tr>
               </thead>
               <tbody className="text-text">
-                {TIER_RATES.map((r) => (
+                {rates.length === 0 && (
+                  <tr className="border-t border-border">
+                    <td className="px-3 py-2 text-text-silver" colSpan={5}>
+                      Rate card unavailable right now.
+                    </td>
+                  </tr>
+                )}
+                {rates.map((r) => (
                   <tr key={r.tier} className="border-t border-border">
                     <td className="px-3 py-2 font-mono">{r.tier}</td>
                     <td className="px-3 py-2 font-mono text-text-silver">{r.model}</td>
                     <td className="px-3 py-2 font-mono">
-                      {r.ratePlaceholder === null ? 'FREE' : `~${r.ratePlaceholder}`}
+                      {r.tier === 'free' ? 'FREE' : formatTokens(r.inputPerM)}
+                    </td>
+                    <td className="px-3 py-2 font-mono">
+                      {r.tier === 'free' ? 'FREE' : formatTokens(r.outputPerM)}
                     </td>
                     <td className="px-3 py-2 text-text-silver">{r.note}</td>
                   </tr>
@@ -176,8 +191,9 @@ export function OraclePage() {
             </table>
           </div>
           <p className="text-text-silver" style={{ fontSize: '11px' }}>
-            Rates are provisional placeholders — Oracle Token denomination is
-            still being designed.
+            Oracle Tokens per 1,000,000 provider tokens, read live from the same rate card the
+            router charges against. Cached input, where a provider reports it, bills at a lower rate
+            again.
           </p>
         </section>
 
@@ -199,7 +215,11 @@ export function OraclePage() {
                 style={{ fontSize: '13px' }}
               />
               <div className="flex flex-wrap items-center gap-2">
-                <label htmlFor="oracle-tier" className="text-text-silver" style={{ fontSize: '12px' }}>
+                <label
+                  htmlFor="oracle-tier"
+                  className="text-text-silver"
+                  style={{ fontSize: '12px' }}
+                >
                   Tier
                 </label>
                 <select
@@ -231,7 +251,9 @@ export function OraclePage() {
                   style={{ fontSize: '12px' }}
                 >
                   {DIRECTIVE_CATEGORIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
                   ))}
                 </select>
 
@@ -252,9 +274,9 @@ export function OraclePage() {
               {tierRate && (
                 <p className="text-text-silver" style={{ fontSize: '11px' }}>
                   {tierRate.model} ·{' '}
-                  {tierRate.ratePlaceholder === null
+                  {tierRate.tier === 'free'
                     ? 'FREE'
-                    : `~${tierRate.ratePlaceholder} Oracle Tokens (provisional)`}
+                    : `${formatTokens(tierRate.inputPerM)} in / ${formatTokens(tierRate.outputPerM)} out per 1M tokens`}
                 </p>
               )}
             </>
@@ -264,12 +286,21 @@ export function OraclePage() {
             <div className="flex flex-col gap-3 rounded-md border border-honey/60 bg-honey/10 p-4">
               <p className="text-text" style={{ fontSize: '13px' }}>
                 This directive is estimated at{' '}
-                <span className="font-mono font-semibold">{preview.estimatedCost}</span> Oracle
-                Tokens on {preview.provider}. Confirm to route it.
+                <span className="font-mono font-semibold">
+                  {formatTokens(preview.estimatedCostTokens)}
+                </span>{' '}
+                Oracle Tokens on {preview.provider}. Nothing has been spent yet — confirm to route
+                it.
               </p>
               <p className="text-text-silver" style={{ fontSize: '11.5px' }}>
                 est. {preview.estimatedInputTokens.toLocaleString()} in ·{' '}
                 {preview.estimatedOutputTokens.toLocaleString()} out
+                {tokens.balance !== null && (
+                  <>
+                    {' · '}balance {formatTokens(tokens.balance)} → about{' '}
+                    {formatTokens(Math.max(0, tokens.balance - preview.estimatedCostTokens))} after
+                  </>
+                )}
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -299,15 +330,27 @@ export function OraclePage() {
               role="alert"
             >
               <span>{failure.message}</span>
-              {failure.action === 'fund' && (
-                <button
-                  type="button"
-                  onClick={() => setTokenNotice(true)}
-                  className="self-start rounded-md border border-border-bright px-2 py-0.5 text-text-silver transition-colors hover:border-honey/70 hover:text-text"
-                  style={{ fontSize: '11.5px' }}
-                >
-                  GET Oracle Tokens
-                </button>
+              {failure.action === 'get-tokens' && (
+                <>
+                  {failure.requiredTokens !== undefined &&
+                    failure.availableTokens !== undefined && (
+                      <span className="text-text-silver" style={{ fontSize: '11.5px' }}>
+                        needs {formatTokens(failure.requiredTokens)} · you hold{' '}
+                        {formatTokens(failure.availableTokens)} · short by{' '}
+                        {formatTokens(
+                          Math.max(0, failure.requiredTokens - failure.availableTokens),
+                        )}
+                      </span>
+                    )}
+                  <button
+                    type="button"
+                    onClick={() => setTokenNotice(true)}
+                    className="self-start rounded-md border border-border-bright px-2 py-0.5 text-text-silver transition-colors hover:border-honey/70 hover:text-text"
+                    style={{ fontSize: '11.5px' }}
+                  >
+                    GET Oracle Tokens
+                  </button>
+                </>
               )}
               {failure.action === 'retry-later' && failure.retryAfterSeconds && (
                 <span className="text-text-silver" style={{ fontSize: '11.5px' }}>
@@ -337,6 +380,15 @@ export function OraclePage() {
                     ? ` / ${response.tokens.cached.toLocaleString()} cached`
                     : ''}
                 </span>
+                <span className={response.costTokens > 0 ? 'text-honey' : undefined}>
+                  cost ·{' '}
+                  {response.costTokens === 0
+                    ? 'FREE'
+                    : `${formatTokens(response.costTokens)} Oracle Tokens`}
+                </span>
+                {response.balanceAfterTokens !== null && (
+                  <span>balance · {formatTokens(response.balanceAfterTokens)}</span>
+                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -415,9 +467,7 @@ export function OraclePage() {
                       </td>
                       <td className="px-3 py-2 font-mono">{e.tier}</td>
                       <td className="px-3 py-2 font-mono text-text-silver">{e.category}</td>
-                      <td className="px-3 py-2 font-mono text-text-silver">
-                        {e.provider ?? '—'}
-                      </td>
+                      <td className="px-3 py-2 font-mono text-text-silver">{e.provider ?? '—'}</td>
                       <td className="px-3 py-2">
                         <span
                           className={cn(
@@ -446,8 +496,8 @@ export function OraclePage() {
           )}
 
           <p className="text-text-silver" style={{ fontSize: '11px' }}>
-            Metadata only. Directive text and routed responses are never stored —
-            the columns do not exist.
+            Metadata only. Directive text and routed responses are never stored — the columns do not
+            exist.
           </p>
         </section>
       </div>

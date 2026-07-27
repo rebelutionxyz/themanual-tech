@@ -38,7 +38,7 @@
 
 import { errorResponse, handleCors, jsonResponse } from '../_shared/cors.ts';
 import { verifyAuth } from '../_shared/auth.ts';
-import { serviceClient, userClient } from '../_shared/supabase.ts';
+import { serviceClient } from '../_shared/supabase.ts';
 import { assembleCrossAstraCanon } from './canon.ts';
 
 const ALLOWED_CATEGORIES = [
@@ -58,56 +58,100 @@ type Tier = typeof ALLOWED_TIERS[number];
 // claude-sonnet-4-6 and claude-opus-4-7 are both listed Legacy as of that date.
 // Reversal is a one-line revert of this map.
 //
-// ⚠ PREREQUISITE BEFORE FLIPPING PAID_TIERS_ENABLED — do not skip. ⚠
-// This router sends NO `thinking` parameter. On the models being replaced that
-// meant no thinking. On BOTH replacements it does not:
-//   Opus 4.7 / Sonnet 4.6 — omitting `thinking` ⇒ thinking OFF
-//   Opus 5   / Sonnet 5   — omitting `thinking` ⇒ ADAPTIVE THINKING ON, and
-//                           `effort` defaults to `high` on the Claude API
-// max_tokens caps thinking + response text TOGETHER, and TIER_MAX_TOKENS is
-// tight (standard 1500, frontier 5000). A Sonnet 5 call at effort=high can
-// spend most of 1500 on thinking and return truncated or empty content — which
-// this router reports as `provider_empty_content`, a 502, after paying for the
-// tokens. Sonnet 5 also uses the Opus-4.7-generation tokenizer (~30% more
-// tokens for the same text), so estimateInputTokens() drifts further low.
-// Whoever re-enables paid tiers must first set `thinking` and
-// `output_config.effort` explicitly and re-baseline TIER_MAX_TOKENS.
-// Latent only: both paid tiers are gated off, so nothing here is live today.
+// OPS15 (2026-07-27) resolved the thinking-baseline prerequisite this comment
+// used to carry: `thinking` and `output_config.effort` are now sent explicitly
+// per tier and TIER_MAX_TOKENS has been re-baselined. See TIER_THINKING below.
 const TIER_PROVIDER_MODEL: Record<Tier, string> = {
   free:     'claude-haiku-4-5',
   standard: 'claude-sonnet-5',
   frontier: 'claude-opus-5',
 };
 
-// Default expected output tokens by tier — used in cost estimation.
-const TIER_DEFAULT_OUTPUT_TOKENS: Record<Tier, number> = {
-  free:     500,
-  standard: 1500,
-  frontier: 5000,
+// ─── Thinking baseline (OPS15, 2026-07-27). ───
+//
+// Anthropic's effort doc, live-verified this day: max_tokens is "a hard limit
+// on total output, thinking plus response text". Sending no `thinking` field
+// means thinking OFF on Opus 4.7 / Sonnet 4.6 but ADAPTIVE THINKING ON at
+// effort=high on Opus 5 / Sonnet 5. That mismatch, against the old tight
+// max_tokens, is what OPS12 flagged as a blocker. Both are now explicit.
+//
+//   free      Haiku 4.5 supports NEITHER adaptive thinking NOR effort, so both
+//             fields are omitted for that tier. Behaviour is unchanged — this
+//             is why free was never at risk.
+//   standard  Sonnet 5, adaptive + effort=medium. The docs describe medium as
+//             "comparable to Claude Sonnet 4.6 at high effort", i.e. it holds
+//             the quality the standard tier already had, more cheaply.
+//   frontier  Opus 5, adaptive + effort=high (the API default, stated openly
+//             rather than inherited).
+interface ThinkingConfig {
+  thinking?: { type: 'adaptive' };
+  effort?:   'low' | 'medium' | 'high' | 'xhigh' | 'max';
+}
+const TIER_THINKING: Record<Tier, ThinkingConfig> = {
+  free:     {},
+  standard: { thinking: { type: 'adaptive' }, effort: 'medium' },
+  frontier: { thinking: { type: 'adaptive' }, effort: 'high' },
 };
 
-// max_tokens passed to Anthropic by tier — slightly above expected output
-// to give the model headroom.
+// Expected output tokens = base + (input × scale), capped at TIER_MAX_TOKENS.
+//
+// Two jobs. First, the estimate must now cover THINKING as well as response
+// text, so the bases are far above the old response-only figures. Second,
+// making the estimate scale with directive size is what makes the frontier
+// confirm_cost gate reachable at all — see FRONTIER_PREVIEW_THRESHOLD_TOKENS.
+const TIER_BASE_OUTPUT_TOKENS: Record<Tier, number> = {
+  free:     500,    // unchanged: Haiku 4.5 does not think
+  standard: 3000,   // ~1500 response + ~1500 thinking headroom
+  frontier: 8000,   // ~5000 response + ~3000 thinking headroom
+};
+const TIER_OUTPUT_SCALE: Record<Tier, number> = {
+  free:     0,      // flat — keeps the free tier's estimate predictable
+  standard: 1,
+  frontier: 2,
+};
+
+// max_tokens: a ceiling, not a reservation — unused headroom costs nothing,
+// while too little truncates mid-thought and lands on provider_empty_content
+// AFTER the provider has billed. Sized generously on purpose.
 const TIER_MAX_TOKENS: Record<Tier, number> = {
-  free:     800,
-  standard: 1500,
-  frontier: 5000,
+  free:     800,     // unchanged
+  standard: 8_000,
+  frontier: 32_000,
 };
 
-// ─── Paid-tier kill switch (OPS11, 2026-07-27). ───
+// ─── Paid tiers (OPS11 gate, re-opened by OPS15). ───
 //
-// atlasoracle_debit cannot currently succeed: it writes two bling_transactions
-// legs sharing one source_ref, against a unique index on (source_ref) WHERE
-// source_type='atlasoracle_directive'. Every standard / frontier directive
-// therefore called Anthropic (real spend), failed the debit, discarded the
-// model's response and returned 500 — pure waste, with the spend invisible.
-//
-// Until the billing path is rebuilt on Oracle Tokens, paid tiers are refused
-// BEFORE any provider call. Flip this to true to re-enable; nothing else here
-// is economics logic and the debit / credit RPCs are deliberately untouched.
-const PAID_TIERS_ENABLED = false;
+// OPS11 shut these off because atlasoracle_debit could never succeed: it wrote
+// two bling_transactions legs sharing one source_ref against a unique index, so
+// every paid directive called Anthropic, failed the debit, discarded the answer
+// and returned 500. OPS15 does not fix that RPC — it stops calling it. Paid
+// tiers now debit oracle_token_ledger instead (DB8), append-only, one row.
+// atlasoracle_debit / _credit are untouched and dormant per OPEN-7.
+const PAID_TIERS_ENABLED = true;
 
-const FRONTIER_PREVIEW_THRESHOLD_BLING = 10.0;
+// Frontier confirm_cost gate, in Oracle Tokens.
+//
+// OPS10 finding 2: the old gate was arithmetically unreachable — the frontier
+// estimate was a constant 6.5 BLiNG! against a threshold of 10, so it could
+// never fire for any input. A gate that NEVER fires and a gate that ALWAYS
+// fires are the same bug wearing different clothes, so both bounds matter:
+//
+//   cost(input) = input/1e6 × 10000                       (input leg)
+//               + min(32000, 8000 + 2·input)/1e6 × 50000  (output leg)
+// For input < 12000 tokens that reduces to  400 + 0.11·input
+//
+// The canon prefix is 1,529 tokens (6,116 chars, measured 2026-07-27), and it
+// rides on EVERY request, so the frontier estimate can never fall below
+//   400 + 0.11 × 1530 ≈ 568.
+// A threshold at 550 therefore fires on every frontier directive including an
+// empty one — verified live in the OPS15 battery before this constant was
+// retuned. 700 puts the gate inside the real range:
+//   floor  (empty directive)      input ≈ 1,530 ⇒ cost ≈ 568  → no gate
+//   gate   fires when input > 2,727 ⇒ ≈ 4,792 directive chars
+//   ceiling (MAX_DIRECTIVE_CHARS)  input ≈ 4,029 ⇒ cost ≈ 843  → gate
+// So it covers roughly the upper half of the permitted directive range and is
+// clear of both bounds. Proof reproduced in REPORT.md.
+const FRONTIER_PREVIEW_THRESHOLD_TOKENS = 700;
 const ACTUAL_OVERAGE_WARN_RATIO = 1.25;
 const CHARS_PER_TOKEN = 4; // rough English heuristic
 const MAX_DIRECTIVE_CHARS = 10_000;
@@ -148,33 +192,58 @@ function estimateInputTokens(directive: string): number {
     + Math.ceil(CANON_BUNDLE_LENGTH / CHARS_PER_TOKEN);
 }
 
-// Cost calculation in BLiNG! per rate-cap-pricing.md §4.
+// Expected output tokens for a tier, given the estimated input size.
+function estimateOutputTokens(tier: Tier, inputTokens: number): number {
+  return Math.min(
+    TIER_MAX_TOKENS[tier],
+    TIER_BASE_OUTPUT_TOKENS[tier] + inputTokens * TIER_OUTPUT_SCALE[tier],
+  );
+}
+
+// ─── Rates as DATA (OPS15). ───
 //
-// Standard cost-shape boundaries from the dispatch overlap (e.g. input=5000
-// output=2000 matches both medium and large). Resolution: largest shape
-// wins. Check large first, then medium, default short.
-function calculateCostBling(
-  tier: Tier,
+// Per-model Oracle Token rates live in oracle_model_rates (DB8), not in code,
+// so re-pricing is an INSERT rather than a deploy. Current row per model =
+// newest active row by effective_from, which preserves rate history: a debit
+// can always be re-derived against the rate that was live when it happened.
+interface ModelRate {
+  input_tokens_per_m:  number;
+  output_tokens_per_m: number;
+  cached_input_per_m:  number | null;
+}
+
+// Cost in Oracle Tokens.
+//
+// ⚠ Anthropic reports these counts as DISJOINT, not nested. `input_tokens` is
+// the UNCACHED input only; `cache_read_input_tokens` and
+// `cache_creation_input_tokens` are separate buckets that it already excludes.
+// Total input = input_tokens + cached. They are therefore billed on separate
+// legs and must NOT be subtracted from one another.
+//
+// The first cut of this function treated cached as a subset of input and did
+// `min(cached, input)`, which billed ~16 cached tokens instead of ~2,256 and
+// undercharged by roughly 10x. Caught by the OPS15 live battery (B1: charged
+// 0.1064 where the correct figure was 1.0668); the two affected test debits
+// were corrected with reversing adjustment entries rather than edited.
+//
+// If a model has no cached rate configured, cached tokens fall back to the full
+// input rate — over-charging the Bee slightly is the safe direction for a
+// missing rate, and it is visible rather than silent.
+function calculateCostTokens(
+  rate: ModelRate,
   inputTokens: number,
   outputTokens: number,
+  cachedTokens: number,
 ): number {
-  if (tier === 'free') return 0;
+  const cachedRate = rate.cached_input_per_m ?? rate.input_tokens_per_m;
 
-  if (tier === 'standard') {
-    if (inputTokens >= 10000 || outputTokens >= 1500) return 2.0; // large
-    if (inputTokens >= 3000  || outputTokens >= 500)  return 1.0; // medium
-    return 0.5;                                                    // short
-  }
+  const cost =
+      (inputTokens  / 1_000_000) * rate.input_tokens_per_m
+    + (cachedTokens / 1_000_000) * cachedRate
+    + (outputTokens / 1_000_000) * rate.output_tokens_per_m;
 
-  // frontier
-  let cost = 5.0;
-  if (inputTokens > 10000) {
-    cost += Math.ceil((inputTokens - 10000) / 1000) * 0.1;
-  }
-  if (outputTokens > 2000) {
-    cost += Math.ceil((outputTokens - 2000) / 1000) * 0.5;
-  }
-  return Math.min(cost, 50.0);
+  // Six decimals matches oracle_token_ledger.amount_tokens numeric(20,6).
+  return Math.round(cost * 1_000_000) / 1_000_000;
 }
 
 Deno.serve(async (req) => {
@@ -256,11 +325,12 @@ Deno.serve(async (req) => {
       ? body.astra_slug
       : null;
 
-  const jwt = req.headers.get('Authorization')!.slice('Bearer '.length);
-  const userSb = userClient(jwt);
+  // OPS15: the user-scoped client is gone with the escrow path — it existed
+  // only to call atlasoracle_get_escrow_balance as the Bee. Token balances are
+  // read server-side from the oracle_token_balances view instead.
   const service = serviceClient();
 
-  // ─── Rate cap check (BEFORE astra lookup / escrow check / directive insert). ───
+  // ─── Rate cap check (BEFORE astra lookup / balance check / directive insert). ───
   const { data: rateCapResult, error: rateCapErr } = await service.rpc(
     'atlasoracle_check_rate_caps',
     { p_bee_id: beeId, p_tier: tier },
@@ -314,22 +384,50 @@ Deno.serve(async (req) => {
     }
   }
 
-  // ─── Cost estimation. ───
-  const estimatedInputTokens  = estimateInputTokens(directive);
-  const estimatedOutputTokens = TIER_DEFAULT_OUTPUT_TOKENS[tier];
-  const estimatedCostBling = calculateCostBling(
-    tier, estimatedInputTokens, estimatedOutputTokens,
-  );
+  // ─── Rate lookup (rates as data — OPS15). ───
+  const providerModelForRate = TIER_PROVIDER_MODEL[tier];
+  let rate: ModelRate | null = null;
+  if (tier !== 'free') {
+    const { data: rateRow, error: rateErr } = await service
+      .from('oracle_model_rates')
+      .select('input_tokens_per_m, output_tokens_per_m, cached_input_per_m')
+      .eq('model_name', providerModelForRate)
+      .eq('active', true)
+      .order('effective_from', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (rateErr || !rateRow) {
+      // Refuse rather than guess. Charging an invented rate is worse than a 503.
+      console.error('atlasoracle-route rate lookup failed', {
+        bee_id: beeId, model: providerModelForRate,
+        message: rateErr?.message ?? 'no active rate row',
+      });
+      return errorResponse('Pricing not configured for this tier', 503);
+    }
+    rate = {
+      input_tokens_per_m:  Number(rateRow.input_tokens_per_m),
+      output_tokens_per_m: Number(rateRow.output_tokens_per_m),
+      cached_input_per_m:  rateRow.cached_input_per_m === null
+        ? null : Number(rateRow.cached_input_per_m),
+    };
+  }
 
-  // ─── Frontier cost-preview gate. ───
+  // ─── Cost estimation, in Oracle Tokens. ───
+  const estimatedInputTokens  = estimateInputTokens(directive);
+  const estimatedOutputTokens = estimateOutputTokens(tier, estimatedInputTokens);
+  const estimatedCostTokens = rate === null
+    ? 0
+    : calculateCostTokens(rate, estimatedInputTokens, estimatedOutputTokens, 0);
+
+  // ─── Frontier cost-preview gate (now reachable — see the constant). ───
   if (
     tier === 'frontier'
-    && estimatedCostBling > FRONTIER_PREVIEW_THRESHOLD_BLING
+    && estimatedCostTokens > FRONTIER_PREVIEW_THRESHOLD_TOKENS
     && !confirmCost
   ) {
     console.log('atlasoracle-route frontier preview', {
       bee_id: beeId,
-      estimated_cost_bling: estimatedCostBling,
+      estimated_cost_tokens: estimatedCostTokens,
       estimated_input_tokens: estimatedInputTokens,
       estimated_output_tokens: estimatedOutputTokens,
     });
@@ -337,7 +435,7 @@ Deno.serve(async (req) => {
       cost_preview: true,
       tier,
       provider: TIER_PROVIDER_MODEL[tier],
-      estimated_cost_bling: estimatedCostBling,
+      estimated_cost_tokens: estimatedCostTokens,
       estimated_input_tokens: estimatedInputTokens,
       estimated_output_tokens: estimatedOutputTokens,
       action: 'confirm_cost',
@@ -345,26 +443,38 @@ Deno.serve(async (req) => {
     });
   }
 
-  // ─── Escrow pre-check (using ESTIMATED cost). ───
-  // Free tier (cost 0) skips the pre-check entirely.
-  if (estimatedCostBling > 0) {
-    const { data: balanceResult, error: balanceErr } = await userSb.rpc(
-      'atlasoracle_get_escrow_balance',
-      { p_bee_id: beeId },
-    );
-    if (balanceErr) {
-      console.error('atlasoracle-route balance lookup failed', {
-        bee_id: beeId, message: balanceErr.message,
+  // ─── Oracle Token balance pre-check (using ESTIMATED cost). ───
+  //
+  // Reads the oracle_token_balances view (DB8). Free tier costs 0 and skips it.
+  // This runs BEFORE the directive row insert and before the provider call, so
+  // an underfunded Bee costs the platform nothing.
+  let balanceBefore = 0;
+  if (estimatedCostTokens > 0) {
+    const { data: balRow, error: balErr } = await service
+      .from('oracle_token_balances')
+      .select('balance_tokens')
+      .eq('bee_id', beeId)
+      .maybeSingle();
+    if (balErr) {
+      console.error('atlasoracle-route token balance lookup failed', {
+        bee_id: beeId, message: balErr.message,
       });
-      return errorResponse('Escrow balance lookup failed', 500);
+      return errorResponse('Token balance lookup failed', 500);
     }
-    const escrowBalance = Number(balanceResult?.balance ?? 0);
-    if (escrowBalance < estimatedCostBling) {
+    // No ledger rows yet = no view row = zero balance, not an error.
+    balanceBefore = Number(balRow?.balance_tokens ?? 0);
+
+    if (balanceBefore < estimatedCostTokens) {
+      console.log('atlasoracle-route insufficient tokens', {
+        bee_id: beeId, tier,
+        required_tokens: estimatedCostTokens,
+        available_tokens: balanceBefore,
+      });
       return jsonResponse({
-        error: 'Insufficient AtlasOracle escrow. Fund your escrow to continue.',
-        escrow_balance: escrowBalance,
-        cost_bling: estimatedCostBling,
-        action: 'fund_escrow',
+        error: 'Insufficient Oracle Tokens.',
+        required_tokens: estimatedCostTokens,
+        available_tokens: balanceBefore,
+        action: 'get_tokens',
       }, 402);
     }
   }
@@ -391,7 +501,7 @@ Deno.serve(async (req) => {
   console.log('atlasoracle-route directive created', {
     directive_id: directiveId, bee_id: beeId, tier, category,
     astra_slug: astraSlug,
-    estimated_cost_bling: estimatedCostBling,
+    estimated_cost_tokens: estimatedCostTokens,
   });
 
   // ─── Call Anthropic. ───
@@ -404,6 +514,18 @@ Deno.serve(async (req) => {
       cache_control: { type: 'ephemeral' },
     },
   ];
+  // Thinking + effort per tier (OPS15). Omitted entirely for free, because
+  // Haiku 4.5 supports neither and would reject them.
+  const thinkingCfg = TIER_THINKING[tier];
+  const providerBody: Record<string, unknown> = {
+    model: providerModel,
+    max_tokens: maxTokens,
+    system: systemBlock,
+    messages: [{ role: 'user', content: directive }],
+  };
+  if (thinkingCfg.thinking) providerBody.thinking = thinkingCfg.thinking;
+  if (thinkingCfg.effort)   providerBody.output_config = { effort: thinkingCfg.effort };
+
   const startedAt = Date.now();
   let providerResponse: Response;
   try {
@@ -414,12 +536,7 @@ Deno.serve(async (req) => {
         'x-api-key': apiKey,
         'anthropic-version': ANTHROPIC_VERSION,
       },
-      body: JSON.stringify({
-        model: providerModel,
-        max_tokens: maxTokens,
-        system: systemBlock,
-        messages: [{ role: 'user', content: directive }],
-      }),
+      body: JSON.stringify(providerBody),
     });
   } catch (err) {
     const latencyMs = Date.now() - startedAt;
@@ -493,19 +610,25 @@ Deno.serve(async (req) => {
     return errorResponse('Provider returned empty content', 502);
   }
 
-  // ─── Charge-the-lesser cost. ───
-  const actualCostBling = calculateCostBling(tier, inputTokens, outputTokens);
-  const finalCostBling = Math.min(estimatedCostBling, actualCostBling);
+  // ─── Charge-the-lesser cost, in Oracle Tokens. ───
+  //
+  // Survives the rewire unchanged in spirit: the Bee pays min(estimate, actual)
+  // and the platform absorbs any underestimate. What changed is the unit and
+  // the fact that cached input is now priced at its own cheaper rate.
+  const actualCostTokens = rate === null
+    ? 0
+    : calculateCostTokens(rate, inputTokens, outputTokens, cachedTokens);
+  const finalCostTokens = Math.min(estimatedCostTokens, actualCostTokens);
   if (
-    estimatedCostBling > 0
-    && actualCostBling > estimatedCostBling * ACTUAL_OVERAGE_WARN_RATIO
+    estimatedCostTokens > 0
+    && actualCostTokens > estimatedCostTokens * ACTUAL_OVERAGE_WARN_RATIO
   ) {
     console.warn('atlasoracle-route actual cost exceeded estimate >25%', {
       directive_id: directiveId,
       tier,
-      estimated_cost_bling: estimatedCostBling,
-      actual_cost_bling: actualCostBling,
-      treasury_absorbed_bling: actualCostBling - estimatedCostBling,
+      estimated_cost_tokens: estimatedCostTokens,
+      actual_cost_tokens: actualCostTokens,
+      platform_absorbed_tokens: actualCostTokens - estimatedCostTokens,
       estimated_input_tokens: estimatedInputTokens,
       actual_input_tokens: inputTokens,
       estimated_output_tokens: estimatedOutputTokens,
@@ -513,45 +636,55 @@ Deno.serve(async (req) => {
     });
   }
 
-  // ─── Debit (skip for free tier / zero cost). ───
-  let escrowBalanceAfter: number | null = null;
-  if (finalCostBling > 0) {
-    const { data: debitResult, error: debitErr } = await service.rpc(
-      'atlasoracle_debit',
-      {
-        p_bee_id: beeId,
-        p_amount: finalCostBling,
-        p_source_ref: directiveId,
-      },
-    );
+  // ─── Debit: ONE append-only row in oracle_token_ledger. ───
+  //
+  // Lead design ruling (OPS15): no second/treasury leg. Revenue is the sum of
+  // debit rows, queryable directly; double-entry buys nothing in an append-only
+  // ledger whose corrections are reversing entries. This is also what makes the
+  // write safe — the defect that killed atlasoracle_debit was precisely its
+  // second leg colliding with a one-row-per-source_ref unique index.
+  //
+  // amount_tokens is NEGATIVE for a debit; the ledger CHECK enforces the sign.
+  // atlasoracle_debit / _credit are NOT called and NOT modified (OPEN-7).
+  let balanceAfter: number | null = null;
+  if (finalCostTokens > 0) {
+    const { error: debitErr } = await service
+      .from('oracle_token_ledger')
+      .insert({
+        bee_id: beeId,
+        entry_type: 'debit',
+        amount_tokens: -finalCostTokens,
+        directive_id: directiveId,
+        memo: `${tier} directive via ${providerModel}`,
+      });
     if (debitErr) {
-      const msg = debitErr.message ?? 'debit failed';
+      // The provider has already been paid at this point, so the token counts
+      // are carried onto the failure row — that is OPS11's telemetry earning
+      // its keep. The Bee is not charged.
+      const msg = debitErr.message ?? 'ledger debit failed';
       await markFailed(
-        service, directiveId, latencyMs, `debit: ${msg}`, spendTelemetry,
+        service, directiveId, latencyMs, `token_debit: ${msg}`, spendTelemetry,
       );
-      console.error('atlasoracle-route debit failed', {
+      console.error('atlasoracle-route token debit failed', {
         directive_id: directiveId, message: msg,
       });
-      if (/insufficient/i.test(msg)) {
-        return jsonResponse({
-          error: 'Escrow drained during directive execution. Fund and retry.',
-          action: 'fund_escrow',
-        }, 402);
-      }
-      return errorResponse('Failed to debit escrow', 500);
+      return errorResponse('Failed to debit Oracle Tokens', 500);
     }
-    escrowBalanceAfter = Number(debitResult?.escrow_balance_after ?? 0);
+
+    const { data: afterRow } = await service
+      .from('oracle_token_balances')
+      .select('balance_tokens')
+      .eq('bee_id', beeId)
+      .maybeSingle();
+    balanceAfter = Number(afterRow?.balance_tokens ?? 0);
   }
 
   // ─── Finalize directive row. ───
   //
-  // cost_bling WRITE-STOP (DB7, 2026-07-27). This UPDATE no longer persists
-  // cost_bling. The column is `NOT NULL DEFAULT 0`, so rows simply keep the 0
-  // the INSERT gave them — no null risk, no behavior change (every row in the
-  // table already reads 0.000000). finalCostBling is still computed, still
-  // logged, and still returned in the HTTP body: the router keeps reporting
-  // cost, it just stops persisting it. This is step one of the retirement;
-  // the column DROP is a separate dispatch and must not ride along blind.
+  // cost_bling is gone entirely (DB7 write-stop, DB9 column DROP). Cost now
+  // lives where it belongs: as a signed row in oracle_token_ledger, joinable to
+  // this directive by directive_id. The directives table keeps the token counts
+  // and the provider, which is what a spend audit should read anyway.
   const { error: finalizeErr } = await service
     .from('atlasoracle_directives')
     .update({
@@ -577,20 +710,30 @@ Deno.serve(async (req) => {
     tier,
     category,
     provider: providerModel,
-    estimated_cost_bling: estimatedCostBling,
-    actual_cost_bling: actualCostBling,
-    final_cost_bling: finalCostBling,
+    estimated_cost_tokens: estimatedCostTokens,
+    actual_cost_tokens: actualCostTokens,
+    final_cost_tokens: finalCostTokens,
     latency_ms: latencyMs,
     input_tokens: inputTokens,
     output_tokens: outputTokens,
     cached_tokens: cachedTokens,
-    escrow_balance_after: escrowBalanceAfter,
+    balance_after_tokens: balanceAfter,
   });
 
+  // Response shape (OPS15). `cost_bling` and `estimated_cost_bling` are GONE,
+  // replaced by `cost_tokens` / `estimated_cost_tokens` + `balance_after_tokens`.
+  // Verified non-breaking against src/lib/atlasoracle/client.ts: both call sites
+  // read `Number(d.cost_bling ?? 0)` / `Number(d.estimated_cost_bling ?? 0)`, so
+  // an absent field coalesces to 0 rather than throwing. The badge therefore
+  // shows a cost of 0 until FRONT17 reads the new fields — cosmetic and
+  // transitional, not a crash. Emitting `cost_bling: 0` instead would produce
+  // the identical 0 in the UI while keeping a dead BLiNG!-named field alive, so
+  // removal is strictly cleaner.
   return jsonResponse({
     directive_id: directiveId,
     response: responseText,
-    cost_bling: finalCostBling,
+    cost_tokens: finalCostTokens,
+    balance_after_tokens: balanceAfter,
     provider: providerModel,
     tier,
     tokens: {
@@ -598,7 +741,6 @@ Deno.serve(async (req) => {
       output: outputTokens,
       cached: cachedTokens,
     },
-    escrow_balance_after: escrowBalanceAfter,
   });
 });
 
@@ -621,11 +763,10 @@ async function markFailed(
   errorMessage: string,
   telemetry?: FailureTelemetry,
 ): Promise<void> {
-  // Before OPS11 a directive that called Anthropic and then died — the debit
-  // defect being the live case — recorded null tokens and null provider, so
-  // real provider spend was invisible to the platform. cost_bling stays 0 on
-  // this path deliberately: the Bee was not charged, and inventing a charge
-  // here would be an economics change, which this pass is forbidden to make.
+  // Before OPS11 a directive that called Anthropic and then died recorded null
+  // tokens and null provider, so real provider spend was invisible. It is now
+  // carried here. No ledger row is written on this path, deliberately: the Bee
+  // was not charged, and the absence of a debit row IS the record of that.
   const patch: Record<string, unknown> = {
     status: 'failed',
     success: false,

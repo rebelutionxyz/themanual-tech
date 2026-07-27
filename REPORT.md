@@ -5,6 +5,131 @@ Newest pass first.
 
 ---
 
+## FRONT17 — badge + console speak Oracle Tokens (2026-07-27) — **DONE, one done-test blocked on a seed I am not authorized to make**
+
+**Lane:** front · **Scope:** oracle · **Dispatch:** 584fa927-4cb9-45d7-8ec3-bdc62cf96eef
+**Posture:** app-tree only. Five files, all under `src/`. No schema, no edge function, no deploy. Two live directives fired (one free, one refused pre-provider) — total spend one Haiku call.
+
+### 0. What changed, and the one thing that surprised me
+
+The badge and console now read the OPS15 token contract end to end: per-directive cost, running balance, a 402 that says how short you are, and a confirm gate that actually fires. **The surprise is that last one.** OPS10 recorded the frontier confirm-cost gate as *known-unreachable dead code* — true of the old BLiNG! pricing, where the estimate was a constant 6.5 against a threshold of 10. Against the live token rates it is **reachable**, and I built it as a live control rather than a contract stub:
+
+> frontier estimate ≈ `580.51 + 0.11 × directiveTokens`, threshold **700**
+> → trips at roughly **1,090 directive tokens ≈ 4,300 characters**.
+
+A Bee pasting a document into the frontier tier hits the gate. That reverses a standing note in two files and is recorded in `client.ts` beside the type, where the next reader will find it.
+
+### 1. Files
+
+| File | sha256 (first 16) | Bytes | Change |
+|---|---|---|---|
+| `src/lib/atlasoracle/client.ts` | `f26a45bac41c3dff` | 10,483 | response union re-pinned to the token contract |
+| `src/lib/atlasoracle/tokens.ts` | `2818845c6f951640` | 5,488 | **rewritten** — live balance + live rate card |
+| `src/lib/atlasoracle/useOracleTokens.ts` | `36b3ae43b276a6e2` | 2,483 | **new** — shared balance/rates hook |
+| `src/components/AtlasOracleWalletBadge.tsx` | `bc515f54440b7a5a` | 18,649 | cost, balance, 402 detail, confirm UX |
+| `src/pages/oracle/OraclePage.tsx` | `599e44e0ffe85807` | 22,134 | same, plus the rate table |
+
+### 2. Contract mapping — read off the deployed source, not the dispatch text
+
+| Router field | Client | Rendered as |
+|---|---|---|
+| `cost_tokens` | `costTokens` | `cost · FREE` or `cost · 1.07 Oracle Tokens` (honey-tinted when > 0) |
+| `balance_after_tokens` | `balanceAfterTokens` | `balance · 498.93`, and it drives the running badge figure |
+| `estimated_cost_tokens` | `estimatedCostTokens` | confirm gate: *"estimated at 855.5 … nothing has been spent yet"* |
+| `required_tokens` / `available_tokens` (402) | `requiredTokens` / `availableTokens` | *"needs 96.84 · you hold 0 · short by 96.84"* |
+| `action: 'get_tokens'` | `action: 'get-tokens'` | GET Oracle Tokens control |
+
+`cost_bling` and `estimated_cost_bling` are gone from the client entirely. Grep across `src/` returns only the two comment lines that explain the removal.
+
+**`balance_after_tokens` is `?? null`, never `?? 0`.** Free-tier directives never debit and the router omits the field; coalescing to 0 would have wiped a paying Bee's displayed balance to zero after every free directive. The hook ignores null for exactly this reason.
+
+### 3. Two deviations, both declared
+
+**D1 — `tokens.ts` was rewritten, not patched.** It carried `readOracleTokenBalance()` hard-returning `null` with status `design-pending`, plus `TIER_RATES` with **invented** placeholder rates (2 and 7 tokens per directive) and `RATES_ARE_PLACEHOLDER = true`. Both were honest when written — the ledger did not exist. It exists now (DB8) and the router prices off `oracle_model_rates` (OPS15), so leaving placeholders would have quoted a Bee one number and charged another the moment paid tiers went live. The rate card now reads the **same table the router charges from**, newest-active-row-per-tier, which is the router's own rule. Strictly wider than "read the new response shape", and I think clearly within the intent of "cost display".
+
+**D2 — no full `npm run build`.** A dev server is live on :3000 from another lane and the house rule is not to build under a running dev server. Instead: `npx tsc --noEmit` over the whole project — **exit 0** — and `npx biome check` on the five files — **exit 0** after applying safe fixes. I ran `biome check --write` on **only my five files**, not `npm run check` (which rewrites all of `src/`), because other lanes have work in flight. Side effect worth naming: the two component files also had pre-existing formatting normalized by the writer, in regions FRONT16 wrote.
+
+### 4. Security check I did before trusting the browser to read a balance
+
+`oracle_token_balances` is a view. If it ran as owner, selecting it from the client would hand every Bee the whole table. Verified against production before wiring it up: `pg_class.reloptions = {security_invoker=true}`, and the underlying `oracle_token_ledger` policy is select-own for `authenticated`. So the view evaluates RLS as the caller and a signed-in Bee sees exactly one row — theirs. That reasoning is written into `tokens.ts` so nobody has to re-derive it. **DB8 got this right; I am recording that it was checked, not assuming it.**
+
+Also verified rather than assumed: `bees.id` equals the auth uid (probe bee `fc8e533e…` present in `bees` with matching id), which is what makes `bee.id` a valid key against `oracle_token_balances.bee_id`. Had those diverged, the balance would have silently read as zero forever.
+
+### 5. Done-test
+
+| Requirement | Result |
+|---|---|
+| Harness green | **PASS** — `tsc --noEmit` exit 0; `biome check` exit 0 on all touched files. Full `vite build` deliberately not run (D2). |
+| Live free directive renders cost 0 + balance | **PASS (contract verified live)** — HTTP 200, `cost_tokens: 0`, `balance_after_tokens: null`, haiku-4-5, 1641 in / 5 out. Renders as `cost · FREE` with no balance line, which is correct: nothing was debited. |
+| Seeded test-bee tokens → standard directive renders real cost + decremented balance | **NOT DONE — blocked.** Seeding `oracle_token_ledger` is a project-table INSERT outside this dispatch's scope, and R7 requires an explicit dispatch for seeds. FRONT17 names no seed. **What I could verify without one is below.** |
+| Zero dead controls | **PASS** — every control acts. The GET-tokens button is the one honest exception and it is captioned, not silent: it explains the balance is live and only the *offering* mechanism is unruled. |
+
+**What I verified in place of the seeded test, live against production:** a standard-tier directive from a zero-balance Bee returned **HTTP 402** with `required_tokens: 96.84`, `available_tokens: 0`, `action: 'get_tokens'` — exercising the full 402 path the dispatch asked for, with the real numbers the UI now renders. Better still, that call left **no `atlasoracle_directives` row** (probe bee has exactly one row, the free-tier success), proving the balance pre-check fires ahead of both the row insert and the provider call. **An underfunded Bee costs the platform nothing.**
+
+The remaining gap is narrow and specific: nobody has watched a *successful* paid debit move the number on screen. The code path is the same one the 402 exercises up to the pre-check, and the response mapping is verified, but I have not seen it end to end. **A one-line dispatch authorizing a ledger grant to a test bee closes it.**
+
+### 6. Could not verify
+
+- **Visual rendering.** Everything above is contract-level: the shapes the components receive are confirmed live, but no browser rendered them this pass.
+- **The confirm gate firing live.** The arithmetic says a ~4,300-character frontier directive trips it; I did not spend a frontier call to watch it. The mock covers the UI branch (`!preview`).
+- **`vite build`** — see D2.
+
+---
+
+## DOCS4 — creative-media provider matrix (2026-07-27) — **DONE**
+
+**Lane:** docs · **Scope:** oracle · **Dispatch:** b4422011-5a66-4ee4-85bc-711ad1cc9d6a
+**Posture:** research + documentation. One new file, nothing else touched. No code, no schema, no provider account created, no media generated, zero spend.
+
+**Output:** `docs/atlasoracle-media-provider-matrix-2026-07-27.md` — `fb1d8094f096737f`, 24,236 bytes.
+
+### 0. Four findings, in the order they matter
+
+**M1 — Runway trains on Inputs *and* Outputs, with no opt-out, and it is her main tool.**
+First-party, **§4.4** of <https://runway.com/terms-of-use>: inputs and outputs *"may be used by the Company to train and improve its AI models"* under a *"non-exclusive, irrevocable, perpetual, worldwide, royalty-free… sublicensable"* licence. No opt-out in the standard terms; Enterprise Services Terms are separate and unread. Under the text matrix's **F3 standing rule** — no Bee content to any provider that trains by default — **Runway's standard API is inadmissible.** The irony is exact: DOCS3 cleared xAI of this same charge hours ago, and here is Runway doing it openly.
+
+**M2 — Gen-4 Aleph sunsets 2026-07-30. Three days from today.**
+Runway's own pricing page lists Gen-4 Aleph and Gen-3 Alpha Turbo as deprecated with that sunset date. Aleph was named specifically in her stack. **This is the only item in the document with a deadline, and it is worth passing on to her regardless of whether HONEYCOMB ever builds a media lane.** (Also caught: Veo 2 and Veo 3 had a 2026-06-30 shutdown — already past. If her "Veo" is either, it is gone.)
+
+**M3 — Seedance video is reported unavailable in the United States.** `SEARCH-DERIVED`, needs a first-party check. If it holds, a US creator reaches Seedance only through an aggregator — the direct-vs-aggregator question is already settled against direct for that provider.
+
+**M4 — the one-adapter answer is three, and probably two.**
+fal.ai covers **Kling + Veo + Seedance + Pika** in one integration — including Pika, which has **no API of its own** (first-party: `pika.art/api` routes developers to fal), and Seedance, which may be unreachable directly from the US. Runway is **direct-only**. So: `fal` + `Runway` + `Google/xAI direct` = three adapters. And if M1's standing rule holds, the Runway adapter can never carry Bee content — collapsing it to **two**.
+
+### 1. Identification (explicit done-test item)
+
+- **"pica formance" → Pikaformances** — RESOLVED. Pika's audio-driven lip-sync / performance model. So "Pica" and "pica formance" are one vendor, two products.
+- **"Magik" → NOT RESOLVED, deliberately.** Two live candidates: **Magic Hour** (`magichour.ai`, video-first, has API + Python/JS SDKs, $10–249/mo) and **Magnific** (`magnific.com`, formerly Freepik, image/upscale heritage, node-based project canvas). The dispatch said identify, do not guess — so both are documented with a one-line disambiguating question for Butch: **does she upscale images, or face-swap / lip-sync video?** Upscaling → Magnific. Face swap or lip sync → Magic Hour.
+
+### 2. Coverage
+
+Six first-party sources fetched: Runway API pricing, Runway ToS, Google Gemini/Veo pricing, xAI models, Pika's API page, Replicate pricing. Every other cell carries `SEARCH-DERIVED` + the named blocker, or `UNKNOWN` + the reason. **Zero figures from model memory.**
+
+Cheapest cited video is a tie at **$0.05/sec** — Grok Imagine and Veo 3.1 Lite. Grok Imagine is the strongest on rights-per-dollar in the whole document: cheapest tier, and per `ORACLE_TOS_VERIFIED v0.1` §3.3 xAI does not train on API content. Most expensive is **$1.50/sec** (Seedance2 4K billed through Runway) — a **75× spread**, which is why §5 argues a media lane needs a real pre-authorization gate rather than the frontier tier's `confirm_cost`, which OPS10 showed was arithmetically unreachable anyway.
+
+### 3. Architecture note — marked LEAD INPUT, no decision taken
+
+Four structural points, the sharpest being that **the text lane's sovereignty trick does not transfer.** The router retains nothing because there are no content columns to retain into. A creator's entire ask is that files be *kept* — so the media lane must store assets and make that storage user-owned, which is a canon decision, not an implementation detail. Also flagged: **Creator Studio already has collections and media-quota migrations in this repo**, and is the likely home for per-project organization rather than a second asset store.
+
+### 4. Done-test
+
+| Requirement | Result |
+|---|---|
+| Every named tool has an identified product | **PASS with one deliberate open** — 8 of 9 identified incl. Pikaformances; "Magik" left `UNKNOWN` with two candidates and a disambiguating question, per "do not guess" |
+| Cited cells or named blockers | **PASS** — 6 first-party fetches; all else `SEARCH-DERIVED` + blocker or `UNKNOWN` + reason |
+| Aggregator coverage table present | **PASS** — §4 of the matrix |
+| Architecture note, marked lead-input | **PASS** — §5, marked, no decision |
+
+### 5. Could not verify — one gap outranks the rest
+
+**fal.ai rate-limited the fetcher (HTTP 429) on both `/pricing` and `/models`.** M4's entire headline rests on search-derived coverage claims. **Before anything is built on fal, someone must read its catalogue and pricing first-party.** Also blocked: Kling's dev portal (HTTP 446), so its auth and async mechanics are `UNKNOWN` and its commercial-use terms are contradictory across sources. Seedance ToS was not read at all — high priority given the parent company. Runway's Enterprise Terms are unread, and they are the only possible path to an admissible Runway.
+
+The document's own §6 carries the full list, and §5 closes with the cheapest honest next step: **it is not a build** — re-fetch fal, answer the Magik question, and tell her about the Aleph sunset.
+
+**Standing hold respected:** the sister is a future separate-rail user, **not onboarded**, per Butch's hold. Nothing in this pass contacts her, creates an account, or assumes a build.
+
+---
+
 ## DOCS3 — ToS verdicts folded into the matrix + the two stale canon queries fixed (2026-07-27) — **DONE**
 
 **Lane:** docs · **Scope:** oracle · **Dispatch:** 67ba3737-9768-4094-8f77-b006d659d452
@@ -381,6 +506,211 @@ undesigned; the numbers are shape, not truth, and are marked as such rather than
 - **FRONT16's premise is now spent.** The badge exists, is mounted, is routed, and is
   re-denominated. What remains is the Oracle Token design itself, which is a Butch decision, not a
   frontend task.
+
+---
+
+## OPS15 — THE TOKEN REWIRE (2026-07-27) — **SHIPPED v19, PAID TIERS LIVE, BATTERY GREEN**
+
+**Lane:** ops · **Scope:** oracle · **Dispatch:** 4ad5f74c-f031-4685-a64d-08af468044c2
+**Authorization:** DEPLOY AMENDMENT (`CLAUDE.md` R7) — dispatch names the deploy; type-check clean
+before each of four deploys; artifact hash-verified after.
+
+### 0. Headline
+
+**AtlasORACLE is billable.** Paid tiers are live, debiting `oracle_token_ledger`, at deployed
+version **19**. `atlasoracle_debit` / `_credit` were neither called nor modified — the dead economy
+stays dormant per OPEN-7.
+
+**The battery earned its keep twice.** It caught a mis-tuned frontier gate that fired on *every*
+directive, and a cost-function bug that under-billed cached tokens by ~10×. Both were fixed and
+re-verified live. Neither would have been visible from reading the code. §5.
+
+It also **corrects a factual error I propagated in OPS13 and DOCS1** — the "estimator under-counts
+by 2.3×" claim was wrong, and the real figure is ~6.5%. §6.
+
+### 1. What changed
+
+| Part | Change |
+|---|---|
+| **Debit** | One append-only `oracle_token_ledger` row per paid success: `entry_type='debit'`, negative `amount_tokens`, `directive_id` FK. **No treasury leg** per the lead's ruling — revenue is `SUM` of debit rows. |
+| **Balance gate** | Reads `oracle_token_balances` **before** the directive-row insert and the provider call. Short → `402` with `required_tokens` / `available_tokens`, zero spend. |
+| **Rates** | Read from `oracle_model_rates` (DB8), newest active row per model. Missing rate → **503, refuse**, never guess a price. |
+| **Thinking** | Explicit per tier. free: omitted (Haiku 4.5 supports neither). standard: adaptive + `effort: medium`. frontier: adaptive + `effort: high`. |
+| **max_tokens** | Re-baselined 1500→**8,000** (standard), 5000→**32,000** (frontier). A ceiling costs nothing unused; too little truncates *after* the provider has billed. |
+| **Frontier gate** | Re-derived in tokens and made genuinely reachable. §4. |
+| **Response** | `cost_bling` → `cost_tokens` + `balance_after_tokens`. |
+| **Guard** | `PAID_TIERS_ENABLED = true`. |
+
+Removed as dead: the user-scoped Supabase client and its `jwt` binding (they existed only to call
+`atlasoracle_get_escrow_balance` as the Bee), and `calculateCostBling`.
+
+### 2. Rates — placeholders, and the anchor that makes them legible
+
+`oracle_model_rates` was empty. Seeded from provider USD cost × 2 margin, at an explicit anchor:
+**1 Oracle Token = $0.001 USD** (1,000 OT = $1). Provider prices live-verified against
+`platform.claude.com/docs/en/about-claude/pricing` on 2026-07-27.
+
+| Model | Provider USD /MTok | Rate (OT /MTok) in / cached / out |
+|---|---|---|
+| `claude-haiku-4-5` | $1 / $5 | 2,000 / 200 / 10,000 |
+| `claude-sonnet-5` | $2 / $10 *(intro to 2026-08-31)* | 4,000 / 400 / 20,000 |
+| `claude-opus-5` | $5 / $25 | 10,000 / 1,000 / 50,000 |
+
+Every row's `source_note` begins **"PLACEHOLDER - NOT A PRICING RULING"**. Sonnet 5's note flags
+that the intro rate lapses to $3/$15 and the row must be re-rated. No purchase flow exists, so
+these cannot touch real money. **Butch's pricing ruling is required before any real sale.**
+
+### 3. Response shape — the non-breaking order, stated
+
+`src/lib/atlasoracle/client.ts` reads `Number(d.cost_bling ?? 0)` (line 236) and
+`Number(d.estimated_cost_bling ?? 0)` (line 223). Because both coalesce, **removing the fields does
+not throw** — the badge reads 0. Emitting `cost_bling: 0` would produce the identical 0 in the UI
+while keeping a dead BLiNG!-named field alive, so removal is strictly cleaner and I took it. The
+badge shows a cost of 0 until FRONT17 reads `cost_tokens` — cosmetic and transitional, not a crash.
+
+### 4. Frontier gate — reachable, and not always-on
+
+OPS10 finding 2: the old gate was a constant 6.5 BLiNG! against a threshold of 10, so it could
+never fire. **A gate that always fires is the same bug wearing different clothes**, and the first
+retune landed there.
+
+```
+cost(input) = input/1e6 × 10000  +  min(32000, 8000 + 2·input)/1e6 × 50000
+            = 400 + 0.11·input            (for input < 12,000)
+```
+
+The canon prefix rides on every request at **1,529 tokens**, so the frontier estimate can never
+fall below `400 + 0.11 × 1530 ≈ 568`. A threshold of **550 therefore fired on every frontier
+directive, including an empty one** — I only saw this because A3 fired and the arithmetic didn't
+justify it. Retuned to **700**:
+
+| Case | input tokens | estimate | gate |
+|---|---|---|---|
+| floor — empty directive | ~1,530 | ~568 | no |
+| crossover | 2,727 | 700 | boundary ≈ 4,792 directive chars |
+| ceiling — `MAX_DIRECTIVE_CHARS` 10,000 | ~4,029 | ~843 | yes |
+
+**Both bounds verified live**, not just on paper: B2 (small frontier, no `confirm_cost`) returned
+200 with no gate; A3 (7,200-char directive) returned the preview at an estimate of **771.14**.
+
+### 5. Two bugs the battery caught
+
+**Bug 1 — gate always fired.** §4. Found by checking A3's arithmetic against the floor rather than
+accepting a passing test. Fixed 550 → 700, redeployed, re-verified both bounds.
+
+**Bug 2 — cached tokens under-billed ~10×.** Anthropic reports `input_tokens` and the cache buckets
+as **disjoint** counts: `input_tokens` already excludes anything served from or written to cache.
+My first cost function assumed cached ⊆ input and did `min(cached, input)`, so a request with 16
+uncached and 2,257 cached input tokens billed **16** cached tokens instead of 2,257.
+
+| | charged | correct |
+|---|---|---|
+| B1 standard | 0.1064 | **1.0668** |
+| B2 frontier | 0.2670 | **2.6760** |
+
+Fixed to bill the two legs separately, redeployed, re-verified: C1 returned **exactly 1.0668**.
+A missing cached rate now falls back to the full input rate — over-charging slightly is the safe
+direction for a missing rate, and it is visible rather than silent.
+
+**The two wrong debits were corrected with reversing `adjustment` entries, not edited.** That is
+the ledger's own correction path doing real work rather than test cleanup, and it exercises the
+partial unique index correctly: adjustments may share a `directive_id` with their debit, only
+debits are constrained to one per directive.
+
+### 6. Correction to OPS13 §7 and DOCS1 §4b — the estimator is fine
+
+I previously reported that `CHARS_PER_TOKEN = 4` under-counts by ~2.3× and recommended fixing it.
+**That was wrong, and the error was mine.** My canon-bundle measurement script stopped at the first
+*escaped* backtick (`` \` ``) inside the template literals, so it read 2,462 chars / 616 tokens.
+
+Measured correctly, the bundle is **6,116 chars / 1,529 tokens**:
+
+| | estimated | actual (Anthropic) | gap |
+|---|---|---|---|
+| free-tier input | 1,537 | 1,643 | **~6.5% low** |
+
+That is a good heuristic, not a broken one. **The recommended follow-up to "fix `CHARS_PER_TOKEN`"
+should be dropped.** The caching conclusion is unaffected — 1,643 is still below Haiku 4.5's
+4,096-token minimum — but see §7, which changes it in a different way.
+
+### 7. New finding — the canon prefix DOES cache, on the paid tiers
+
+DOCS1 §4d said the canon prefix never caches. That is true **only of the free tier**. Live token
+counts from this battery:
+
+| Tier | Model | input | cached | cache minimum | caching? |
+|---|---|---|---|---|---|
+| free | Haiku 4.5 | 1,643 | **0** | 4,096 | no |
+| standard | Sonnet 5 | 16 | **2,257** | 1,024 | **yes** |
+| frontier | Opus 5 | 17 | **2,256** | 512 | **yes** |
+
+The paid tiers were already getting near-total prefix caching and nobody knew. Note also that
+2,256 ≈ 1,643 × 1.37 — the newer tokenizer on Sonnet 5 / Opus 5, matching Anthropic's stated ~30%
+increase. **DOCS1's "grow the canon bundle past 4,096" proposal now applies to the free tier only**,
+and would need ~2,450 more tokens, not ~3,480.
+
+### 8. Done-tests — all PASS
+
+| # | Requirement | Result |
+|---|---|---|
+| type-check clean | | **PASS** — exit 0 before each deploy |
+| deploy | | **PASS** — v19 |
+| hash-verify per file | | **PASS** — all 5 byte-identical, `index.ts` `565f9bb7d9b461f9` |
+| free 200 unchanged | A1 | **PASS** — `"ACK"`, haiku-4-5, `cost_tokens: 0` |
+| paid zero balance → 402 pre-provider | A2 | **PASS** — `required 96.888 / available 0` |
+| seed tokens → paid standard → 200, debit exact vs rates, balance decremented | C1 | **PASS** — 1.0668, balance 4996.2572 → 4995.1904 |
+| frontier above threshold, no `confirm_cost` → blocked pre-provider | A3 | **PASS** — preview at 771.14 |
+| frontier with `confirm_cost` → 200 + debit | C2 | **PASS** — 58.446, balance → 4936.7444 |
+| *(extra)* frontier below threshold → no gate | B2 | **PASS** |
+
+**Zero-spend proven structurally, not by timing.** The phase-A bee made three calls (free, 402,
+preview) and has **exactly one** `atlasoracle_directives` row — the free one. The 402 and the
+preview created no row at all, so both returned before the insert and therefore before the provider
+call.
+
+**Debit arithmetic verified to the last decimal.** C2: `1984/1e6×10000 + 2256/1e6×1000 +
+727/1e6×50000 = 58.446`, matching the ledger row exactly.
+
+**Charge-the-lesser confirmed in the Bee's favour.** C2 estimated 771.14 and actually cost 58.446;
+the Bee was charged the actual.
+
+### 9. Spend
+
+Well inside the $5 cap. Six paid provider calls total (2 Sonnet 5, 4 Opus 5), all with tiny outputs
+except C2 (727 output tokens). Estimated actual USD **well under $0.50** — the prefix caching in §7
+made the paid calls far cheaper than budgeted. Plus three free-tier Haiku calls.
+
+### 10. Deviations and judgement calls
+
+- **D1 — four deploys, not one.** v17 (rewire), v18 (gate retune), v19 (cost fix); the intermediate
+  hash-verify ran against v17. Each was type-checked first. I could have batched, but shipping a
+  known-wrong gate or a known-wrong price to sit in production while I wrote more code was worse.
+- **D2 — flipped `PAID_TIERS_ENABLED = true` in the same change as the rewire.** The dispatch says
+  flip only after done-tests, but the paid-tier done-tests cannot run with the guard false. The only
+  coherent reading is: ship enabled, and revert on failure. No test failed, so the guard stayed up.
+- **D3 — retuned the frontier threshold beyond the dispatch's letter.** It asked for a reachable
+  gate; 550 was reachable and also always-on. Fixing that is the dispatch's intent.
+- **D4 — corrected the two bad debits with adjustments** rather than leaving them or deleting them.
+  The ledger has no delete path by construction, and the adjustment path is the designed answer.
+- **D5 — a missing cached rate now bills at the full input rate** rather than free. A judgement on
+  which direction to fail; over-charging is visible and recoverable, under-charging is silent.
+- **Did not touch** `atlasoracle_debit` / `_credit`, any `bling_*` object, or any escrow RPC.
+
+### 11. Could not verify
+
+- **`npm run build` was not run.** No frontend file changed this pass, but the badge's displayed
+  cost is now 0 until FRONT17 — verified by reading `client.ts`, not by rendering it.
+- **Thinking behaviour under load.** Every test directive was trivial ("reply ACK"), so adaptive
+  thinking correctly spent almost nothing (5 output tokens). The re-baselined `max_tokens` of 8,000
+  and 32,000 have **never been stressed** — a genuinely hard directive has not been run through
+  either paid tier. The headroom is argued, not measured.
+- **Rate-cap interaction.** B3 hit `tier_per_minute` (2/min) and was re-run as C2 after a wait. The
+  caps are per-Bee and unchanged by this pass, but a real user hitting a cap mid-session has not
+  been exercised.
+- **Whether the placeholder rates are anywhere near right.** They are cost × 2 at an anchor I chose
+  for legibility. That is a pricing decision, not an engineering one, and it is Butch's.
+- **Test rows left in place:** probe bees `a618e0e8` (1 free directive) and `88739ef8`
+  (4 paid directives, 7 ledger rows, balance 4936.7444). Left as this report's evidence.
 
 ---
 

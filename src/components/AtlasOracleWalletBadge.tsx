@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { X } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
-import { cn } from '@/lib/utils';
 import {
   DIRECTIVE_CATEGORIES,
   type DirectiveCategory,
   type Tier,
   isMocked,
 } from '@/lib/atlasoracle/client';
+import { formatTokens } from '@/lib/atlasoracle/tokens';
 import { useOracleDirective } from '@/lib/atlasoracle/useOracleDirective';
-import { TIER_RATES, readOracleTokenBalance } from '@/lib/atlasoracle/tokens';
+import { useOracleTokens } from '@/lib/atlasoracle/useOracleTokens';
+import { useAuth } from '@/lib/auth';
+import { cn } from '@/lib/utils';
+import { X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 // AtlasOracle wallet badge.
 //
@@ -62,17 +63,22 @@ export function AtlasOracleWalletBadge({
   const [category, setCategory] = useState<DirectiveCategory>(DEFAULT_CATEGORY);
   const [tokenNotice, setTokenNotice] = useState(false);
 
-  const {
-    state, response, preview, failure,
-    send, confirm, cancelConfirm, reset,
-  } = useOracleDirective();
+  const { state, response, preview, failure, send, confirm, cancelConfirm, reset } =
+    useOracleDirective();
 
-  const tokens = readOracleTokenBalance(!!bee);
+  const { balance: tokens, rates, applyBalanceAfter } = useOracleTokens(bee?.id ?? null);
+
+  // The router returns the post-debit balance with the response, so the badge
+  // updates from the ledger's own figure the moment a directive lands rather
+  // than refetching and briefly showing a stale number.
+  useEffect(() => {
+    if (state === 'response-ready' && response) {
+      applyBalanceAfter(response.balanceAfterTokens);
+    }
+  }, [state, response, applyBalanceAfter]);
 
   const badgeState =
-    state === 'working' ? 'working'
-      : state === 'response-ready' ? 'response-ready'
-        : 'idle';
+    state === 'working' ? 'working' : state === 'response-ready' ? 'response-ready' : 'idle';
 
   const canSubmit = useMemo(
     () => directive.trim().length > 0 && state !== 'working',
@@ -107,14 +113,19 @@ export function AtlasOracleWalletBadge({
 
   if (!bee) return null;
 
-  const tierRate = TIER_RATES.find((r) => r.tier === tier);
+  const tierRate = rates.find((r) => r.tier === tier);
+  const balanceLabel = tokens.balance === null ? '—' : formatTokens(tokens.balance);
+  const badgeTitle =
+    tokens.status === 'live'
+      ? `AtlasOracle · ${balanceLabel} Oracle Tokens`
+      : `AtlasOracle · ${tokens.reason}`;
 
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        title={`AtlasOracle · ${tokens.reason}`}
+        title={badgeTitle}
         aria-label="Open AtlasOracle"
         className={cn(
           'flex items-center gap-2 rounded-full border bg-bg-elevated px-2.5 py-1 transition-colors',
@@ -130,13 +141,10 @@ export function AtlasOracleWalletBadge({
         >
           A⊕O
         </span>
-        {/* Oracle Token balance. Renders an em dash until the ledger ships —
-            a zero here would read as an empty wallet rather than no wallet. */}
-        <span
-          className="font-mono tracking-wide text-text-silver"
-          style={{ fontSize: '11.5px' }}
-        >
-          {tokens.balance === null ? '—' : tokens.balance.toLocaleString()}
+        {/* Live Oracle Token balance (FRONT17). An em dash still means "could
+            not read", never "zero" — a Bee with an empty wallet sees 0. */}
+        <span className="font-mono tracking-wide text-text-silver" style={{ fontSize: '11.5px' }}>
+          {balanceLabel}
         </span>
       </button>
 
@@ -189,10 +197,7 @@ export function AtlasOracleWalletBadge({
               style={{ fontSize: '11.5px' }}
             >
               <span className="text-text-silver">
-                Oracle Tokens ·{' '}
-                <span className="font-mono text-text">
-                  {tokens.balance === null ? '—' : tokens.balance.toLocaleString()}
-                </span>
+                Oracle Tokens · <span className="font-mono text-text">{balanceLabel}</span>
               </span>
               <button
                 type="button"
@@ -216,9 +221,9 @@ export function AtlasOracleWalletBadge({
                 className="rounded-md border border-border-bright bg-bg p-3 text-text-silver"
                 style={{ fontSize: '12px' }}
               >
-                The Oracle Token flow is not live yet — the token design is still
-                open, so there is nothing to hand you here. The free tier routes
-                today at no token cost.
+                Your balance is live, but there is no way to GET more yet — how Oracle Tokens are
+                offered has not been ruled on, so this control has nothing to hand you. The free
+                tier routes today at no token cost.
               </div>
             )}
 
@@ -290,7 +295,9 @@ export function AtlasOracleWalletBadge({
                     style={{ fontSize: '12px' }}
                   >
                     {DIRECTIVE_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
                     ))}
                   </select>
 
@@ -312,9 +319,9 @@ export function AtlasOracleWalletBadge({
                 {tierRate && (
                   <p className="text-text-silver" style={{ fontSize: '11px' }}>
                     {tierRate.model} ·{' '}
-                    {tierRate.ratePlaceholder === null
+                    {tierRate.tier === 'free'
                       ? 'FREE'
-                      : `~${tierRate.ratePlaceholder} Oracle Tokens (provisional)`}
+                      : `${formatTokens(tierRate.inputPerM)} in / ${formatTokens(tierRate.outputPerM)} out per 1M tokens`}
                   </p>
                 )}
               </>
@@ -327,9 +334,17 @@ export function AtlasOracleWalletBadge({
               <div className="flex flex-col gap-3 rounded-md border border-honey/60 bg-honey/10 p-3">
                 <p className="text-text" style={{ fontSize: '12.5px' }}>
                   This directive is estimated at{' '}
-                  <span className="font-mono font-semibold">{preview.estimatedCost}</span>{' '}
+                  <span className="font-mono font-semibold">
+                    {formatTokens(preview.estimatedCostTokens)}
+                  </span>{' '}
                   Oracle Tokens on {preview.provider}. Confirm to route it.
                 </p>
+                {tokens.balance !== null && (
+                  <p className="text-text-silver" style={{ fontSize: '11px' }}>
+                    balance {formatTokens(tokens.balance)} → about{' '}
+                    {formatTokens(Math.max(0, tokens.balance - preview.estimatedCostTokens))} after
+                  </p>
+                )}
                 <p className="text-text-silver" style={{ fontSize: '11px' }}>
                   est. {preview.estimatedInputTokens.toLocaleString()} in ·{' '}
                   {preview.estimatedOutputTokens.toLocaleString()} out
@@ -362,15 +377,30 @@ export function AtlasOracleWalletBadge({
                 role="alert"
               >
                 <span>{failure.message}</span>
-                {failure.action === 'fund' && (
-                  <button
-                    type="button"
-                    onClick={() => setTokenNotice(true)}
-                    className="self-start rounded-md border border-border-bright px-2 py-0.5 text-text-silver transition-colors hover:border-honey/70 hover:text-text"
-                    style={{ fontSize: '11.5px' }}
-                  >
-                    GET Oracle Tokens
-                  </button>
+                {failure.action === 'get-tokens' && (
+                  <>
+                    {failure.requiredTokens !== undefined &&
+                      failure.availableTokens !== undefined && (
+                        <span className="text-text-silver" style={{ fontSize: '11.5px' }}>
+                          needs {formatTokens(failure.requiredTokens)} · you hold{' '}
+                          {formatTokens(failure.availableTokens)} · short by{' '}
+                          {formatTokens(
+                            Math.max(0, failure.requiredTokens - failure.availableTokens),
+                          )}
+                        </span>
+                      )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpen(true);
+                        setTokenNotice(true);
+                      }}
+                      className="self-start rounded-md border border-border-bright px-2 py-0.5 text-text-silver transition-colors hover:border-honey/70 hover:text-text"
+                      style={{ fontSize: '11.5px' }}
+                    >
+                      GET Oracle Tokens
+                    </button>
+                  </>
                 )}
                 {failure.action === 'retry-later' && failure.retryAfterSeconds && (
                   <span className="text-text-silver" style={{ fontSize: '11.5px' }}>
@@ -396,7 +426,18 @@ export function AtlasOracleWalletBadge({
                   <span>
                     tokens · {response.tokens.input.toLocaleString()} in /{' '}
                     {response.tokens.output.toLocaleString()} out
+                    {response.tokens.cached > 0 &&
+                      ` / ${response.tokens.cached.toLocaleString()} cached`}
                   </span>
+                  <span className={response.costTokens > 0 ? 'text-honey' : undefined}>
+                    cost ·{' '}
+                    {response.costTokens === 0
+                      ? 'FREE'
+                      : `${formatTokens(response.costTokens)} Oracle Tokens`}
+                  </span>
+                  {response.balanceAfterTokens !== null && (
+                    <span>balance · {formatTokens(response.balanceAfterTokens)}</span>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
