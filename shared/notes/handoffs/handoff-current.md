@@ -13,17 +13,21 @@ This block is ops_docs slug BOOT_BLOCK; regenerate snapshots rather than editing
 
 ======================================================================
 
-REFRESHED 2026-07-27 04:59 local (2026-07-27T10:59Z) FROM THE OPS RAIL — this file IS the living handoff. The rail is canon; this is a snapshot of it.
+REFRESHED 2026-07-28 10:54 local (2026-07-28T16:54Z) FROM THE OPS RAIL — this file IS the living handoff. The rail is canon; this is a snapshot of it.
 Regenerate: node atlasJUSTICE.org/scripts/pull-rail.mjs  (or double-click pull-rail.cmd). Edits here are overwritten — change the rail, not this file.
 
 DOCS ON THE RAIL - latest version per slug
   BOOT_BLOCK      v0.1   2026-07-27 10:46 UTC  Universal boot block — prepended to the MMF and every master snapshot
   JMF             v0.5   2026-07-26 21:02 UTC  JUSTICE MASTER FILE v0.5 — day one sealed: commit 08074d0 pushed
-  LEAD_PROTOCOL   v0.4   2026-07-26 23:27 UTC  Lead protocol v0.4 — single-statement claim (batch-proof sticky)
+  LEAD_PROTOCOL   v0.5   2026-07-27 11:05 UTC  Lead protocol v0.5 — per-handle broadcast reads (delta on v0.4)
+  ORACLE_MF       v0.19  2026-07-28 00:03 UTC  ORACLE MASTER FILE v0.19 — 2a/3a ruled; free tier semantics clarified: free = FREE PROVIDERS, permanent, near-zero platform cost
+  ORACLE_OUTLOOK  v0.1   2026-07-27 12:12 UTC  ORACLE OUTLOOK v0.1 — 30,000-foot review: what aged well, what died, and where the moat actually is
+  ORACLE_TOS_VERIFv0.2   2026-07-27 14:24 UTC  ORACLE ToS VERIFICATION v0.2 — Llama 3.1 Community License VERIFIED: training-permissive; first fully-clean Western weights path
   VOTE_MF         v0.1   2026-07-26 19:59 UTC  VOTE MASTER FILE stub — cross-astra notices (Karma supersession)
 
 OPEN DISPATCHES - queued + claimed, by priority then age. STALE = claimed over 30 minutes ago; it is a DISPLAY FLAG ONLY and nothing is ever auto-requeued - requeue is a deliberate lead action, so a slow pass is safe and an orphan is loud.
-  (none)
+  claimed STALE ops   OPS22   p100               TheMANUAL.tech              OPS22 — EFFORT: standard — mission control spawn windows open behind the browser (Windows foreground-lock)
+  claimed STALE ops   OPS26   p100               TheMANUAL.tech              OPS26 — EFFORT: high — RESTORE FIDELITY: prove the backup restores 100%, not 99% — real Supabase target, the 17 dropped objects accounted for
 
 UNREAD BROADCAST MESSAGES - to_handle = all, never read
   2026-07-26 22:35 UTC  from justice: TOMORROW (after ORACLE's morning rail shakeout): sister onboarding package
@@ -31,8 +35,8 @@ UNREAD BROADCAST MESSAGES - to_handle = all, never read
   2026-07-26 23:13 UTC  from justice: POST-ORACLE EXPERIMENTS BUCKET (run after the rails prove out, any order)
 
 LAST 5 REPORTS
-  2026-07-27 10:55 UTC  ops OPS8    pull-rail prepends the live BOOT_BLOCK - every master snapshot boots itself
-  2026-07-27 08:13 UTC  ops OPS7    OPS7 — SWEEP overnight close: 15 paths, gates all-zero, staged 15/15, commit 98ccae1, pushed 6a00993..98ccae1, tree clean
-  2026-07-27 08:05 UTC  fronFRONT15 FRONT15 — four filtered routes live (/inquiries /class-actions /resolved /archived); sidebar counts now equal cards behind the link; DocketQuery.status seam bug fixed
-  2026-07-27 07:51 UTC  ops OPS5    OPS5 — claim is now one atomic statement in both CLAUDE.md editions (v0.4 + NULLS LAST fix); 2 lead findings filed
-  2026-07-27 07:40 UTC  ops OPS6    OPS6 — dev-server first aid: corpse killed, relaunched detached under explorer.exe, all routes 200
+  2026-07-28 16:36 UTC  ops OPS27   OPS27 — THREE-REPO CLOSING SWEEP: c1234e7 / 20f76da / a54201b committed, all three pushes parked and holding, 11 runtime artifacts gitignored
+  2026-07-28 15:53 UTC  docsDOCS8   DOCS8 — DESIGN: PROJECT MODE — Oracle decomposes a project into tasks and routes each to the right AI, rail-style
+  2026-07-28 15:43 UTC  ops OPS26-Q OPS26-Q — it is 23 objects not 17, and 22 are noise: the one real defect (justice_dockets repath trigger) is search_path-caused and a Supabase target does NOT fix it
+  2026-07-28 15:31 UTC  ops OPS25   OPS25 — BOTH TIERS GREEN: Tier 3 fixed per Butch option (a) (pooler+pgpass, DPAPI retired, stderr captured) — first success since 2026-05-10, verified atoms 37437/auth.users 18 exact vs live; Tier 2 green+restorable; backup-age panel live; restore test found silent data loss in vanilla PG
+  2026-07-28 15:20 UTC  ops OPS25-Q OPS25-Q — Tier 2 GREEN + restorable (172/172 tables, auth exact); backup-age panel live and flagged Tier 3 at 79d on first run; snapshots preserved+hashed; Tier 2 guard hardened (uncommitted, needs sweep). RESTORE TEST FOUND SILENT DATA LOSS: elections_private.config 6 rows -> 0 while psql exits 0. Tier 3 fix needs Butch: (a) pooler+pgpass or (b) re-encrypt DPAPI
