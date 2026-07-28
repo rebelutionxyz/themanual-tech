@@ -403,6 +403,212 @@ writer didn't; one of the cheapest wins on the board.
 
 ---
 
+## OPS21 — FIRST NON-ANTHROPIC PROVIDER IS LIVE (2026-07-28) — **DONE. v21 deployed, all done-tests PASS.**
+
+**Lane:** ops · **Scope:** oracle · **Dispatch:** 36a42871-7bf5-4033-a33a-778b2f516331
+**Authorization:** DEPLOY AMENDMENT (`CLAUDE.md` R7) — the dispatch names `atlasoracle-route`; bundle type-checked clean before the deploy; artifact hash-verified after.
+**Supersedes:** `OPS21-Q` (filed 2026-07-28, `0a181c14`) — its blocking ask, `GROQ_API_KEY`, was answered by Butch. That row stays as the record of the ask.
+
+### 0. Headline
+
+**AtlasORACLE is no longer a single-vendor router.** A free directive was served end-to-end by **Groq running `llama-3.1-8b-instant`**, proven by `provider_selected` in the database, and a forced primary failure fell through to Haiku and still returned 200. `ORACLE_OUTLOOK v0.1`'s WRONG #1 — *"a router whose paid paths all land on one provider is a reseller"* — no longer describes the free tier.
+
+The measured numbers are better than the matrix projected:
+
+| | Groq `llama-3.1-8b-instant` | Anthropic `claude-haiku-4-5` |
+|---|---|---|
+| **Latency, same directive** | **270 ms** | 2,837 ms — **10.5× slower** |
+| Input tokens, same canon prefix | 1,459 | 1,658 |
+| Cost to Bee | 0 | 0 |
+| Cost to platform / 1,000 free directives | **$0.12** | $4.14 — **33.9×** |
+
+The latency gap was not in the dispatch and is arguably the bigger finding: the free tier just got an order of magnitude faster *and* 34× cheaper in the same change. The token-count gap (1,459 vs 1,658 on the same text) is tokenizer difference, not an error — worth knowing before anyone compares provider costs by token count rather than by dollars.
+
+**One thing that is NOT closed, and I want it read rather than skimmed:** the free tier is now pointed at a provider whose free plan tops out around **3.5 directives/minute platform-wide** (§4). At today's traffic that is invisible. It is not "migrated to OSS" in any load-bearing sense until the plan question in §4 is answered.
+
+---
+
+### 1. What shipped
+
+**One adapter, eight providers — written to the wire, not to the vendor.** `callOpenAICompatible` speaks the OpenAI wire format, so Together, Fireworks, DeepSeek, xAI, Mistral, Qwen and OpenRouter are each a `ProviderSpec` literal from here, not a new adapter. That was DOCS1 §4's own recommendation and it cost nothing extra to honour at build time; retrofitting it later would have meant rewriting the provider call a second time.
+
+| Piece | What it does |
+|---|---|
+| `ProviderSpec` / `ProviderAttempt` | Normalized call + result. **The adapters never throw** — every failure returns `ok: false` with a sanitized kind, because a thrown error would take the fallback down with the primary. |
+| `callAnthropic` | The v19 Anthropic path, lifted verbatim into a function. Same body, same headers, same cache_control, same thinking/effort config. |
+| `callOpenAICompatible` | Bearer auth, `messages[]` with a system role, `max_tokens`. Deliberately sends **no** `temperature`, `logprobs`, `logit_bias`, `top_logprobs`, `messages[].name` or `n` — Groq 400s on the last five, and sending nothing we don't need keeps it portable. |
+| The ladder | Free tier: `[Groq, Haiku]`. Every other tier: `[Anthropic]` — a one-rung ladder, i.e. byte-identical behaviour to v19. |
+| `GROQ_API_KEY` optional | Absent key ⇒ the ladder is just Haiku, exactly as before this pass. **A missing second provider degrades to the previous behaviour, never to an outage.** |
+
+**Model and endpoint verified live 2026-07-28, zero from-memory IDs**, per the dispatch: `llama-3.1-8b-instant` is listed under **Production Models** at `console.groq.com/docs/models` (not Preview — "evaluation purposes only, may be discontinued"), and the endpoint is `https://api.groq.com/openai/v1/chat/completions`, confirmed at `console.groq.com/docs/openai`.
+
+#### ⚠ The token-counting trap — the mirror image of OPS15 Bug 2
+
+This is the part most likely to have shipped silently wrong, so it is written into the code as well as here.
+
+- **Anthropic reports input buckets as DISJOINT:** `input_tokens` already *excludes* cached.
+- **OpenAI-wire reports them NESTED:** `prompt_tokens` *includes* `prompt_tokens_details.cached_tokens`.
+
+OPS15 lost ~10× by assuming nested where it was disjoint. Assuming disjoint where it is nested would double-count every cached token in the other direction. `callOpenAICompatible` therefore **subtracts cached from `prompt_tokens`** and returns Anthropic's disjoint convention, so `calculateCostTokens` stays correct for both wires without knowing which one it was fed. A `Math.max(0, …)` guards a provider that reports cached > prompt rather than letting a negative leg through.
+
+**This costs nothing today** — free is 0 to the Bee either way. It is wrong-by-default the instant a paid tier points at an OpenAI-wire provider, which is precisely the kind of bug that ships without anyone noticing.
+
+---
+
+### 2. Done-tests — all PASS
+
+| # | Requirement | Result |
+|---|---|---|
+| 1 | Live free directive served **BY GROQ** end-to-end, `provider_selected` proves it, metadata logged | **PASS** |
+| 2 | Forced Groq failure falls back to Haiku with success | **PASS** |
+| 3 | Paid tiers untouched (hash-diff scoped) | **PASS** |
+| 5 | Standing-rule check cited from the VERIFIED cell | **PASS** — §3 |
+
+**Test 1 — Groq, live.** Probe bee `ef529f37`, free tier, directive *"Reply with exactly the word ACK and nothing else."*
+
+```
+http 200 · provider llama-3.1-8b-instant · cost_tokens 0
+tokens {input 1459, output 2, cached 0} · response "ACK"
+directive_id 9e2827c5-e051-4d26-9c1d-bf76701f8cb2
+```
+
+**Test 2 — forced fallback.** Same bee, same directive prefixed with the `[OPS21-FORCE-FALLBACK]` sentinel:
+
+```
+http 200 · provider claude-haiku-4-5 · cost_tokens 0
+tokens {input 1658, output 5, cached 0} · response "ACK"
+directive_id 7f650af0-42f2-4511-8363-f1f3de860fec
+```
+
+**Confirmed in the database, not just in the HTTP body** — `provider_selected` is what the dispatch asked to see:
+
+```
+id        | tier | provider_selected     | in   | out | cached | status  | success | latency_ms
+9e2827c5  | free | llama-3.1-8b-instant  | 1459 |   2 |      0 | success | t       |        270
+7f650af0  | free | claude-haiku-4-5      | 1658 |   5 |      0 | success | t       |       2837
+```
+
+**`oracle_token_ledger` rows for the probe bee: 0.** Free wrote nothing to the ledger, which is the structural proof that free stayed free.
+
+**Test 3 — paid tiers untouched.** Two zero-spend live checks, both designed to return *before* any provider call:
+
+- **Standard @ zero balance → `402` `{required_tokens: 217.728, available_tokens: 0}`** — the pre-provider balance gate is intact and still refuses before spending.
+- Frontier gate behaviour unchanged (§5, where it does double duty).
+
+Structurally: the paid path is a one-rung ladder whose single rung is `callAnthropic`, which is the v19 code lifted into a function with no change to body, headers, thinking config, rate lookup, estimation, gate, balance check, debit or finalize. `PAID_TIERS_ENABLED`, `TIER_PROVIDER_MODEL`, `calculateCostTokens`, `FRONTIER_PREVIEW_THRESHOLD_TOKENS` and the `oracle_token_ledger` write are all untouched — a `grep` of the diff for those symbols returns nothing.
+
+---
+
+### 3. Dispatch item 5 — STANDING RULE check. **PASSES.**
+
+Re-checked against the DOCS1 matrix `VERIFIED` cells (sources fetched 2026-07-27) before building. **Nothing changed, so no stop-and-Q was triggered.**
+
+- Groq **does not train on customer inputs or outputs**; **no retention of inference data by default** (usage metadata only); **Zero Data Retention is self-serve to all customers**, no approval gate — unlike OpenAI's.
+- `ORACLE_MF v0.11`'s ratified supply-chain rule — no Bee directive text to any provider that trains on inputs by default — is **satisfied**.
+
+**The subtlety that decided the model, and it is not a detail:** Groq does not own the models it serves, so clearing Groq's terms does **not** clear the model. The binding constraint is the weights licence. That splits the candidates:
+
+| Candidate | $/1,000 free directives | Weights licence |
+|---|---|---|
+| **`llama-3.1-8b-instant`** *(chosen)* | **$0.12** | **`VERIFIED` training-permissive** — `ORACLE_TOS_VERIFIED v0.2` §1.b.i |
+| `openai/gpt-oss-20b` | $0.27 | **not verified** in the matrix |
+
+Cheapest *and* the only affirmatively-cleared licence. Rights and price pointed the same way, which does not happen often.
+
+---
+
+### 4. ⚠ THE CAPACITY QUESTION IS STILL OPEN — and it decides what canon may claim
+
+Groq's **free** plan for this model is **30 RPM / 6,000 TPM**. The canon prefix rides ~1,459–1,530 tokens on every single request, so:
+
+```
+6,000 TPM ÷ ~1,500 tokens ≈ 4 directives per minute, PLATFORM-WIDE
+```
+
+**TPM binds long before RPM does** — the 30 RPM allowance is unreachable. ORACLE's own free cap is 2/min *per Bee*, so **two concurrent free Bees saturate the entire plan**, and the third gets 429s.
+
+**The fallback ladder is what stops that becoming an outage** — it degrades to Haiku instead of failing. But that means under real concurrency the "OSS free tier" would quietly be Haiku again, at Haiku's price, while looking migrated. **That is the exact failure this build existed to eliminate**, so it must not be papered over.
+
+**I could not determine which plan the key is on.** The key is a secret; I never read its value, and Groq's rate-limit headers were not captured on the two test calls. Both succeeded, which is consistent with either plan at a volume of two.
+
+**Recorded in canon as required:** `economic_constitution.md` and `rate-cap-pricing.md` already say the free tier routes to free/OSS providers with platform cost ≈ 0 by construction (DOCS7, per `v0.19` 3a). That is now **true in the code**. Whether it is true *at load* depends on the plan. **The honest statement today is "the free tier's OSS route is live and capacity-limited"**, not "the free tier is migrated." I have not written the stronger claim anywhere.
+
+**Ask, unchanged from OPS21-Q:** find the Developer-plan minimum spend when you next have the Groq console open, and rule.
+
+---
+
+### 5. ★ Bonus — the frontier gate DRIFT is now confirmed LIVE, not just on paper
+
+OPS19 §7 listed "the gate's live behaviour" as *could not verify* — the arithmetic was sound but no directive had been watched hitting it. One of this pass's zero-spend checks closes that, for free:
+
+```
+frontier · directive "Reply ACK."  (10 characters)
+→ http 200, cost_preview: true, estimated_cost_tokens 710.65, estimated_input_tokens 1532
+```
+
+OPS19 predicted `cost = 500 + 0.1375 × 1532 = 710.65` and a threshold of 700. **Observed 710.65 — exact to the last decimal.** A ten-character directive trips the gate.
+
+**DRIFTED is now an observation, not an inference.** Every frontier directive in production returns a preview instead of executing. The corrected constant remains **875**, still unapplied, still needing a dispatch that names the deploy. This pass deliberately did not touch it: OPS21 authorizes a Groq adapter, not a threshold change, and quietly fixing an unrelated money-path constant inside a provider pass is how two changes become one unreviewable one.
+
+---
+
+### 6. Dispatch item 4 — `atlasoracle_provider_pool`: **explicitly noted STILL-INERT**
+
+The dispatch allowed either outcome. This is the honest one, and the reason is structural rather than lazy — the live schema is:
+
+```
+id · provider_name · provider_category · selection_weight · drift_flag · last_drift_check_at · active · created_at
+```
+
+**No endpoint URL. No auth-secret reference. No per-provider price fields.** The table cannot express where Groq lives or which secret authenticates it, so nothing the router needs could be read from it even if the router tried. Flipping `active` would be theatre. DOCS1 §4 reached the same conclusion independently: *"multi-provider routing needs schema work, which is a `db`-lane dispatch, not this one."*
+
+**Left untouched, flagged for that dispatch:** the pool still carries an **active** row named `groq-mixtral`. Mixtral is not on Groq's current catalogue — a from-memory model ID sitting in production data, which is exactly what this dispatch's "zero from-memory model IDs" rule exists to prevent. It is inert so it has done no harm, but it is the first thing a naive "activate the pool" pass would pick up. I did not correct it: it is a production data row and the dispatch authorizes activating a row, not rewriting one.
+
+---
+
+### 7. Changes
+
+| Change | Detail |
+|---|---|
+| `supabase/functions/atlasoracle-route/index.ts` | Provider abstraction, two adapters, free-tier ladder, optional Groq key, header rewrite. Deployed. |
+| `oracle_model_rates` **+1 row** | `llama-3.1-8b-instant` / free / **0 / 0 / 0**, active. Zero **by ruling**, not as a placeholder — `ORACLE_MF v0.16` §2 + `v0.19` 3a. `source_note` carries the **metering truth** the dispatch asked for: $0.05 in / $0.08 out per MTok provider cost, 50% cached discount, $0.12 per 1,000 directives, and the note that **the router does not read this row** (free skips the rate lookup entirely). |
+| `atlasoracle_provider_pool` | **No change.** §6. |
+| Deploy | **v19 → v21**, bundle `ezbr_sha256 a555d609…` |
+
+**Deploy verification per the amendment** — artifact fetched back and compared file-by-file:
+
+```
+MATCH  functions/atlasoracle-route/index.ts    58d1ff74c12e6c1e
+MATCH  functions/atlasoracle-route/canon.ts    9d445f3504d7ef48
+MATCH  functions/_shared/cors.ts               0cd6368aa21754cd
+MATCH  functions/_shared/auth.ts               a92b9dea385fcd8a
+MATCH  functions/_shared/supabase.ts           6e961b1ac4ee57c8
+```
+
+All five byte-identical. **Note the version jumped 19 → 21, not 19 → 20** — every other function on the project also incremented by exactly 1 in the same window, so `version` appears to be a project-wide counter rather than a per-function one. The amendment's requirement ("confirm the version incremented") is met either way, but anyone reading a version number as a per-function deploy count will be wrong.
+
+**★ A concurrent commit swept this work mid-pass.** `506ca35` *"morning: heartbeat wrapper + spawn fix + canon reconciliation"* (2026-07-28 06:47:20 -0600) contains **423 changed lines of `atlasoracle-route/index.ts`** — this pass's Groq adapter — under a message that mentions none of it. The human commits, per R7, so this is not a breach; but the commit message understates its contents, and **deployed v21 corresponds to that commit**. Recorded so the deploy can be traced to a sha later.
+
+### 8. Deviations and judgement calls
+
+- **D1 — the `[OPS21-FORCE-FALLBACK]` sentinel is a test affordance, not a feature.** Done-test 2 requires proving the fallback fires; the honest way is to fire it, not to reason that it would. It cannot change pricing, tier, or provider eligibility — the worst a Bee achieves by typing it is Haiku instead of Groq on a tier that costs them nothing. Removable in one line if you would rather it not exist in production.
+- **D2 — type-checked with a transiently-fetched Deno** (`npx --yes deno@2 check`, exit 0). No Deno toolchain exists on this machine and nothing in `package.json` type-checks edge functions — `npm run build` is `tsc -b` over `src/`, which never touches `supabase/functions/`. The amendment requires a clean type-check before deploy, so the checker had to come from somewhere. Nothing was added to `package.json`. **This gap is worth closing properly:** OPS15 claimed "type-check clean" for four deploys and the mechanism is recorded nowhere.
+- **D3 — probe bee `ef529f37` and its two free directive rows are left in place** as this report's evidence, matching OPS15's precedent. Created through the **public anon key** via ordinary signup — **no service-role key was read, used, or printed** at any point in this pass.
+- **D4 — added the rate row before deploying**, though the router never reads it for free tier. The dispatch asked for metering truth; recording it before the provider went live means there is no window where Groq served traffic with no record of what it costs.
+- **D5 — did not touch `FRONTIER_PREVIEW_THRESHOLD_TOKENS`** despite confirming the drift live in §5. Not this dispatch's authorization.
+- **D6 — house-rule slip, disclosed:** one command was issued as `cd TheMANUAL.tech && …`, which the OPS rule forbids. Caught immediately, no effect on the result, and subsequent directory changes were issued as standalone `cd` calls.
+
+### 9. Could not verify
+
+- **Which Groq plan the key is on.** §4 — the deciding fact for whether "free tier on OSS" is a capacity claim or only a routing claim. Rate-limit response headers were not captured on the two test calls; that is the cheap way to find out and I would take it on the next pass.
+- **Groq under concurrency.** Two sequential directives is not a load test. The 429-into-fallback path is **built and reasoned but never fired** — the fallback was proven with a sentinel, not with a real rate-limit rejection.
+- **Prompt caching on Groq.** `cached: 0` on the live call. Groq advertises a 50% cached-input discount, but nothing here confirms whether the ~1,459-token canon prefix qualifies or how long it persists. The disjoint-conversion code path is therefore **written and type-checked but not exercised against a non-zero cached count.**
+- **Output quality.** Both tests asked for "ACK" and got "ACK". `llama-3.1-8b-instant` has **not** been compared to Haiku on a real directive, and an 8B model is a genuine quality step down. The dispatch asked for routing, not evaluation — but nobody should assume free-tier answer quality is unchanged.
+- **Streaming parity.** The dispatch mentions it "where the UI expects it". The route does not stream on any tier — it returns one JSON body — so there was no streaming behaviour to preserve. If streaming is wanted, it is a new feature for both providers, not a parity gap.
+- **The paid tiers were not run end-to-end this pass.** Verified structurally (untouched code paths) and by the zero-spend 402 gate, not by a billed directive. OPS15's battery remains the last full paid-path proof.
+
+---
+
 ## OPS19 — heartbeat enable-gates closed + frontier threshold DRIFTED (2026-07-28) — **DONE**
 
 **Lane:** ops · **Scope:** oracle · **Dispatch:** c8b49d31-b397-4a70-b902-cd1ea5e60a50
