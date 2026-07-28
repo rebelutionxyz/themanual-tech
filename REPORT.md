@@ -1411,6 +1411,116 @@ writer didn't; one of the cheapest wins on the board.
 
 ---
 
+## OPS27 — THREE-REPO CLOSING SWEEP (2026-07-28) — **DONE. Three commits, three parks, all held.**
+
+**Lane:** ops · **Scope:** oracle · **Dispatch:** 02b501db-c512-4401-ab49-596548806255
+**Authorization:** GIT AMENDMENT (`CLAUDE.md` R7) — this dispatch is the sweep authorization for all three repos.
+
+### 0. ⇒ THE THREE PARKED PUSH COMMANDS
+
+Together, as the dispatch requires. **All three are genuinely unpushed** — verified by a real `git fetch` per repo, not by trusting a local ref.
+
+```bash
+# 1. TheMANUAL.tech            c1234e7   5 files
+cd C:/Users/Butch/Documents/HONEYCOMB/TheMANUAL.tech && git push origin main
+
+# 2. honeycomb-ops             20f76da   1 file
+cd C:/Users/Butch/Documents/HONEYCOMB/honeycomb-ops && git push origin main
+
+# 3. honeycomb-workspace       a54201b  14 files
+cd C:/Users/Butch/Documents/HONEYCOMB && git push origin main
+```
+
+**Push #2 is the one with a deadline attached.** The hardened Tier 2 backup guard protects nothing until it is on GitHub — Actions runs what is in the repo, not what is on this laptop. Every weekly backup between now and that push runs with the old guard that let a whitespace-only secret through.
+
+**The parks held this time.** OPS23's commit reached `origin/main` within a minute of being parked, by an actor I could not identify. All three of today's are still local. I do not know whether that means the other actor is idle or gone — it means only what it says.
+
+---
+
+### 1. The three commits
+
+| # | Repo | SHA | Files | Content |
+|---|---|---|---|---|
+| 1 | `TheMANUAL.tech` | **`c1234e7`** | 5 | restore runbook, project-mode doc, mission-control backup panel (config + server), REPORT.md |
+| 2 | `honeycomb-ops` | **`20f76da`** | 1 | hardened `backup-weekly.yml` |
+| 3 | `honeycomb-workspace` | **`a54201b`** | 14 | DOCS7 canon rewrite (11), permission log, heartbeat evidence, `.gitignore` |
+
+Diffstats: **+1,893 / −1** · **+38 / −4** · **+707 / −303**.
+
+Commit #2's message states the no-effect-until-pushed condition in its body, per the dispatch.
+
+### 2. Gates — run per repo, all passed
+
+| Gate | Repo 1 | Repo 2 | Repo 3 |
+|---|---|---|---|
+| Forbidden paths (`backups/`, `*.env*`, `settings.local.json`, `node_modules/`, `.next/`, `verify-out/`, `*.dump`) | none | none | none |
+| File > 1 MB | none | none (4,121 B) | none |
+| **Deletions / renames** | none | none | none |
+| Staged set **identical** to manifest | ✅ `diff` empty | ✅ | ✅ `diff` empty |
+
+For repo 3 the manifest was taken **after** the `.gitignore` edit, so the excluded files had already left the manifest and the standard identity gate applied cleanly rather than needing an exception. Exclusions were then verified positively with `git check-ignore` (§4) instead of being assumed from their absence.
+
+### 3. Secret scan — two hits, both false positives, both shown
+
+Scanned every file proposed for commit against value-shaped patterns: `gsk_`, `sk-ant-`, `sb_secret_`, three-segment JWTs, `postgres://user:pass@`, `AKIA…`, and PEM private-key headers.
+
+**17 of 19 files: clean. Two hits, and neither is a credential:**
+
+| File | Line | The match | Verdict |
+|---|---|---|---|
+| `TheMANUAL.tech/REPORT.md` | 239 | ``A `case` on `postgres://*@*\|postgresql://*@*` `` | **Prose quoting a shell glob.** My own URI pattern matched the glob's punctuation. |
+| `honeycomb-ops/.github/workflows/backup-weekly.yml` | 26, 31 | `postgres://*@*\|postgresql://*@*)` and `(postgresql://USER:PASSWORD@aws-1-…pooler.supabase.com:5432/postgres)` | **A `case` pattern and an error-message template.** `USER:PASSWORD` is the literal placeholder text shown to whoever mis-sets the secret. |
+
+Confirmed by a second pass requiring a *plausible* credential shape and excluding the literal `USER:PASSWORD`: **zero matches.** Every URI in the workflow is a glob or a placeholder.
+
+**This is the second sweep in a row where my own regex cried wolf** (OPS23's was the bare word `service_role`). The pattern set is deliberately over-broad — a sweep should over-report and then explain, not under-report and stay quiet — but it means every hit needs eyes, and a future sweep that pattern-matches and stops would draw the wrong conclusion.
+
+### 4. Repo 3 — the judgement calls, each named
+
+The dispatch asked for a per-file decision with every exclusion stated. **14 committed, 11 excluded.**
+
+**COMMITTED — 14**
+
+- **The DOCS7 canon rewrite, 11 files** — 8 in `AtlasORACLE.to/master_plan/` + the 3 `shared/canon/` mirrors. This is the token-era re-denomination and it is the most consequential work in the workspace; `master_plan/` is also the copy that syncs to the bucket routed models read.
+- **`logs/permission-needed.md`** — doc-type, tracked already, and it is the running record of what Code cannot do and why. Evidence.
+- **`logs/heartbeat/push-park-probe.md`** — **evidence, and the reason for the exception.** It is the verbatim record, written by the unattended session itself, that OPS19 done-test 4 passed: a push-class action auto-denied under `dontAsk` with the session surviving. That is a canon-critical proof, not a log line. Explicitly **not** covered by the new ignore globs.
+- **`.gitignore`** — carries the exclusions below, so it has to be in the same commit that makes them.
+
+**EXCLUDED — 11, gitignored not deleted**
+
+| Files | Reason |
+|---|---|
+| `supabase/.temp/cli-latest`, `supabase/.temp/linked-project.json` (2) | Supabase CLI scratch, created as a side effect of the OPS21 deploy. Regenerates on every CLI run. Not project content. OPS23 flagged this. |
+| `logs/heartbeat/hb-*.json`, `hb-*.err.txt` (8) | Per-machine runtime output, one pair per unattended run. **The `.json` carries the session's full `result` text — i.e. whatever that run happened to print.** That is an unbounded surface to commit blind, and it is the strongest reason of the three to ignore rather than keep. |
+| `logs/heartbeat/cost-ledger.csv` (1) | Runtime output, appended per run. |
+
+**⚠ One tension I want on the record rather than buried in a gitignore.** `cost-ledger.csv` is the **only** record of unattended spend — currently four runs, $1.80 + $1.12 + $0.58 + $0.86. The dispatch classed `csv` as a runtime artifact and I followed that, but the consequence is that **heartbeat spend history is now local-only and dies with the machine.** If spend needs to be durable, the right answer is not committing a CSV that every run rewrites — it is a `ops_*` table or a periodic roll-up. Flagging, not fixing.
+
+### 5. Done-tests
+
+| Requirement | Result |
+|---|---|
+| Three trees clean or exclusions named | **PASS** — all three `git status --porcelain -uall` return empty; 11 exclusions named individually in §4 with reasons |
+| Zero secret-shaped strings | **PASS** — 2 raw hits, both shown in full and both non-credentials (§3); confirming pass returned zero |
+| Three push commands parked | **PASS** — §0, all three verified unpushed by real `git fetch` |
+
+### 6. Deviations and judgement calls
+
+- **D1 — `.gitignore` edited before taking repo 3's manifest.** Doing it the other way would have forced an exception to the staged-equals-manifest gate. Editing first meant the strict gate applied unmodified, and the exclusions were then proven positively with `git check-ignore` rather than inferred from absence. Stronger, not looser.
+- **D2 — committed `push-park-probe.md` against the letter of "logs/heartbeat/* = gitignore".** The dispatch's own carve-out — *"UNLESS a doc-type file … reads as evidence worth keeping"* — names it explicitly. The ignore globs are written to match `*.json`/`*.err.txt`/`cost-ledger.csv` only, so it stays committable by construction rather than by anyone remembering.
+- **D3 — did not push anything.** Three commands parked. The push click is Butch's and is canon.
+- **D4 — `git remote -v` not used** (denied at this root by R7); remote identity came from `.git/config` and `git fetch` output.
+- **D5 — three separate commits, not one.** Three repos; there was no choice, but it is worth stating that pushing #1 and #3 without #2 leaves the backup guard inert while the reports claim it is hardened.
+
+### 7. Could not verify / residual
+
+- **`REPORT.md` is dirty again the moment this section lands** — this pass's own report cannot be inside the commit that this pass made. Expected, named, and the standard tail of every sweep that reports into the tree it swept.
+- **CRLF normalization warnings** on `.gitignore` and `backup-weekly.yml` (`LF will be replaced by CRLF the next time Git touches it`). The repo stores LF, so the committed bytes are correct — but `backup-weekly.yml` contains a shell script that runs on a Linux runner, and if a future checkout on this machine writes CRLF into it, the workflow can break in ways that read as unrelated. Not changed; worth a `.gitattributes` decision.
+- **Whether the parks hold.** They held for the ~2 minutes between commit and this report. OPS23's did not. I cannot verify what happens after I stop looking.
+- **Whether `honeycomb-ops` has other unpushed history.** I checked `origin/main..HEAD` on `main` only; other branches were not examined in any of the three repos.
+
+---
+
 ## OPS26 — RESTORE FIDELITY — **QUESTION FILED (OPS26-Q). The count was wrong, and the real finding is worse.**
 
 **Lane:** ops · **Scope:** oracle · **Dispatch:** df586c1d-ccd7-417a-85c5-ce0931a8dde5
