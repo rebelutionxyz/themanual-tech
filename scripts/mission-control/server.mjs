@@ -74,7 +74,7 @@
 
 import { createServer } from 'node:http';
 import { execFile, execFileSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, basename } from 'node:path';
 
@@ -193,6 +193,8 @@ const RESOLVED = {
   // OPS22's activator host. PATH first, then the fixed System32 location — a
   // thin PATH must not silently cost us window focus.
   powershell: resolveExe('powershell.exe') || (existsSync(SYSTEM_PS) ? SYSTEM_PS : null),
+  // OPS25's Tier 2 reader. Carries its own auth; the board holds no token.
+  gh: resolveExe('gh.exe') || resolveExe('gh'),
 };
 
 // A console host appearing is the only honest evidence that a terminal opened —
@@ -399,6 +401,85 @@ async function spawnTerminal(index) {
   return { label: folder.label, verified: r.verified, focus: r.focus };
 }
 
+// ── backup age (OPS25) ──────────────────────────────────────────────────────
+// Both backup tiers failed SILENTLY: Tier 3 for eleven weeks, Tier 2 for a week.
+// Nothing anywhere showed a stale backup, so nobody looked. This panel puts the
+// age of each tier on the board Butch already reads.
+//
+// Deliberately credential-free:
+//   Tier 3 — a filesystem stat of the local snapshot directory.
+//   Tier 2 — the GitHub Actions run history via `gh`, which carries its own
+//            auth. The board does NOT hold the service-role key and does NOT
+//            list the storage bucket; the run's own upload step already fails
+//            hard on a non-2xx, so a successful run means the object landed.
+const BK = cfg.backups || {};
+const DAY_MS = 86400000;
+
+function ageState(days) {
+  if (days == null) return 'unknown';
+  if (days >= (Number(BK.alertDays) || 14)) return 'alert';
+  if (days >= (Number(BK.warnDays) || 8)) return 'warn';
+  return 'ok';
+}
+
+function tier3Status() {
+  try {
+    const dir = BK.tier3Dir;
+    if (!dir || !existsSync(dir)) return { tier: 'Tier 3 — local', error: 'directory not found' };
+    const prefix = BK.tier3Glob || 'themanual-snapshot-';
+    let newest = null;
+    for (const name of readdirSync(dir)) {
+      if (!name.startsWith(prefix) || !name.endsWith('.sql.gz')) continue;
+      const st = statSync(join(dir, name));
+      if (!newest || st.mtimeMs > newest.mtimeMs) newest = { name, mtimeMs: st.mtimeMs, size: st.size };
+    }
+    if (!newest) return { tier: 'Tier 3 — local', error: 'no snapshots found' };
+    const days = (Date.now() - newest.mtimeMs) / DAY_MS;
+    return {
+      tier: 'Tier 3 — local', label: newest.name, bytes: newest.size,
+      ageDays: days, state: ageState(days),
+    };
+  } catch (e) {
+    return { tier: 'Tier 3 — local', error: e.message };
+  }
+}
+
+function tier2Status() {
+  return new Promise((resolve) => {
+    const gh = RESOLVED.gh;
+    if (!gh) return resolve({ tier: 'Tier 2 — Actions', error: 'gh CLI not found' });
+    execFile(
+      gh,
+      ['run', 'list', '--repo', BK.tier2Repo, '--workflow', BK.tier2Workflow,
+       '--limit', '10', '--json', 'status,conclusion,createdAt,databaseId'],
+      { windowsHide: true, timeout: 15000, maxBuffer: 1024 * 512 },
+      (err, stdout) => {
+        if (err) return resolve({ tier: 'Tier 2 — Actions', error: 'gh run list failed' });
+        let runs;
+        try { runs = JSON.parse(stdout); } catch { return resolve({ tier: 'Tier 2 — Actions', error: 'unparseable gh output' }); }
+        const ok = runs.find((r) => r.conclusion === 'success');
+        const newest = runs[0];
+        if (!ok) return resolve({ tier: 'Tier 2 — Actions', error: 'no successful run in last 10' });
+        const days = (Date.now() - Date.parse(ok.createdAt)) / DAY_MS;
+        return resolve({
+          tier: 'Tier 2 — Actions',
+          label: new Date(ok.createdAt).toISOString().slice(0, 10),
+          ageDays: days,
+          state: ageState(days),
+          // A red LATEST run with a green older one is its own warning: the
+          // backup is not yet stale, but it has started failing.
+          lastRunFailed: newest && newest.conclusion !== 'success' && newest.databaseId !== ok.databaseId,
+        });
+      },
+    );
+  });
+}
+
+async function backupStatus() {
+  const [t2, t3] = await Promise.all([tier2Status(), Promise.resolve(tier3Status())]);
+  return [t2, t3];
+}
+
 // ── page ────────────────────────────────────────────────────────────────────
 const PAGE = `<!doctype html><html><head><meta charset="utf-8">
 <title>Mission Control — ops rail</title>
@@ -453,6 +534,12 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
       actually appeared, and it states where the window <b>ended up</b> — Windows can refuse to hand
       focus away from the browser you clicked in, and when it does you get a flashing taskbar button
       instead of a lie.</div>
+    </section>
+    <section style="margin-top:18px"><h2>Backups</h2><div id="backups" class="wrap">…</div>
+      <div class="note">Age of the newest <b>verified</b> backup per tier. Tier 3 is a local file
+      stat; Tier 2 is the last successful Actions run (its upload step fails hard on a bad response,
+      so a green run means the object landed). Amber at 8 days, red at 14 — a weekly job that has
+      missed one run, then two. Both tiers failed silently before this panel existed.</div>
     </section>
     <section style="margin-top:18px"><h2>Read-only</h2>
       <div class="note" style="padding:12px 14px">This board issues <b>SELECT only</b>.
@@ -518,11 +605,37 @@ function render(b) {
       + '<td class="title">' + esc(cleanTitle(r.title)) + '</td></tr>').join('') + '</table>';
 }
 
+// Backup age. Refreshed on a slower beat than the rail — it moves in days, and
+// the Tier 2 read shells out to gh.
+const AGE_CLASS = { ok: 'ok', warn: 'warn', alert: 'alert', unknown: 'sub' };
+async function tickBackups() {
+  const el = document.getElementById('backups');
+  try {
+    const j = await (await fetch('/api/backups')).json();
+    el.innerHTML = '<table>' + j.tiers.map(t => {
+      if (t.error) {
+        return '<tr><td class="pass">' + esc(t.tier) + '</td>'
+          + '<td class="alert" colspan="2">unreadable — ' + esc(t.error) + '</td></tr>';
+      }
+      const d = t.ageDays;
+      const age = d < 1 ? 'today' : Math.floor(d) + 'd old';
+      const cls = AGE_CLASS[t.state] || 'sub';
+      return '<tr><td class="pass">' + esc(t.tier) + '</td>'
+        + '<td class="' + cls + '">' + esc(age) + (t.state === 'alert' ? ' ⚠ STALE' : '') + '</td>'
+        + '<td class="sub">' + esc(t.label || '')
+        + (t.lastRunFailed ? '<div class="alert">latest run FAILED</div>' : '') + '</td></tr>';
+    }).join('') + '</table>';
+  } catch (e) {
+    el.innerHTML = '<div class="err">backup check failed: ' + esc(e.message) + '</div>';
+  }
+}
+
 async function boot() {
   const f = await (await fetch('/api/folders')).json();
   document.getElementById('spawn').innerHTML = f.folders
     .map((x, i) => '<button onclick="spawn(' + i + ')">+ ' + esc(x.label) + '</button>').join('');
   tick(); setInterval(tick, 10000);
+  tickBackups(); setInterval(tickBackups, 300000);
 }
 // "opened" is only ever printed for a spawn the server actually CONFIRMED — a
 // launcher exit code is not evidence a window exists. Failures stay on screen
@@ -584,6 +697,9 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === 'GET' && req.url === '/api/folders') {
       return json(res, 200, { folders: cfg.folders.map((f) => ({ label: f.label })) });
+    }
+    if (req.method === 'GET' && req.url === '/api/backups') {
+      return json(res, 200, { tiers: await backupStatus() });
     }
     if (req.method === 'GET' && req.url === '/api/board') {
       const board = await readBoard();

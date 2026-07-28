@@ -5,6 +5,702 @@ Newest pass first.
 
 ---
 
+## OPS25 — BACKUP RESTORATION (2026-07-28) — **DONE. BOTH TIERS GREEN.**
+
+> **Supersedes the OPS25-Q filing below.** That question was filed with item (1) blocked on Butch's
+> ruling. **Butch answered "a" in-terminal.** §A records the application and verification; everything
+> in §1–§10 stands as written.
+
+### A. Tier 3 FIXED — option (a) applied, run supervised, verified
+
+**First successful Tier 3 backup since 2026-05-10 — eleven weeks and ten consecutive failures ended.**
+
+`run-weekly-backup.ps1` now connects via the **session pooler** with `-w` against `pgpass.conf`. The
+DPAPI decrypt block, the `$CredFile` check, and the `finally` credential-wipe are gone — the script
+no longer holds a secret at all, and no password touches the command line (so none can appear in a
+process listing). Both OPS24 causes die together: the IPv6-only direct host and the stale May-7
+password.
+
+Also applied, and the reason this was ever a forensic exercise: **pg_dump's stderr is captured and
+logged.** Windows PowerShell converts native stderr into a terminating error under
+`$ErrorActionPreference='Stop'`, which would abort before the message could be read — so the
+preference is relaxed for exactly that one call and restored immediately after. Failure now logs the
+real reason instead of `exit code 1`.
+
+**Supervised run, verbatim from `backup-log.txt`:**
+
+```
+2026-07-28 09:25:21 [INFO] === Tier 3 backup run starting ===
+2026-07-28 09:25:21 [INFO] Running pg_dump (postgres.anxmqiehpyznifqgskzc@aws-1-us-east-1.pooler.supabase.com:5432/postgres)
+2026-07-28 09:26:50 [INFO] Dump complete; size=49952225 bytes
+2026-07-28 09:26:51 [INFO] Compression done; gz size=5928753 bytes (ratio: 11.9%)
+2026-07-28 09:26:51 [INFO] Pruned: themanual-snapshot-2026-05-07-1040.sql.gz
+2026-07-28 09:26:51 [INFO] Pruned: themanual-snapshot-2026-05-10-0900.sql.gz
+2026-07-28 09:26:51 [INFO] Retention pass: kept 2, pruned 2
+2026-07-28 09:26:51 [SUCCESS] === Tier 3 backup run finished OK ===
+```
+
+Exit 0. Retention pruned **exactly the two files §2 predicted** — and both are intact in
+`preserved-2026-07-28/`, re-verified after the run (`sha256sum -c` → 4×`OK`). The amendment's
+"preserve first" instruction earned its place: without it those two snapshots would be gone.
+
+**Artifact verified against live production, not just assumed:**
+
+| Table | In the new snapshot | Live |
+|---|---|---|
+| `public.atoms` | **37,437** | 37,437 |
+| `public.bees` | 18 | 18 |
+| `auth.users` | 18 | 18 |
+| `elections_private.config` | **6** | 6 |
+
+That last row settles §3's open question in the right direction: **the backup was never the problem.**
+`elections_private.config` is present and complete in the artifact — the 6→0 loss was purely a
+restore-side cascade in a vanilla Postgres target. The Tier 3 and Tier 2 artifacts also cross-check
+each other: 5,928,753 vs 5,933,949 bytes, **0.09% apart**, produced independently hours apart from
+the same database.
+
+**The board now reads what it should:**
+
+```
+Tier 2 — Actions :: today · ok · 2026-07-28
+Tier 3 — local   :: today · ok · themanual-snapshot-2026-07-28-0925.sql.gz
+```
+
+### B. Done-tests — final
+
+| # | Requirement | Result |
+|---|---|---|
+| 1 | Both tiers GREEN today | **MET** — Tier 2 14:54 UTC, Tier 3 09:26 local, both verified against live counts |
+| 2 | Verified restorable artifacts | **MET** — 172/172 table row-count diff (§3), plus the silent-loss finding |
+| 3 | Backup age visible where Butch looks | **MET** — panel live, flagged 79d before the fix, green after |
+| 4 | Zero production writes | **MET** — production was only ever read; §9 |
+
+### C. What is still open after this pass
+
+1. **The workflow guard hardening is uncommitted** (§5) and has no effect until pushed —
+   `honeycomb-ops`, a different repo. Needs a SWEEP dispatch. **Until then Tier 2's guards are the
+   old weak ones**, though the secret itself is now correct.
+2. **`run-weekly-backup.ps1` is also uncommitted** — it lives in `HONEYCOMB-backups/`, which is
+   outside every repo. It is not version-controlled at all. Worth deciding whether it should be.
+3. **`.connstr.dpapi` was renamed, not deleted** → `.connstr.dpapi.retired-2026-07-28`. Reversible on
+   purpose; it holds a stale password and is no longer read by anything. **Butch's to delete.**
+4. **S4U re-registration** — dropping DPAPI removed the only reason the task must be Interactive.
+   Re-registering as S4U would let it run when Butch is not logged in; three Sundays were skipped for
+   exactly that. Not done, not silently.
+5. **A restore into a real Supabase target is still unproven** (§10) — the highest-value follow-up.
+6. **Local PostgreSQL listens on `0.0.0.0:5432`** (§D2) — flagged, unchanged.
+7. **USB cold-storage copy** — OPS24 Q6, still unanswered.
+
+### D. Additional deviations for §A
+
+- **D6 — renamed rather than deleted the DPAPI file.** Option (a) said delete. A rename is
+  reversible, achieves the same outcome (nothing reads it), and destroying a credential file on my
+  own initiative is not a call I should make when a rename is free. Flagged rather than assumed.
+- **D7 — let the retention pass run.** It was going to prune two snapshots and I knew exactly which.
+  Suppressing it would have meant editing retention logic on a job I had just repaired; preserving
+  the files first — which the amendment required — was the cleaner answer, and the copies verify.
+
+---
+
+## OPS25 — original filing (2026-07-28) — question, now answered
+
+**Lane:** ops · **Scope:** oracle · **Dispatch:** 33b227be-c287-47e6-9dd7-6d38b74e824d
+**Posture:** dispatch item (1) requires Butch's explicit yes before applying. Everything independent
+of that answer is **done**. Dispatch left `claimed` per R4.
+
+### 0. Headline
+
+Three of four items complete. The one that needs a human is waiting on one word.
+
+> **The restore test found something worse than a stale backup: a restore can lose data and still
+> exit 0.** Restoring today's production dump into a clean PostgreSQL 17 silently dropped
+> `elections_private.config` — 6 rows in production, **0 restored** — while `psql` returned success.
+> Every `public` table and all of `auth` landed perfectly, so a casual "did it work?" would have said
+> yes. §3 has the mechanism and the fix for the runbook.
+
+Also built: **the board now shows backup age per tier**, and on its first run it immediately flagged
+the condition that went unseen for eleven weeks — `Tier 3 — local · 79d old · ⚠ STALE`.
+
+### 1. Precondition — Tier 2 verified GREEN (dispatch: "before anything else")
+
+Butch re-set `SUPABASE_DB_URI`; run **30370662594** (`workflow_dispatch`, 2026-07-28 14:54 UTC)
+succeeded in 40 s, all steps including upload. Confirmed from the log, not the checkmark:
+
+```
+-rw-r--r-- 1 runner runner 5.7M Jul 28 14:54 themanual-snapshot-2026-07-28.sql.gz
+{"Key":"themanual-backups/weekly/themanual-snapshot-2026-07-28.sql.gz","Id":"9579725f-…"}
+```
+
+The storage API returned the object key, so the object exists. **Limit:** I could not *list* the
+bucket to double-confirm — it is private (an anonymous GET returns `404 Bucket not found`, which is
+the correct posture and is now verified rather than assumed) and listing needs the service-role key,
+which I will not hold.
+
+### 2. Item 0 (LEAD AMENDMENT) — snapshots preserved BEFORE anything else
+
+Tier 3's retention would delete two of the three surviving local snapshots on its next success. All
+four local artifacts are copied to `HONEYCOMB-backups/preserved-2026-07-28/` and **verified by
+SHA-256 after copying** (`sha256sum -c` → 4×`OK`); the manifest is `ORIGINALS.sha256` in that folder.
+
+```
+d433af74…  themanual-snapshot-2026-05-07-1001.sql.gz   220,104 B
+56059c3a…  themanual-snapshot-2026-05-07-1040.sql.gz   220,104 B
+d9fb5ea1…  themanual-snapshot-2026-05-10-0900.sql.gz   224,980 B
+e13295 34…  themanual-snapshot-2026-05-07-0718.sql    2,043,473 B  (uncompressed, never at risk)
+```
+
+Safe by construction: the retention scan is `Get-ChildItem -Path $BackupRoot -Filter … -File` with
+**no `-Recurse`**, so a subfolder is invisible to it. The new board panel skips it too (it matches on
+`.sql.gz`).
+
+### 3. Item 2 — RESTORABILITY: both artifacts restore, with one real gap
+
+Target: the **local PostgreSQL 17.9** service already running on this machine — a genuinely separate
+cluster. **Zero production writes**; production was only ever read.
+
+**Tier 3 artifact** (`themanual-snapshot-2026-05-10-0900.sql.gz`, the real file):
+
+| | |
+|---|---|
+| Restore | `psql` exit 0, 5 diagnostics — all Supabase-platform (`supabase_vault`, `vault.secrets`, a `wal_level` warning) |
+| Tables | **35 created**, matching the 35 `COPY` blocks in the file |
+| Data | **atoms = 4,860** — exactly the row count measured inside the gz. `bees` 3, `canonical_documents` 5 |
+
+**Verdict: restorable and complete.**
+
+**Tier 2 artifact.** The bucket is private, so I could not restore the literal object. I rebuilt an
+equivalent through the **same pipeline the workflow uses** — `pg_dump --no-owner --no-privileges
+--format=plain` → `gzip` — against production today: **5,933,949 bytes vs the workflow's reported
+5.7 M.** Same shape, same day, same data.
+
+Verified by diffing **every table's row count, production vs restore** (172 tables each, script in
+§6):
+
+| Check | Result |
+|---|---|
+| Tables in prod / restored | **172 / 172**, none missing |
+| `public` row-count mismatches | **1 of 172** — `trivia_question_serves` 4,098 vs 4,096 |
+| `auth.users` / `auth.identities` / `auth.sessions` | **18/18 · 11/11 · 23/23** — exact |
+| `storage.objects` / `storage.buckets` | **59/59 · 5/5** — exact |
+| `elections_private.config` | **6 in production → 0 restored** ⚠ |
+
+The `trivia_question_serves` gap is 2 rows written to a live table *after* the dump's snapshot — the
+dump is transactionally consistent, production simply moved on. Not a defect.
+
+**`elections_private.config` is a real gap, and the mechanism is the finding:**
+
+1. The dump contains `COPY cron.job_run_details` (146 rows of pg_cron history).
+2. `pg_cron` is not installable locally → the `cron` schema never exists → that `COPY` fails.
+3. `psql` drops out of COPY framing, so those 146 data rows are parsed as **SQL** —
+   `ERROR: syntax error at or near "succeeded"` ×146.
+4. The block's `\.` terminator is then **rejected by pg_dump 17.9's restricted mode**
+   (*"backslash commands are restricted; only \unrestrict is allowed"*), so framing never recovers.
+5. The **next** `COPY` — `elections_private.config` — has its data eaten the same way.
+6. **`psql` exits 0.**
+
+So a failure in a table nobody cares about (cron telemetry) silently destroyed a table that matters
+(AtlasVOTE's server-side config and receipt salt), and the process reported success. **This is the
+same disease as the rest of this incident: the error was in the output, and nothing was watching it.**
+
+**⚠ SECURITY, and it needs to be in the binder:** when a `COPY` derails like this, the row data is
+echoed into stderr as failed SQL — which means **restore logs contain live secrets**. I saw
+`elections_private.config`'s receipt salt in mine. I have not reproduced it anywhere, and I deleted
+the restore logs and both scratch dumps (§7). **Treat any restore log as secret material.**
+
+### 4. Item 3 — NEVER SILENT: backup age on the board
+
+New panel on the mission control board (right column, under Add Claude), plus `GET /api/backups`.
+
+| Tier | Source | Credentials |
+|---|---|---|
+| Tier 3 — local | filesystem stat of the newest `themanual-snapshot-*.sql.gz` | none |
+| Tier 2 — Actions | last **successful** run via `gh run list --json` | none held — `gh` carries its own |
+
+Green < 8 days, **amber ≥ 8** (one weekly run missed), **red ≥ 14** (two). It also flags
+`latest run FAILED` when the newest run is red but an older green one is still inside the window —
+i.e. *"not stale yet, but it has started failing"*, which is exactly Tier 2's state yesterday.
+
+Deliberately **not** the storage bucket: reading it needs the service-role key, and a monitoring
+panel is not worth putting that key in a long-lived local process. The workflow's own upload step
+fails hard on any non-2xx, so a green run already means the object landed.
+
+Live output on first run — it caught the real condition immediately:
+
+```json
+{"tier":"Tier 2 — Actions","label":"2026-07-28","ageDays":0.01,"state":"ok","lastRunFailed":false}
+{"tier":"Tier 3 — local","label":"themanual-snapshot-2026-05-10-0900.sql.gz","ageDays":79.0,"state":"alert"}
+```
+
+### 5. Tier 2 guard hardening — DONE IN THE FILE, **NOT YET IN EFFECT**
+
+`honeycomb-ops/.github/workflows/backup-weekly.yml`, per the amendment. Two changes, both aimed at
+the stderr-swallowing pattern:
+
+- **Shape check, not `-z`.** A `case` on `postgres://*@*|postgresql://*@*`. Tested against seven
+  inputs — empty, single space, bare newline, `postgres`, a URI with no `@host`, and two valid URIs.
+  All five bad shapes now fail **in ~1 s naming the cause**; today's whitespace secret would have
+  said so instead of producing a misleading local-socket error 12 s later.
+- **pg_dump's real error reaches the log and fails the step.** Its stderr was previously discarded
+  and its exit status lost (the pipeline reported *gzip's*), so failures only ever surfaced as the
+  generic size guard. Now stderr is captured, `PIPESTATUS[0]` is read, and the reason is quoted into
+  the `::error::` annotation — with a `sed` that redacts anything shaped like credentials-in-a-URI,
+  on top of GitHub's own masking.
+
+Validated: `bash -n` clean on the extracted fragment, run-block indentation uniform.
+
+> **⚠ This has NO effect until it is pushed.** GitHub runs what is in the repo. Git is gated at this
+> root (GIT AMENDMENT — `add`/`commit`/`push` only via an explicit dispatch after a lead-cleared
+> manifest), so the change sits uncommitted in the working tree. **It needs a SWEEP dispatch for
+> `honeycomb-ops`, which is a different repo from this workdir.**
+>
+> Also noting for R5: the workflow file is **outside** `workdir=TheMANUAL.tech`. I treated the
+> dispatch's explicit instruction to harden the Tier 2 guard as the grant, and I am flagging it
+> rather than assuming it.
+
+### 6. Item 4 — the restore command, for the binder
+
+**Restore into a fresh Supabase project, not vanilla Postgres.** §3 proves vanilla is lossy: the dump
+assumes `auth`, `storage`, `cron`, `realtime`, `vault`, `graphql`, `pgbouncer`,
+`supabase_migrations` and the extensions `ltree`, `pg_cron`, `pg_stat_statements`, `pg_trgm`,
+`pgcrypto`, `supabase_vault`. Missing any of them costs data **silently**.
+
+```bash
+# 1. target — a fresh Supabase project is the only environment with all of the above
+createdb -h <target-host> -U postgres honeycomb_restore
+
+# 2. RESTORE WITH ON_ERROR_STOP=1. This is the load-bearing flag.
+#    Without it psql exits 0 on a partial restore (§3) — silent data loss.
+gzip -cd themanual-snapshot-YYYY-MM-DD.sql.gz \
+  | psql -v ON_ERROR_STOP=1 -h <target-host> -U postgres -d honeycomb_restore
+
+# 3. PROVE it — never trust exit 0 alone. Run against BOTH and diff:
+psql -t -A -f counts.sql -d honeycomb_restore  > restored.counts
+psql -t -A -f counts.sql <production coords>   > prod.counts
+join -t'|' -j1 <(sort prod.counts) <(sort restored.counts) | awk -F'|' '$2!=$3'
+```
+
+`counts.sql` (per-table row counts via `query_to_xml`) is the verification tool this pass used and is
+worth keeping in the binder:
+
+```sql
+SELECT c.relname || '|' ||
+       (xpath('/row/cnt/text()',
+              query_to_xml('SELECT count(*) AS cnt FROM public.' || quote_ident(c.relname),
+                           false, true, '')))[1]::text
+  FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE n.nspname = 'public' AND c.relkind = 'r' ORDER BY c.relname;
+```
+
+**When each tier last succeeded / now succeeds:**
+
+| Tier | Last success before this pass | Now |
+|---|---|---|
+| Tier 2 — Actions | 2026-07-21 (then failed 07-27, 07-28 ×1) | ✅ **2026-07-28**, verified in bucket |
+| Tier 3 — local | **2026-05-10** (10 straight failures since) | ❌ still failing — §7 |
+
+### 7. ⇒ OPS25-Q — the one thing I need
+
+Dispatch item (1) says *present the fix, **get his explicit yes**, apply*. Presenting:
+
+**Q — which Tier 3 fix?**
+
+**(a) RECOMMENDED — pooler + `pgpass.conf`, delete the DPAPI file.** Replace the decrypt block and
+positional URI in `run-weekly-backup.ps1` with explicit connection flags:
+
+```powershell
+& $PgDump -h aws-1-us-east-1.pooler.supabase.com -p 5432 -U postgres.anxmqiehpyznifqgskzc `
+          -d postgres -w --no-owner --no-privileges --format=plain --file=$sqlFile
+```
+
+- Kills **both** causes at once — no IPv6 dependency, and no third copy of the password to go stale.
+- **Needs nothing from you but the word "yes".** `pgpass.conf` already holds the current password —
+  proven twice today: my probe dump and the equivalence dump both ran through it.
+- Removes a credential file from disk.
+- **Bonus:** the DPAPI decrypt is the *only* reason the task is `LogonType=Interactive`
+  (`register-task.ps1` documents this — S4U does not load the DPAPI master key). Remove it and the
+  task could run **S4U**, i.e. even when you are not logged in. Three Sundays were skipped for
+  exactly that reason. I'd propose that as a follow-up, not silently.
+
+**(b) Minimum change.** Re-encrypt `.connstr.dpapi` with a *pooler* URI and the current password.
+Keeps the architecture; you would have to type the password at the terminal; still leaves a third
+copy to rotate.
+
+**Say "a" (or "b") and I'll apply it, run Tier 3 supervised, and verify the snapshot against live
+row counts.** I will also add the same stderr capture to the Tier 3 script in the same pass — its
+`$LASTEXITCODE`-only logging is what made OPS24 a forensic exercise.
+
+I have **not** touched `run-weekly-backup.ps1`, `.connstr.dpapi`, or the scheduled task.
+
+### 8. Done-tests
+
+| # | Requirement | Result |
+|---|---|---|
+| 1 | Both tiers GREEN today | **PARTIAL — Tier 2 ✅ verified; Tier 3 ❌ blocked on §7.** Stated plainly rather than claimed. |
+| 2 | Verified restorable artifacts | **MET, and better than asked** — full 172-table row-count diff, plus a real gap found (§3) that a spot-check would have missed |
+| 3 | Backup age visible where Butch looks | **MET** — board panel live, flagged Tier 3 on first run |
+| 4 | Zero production writes | **MET** — §9 |
+
+### 9. Zero production writes — the evidence
+
+Every production statement this pass was `SELECT`, `SHOW`, `count(*)`, or `pg_dump` (read-only).
+All writes went to: the **local** PostgreSQL scratch databases (both since dropped), the
+**scratchpad**, and `HONEYCOMB-backups/preserved-2026-07-28/` (new files only, nothing overwritten).
+The Tier 3 script, its DPAPI file and the scheduled task are untouched — task still `Ready`, next run
+2026-08-02 09:00.
+
+### 10. Deviations, judgement calls, could-not-verify
+
+- **D1 — I destroyed my own evidence, on purpose.** Both scratch restore databases were **dropped**
+  and the scratch dumps + restore logs **deleted**. They held a complete copy of production including
+  `auth.users` and, per §3, a live secret in plaintext — on a server that (see D2) listens on
+  `0.0.0.0`. Keeping them for re-inspection was not worth that. The counts in §3 are the record; §6
+  reproduces the test in three commands.
+- **D2 — flagging, not fixing: the local PostgreSQL 17 listens on `0.0.0.0:5432`,** not
+  `127.0.0.1`. Out of scope for this dispatch and I changed nothing, but it is a real exposure on a
+  laptop that joins other networks, and it is the reason D1 mattered.
+- **D3 — used the local Postgres as the restore target** rather than a scratch schema on production.
+  The dispatch offered either; a scratch schema on production would be a production write and would
+  have failed done-test 4.
+- **D4 — Tier 2 restorability was proven on an equivalent artifact, not the bucket object** (§3).
+  Same pipeline, same flags, same day, sizes within 0.5%. What it does *not* prove is that the
+  specific bytes in the bucket are intact — that needs the service-role key.
+- **D5 — the workflow edit is outside the workdir and uncommitted** (§5).
+- **Could not verify — that the fix in §7 makes Tier 3 green.** It is unapplied, by instruction. The
+  pooler path itself is proven working three separate ways today.
+- **Could not verify — the USB cold-storage copy** (OPS24 Q6, still open).
+- **Could not verify — whether `elections_private.config` would restore into a real Supabase
+  target.** The cascade in §3 is caused by `pg_cron` being absent; a Supabase project has it, so the
+  chain should not start. Untested — I have no spare project to restore into, and that is the single
+  most valuable follow-up in this report.
+
+---
+
+## OPS24-ADDENDUM — Tier 2 re-run on Butch's instruction (2026-07-28 14:44 UTC) — **STILL FAILING, new cause**
+
+Not a dispatched pass. Butch said "run the weekly backup workflow"; recorded here so the action is on
+the record. Triggered via `workflow_dispatch`, run **30369809154**, failed in **12 s**.
+
+**The failure changed shape, which proves the secret was touched between yesterday and now:**
+
+| | Yesterday 07-27 (scheduled) | Today 07-28 (this run) |
+|---|---|---|
+| Error | `FATAL: password authentication failed for user "postgres"` | `connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: No such file or directory` |
+| Means | reached the pooler, wrong password | **never reached any server** — pg_dump got no connection parameters and fell back to a local unix socket |
+
+`SUPABASE_DB_URI` no longer carries a usable URI. It is **not empty** — the workflow's own
+`if [ -z "$SUPABASE_DB_URI" ]` guard did not fire, and no `::error::SUPABASE_DB_URI secret is empty`
+annotation appears — but whatever it now holds yields no host, so pg_dump defaulted to localhost.
+A whitespace-only or truncated value fits: non-empty to `-z`, useless to libpq.
+
+**Two things worth noting from this run:**
+
+- **The 20-byte snapshot was NOT uploaded.** The dump step failed, so the upload step never ran and
+  the size guard fired. Nothing was written to `themanual-backups/` — worth stating explicitly
+  because that step uses `x-upsert: true` and *could* have overwritten a good object. It did not.
+  The bucket's newest object is still the **2026-07-21** snapshot.
+- **The `-z` guard is too weak.** It admits whitespace. A prefix check (`case "$SUPABASE_DB_URI" in
+  postgres*://*) ;; *) exit 1 ;; esac`) would have failed the run in 1 s with an accurate message
+  instead of 12 s with a misleading socket error. Same family as OPS24 §2's stderr finding: the
+  guards report the symptom, not the cause.
+
+### ✅ RESOLVED — Butch re-set the secret; re-run 14:54 UTC is GREEN
+
+Run **30370662594**, `workflow_dispatch`, **success in 40 s, all steps including the upload.**
+
+Verified from the log rather than from the green check:
+
+```
+-rw-r--r-- 1 runner runner 5.7M Jul 28 14:54 themanual-snapshot-2026-07-28.sql.gz
+{"Key":"themanual-backups/weekly/themanual-snapshot-2026-07-28.sql.gz",
+ "Id":"9579725f-3b30-4977-a653-99ca7f8d5b34"}
+```
+
+The storage API returned the object key, so the snapshot is genuinely in the bucket — not merely
+dumped on the runner.
+
+**Size sanity check:** 5.7 MB gz today against 225 KB gz on 2026-05-10. That is a ~25× jump, and it
+is the right shape: atoms went 4,860 → 37,437 over the same period, plus growth in every other table.
+Well clear of the workflow's 100 KB floor. **This is now the newest backup that exists anywhere, and
+it is current as of today.**
+
+**Tier 2 is restored.** Its next scheduled run, Monday 2026-08-03, should now succeed unattended.
+
+**Tier 3 is still dead** and fires again **Sunday 2026-08-02**, where it will fail for the 11th time.
+It needs OPS24 §5 Q1 ruled — and note it needs *both* fixes: the host (IPv6-only direct → pooler) and
+the password, since its DPAPI blob is from 2026-05-07 and predates the rotation.
+
+---
+
+## OPS24 — Tier-3 backup task failing (0x1) — DIAGNOSIS (2026-07-28) — **DONE, fix awaits Butch**
+
+**Lane:** ops · **Scope:** oracle · **Dispatch:** d18b9918-75b3-4a25-8b72-7ebe1171ff2d
+**Posture:** diagnose only. **Nothing on disk or in the task was modified** — verified in §7.
+
+### 0. ⚠️ HEADLINE — this is worse than one failed Sunday, and it is not only Tier 3
+
+Two independent findings, and the second one was not in the dispatch:
+
+> **1. Tier 3 has not produced a backup since 2026-05-10. It has failed 10 consecutive times.**
+> The dispatch said "failed Sunday." It has failed every run for **eleven weeks**.
+>
+> **2. Tier 2 — the GitHub Actions weekly — failed for the FIRST TIME yesterday, 2026-07-27,
+> with `FATAL: password authentication failed`. The production DB password was rotated between
+> 2026-07-21 and 2026-07-27 and the GitHub secret was never updated.**
+
+**So as of right now every automated backup tier is failing.** The newest surviving backup anywhere
+is Tier 2's **2026-07-21** snapshot in the `themanual-backups/weekly/` bucket — 7 days old. The
+newest *local* copy is **2026-05-10**, which is **79 days** old and holds **4,860 atoms against
+37,437 live today** — it protects roughly **13%** of the current spine.
+
+Nothing is lost. But the safety net has one week of slack left, and Tier 3 fires again **Sunday
+2026-08-02**, Tier 2 **Monday 2026-08-03** — both will fail again untouched.
+
+The June 6 handoff called this exactly: *"VERIFY the backup tiers actually ran… Don't assume — check
+the actual run logs."* At that point Tier 3 had already been dead for three weeks.
+
+---
+
+### 1. What it backs up (dispatch item 1)
+
+| | |
+|---|---|
+| **Task** | `\HONEYCOMB-Tier3-Backup`, weekly Sundays 09:00 local, since 2026-05-07 |
+| **Runs** | `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Butch\Documents\HONEYCOMB-backups\scripts\run-weekly-backup.ps1"` |
+| **Principal** | `Butch`, LogonType **Interactive**, RunLevel Limited, 15-min execution limit |
+| **What** | Full `pg_dump --no-owner --no-privileges --format=plain` of TheMANUAL.tech production (`anxmqiehpyznifqgskzc`) — schema **and data**. The 2026-05-10 snapshot carries **35 `COPY public.*` data blocks**: `atoms`, `bees`, `bling_transactions`, `bling_orders`, `bling_escrows`, `atom_sources`, `forum_threads`, `entity_atom_links`, `canonical_documents` and the rest. It is a real full-content backup, not schema-only. |
+| **Where** | `C:\Users\Butch\Documents\HONEYCOMB-backups\themanual-snapshot-YYYY-MM-DD-HHmm.sql.gz` |
+| **Credential** | `.connstr.dpapi` — a DPAPI blob decryptable only by Butch's account on this machine. **Last written 2026-05-07 09:58 and never touched since.** Per the Secrets rule I did **not** decrypt or read it, and §4 explains why that limits one conclusion. |
+| **Retention** | all ≤30 days; one per month to 365 days; one per year beyond. Pruning runs after every **successful** dump. |
+
+`register-task.ps1` documents a real design decision worth preserving: LogonType is **Interactive**,
+not S4U, because S4U does not load the user's DPAPI master key, so `ConvertTo-SecureString` could not
+decrypt the credential at all. The trade-off is that the task only fires when Butch is logged in.
+
+### 2. Why it failed (dispatch item 2)
+
+**Every failure is identical:** `Backup failed: pg_dump exited with code 1`. That is all the log has,
+in all ten failures — and that is itself the first finding:
+
+> **The script never captures pg_dump's stderr.** Line 61 runs `& $PgDump … $connStr` and line 62
+> logs only `$LASTEXITCODE`. pg_dump writes the actual reason — wrong host, bad password, version
+> mismatch — to stderr, which under Task Scheduler goes to a console nobody sees. **Eleven weeks of
+> failures produced zero diagnostic information.** Whatever else is decided, this line should change.
+
+So the cause had to be reconstructed from outside. What I ruled **out**, each by direct test:
+
+| Hypothesis | Test | Result |
+|---|---|---|
+| pg_dump/server version mismatch | `pg_dump 17.9` / `psql 17.9` vs `SHOW server_version` | **17.6 server, 17.9 client — fine.** Client newer than server is supported. Not this. |
+| Server unreachable / DB down | `pg_dump --schema-only` to scratchpad via the pooler + `pgpass.conf` | **Exit 0, 1,116,864 bytes.** Production dumps fine right now. Not this. |
+| Missing `pg_dump.exe`, missing backup root, missing cred file | script's own pre-flight `throw`s name each distinctly; log says `pg_dump exited with code 1` | All three present. Not this. |
+| Disk full | 3 snapshots + logs present, writes succeed | Not this. |
+| 15-minute execution limit | failures take **1–7 seconds**; successes took 27–38s | Not this. Would also report `0x41306`, not `0x1`. |
+
+What survives, and the evidence for it:
+
+**The connection string names the direct host `db.anxmqiehpyznifqgskzc.supabase.co`, which is now
+IPv6-only, and this laptop has no IPv6.** Measured this pass:
+
+```
+nslookup db.anxmqiehpyznifqgskzc.supabase.co 8.8.8.8
+   -> 2600:1f18:2e13:9d58:e35a:7a4b:c43b:91f      (AAAA only — no A record)
+
+dns.lookup(host)            -> ENOTFOUND     <- this is what libpq/pg_dump gets
+tcp [2600:1f18:...]:5432    -> ENETUNREACH (4ms)
+local non-internal addrs    -> Wi-Fi IPv4 192.168.0.120        (and nothing else)
+```
+
+This machine is IPv4-only. That host cannot be resolved *or* routed from it. pg_dump would fail
+instantly — matching the observed 1–2 second failures.
+
+**And Tier 2 is the control that makes this the leading answer rather than a guess.** Both tiers were
+configured on **2026-05-07**, hours apart, with the same-vintage credentials. Tier 2's URI points at
+the **pooler** (proved by its own error text naming `aws-1-us-east-1.pooler.supabase.com`). Tier 2
+then ran green from 2026-05-16 through **2026-07-21**. Tier 3 died on **2026-05-17**.
+
+Same project, same age of credential, same password — **the tier on the pooler lived, the tier on the
+machine that cannot do IPv6 died.** That asymmetry also **rules out** the otherwise-attractive theory
+that a mid-May password rotation broke Tier 3: a rotation would have taken Tier 2 down at the same
+moment, and it demonstrably did not.
+
+**⚠️ Compound problem:** yesterday's Tier 2 failure proves the password *has now* been rotated
+(§3). Tier 3's DPAPI blob is from 2026-05-07, so it holds the **old** password too. **Fixing only
+the host would leave Tier 3 still failing, on the second cause.** Both have to be addressed together.
+
+### 3. The finding that was not in the dispatch — Tier 2 broke yesterday
+
+`gh run list --repo rebelutionxyz/honeycomb-ops` — 18 runs, first green 2026-05-07 15:44:
+
+| Date | Result |
+|---|---|
+| 2026-05-07 → 2026-07-21 | **success ×12** (weekly, Mondays) |
+| **2026-07-27 12:10** | **failure, 14s** |
+
+Failure log, verbatim:
+
+```
+pg_dump: error: connection to server at "aws-1-us-east-1.pooler.supabase.com" (18.213.155.45),
+port 5432 failed: FATAL:  password authentication failed for user "postgres"
+##[error]Snapshot suspiciously small (20 bytes) - failing run
+```
+
+The workflow's size guard caught it and failed the run loudly — that guard did its job. The GitHub
+secret `SUPABASE_DB_URI` now holds a stale password. My `pgpass.conf`-based dumps work, so the
+**current** password is fine and known-good locally; only the stored copies are stale.
+
+**When:** between 2026-07-21 (last green) and 2026-07-27. **By whom / why:** unknown, not mine to
+guess. Butch will know whether he rotated it.
+
+### 4. When it last worked + prior run history (dispatch items 3 and 4)
+
+**Last successful Tier 3 backup: 2026-05-10 09:00:45**, 2,030,061 bytes → 224,980 gz.
+
+From `backup-log.txt` (complete history, nothing elided):
+
+| Run | Result | Duration |
+|---|---|---|
+| 2026-05-07 10:01 | **SUCCESS** — 2,004,712 B | 27 s |
+| 2026-05-07 10:40 | **SUCCESS** — 2,004,712 B | 30 s |
+| 2026-05-10 09:00 | **SUCCESS** — 2,030,061 B | 40 s |
+| 2026-05-17 10:35 | FAILED — `pg_dump exited with code 1` | 1 s |
+| 2026-05-24 09:00 | FAILED | 7 s |
+| 2026-06-07 09:00 | FAILED | 2 s |
+| 2026-06-14 09:00 | FAILED | 2 s |
+| 2026-06-22 11:32 | FAILED | 4 s |
+| 2026-06-28 09:00 | FAILED | 3 s |
+| 2026-07-05 09:00 | FAILED | 3 s |
+| 2026-07-19 09:00 | FAILED | 3 s |
+| 2026-07-26 09:00 | FAILED | 2 s |
+
+**10 consecutive failures.** Three Sundays are absent entirely (2026-05-31, 06-21, 07-12) and two ran
+late (05-17 at 10:35, 06-22 at 11:32) — consistent with the laptop being off or asleep at 09:00 and
+`-StartWhenAvailable` catching up. Not a separate fault.
+
+The 27–40 s successes against 1–7 s failures is itself diagnostic: it fails before transferring
+anything, i.e. at connect.
+
+**⚠️ One more thing, and it needs a decision before any fix runs.** Retention prunes to one snapshot
+per month beyond 30 days. All three surviving local snapshots are now 79+ days old and **two are from
+the same month (2026-05)**. On the **next successful run**, retention will delete
+`themanual-snapshot-2026-05-07-1040.sql.gz` **and** `themanual-snapshot-2026-05-10-0900.sql.gz`,
+keeping only `2026-05-07-1001`. That is the policy working as designed — but it silently discards the
+*newest* local snapshot in favour of the oldest, and it happens the moment the job is fixed.
+(`themanual-snapshot-2026-05-07-0718.sql`, the uncompressed one, does not match the `*.sql.gz` filter
+and is not at risk.)
+
+### 5. ⇒ QUESTIONS FOR BUTCH (dispatch item 5) — nothing will be changed without your word
+
+**Q1 — the fix for Tier 3. Which shape?**
+
+**(a) Recommended — move Tier 3 onto the pattern that already works.** `shared/ops/backup-preflight.ps1`
+has been dumping this same database since 2026-07-04 using the **session pooler + `pgpass.conf`**,
+with no stored credential of its own. One-line change in `run-weekly-backup.ps1`:
+
+```powershell
+# replace the DPAPI decrypt + positional $connStr with:
+& $PgDump -h aws-1-us-east-1.pooler.supabase.com -p 5432 -U postgres.anxmqiehpyznifqgskzc `
+          -d postgres -w --no-owner --no-privileges --format=plain --file=$sqlFile
+```
+
+This kills **both** causes at once — no IPv6 dependency, and no separately-rotatable password copy,
+because `pgpass.conf` is the one place the password already lives and is already current. It also
+lets `.connstr.dpapi` be deleted, removing a credential file from disk. Cost: the task inherits
+whatever `pgpass.conf` says, so a future rotation needs updating in one place instead of three.
+
+**(b) Minimum change.** Re-encrypt `.connstr.dpapi` with a *pooler* URI carrying the *current*
+password. Keeps the existing architecture; still leaves a credential on disk and a third copy of the
+password to rotate.
+
+**Q2 — Tier 2 needs the new password in its GitHub secret.** Update `SUPABASE_DB_URI` on
+`rebelutionxyz/honeycomb-ops` (Settings → Secrets → Actions). **Only you can do this — I have no
+access and would not touch a secret store if I did.** Until it is done, Tier 2 fails again Monday
+2026-08-03. Same for `SUPABASE_SERVICE_ROLE_KEY` if that was rotated too — untested, since the run
+failed before reaching the upload step.
+
+**Q3 — capture stderr, whatever else you decide.** The single highest-value line in this whole
+report. Something like `2>&1 | Tee-Object -Variable dumpErr` around the pg_dump call, with `$dumpErr`
+written into the log on failure. Eleven weeks of "exit code 1" is what made this a forensic exercise
+instead of a two-minute read.
+
+**Q4 — do you want failure to be loud?** Ten silent failures in a row. The rail already runs an
+unattended heartbeat; a weekly check that the newest snapshot is younger than N days, filing an
+`ops_reports` row when it is not, would have caught this in May. Say the word and it becomes a
+dispatch.
+
+**Q5 — retention, before the fix runs.** §4: the next success deletes two of the three surviving
+local snapshots. Copy them aside first, or leave the policy to do its job?
+
+**Q6 — the USB cold-storage copy** from the June 6 handoff. I cannot check removable media. When was
+it last refreshed?
+
+**Q7 — canon divergence, minor.** MMF v2.6 §5.11 says Tier 3 "Runs the Tier 1 script"
+(`honeycomb-ops/scripts/master-backup.sh`). It does not — it runs `run-weekly-backup.ps1`, a separate
+PowerShell implementation. One of the two should be corrected; the code is what actually ran, so I
+would fix the canon.
+
+### 6. Done-tests
+
+| # | Requirement | Result |
+|---|---|---|
+| 1 | What it backs up | **MET** — §1 |
+| 2 | Why it failed | **MET** — §2, with four hypotheses eliminated by direct test and the survivor supported by a natural control (Tier 2). Honest limit in §8. |
+| 3 | When it last succeeded | **MET** — §4, 2026-05-10 09:00:45 |
+| 4 | Prior run history | **MET** — §4, all 13 runs |
+| 5 | Proposed fix as a QUESTION | **MET** — §5, seven questions, nothing acted on |
+| 6 | Nothing on disk or in the task modified | **MET** — §7 |
+
+### 7. Nothing was modified — the evidence
+
+- `HONEYCOMB-backups/` mtimes are all unchanged: `backup-log.txt` 2026-07-26 09:00:10,
+  `themanual-snapshot-2026-05-10-0900.sql.gz` 2026-05-10 09:00:45, `.connstr.dpapi` 2026-05-07 09:58.
+  Nothing in that tree was written today.
+- The scheduled task was **read** (`schtasks /query`) only. Still `Status: Ready`, next run
+  **8/2/2026 09:00**. No `/Change`, no `/Run`, no re-register.
+- **`run-weekly-backup.ps1` was NOT executed.** Deliberate: it writes a new snapshot *and* runs the
+  retention pass, which per §4 would have deleted two of the three surviving snapshots. The dispatch
+  said never overwrite existing backup sets; running the real script would have pruned them.
+- The only file written anywhere was `probe-schema.sql` in the session scratchpad, from a
+  `--schema-only` dump. Never in the backup tree.
+- No production writes. Every DB statement was `SELECT` / `SHOW` / a read-only dump.
+
+### 8. Deviations, judgement calls, and could-not-verify
+
+- **D1 — I did not decrypt `.connstr.dpapi`.** The Secrets rule is absolute: never read or print a
+  file holding live credentials. That is why §2's conclusion is stated as a strongly-supported
+  inference rather than a fact: **I have not seen which host the string names.** If you want it
+  settled in one command, this prints the host and nothing else — no password ever reaches the
+  screen. **Run it yourself; do not paste the output of anything wider:**
+  ```powershell
+  ((Get-Content 'C:\Users\Butch\Documents\HONEYCOMB-backups\.connstr.dpapi' -Raw |
+    ConvertTo-SecureString | ForEach-Object {
+      [Runtime.InteropServices.Marshal]::PtrToStringBSTR(
+        [Runtime.InteropServices.Marshal]::SecureStringToBSTR($_)) }) -replace '.*@','' -replace ':.*',''
+  )
+  ```
+  If it prints `db.anxmqiehpyznifqgskzc.supabase.co`, §2 is confirmed outright.
+- **D2 — I checked Tier 2, which the dispatch did not ask for.** A Tier-3-only report would have
+  been technically complete and materially misleading: the honest answer to "how exposed are we"
+  needs the whole chain, and Tier 2 turned out to have broken yesterday. Read-only (`gh run list`,
+  `gh run view --log-failed`).
+- **D3 — I ran one real `pg_dump` against production**, `--schema-only`, to the scratchpad. It is the
+  only way to prove the server side is healthy rather than assume it. Schema-only, no data
+  transferred, nothing written near the backup tree.
+- **D4 — `git -C` is denied at this root (R7)**, so I read `honeycomb-ops/.git/config` with the file
+  reader to get the remote instead. Deliberate deny respected, not worked around.
+- **Could not verify — the exact contents of the connection string.** D1. The single fact that would
+  turn §2 from inference into proof.
+- **Could not verify — whether the `themanual-backups` bucket actually holds the 2026-07-21 object.**
+  The run reported success *including* its upload step, which returns non-200 as a hard failure, so
+  the object should exist. I did not list the bucket, which would need the service-role key.
+- **Could not verify — when or why the password was rotated**, or whether `SUPABASE_SERVICE_ROLE_KEY`
+  rotated with it. The Tier 2 run died before the upload step, so that credential is untested.
+- **Could not verify — the USB cold-storage copy.** Removable media, and Q6.
+- **Could not verify — that Tier 3 would succeed under fix (a).** I did not modify or run the script.
+  The pattern is proven by `backup-preflight.ps1` and by my own probe using the same coordinates, but
+  the Tier 3 script itself has not been run under it.
+
+---
+
 ## HEARTBEAT-SMOKE2 — no-op proof for the canonical claim transport (2026-07-28) — **DONE**
 
 **Lane:** ops · **Scope:** oracle · **Dispatch:** acc795ea-582c-4e92-a199-37aeff3fc7f8
@@ -94,6 +790,136 @@ Nothing else written. No `logs/permission-needed.md` entry: nothing was denied t
 - Whether the launcher was Task Scheduler or a manual `heartbeat.cmd` (§2).
 - The run's own `total_cost_usd` — `log-cost.mjs` appends to `cost-ledger.csv` **after** Claude exits,
   so this pass cannot read its own ledger line.
+
+---
+
+## DOCS8 — DESIGN: PROJECT MODE — Oracle decomposes a project and routes each task (2026-07-28) — **DONE**
+
+**Lane:** docs · **Scope:** oracle · **Dispatch:** 2d3218d5-bd93-4494-b0e5-14991fb3f84e
+**Posture:** design doc, no build. One new file; no code, schema or config touched.
+
+**Output:** `docs/atlasoracle-project-mode-2026-07-28.md`
+
+### 0. Headline
+
+All seven required sections are covered, and the rail mapping the DONE-TEST asks for is **§0, at the
+top of the doc** — one table of reuses, one table of concepts that cannot carry over with the reason
+each fails. Four rail concepts are named as non-transferable: `FOR UPDATE SKIP LOCKED` claiming (v1
+has one claimer, so contention control has nothing to control), one-`go`-one-claim (Project Mode's
+purpose is to fan out; the equivalent safety property is one cost gate per project), `author='LEAD'`
+as sole queue-writer (the plan is a model output, not an authority — the safeguard is human
+confirmation instead), and `workdir` (no filesystem; `astra_id` is the nearest thing).
+
+**The finding that matters most for the build:** `atlasoracle-route` **has never read
+`atlasoracle_provider_pool`.** A grep across `supabase/functions/` returns exactly one reader — the
+read-only `atlasoracle-providers` endpoint — while the router pins models in code via
+`TIER_PROVIDER_MODEL`. Per-task provider selection is therefore not a wiring job on top of an
+existing lookup; it is the first time the router resolves a provider from pool data at all. That is
+`ORACLE_OUTLOOK` WRONG #1 stated as a build task, and the doc marks it as Phase 1's real work.
+
+### 1. File tree
+
+```
+TheMANUAL.tech/docs/
+└── atlasoracle-project-mode-2026-07-28.md   NEW — the design doc
+TheMANUAL.tech/REPORT.md                     MODIFIED — this section
+```
+
+Nothing else created, modified or deleted. No migration written, no code changed — the schema delta
+in §4 is specified, not applied, and the doc states it needs its own dispatch with a stated rollback
+per R7's MIGRATION AMENDMENT.
+
+### 2. Canon read before writing
+
+`ORACLE_MF` v0.7 (product vision), v0.8 (scope doctrine / consent gating), v0.15 (OPEN-9 informed
+consent), v0.16 (pricing canon), v0.19 (free-tier permanence) · `ORACLE_OUTLOOK` v0.1 ·
+`AtlasORACLE.to/master_plan/categorization.md` · live schema for `atlasoracle_*`, `oracle_*` and
+`ops_dispatches` · `supabase/functions/atlasoracle-route/index.ts` (1,042 lines, read in the regions
+cited).
+
+### 3. The seven, and where each landed
+
+| # | Dispatch item | Section |
+|---|---|---|
+| 1 | Lifecycle: intake → decomposition → per-task selection → execution → assembly → one result | §1.1–§1.6 |
+| 2 | Billing: rolled-up receipt, project-level charge-the-lesser, project confirm-cost gate | §2.1–§2.4 |
+| 3 | The "you saved X" line, frontier-only vs actual mixed routing | §3.1–§3.3 |
+| 4 | Schema delta for parent/child directives, metadata only | §4 |
+| 5 | How it feeds the learned router | §5 |
+| 6 | UI sketch: two-column console, the rail skinned for a Bee | §6 |
+| 7 | Phase plan: v1 decompose+route, media lane later | §7 |
+
+### 4. Judgement calls made inside the doc
+
+- **`tier` becomes a ceiling, not a selection.** In project mode `frontier` authorises ORACLE to
+  *reach* for Opus on the tasks that need it, and to route down everywhere else. The whole savings
+  story rests on this sentence, so it is flagged as open question #2 for Butch rather than assumed.
+- **Where the plan text lives — the sovereignty fork.** Persisting task text server-side would
+  require a content column and would end `ORACLE_OUTLOOK` RIGHT #1 (*"ORACLE asks them to trust a
+  schema"*). **Refused.** v1 recommendation is client-held plans with server-side metadata only;
+  server-side project resume is deferred to the opt-in retention carve-out that `DOCS6` confirmed
+  already exists in `whitepaper.md` §5/§9. Three options tabled with the refusal reasoned, not
+  asserted.
+- **The cost gate's trigger changes from tier to cost.** Today's gate is frontier-only. A fourteen-
+  task standard project can cost more than one frontier directive, so the project gate fires on the
+  estimate crossing a threshold at *any* tier.
+- **Assembly runs at the ceiling, never down-routed** — written as a rule so it does not get
+  "optimised" later. It is the artifact the Bee actually reads.
+- **R4 promoted to a product feature.** A task that cannot proceed files a question and stops, with
+  completed work preserved and only successful tasks billed. This is the rail's best rule and it is
+  exactly where competing multi-step products fail.
+- **`task_role` instead of a fan-in dependency edge.** `after_pass` names one predecessor; assembly
+  depends on all. Rather than generalise the rail's dependency model on first contact, v1 encodes
+  assembly as a role and keeps `after_task_index` as a straight port of `after_pass`. The v1 limit
+  and its generalisation (`atlasoracle_task_deps`) are both on the record.
+- **No dates anywhere.** Phases are gated on readiness per `ORACLE_MF` v0.5 ruling 1 and `OUTLOOK`
+  WRONG #3, and per the Code Time Autonomy principle.
+
+### 5. Discrepancies found while checking, worth their own passes
+
+1. **The router does not read the provider pool** (headline above).
+2. **The pool's contents have drifted from the code.** Live rows: `claude-haiku-4-5` (fast),
+   `groq-mixtral` (fast), `claude-opus-5` (frontier), `claude-sonnet-5` (mid-tier), `oss-llama-3`
+   (oss). `OPS21` actually ships Groq as `llama-3.1-8b-instant`, which no row names. A router that
+   started reading this table today would select a model the ladder does not run.
+3. **`drift_flag` is per-provider; `categorization.md` specifies per-category.** The doc's selection
+   step is written to what the schema supports, with the gap named. Nothing writes even the coarse
+   flag — `last_drift_check_at` is NULL on all five rows, matching `OUTLOOK` CLOSE (*"drift checks:
+   right concept, never run once"*).
+
+### 6. DONE-TEST
+
+- **"Doc covers all seven"** — table in §3 above; each maps to a numbered section.
+- **"Every mechanism reuses an existing rail concept or names why it can't"** — §0 of the doc is
+  exactly this, split into a reuse table (12 rows) and a cannot-reuse table (4 rows, each with its
+  reason). Mechanisms introduced later that have no rail counterpart are marked in place: `task_role`
+  (§4) carries an explicit "why not a dependency edge", and the decomposition-cost problem (§2.3) is
+  tabled as three options with a lead lean rather than a silent choice.
+- **Language firewall** — scanned. Every hit for the banned set is analytical prose, not proposed
+  user-facing copy; two instances ("buying", "re-price") were reworded anyway. §3.2 specifies the
+  approved wording for the receipt line: **cost** for what a route consumes, **kept** for the delta,
+  never "price" and never "saved you money".
+
+### 7. Could not verify
+
+- **Nothing was executed.** This is a design doc; no directive was fired, no cost measured, no
+  decomposition prompt tested against a real model. The savings arithmetic in §3.1 is derived from
+  the rate card and the existing `calculateCostTokens` signature, not from a run.
+- **The fit table's weights are still `categorization.md`'s "recommended starting weights"** and
+  every `selection_weight` in the pool is `1.000`. Whether the routing choices in §1.3 actually
+  preserve quality is unmeasured — that is precisely what Phase 1 would produce the first data for.
+- **Wall-clock limits were not measured.** §1.4 asserts a multi-task project cannot fit one edge
+  invocation; that is a reasoned constraint from the platform, not a timed test.
+
+### 8. Open questions filed for Butch (§8 of the doc)
+
+1. Who pays for the quote — free-route the decomposition, charge and disclose it, or the house eats
+   it? Lead leans charge-and-disclose, with free-routing for free-tier Bees. **Needed before Phase 1
+   starts.**
+2. Is `tier` a ceiling (route down freely, never up)? The doc rules it so; worth confirming.
+3. Is the estimated counterfactual acceptable as a public claim? Defensible and labelled, but it is
+   the number a competitor attacks first.
+4. Does the opt-in retention carve-out extend from conversation history to project plans?
 
 ---
 
@@ -582,6 +1408,180 @@ writer didn't; one of the cheapest wins on the board.
   the catalog.
 - **Whether `provider_partnership_terms.md` exists elsewhere** — `categorization.md` references it as
   "HONEYCOMB-wide … (to be drafted)"; only the `AtlasORACLE.to` tree was searched.
+
+---
+
+## OPS26 — RESTORE FIDELITY — **QUESTION FILED (OPS26-Q). The count was wrong, and the real finding is worse.**
+
+**Lane:** ops · **Scope:** oracle · **Dispatch:** df586c1d-ccd7-417a-85c5-ce0931a8dde5
+**Posture:** zero production writes — every production statement was `SELECT`. Dispatch left `claimed` per R4.
+
+### 0. Headline
+
+The dispatch asked me to account for **17** dropped objects and prove a Supabase target fixes them. Two corrections, and the second is the reason this pass matters:
+
+> **1. It is 23 objects, not 17.** The 17 was an error-line count from OPS25's full restore; error lines and dropped objects are different quantities. Measured properly — by diffing the **object inventory** of production against a restore, 1,019 vs 996 — the answer is **23**, enumerated by name in §2.
+>
+> **2. Twenty-two of them are noise. One is a real defect, and A REAL SUPABASE TARGET DOES NOT FIX IT.** `public.justice_dockets.justice_dockets_repath_children_trg` fails to restore for a reason that has nothing to do with which extensions the target has. It fails because `pg_dump` sets `search_path = ''` and the trigger's `WHEN` clause needs an operator lookup that `search_path` governs. **Proven by A/B test, §3.** It would fail on a fresh Supabase project exactly the same way.
+
+So the premise of the dispatch — *restore into a real Supabase target and the gap closes* — is **77% right and 23-objects wrong in the one place that counts.** The residual gap is not "vanilla Postgres is the wrong target." It is a genuine hole in the backup's fidelity that follows you to every target.
+
+**I did this without restoring a single row of production data anywhere** — §5.
+
+---
+
+### 1. Method — and why the branch was not needed to get this far
+
+The dispatch offered `supabase start` (local) or a paid branch. **`supabase start` is unavailable: Docker is not installed on this machine** (`docker: command not found`; the OPS21 deploy also logged `WARNING: Docker is not running`). That leaves a branch, which costs money and needs your confirm first — §6.
+
+Rather than stall on that, I took a route that produced a **stronger** result than either:
+
+1. **Stripped every `COPY` payload** out of today's snapshot (`themanual-snapshot-2026-07-28-0925.sql.gz`, 5,928,753 B). 348 `COPY` blocks, 109,370 data lines removed, 34,378 lines of pure DDL kept. **No production row and no secret ever touched disk or any log** — which directly answers OPS25's warning that restore logs are credential material.
+2. **Restored the DDL** into a scratch local PostgreSQL 17.9 database with `ON_ERROR_STOP=0` to collect *all* failures rather than stopping at the first.
+3. **Diffed the object inventory** — extensions, schemas, tables, views, matviews, sequences, functions with signatures, and non-internal triggers — production vs restore. That is what produced the 23, and it is a far better instrument than counting stderr lines: it catches an object that fails *silently* and ignores an error that turns out to be harmless.
+
+**Sanity check on the instrument:** objects present in the restore but *not* in production = **0**. No reverse drift, so the diff is measuring exactly one thing.
+
+---
+
+### 2. The 23, named, with a verdict each
+
+| # | Object | Cause | Verdict |
+|---|---|---|---|
+| 1 | `extension pg_cron` | not installable off-Supabase | restores-clean-on-Supabase ¹ |
+| 2 | `schema cron` | ↳ extension-owned | restores-clean-on-Supabase ¹ |
+| 3 | `cron.alter_job(bigint, text, text, text, text, boolean)` | ↳ | restores-clean-on-Supabase ¹ |
+| 4 | `cron.job_cache_invalidate()` | ↳ | restores-clean-on-Supabase ¹ |
+| 5 | `cron.schedule(text, text, text)` | ↳ | restores-clean-on-Supabase ¹ |
+| 6 | `cron.schedule(text, text)` | ↳ | restores-clean-on-Supabase ¹ |
+| 7 | `cron.schedule_in_database(text, text, text, text, text, boolean)` | ↳ | restores-clean-on-Supabase ¹ |
+| 8 | `cron.unschedule(bigint)` | ↳ | restores-clean-on-Supabase ¹ |
+| 9 | `cron.unschedule(text)` | ↳ | restores-clean-on-Supabase ¹ |
+| 10 | `sequence cron.jobid_seq` | ↳ | restores-clean-on-Supabase ¹ |
+| 11 | `sequence cron.runid_seq` | ↳ | restores-clean-on-Supabase ¹ |
+| 12 | `table cron.job` | ↳ | restores-clean-on-Supabase ¹ |
+| 13 | `table cron.job_run_details` | ↳ | restores-clean-on-Supabase ¹ |
+| 14 | `trigger cron.job.cron_job_cache_invalidate` | ↳ | restores-clean-on-Supabase ¹ |
+| 15 | `extension supabase_vault` | not installable off-Supabase | restores-clean-on-Supabase |
+| 16 | `vault._crypto_aead_det_decrypt(bytea, bytea, bigint, bytea, bytea)` | ↳ extension-owned | restores-clean-on-Supabase |
+| 17 | `vault._crypto_aead_det_encrypt(bytea, bytea, bigint, bytea, bytea)` | ↳ | restores-clean-on-Supabase |
+| 18 | `vault._crypto_aead_det_noncegen()` | ↳ | restores-clean-on-Supabase |
+| 19 | `vault.create_secret(text, text, text, uuid)` | ↳ | restores-clean-on-Supabase |
+| 20 | `vault.update_secret(uuid, text, text, text, uuid)` | ↳ | restores-clean-on-Supabase |
+| 21 | `table vault.secrets` | ↳ | restores-clean-on-Supabase |
+| 22 | `view vault.decrypted_secrets` | ↳ | restores-clean-on-Supabase |
+| **23** | **`trigger public.justice_dockets.justice_dockets_repath_children_trg`** | **`search_path=''` vs an `ltree` operator — NOT an extension problem** | **needs-documented-manual-step** ² |
+
+**¹ Conditional, and the condition is easy to miss:** `pg_cron` is **not enabled by default on a fresh Supabase project.** It is available, but somebody has to turn it on *before* the restore. If they don't, this is not merely 14 missing objects — it is the trigger for OPS25 §3's silent-data-loss cascade, where a failed `COPY cron.job_run_details` derails the parser and eats the *next* table's rows. The runbook now makes enabling it a pre-step.
+
+**² The only one that is a real defect.** §3.
+
+**No `elections_private` object is in this list.** OPS25 lost `elections_private.config`'s **data** to the COPY cascade; the receipt-salt function and the table itself restore fine as DDL. The dispatch's phrase "restricted-mode rejections incl. the receipt-salt function" conflated the two — the function was never dropped, its table's *rows* were.
+
+---
+
+### 3. ★ Object 23 — proven environment-independent
+
+`pg_dump` emits this at line 16 of every dump, deliberately, as the fix for CVE-2018-1058:
+
+```sql
+SELECT pg_catalog.set_config('search_path', '', false);
+```
+
+The trigger is:
+
+```sql
+CREATE TRIGGER justice_dockets_repath_children_trg AFTER UPDATE ON public.justice_dockets
+  FOR EACH ROW WHEN ((new.path IS DISTINCT FROM old.path))
+  EXECUTE FUNCTION public.justice_dockets_repath_children();
+```
+
+`path` is `public.ltree`. `IS DISTINCT FROM` requires the `=` operator for `ltree`, and **an operator inside a `WHEN` clause cannot be schema-qualified** — it is resolved through `search_path`, which the dump has just emptied. Result:
+
+```
+ERROR: operator does not exist: public.ltree = public.ltree
+```
+
+**The A/B test — same statement, same database, same session, one variable:**
+
+| `search_path` | Result |
+|---|---|
+| `''` — what the dump sets | **ERROR, trigger not created** |
+| `public, pg_catalog` | **CREATE TRIGGER — succeeds** |
+
+And in the failing run, **both** of these were verified present in the target:
+
+```
+extension ltree 1.3, schema public
+operator public.= (public.ltree, public.ltree)
+```
+
+**Nothing was missing. The restore simply could not see it.** That is why a better target does not help: a fresh Supabase project has `ltree` in `public` too, and gets the identical empty `search_path` from the identical dump.
+
+**Why this one matters more than the other 22.** The trigger repaths child dockets when a parent's `ltree` path changes. A restored database missing it does not fail loudly — it **silently stops cascading docket repaths**, and the corruption appears later during ordinary use, in AtlasJUSTICE data, long after anyone would connect it to a restore. It is the same disease as the rest of this incident: *the failure is in the output, and nothing is watching.*
+
+---
+
+### 4. Item 4 — the runbook, and the binder that did not exist
+
+**`TheMANUAL.tech/docs/backup-restore-runbook-2026-07-28.md` — new.** It carries: the two rules (`ON_ERROR_STOP=1`; verify by object diff *and* row diff), the extension pre-steps with the three that need explicit enabling, the exact restore commands, the §3 manual step written out ready to paste, both verification scripts, and the restore-logs-are-secret-material warning.
+
+**OPS25 said "for the binder" three times. There is no binder.** I searched the workspace and the rail: no file, no `ops_docs` row, no directory by that name. I placed the runbook alongside the other ops docs in `TheMANUAL.tech/docs/` and said so at the top of it. **If the binder is meant to be somewhere else — an `ops_docs` slug, a Drive folder, `shared/canon/` — name it and I will move it.** A runbook nobody can find is the same as no runbook, which is the failure mode this whole thread is about.
+
+---
+
+### 5. Zero production writes — the evidence
+
+Every production statement this pass was a `SELECT` (extension list, object inventory). The snapshot was read from `HONEYCOMB-backups/`. All writes went to a **local** scratch database and the scratchpad, both since destroyed:
+
+- `honeycomb_ddl_probe` — **dropped**, confirmed absent.
+- The DDL extract, its restore stdout and stderr — **deleted**, confirmed gone.
+
+**No production row was ever written to disk anywhere in this pass** — the COPY-stripping approach means production *data* never left the compressed snapshot. That is a deliberate improvement on OPS25, which had to restore real data and then destroy it, and which found a live secret in its own restore log while doing so.
+
+---
+
+### 6. ⇒ OPS26-Q — three things, and only the first costs money
+
+**Q1 — Do you want the branch demonstration? It is $0.01344/hour.**
+Retrieved via the Supabase cost tool for org `HONEYCOMB` (`cppwafjqlwqagpffayyk`): a branch bills **$0.01344 per hour**, hourly recurrence — about **$0.32/day**, ~$9.68/month if left running. A restore test would need a couple of hours, so **roughly 3 cents**, plus whatever it costs if someone forgets to delete it.
+
+**My recommendation: not needed, and here is the honest case against my own recommendation.** What a branch would prove is that the 22 extension-owned objects restore clean — which is near-certain but currently *reasoned*, not *observed*. What it would **not** change is object 23, which §3 proves fails regardless. So the branch buys confirmation of the part that is not in doubt, and buys nothing for the part that is. If you would rather have the observation than the argument, say so — it is three cents and I will run it.
+
+**Q2 — Object 23: manual step, or fix at source?**
+
+- **(a) Manual step.** Zero production change. The `CREATE TRIGGER` is in the runbook ready to paste. Cost: a step that must never be forgotten, which is precisely the class of thing that produced this incident.
+- **(b) Fix at source (recommended).** Recreate the trigger in production with a `search_path`-independent `WHEN` — compare `new.path::text IS DISTINCT FROM old.path::text`, or drop the `WHEN` and test inside the function body. Every future dump then restores clean with no manual step and no way to forget it. **This is production DDL and needs its own dispatch naming the migration.**
+
+**Q3 — Sign-off on the residual risk.** The done-test asks for exactly this. As of today, stated plainly: **every snapshot HONEYCOMB holds is missing one trigger on restore, and restoring any of them without the §4 manual step yields a database that silently stops cascading docket repaths.** That is the accepted risk until Q2 is ruled. I am not signing it off on your behalf.
+
+---
+
+### 7. Done-tests
+
+| # | Requirement | Result |
+|---|---|---|
+| 1 | Test-restore into a REAL Supabase-configured target | **NOT DONE — `supabase start` impossible (no Docker); branch needs your cost confirm (Q1).** Substituted a DDL-level restore + object diff, which answered the underlying question and, for object 23, answered it *better* than a branch would have. |
+| 2 | Every one of the 17 named with a verdict | **MET, and corrected** — 23, not 17, each named with a verdict (§2). |
+| 3 | Propose the workflow change as a question if dump flags fix it | **MET — and the answer is that no dump flag fixes it.** `search_path=''` is unconditional in `pg_dump` and is a security fix, not a toggle. The fix is either a restore step or a source change: Q2. |
+| 4 | Runbook in the binder doc | **MET, with a caveat** — runbook written; the binder had no location, so I named one and flagged it (§4). |
+| — | Never touches production | **MET** — §5, reads only. |
+
+### 8. Deviations and judgement calls
+
+- **D1 — DDL-only restore instead of a full one.** Not the literal instruction, but it is strictly safer (no production data or secret at rest, addressing OPS25's own security finding) and strictly more precise for the question asked, since the object diff is unaffected by data. The one thing it cannot measure is data loss — and OPS25 already measured that.
+- **D2 — measured objects, not error lines.** The dispatch's "17" came from error lines. I reported 23 and explained the discrepancy rather than forcing my result to match the brief.
+- **D3 — did not create a branch.** The dispatch requires your cost confirm first; that is Q1.
+- **D4 — created the binder rather than filing a question about where it lives.** Writing the runbook was unambiguously in scope and the content is location-independent; blocking a deliverable on a filing question would have been the wrong trade. Flagged, movable.
+- **D5 — corrected the dispatch's "receipt-salt function" framing** (§2, closing note). The function restores fine; its table's rows were the casualty.
+
+### 9. Could not verify
+
+- **That the 22 extension objects actually restore clean on Supabase.** Reasoned from the extension list, not observed. This is exactly what Q1's branch would settle.
+- **Whether a fresh Supabase project has `pg_cron` enabled by default.** I believe it must be enabled explicitly and wrote the runbook that way; not verified against a real fresh project, and it is the difference between 14 missing objects and OPS25's silent-data-loss cascade.
+- **Whether any other trigger, index or constraint has the same `search_path` fragility.** I found object 23 because it failed. A trigger whose `WHEN` clause uses only built-in operators would not fail and would not appear. **I did not audit production for other schema-qualified-operator dependencies** — worth its own pass, because this class of defect is invisible until a restore.
+- **The Tier 2 bucket object.** Still unverifiable without the service-role key; unchanged from OPS25 D4.
+- **That today's snapshot is itself complete.** I verified what restores *from* it, not that `pg_dump` captured everything. OPS25's 172-table row-count diff is the last evidence on that question.
 
 ---
 

@@ -19,6 +19,15 @@
     "command": "claude"
   },
   "spawnVerifyMs": 3000,
+  "backups": {
+    "_comment": "OPS25: backup-age panel. Tier 3 is read from the filesystem (a stat, no credentials). Tier 2 is read from the GitHub Actions run history via the `gh` CLI, which carries its own auth — the board never touches the service-role key and never lists the bucket. warnDays/alertDays are chosen for a WEEKLY cadence: 8 days means one run was missed, 14 means two. Both tiers failed silently for 11 weeks before this panel existed.",
+    "warnDays": 8,
+    "alertDays": 14,
+    "tier3Dir": "C:\\Users\\Butch\\Documents\\HONEYCOMB-backups",
+    "tier3Glob": "themanual-snapshot-",
+    "tier2Repo": "rebelutionxyz/honeycomb-ops",
+    "tier2Workflow": "backup-weekly.yml"
+  },
   "focus": {
     "_comment": "OPS22: after a confirmed spawn, hand the new window's pid to focus-window.ps1 so it comes to the FRONT of the browser you clicked in. Windows' foreground lock blocks a background process from taking focus, so the activator walks a ladder and reports which rung won. enabled:false reverts to the old behaviour (window opens behind). flashFallback:false suppresses the taskbar-flash cue when no rung can take focus — leave it true, it is the only signal left at that point.",
     "enabled": true,
