@@ -13,26 +13,55 @@ and anything else disagree, **the document wins**.
 
 Two independent preconditions are **currently unmet**. Both need Butch; neither can be fixed by Code.
 
-### 1. C3 — the allow-list (BLOCKING)
-
-Verified 2026-07-27: `~/.claude/settings.json` `permissions.allow` contains `Bash(node *)` and
-eight `git` entries, and **no `psql` entry at all**.
+### 1. C3 — the allow-list (BLOCKING) — *superseded twice, read to the end*
 
 Under `--permission-mode dontAsk` a session may run only what `permissions.allow` covers, plus
-read-only Bash. **The R2 claim runs through `psql.exe`.** So today, the first heartbeat would:
+read-only Bash. **The R2 claim runs through `psql.exe`.** A heartbeat that cannot claim wakes, finds
+nothing to do, files nothing, and **exits 0 looking perfectly healthy** — a silent no-op on a
+schedule, worse than not running.
 
-1. wake, read `CLAUDE.md`, understand `go`,
-2. attempt the claim,
-3. have that claim **auto-denied**,
-4. find nothing to do, file nothing,
-5. **exit 0 and look perfectly healthy.**
+**First state (OPS18):** no `psql` entry existed at all. Butch added `Bash(psql*)`.
 
-That is a silent no-op on a schedule. It is worse than not running, because it looks like it works.
-Logged in `logs/permission-needed.md` under 2026-07-27.
+**Second state (HEARTBEAT-SMOKE, 2026-07-27):** that was not enough, and the reason generalises.
+**Allow-list matching is a prefix on the command string.** The canonical transport is invoked as
+`"/c/Program Files/PostgreSQL/17/bin/psql.exe" …`, which begins with a quote — it does not match
+`Bash(psql*)` and is auto-denied. Bare `psql` matches the rule but is not on PATH (**exit 127**).
+So psql was *allowed by name and unreachable by path*, and every heartbeat would still have died at
+the claim.
 
-**Required:** add `Bash(psql*)` to `permissions.allow`, then run the permission-needed loop to
-convergence **in supervised mode**, as C3 demands — not once, but until a supervised `go` completes
-a real pass with nothing auto-denied.
+**Third state (OPS19) — the fix, pending one line from Butch.** `claim.cmd` + `claim.sql` in this
+folder are a wrapper that performs exactly the R2 claim and nothing else. Allow it by name:
+
+```json
+"Bash(TheMANUAL.tech/scripts/heartbeat/claim.cmd*)"
+```
+
+and — recommended in the same edit — **delete `"Bash(psql*)"`**, which authorizes only a command
+form that exits 127 here, and so grants nothing that works while widening `dontAsk` to any statement
+psql can carry. R3 FINISH and R4 QUESTION stay reachable through the Node shim under `Bash(node *)`.
+
+The path is root-relative on purpose: the R2 claim always runs **before** the R2b `cd`, and
+`heartbeat.cmd` sets the cwd to `HONEYCOMB\`, so that is the exact string a heartbeat types.
+
+**Still required after the edit:** one supervised run in which the claim goes through the wrapper
+with nothing auto-denied. Allowed-in-settings and allowed-in-fact are different claims, and only an
+unattended run can distinguish them. See `../../REPORT.md` § OPS19.
+
+#### `claim.cmd` usage
+
+```bat
+claim.cmd                     REM bare `go` - no lane filter, no sticky lanes
+claim.cmd ops                 REM `go ops` - hard lane filter
+claim.cmd "" ops,docs         REM bare `go`, sticky-first on ops then docs
+claim.cmd ops ops,docs        REM both
+```
+
+Arg 1 is `:lane`, arg 2 is `:lanes` (the R2 sticky-first array, comma-separated). Both are
+interpolated by psql's `:'name'` literal quoting, so neither can inject SQL. Arg 1 is additionally
+rejected unless it is one of `front`/`db`/`docs`/`ops` — a typo'd lane would otherwise return
+`UPDATE 0`, which R2 reads as "queue empty", and a wrong stop that looks like a right one is the
+failure mode this whole file exists to prevent. Exit 0 with `UPDATE 0` means the queue is empty;
+nonzero means the transport failed and **nothing was claimed**.
 
 ### 2. The smoke dispatch (BLOCKING the done-test, not the build)
 
@@ -125,6 +154,8 @@ Runs as **Butch**, `/RL LIMITED` — not elevated. A heartbeat has no business h
 | `install-heartbeat.cmd` | Creates the task **disabled**. Re-runnable. |
 | `uninstall-heartbeat.cmd` | Deletes the task, keeps the logs (a tool that erases its own audit trail on uninstall is not a good tool). |
 | `heartbeat-smoke.sql` | The throwaway smoke dispatch, ready for the lead or Butch to fire. Code may not run it. |
+| `claim.cmd` | **(OPS19)** The R2 claim transport, and nothing else — see below. |
+| `claim.sql` | **(OPS19)** The one statement `claim.cmd` can run. Checked in so the grant is auditable. |
 
 Logs land in `logs/heartbeat/` — one `hb-<stamp>.json` and `.err.txt` per run, plus the shared
 `cost-ledger.csv`.

@@ -11,10 +11,13 @@
 //     confirm_cost?: boolean,                              // frontier preview override
 //   }
 //
-// Tier behavior:
-//   - free      → claude-haiku-4-5, cost 0
-//   - standard  → claude-sonnet-4-6, cost-shape pricing (0.5 / 1.0 / 2.0 BLiNG!)
-//   - frontier  → claude-opus-4-7, base 5 + surcharges, cap 50, preview > 10
+// Tier behavior (current — OPS15 rewired pricing, OPS21 added the free ladder):
+//   - free      → llama-3.1-8b-instant on Groq, FALLBACK claude-haiku-4-5. Cost 0.
+//   - standard  → claude-sonnet-5,  metered at 3.0x provider cost, rates as data
+//   - frontier  → claude-opus-5,    metered at 2.5x provider cost, confirm-cost gate
+//
+// Prices are NOT in this file. They live in oracle_model_rates, newest active
+// row per model; a missing rate is a 503, never a guess.
 //
 // OPS11 (2026-07-27): standard and frontier are GATED OFF at PAID_TIERS_ENABLED
 // and return 503 before any provider call — see the const's comment below. The
@@ -158,6 +161,44 @@ const MAX_DIRECTIVE_CHARS = 10_000;
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
 
+// ─── OPS21: the first non-Anthropic provider. ───
+//
+// Endpoint and model id verified live 2026-07-28 against console.groq.com/docs
+// — NOT from memory, per the dispatch. `llama-3.1-8b-instant` is listed under
+// Production Models ("intended for use in your production environments"), not
+// Preview ("evaluation purposes only, may be discontinued").
+//
+// WHY LLAMA 3.1 8B and not gpt-oss-20b: it is both the cheapest route in the
+// DOCS1 matrix ($0.12 per 1,000 free directives vs Haiku's $4.14 — 33.9x) AND
+// the only candidate whose WEIGHTS LICENCE is VERIFIED training-permissive
+// (ORACLE_TOS_VERIFIED v0.2 §1.b.i). That distinction matters because Groq does
+// not own the models it serves: clearing Groq's own terms does NOT clear the
+// model. Rights and price pointed the same way, which is rare enough to take.
+//
+// Groq's standing-rule posture (ORACLE_MF v0.11), re-checked this pass against
+// the DOCS1 matrix VERIFIED cells: does not train on customer inputs or outputs,
+// no retention of inference data by default, self-serve Zero Data Retention.
+// Nothing changed, so no stop-and-Q was required.
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_FREE_MODEL = 'llama-3.1-8b-instant';
+
+// Free-tier provider ladder. Groq FIRST, Anthropic Haiku as FALLBACK.
+//
+// The fallback is not decoration. Groq's free plan is rate-limited to 30 RPM /
+// 6,000 TPM on this model, and the canon prefix alone is ~1,530 tokens, so the
+// ceiling is roughly 3.5 directives/minute PLATFORM-WIDE — about two concurrent
+// Bees at the 2/min per-Bee cap. Above that Groq starts returning 429 and the
+// free tier would break outright without this ladder. Recorded rather than
+// discovered: see REPORT.md § OPS21 and OPS21-Q §2a.
+type ProviderKind = 'anthropic' | 'openai-compatible';
+interface ProviderSpec {
+  kind:   ProviderKind;
+  model:  string;
+  url:    string;
+  apiKey: string | undefined;
+  label:  string;
+}
+
 // Canon bundle length is fixed — compute once at module init for estimation.
 const CANON_BUNDLE_LENGTH = assembleCrossAstraCanon().length;
 
@@ -184,6 +225,33 @@ interface AnthropicMessageBlock {
 interface AnthropicResponse {
   content?: AnthropicMessageBlock[];
   usage?: AnthropicUsage;
+}
+
+// OpenAI-wire response shape (Groq, and every other OpenAI-compatible provider
+// in the DOCS1 matrix — Together, Fireworks, DeepSeek, xAI, Mistral, Qwen,
+// OpenRouter). The adapter below is deliberately written to the WIRE FORMAT and
+// not to Groq, so adding any of those is a ProviderSpec, not a new adapter.
+interface OpenAIUsage {
+  prompt_tokens?:     number;
+  completion_tokens?: number;
+  prompt_tokens_details?: { cached_tokens?: number };
+}
+interface OpenAIResponse {
+  choices?: Array<{ message?: { content?: string | null } }>;
+  usage?: OpenAIUsage;
+}
+
+// Normalized result of one provider attempt. `failureKind` is null on success
+// and otherwise carries the sanitized reason already used by markFailed, so a
+// failed rung of the ladder reads identically to the old inline failure path.
+interface ProviderAttempt {
+  ok:          boolean;
+  responseText: string;
+  input:       number;
+  output:      number;
+  cached:      number;
+  latencyMs:   number;
+  failureKind: string | null;
 }
 
 // Token estimation from text length. Coarse but predictable.
@@ -246,6 +314,185 @@ function calculateCostTokens(
   return Math.round(cost * 1_000_000) / 1_000_000;
 }
 
+// ─── Provider adapters (OPS21). ───
+//
+// One attempt against one provider. NEVER throws: every failure mode comes back
+// as `ok: false` with a sanitized `failureKind`, because the caller walks a
+// ladder and a thrown error would take the fallback down with the primary.
+//
+// ⚠ THE TOKEN-COUNTING TRAP, and it is the mirror image of OPS15 Bug 2.
+// Anthropic reports input and cache buckets as DISJOINT: `input_tokens` already
+// excludes cached. OpenAI-wire reports them NESTED: `prompt_tokens` INCLUDES
+// `prompt_tokens_details.cached_tokens`. OPS15 lost ~10x by assuming nested
+// where it was disjoint; assuming disjoint where it is nested would double-count
+// every cached token in the opposite direction. The OpenAI adapter therefore
+// SUBTRACTS cached from prompt_tokens and returns Anthropic's disjoint
+// convention, so calculateCostTokens stays correct for both wires without
+// knowing which one it is fed.
+//
+// This costs nothing today — the free tier is 0 to the Bee either way — but it
+// is wrong-by-default the instant a paid tier points at an OpenAI-wire provider,
+// and that is exactly the kind of bug that ships silently.
+async function callAnthropic(
+  spec: ProviderSpec,
+  canonText: string,
+  directive: string,
+  maxTokens: number,
+  thinkingCfg: ThinkingConfig,
+): Promise<ProviderAttempt> {
+  const body: Record<string, unknown> = {
+    model: spec.model,
+    max_tokens: maxTokens,
+    system: [{ type: 'text', text: canonText, cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: directive }],
+  };
+  if (thinkingCfg.thinking) body.thinking = thinkingCfg.thinking;
+  if (thinkingCfg.effort)   body.output_config = { effort: thinkingCfg.effort };
+
+  const startedAt = Date.now();
+  const empty = (kind: string): ProviderAttempt => ({
+    ok: false, responseText: '', input: 0, output: 0, cached: 0,
+    latencyMs: Date.now() - startedAt, failureKind: kind,
+  });
+
+  let res: Response;
+  try {
+    res = await fetch(spec.url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': spec.apiKey ?? '',
+        'anthropic-version': ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'network failure';
+    return empty(`provider_network: ${msg}`);
+  }
+  const latencyMs = Date.now() - startedAt;
+
+  if (!res.ok) {
+    let excerpt = '';
+    try { excerpt = (await res.text()).slice(0, 200); } catch { excerpt = '<unreadable>'; }
+    console.error('atlasoracle-route provider http error', {
+      provider: spec.label, status: res.status, body_excerpt: excerpt,
+    });
+    return { ...empty(`provider_http_${res.status}`), latencyMs };
+  }
+
+  let payload: AnthropicResponse;
+  try { payload = await res.json(); }
+  catch (err) {
+    const msg = err instanceof Error ? err.message : 'unknown parse error';
+    return { ...empty(`provider_parse: ${msg}`), latencyMs };
+  }
+
+  // Usage is read BEFORE the empty-content check (OPS11): the provider has
+  // already billed us by this point, so the counts must reach every path.
+  const usage = payload.usage ?? {};
+  const input  = usage.input_tokens  ?? 0;
+  const output = usage.output_tokens ?? 0;
+  const cached = (usage.cache_creation_input_tokens ?? 0)
+               + (usage.cache_read_input_tokens ?? 0);
+
+  const responseText = (payload.content ?? [])
+    .filter((b) => b.type === 'text' && typeof b.text === 'string')
+    .map((b) => b.text!)
+    .join('\n');
+
+  return {
+    ok: responseText.length > 0,
+    responseText, input, output, cached, latencyMs,
+    failureKind: responseText.length > 0 ? null : 'provider_empty_content',
+  };
+}
+
+async function callOpenAICompatible(
+  spec: ProviderSpec,
+  canonText: string,
+  directive: string,
+  maxTokens: number,
+): Promise<ProviderAttempt> {
+  // Deliberately minimal: no temperature, no logprobs, no logit_bias, no
+  // top_logprobs, no messages[].name, no n. Groq 400s on the last five, and
+  // sending nothing we do not need keeps this portable across the whole
+  // OpenAI-wire family rather than tuned to one vendor.
+  const body: Record<string, unknown> = {
+    model: spec.model,
+    max_tokens: maxTokens,
+    messages: [
+      { role: 'system', content: canonText },
+      { role: 'user',   content: directive },
+    ],
+  };
+
+  const startedAt = Date.now();
+  const empty = (kind: string): ProviderAttempt => ({
+    ok: false, responseText: '', input: 0, output: 0, cached: 0,
+    latencyMs: Date.now() - startedAt, failureKind: kind,
+  });
+
+  let res: Response;
+  try {
+    res = await fetch(spec.url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'authorization': `Bearer ${spec.apiKey ?? ''}`,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'network failure';
+    return empty(`provider_network: ${msg}`);
+  }
+  const latencyMs = Date.now() - startedAt;
+
+  if (!res.ok) {
+    let excerpt = '';
+    try { excerpt = (await res.text()).slice(0, 200); } catch { excerpt = '<unreadable>'; }
+    console.error('atlasoracle-route provider http error', {
+      provider: spec.label, status: res.status, body_excerpt: excerpt,
+    });
+    return { ...empty(`provider_http_${res.status}`), latencyMs };
+  }
+
+  let payload: OpenAIResponse;
+  try { payload = await res.json(); }
+  catch (err) {
+    const msg = err instanceof Error ? err.message : 'unknown parse error';
+    return { ...empty(`provider_parse: ${msg}`), latencyMs };
+  }
+
+  const usage = payload.usage ?? {};
+  const cached = usage.prompt_tokens_details?.cached_tokens ?? 0;
+  // Nested → disjoint. See the trap note above. Math.max guards a provider that
+  // reports cached > prompt_tokens rather than letting a negative leg through.
+  const input  = Math.max(0, (usage.prompt_tokens ?? 0) - cached);
+  const output = usage.completion_tokens ?? 0;
+
+  const responseText = payload.choices?.[0]?.message?.content ?? '';
+
+  return {
+    ok: responseText.length > 0,
+    responseText, input, output, cached, latencyMs,
+    failureKind: responseText.length > 0 ? null : 'provider_empty_content',
+  };
+}
+
+function callProvider(
+  spec: ProviderSpec,
+  canonText: string,
+  directive: string,
+  maxTokens: number,
+  thinkingCfg: ThinkingConfig,
+): Promise<ProviderAttempt> {
+  return spec.kind === 'anthropic'
+    ? callAnthropic(spec, canonText, directive, maxTokens, thinkingCfg)
+    : callOpenAICompatible(spec, canonText, directive, maxTokens);
+}
+
 Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
@@ -265,6 +512,10 @@ Deno.serve(async (req) => {
     });
     return errorResponse('Provider integration not configured', 503);
   }
+  // OPS21: Groq is OPTIONAL by design. Absent key = the free-tier ladder is just
+  // Haiku, exactly as before this pass. A missing second provider must degrade
+  // to the previous behaviour, never to an outage.
+  const groqKey = Deno.env.get('GROQ_API_KEY');
 
   let body: RouteBody;
   try {
@@ -504,110 +755,102 @@ Deno.serve(async (req) => {
     estimated_cost_tokens: estimatedCostTokens,
   });
 
-  // ─── Call Anthropic. ───
-  const providerModel = TIER_PROVIDER_MODEL[tier];
+  // ─── Call the provider ladder (OPS21). ───
+  //
+  // Free tier: Groq first, Haiku fallback. Every other tier: a one-rung ladder,
+  // byte-for-byte the behaviour that shipped in v19 — the paid path does not
+  // change in this pass, and the hash-diff done-test turns on that.
+  //
+  // The sentinel below is a test affordance, not a feature: a directive whose
+  // text begins with `[OPS21-FORCE-FALLBACK]` skips the primary rung. It exists
+  // because done-test 2 requires proving the fallback fires, and the honest way
+  // to prove that is to fire it — not to reason that it would. It cannot change
+  // pricing, tier, or which providers are eligible; the worst a Bee can do by
+  // typing it is get Haiku instead of Groq on a tier that costs them nothing.
   const maxTokens = TIER_MAX_TOKENS[tier];
-  const systemBlock = [
-    {
-      type: 'text',
-      text: assembleCrossAstraCanon(),
-      cache_control: { type: 'ephemeral' },
-    },
-  ];
-  // Thinking + effort per tier (OPS15). Omitted entirely for free, because
-  // Haiku 4.5 supports neither and would reject them.
   const thinkingCfg = TIER_THINKING[tier];
-  const providerBody: Record<string, unknown> = {
-    model: providerModel,
-    max_tokens: maxTokens,
-    system: systemBlock,
-    messages: [{ role: 'user', content: directive }],
-  };
-  if (thinkingCfg.thinking) providerBody.thinking = thinkingCfg.thinking;
-  if (thinkingCfg.effort)   providerBody.output_config = { effort: thinkingCfg.effort };
+  const canonText = assembleCrossAstraCanon();
+  const forceFallback = directive.startsWith('[OPS21-FORCE-FALLBACK]');
 
-  const startedAt = Date.now();
-  let providerResponse: Response;
-  try {
-    providerResponse = await fetch(ANTHROPIC_URL, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': ANTHROPIC_VERSION,
-      },
-      body: JSON.stringify(providerBody),
+  const ladder: ProviderSpec[] = [];
+  if (tier === 'free' && groqKey && !forceFallback) {
+    ladder.push({
+      kind: 'openai-compatible',
+      model: GROQ_FREE_MODEL,
+      url: GROQ_URL,
+      apiKey: groqKey,
+      label: GROQ_FREE_MODEL,
     });
-  } catch (err) {
-    const latencyMs = Date.now() - startedAt;
-    const msg = err instanceof Error ? err.message : 'network failure';
-    await markFailed(
-      service, directiveId, latencyMs, `provider_network: ${msg}`,
-      { providerModel },
-    );
-    console.error('atlasoracle-route provider network error', {
-      directive_id: directiveId, message: msg,
-    });
-    return errorResponse('Provider unreachable', 502);
   }
-  const latencyMs = Date.now() - startedAt;
+  ladder.push({
+    kind: 'anthropic',
+    model: TIER_PROVIDER_MODEL[tier],
+    url: ANTHROPIC_URL,
+    apiKey,
+    label: TIER_PROVIDER_MODEL[tier],
+  });
 
-  if (!providerResponse.ok) {
-    let providerBodyText = '';
-    try { providerBodyText = await providerResponse.text(); }
-    catch { providerBodyText = '<unreadable>'; }
-    const sanitized = `provider_http_${providerResponse.status}`;
-    await markFailed(
-      service, directiveId, latencyMs, sanitized, { providerModel },
+  let attempt: ProviderAttempt | null = null;
+  let providerModel = ladder[0].model;
+  let latencyMs = 0;
+  const ladderTrail: Array<{ provider: string; failure: string }> = [];
+
+  for (let i = 0; i < ladder.length; i++) {
+    const spec = ladder[i];
+    const result = await callProvider(
+      spec, canonText, directive, maxTokens, thinkingCfg,
     );
-    console.error('atlasoracle-route provider http error', {
+    providerModel = spec.model;
+    latencyMs = result.latencyMs;
+    if (result.ok) { attempt = result; break; }
+
+    ladderTrail.push({ provider: spec.label, failure: result.failureKind ?? 'unknown' });
+    const isLast = i === ladder.length - 1;
+    console.warn('atlasoracle-route provider rung failed', {
       directive_id: directiveId,
-      status: providerResponse.status,
-      body_excerpt: providerBodyText.slice(0, 200),
+      provider: spec.label,
+      failure: result.failureKind,
+      falling_back_to: isLast ? null : ladder[i + 1].label,
     });
+    // A failed rung still burned provider tokens in some cases. Carry them.
+    if (isLast) {
+      await markFailed(
+        service, directiveId, result.latencyMs,
+        result.failureKind ?? 'provider_unknown',
+        {
+          providerModel: spec.model,
+          inputTokens: result.input,
+          outputTokens: result.output,
+          cachedTokens: result.cached,
+        },
+      );
+      console.error('atlasoracle-route all provider rungs failed', {
+        directive_id: directiveId, ladder: ladderTrail,
+      });
+      return errorResponse('Provider returned an error', 502);
+    }
+  }
+
+  // Unreachable — the loop either breaks with a result or returns on the last
+  // rung. Narrowed explicitly so the compiler agrees rather than being told to.
+  if (attempt === null) {
+    await markFailed(service, directiveId, latencyMs, 'provider_unknown');
     return errorResponse('Provider returned an error', 502);
   }
 
-  let payload: AnthropicResponse;
-  try {
-    payload = await providerResponse.json();
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'unknown parse error';
-    await markFailed(
-      service, directiveId, latencyMs, `provider_parse: ${msg}`,
-      { providerModel },
-    );
-    console.error('atlasoracle-route provider parse error', {
-      directive_id: directiveId, message: msg,
-    });
-    return errorResponse('Provider response malformed', 502);
-  }
-
-  // Usage is read BEFORE the empty-content check (OPS11) — the provider has
-  // already billed us by this point, so the token counts must be available to
-  // every failure path below, not just the success path.
-  const usage = payload.usage ?? {};
-  const inputTokens  = usage.input_tokens  ?? 0;
-  const outputTokens = usage.output_tokens ?? 0;
-  const cachedTokens =
-    (usage.cache_creation_input_tokens ?? 0)
-    + (usage.cache_read_input_tokens ?? 0);
+  const inputTokens  = attempt.input;
+  const outputTokens = attempt.output;
+  const cachedTokens = attempt.cached;
+  const responseText = attempt.responseText;
   const spendTelemetry: FailureTelemetry = {
     providerModel, inputTokens, outputTokens, cachedTokens,
   };
-
-  const responseText = (payload.content ?? [])
-    .filter((block) => block.type === 'text' && typeof block.text === 'string')
-    .map((block) => block.text!)
-    .join('\n');
-  if (responseText.length === 0) {
-    await markFailed(
-      service, directiveId, latencyMs, 'provider_empty_content', spendTelemetry,
-    );
-    console.error('atlasoracle-route provider empty content', {
+  if (ladderTrail.length > 0) {
+    console.log('atlasoracle-route served via fallback', {
       directive_id: directiveId,
+      served_by: providerModel,
+      skipped: ladderTrail,
     });
-    return errorResponse('Provider returned empty content', 502);
   }
 
   // ─── Charge-the-lesser cost, in Oracle Tokens. ───

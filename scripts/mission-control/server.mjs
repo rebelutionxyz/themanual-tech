@@ -20,14 +20,35 @@
 //   folder list, which this file validates. Combined with execFile (argv array,
 //   no shell), there is no string a page could send that becomes a command.
 //
+// OPS20 — WHY THE BUTTON SAID "opened" AND NOTHING OPENED
+//   Reproduced: `execFile('wt.exe', …)` fails with ENOENT whenever this process's
+//   PATH lacks %LOCALAPPDATA%\Microsoft\WindowsApps — the alias directory wt.exe
+//   lives in, which is on the USER PATH and therefore absent from plenty of
+//   launch contexts. The old code passed a no-op callback to execFile, so that
+//   ENOENT went nowhere, and the handler answered {ok:true} before the child had
+//   done anything at all. The page printed "opened <folder>" over a spawn that
+//   never happened. Two faults, one symptom:
+//     1. RESOLUTION — wt.exe was left to PATH luck at click time. It is now
+//        resolved to an absolute path at startup, with an explicit WindowsApps
+//        fallback and a plain-console fallback under that, so a thin PATH
+//        degrades instead of failing.
+//     2. REPORTING — the launcher's result was discarded. It is now awaited, and
+//        an exit code is still not treated as proof: wt.exe is a stub that exits
+//        0 in ~100ms regardless, so a spawn counts as successful only when a new
+//        console-host process is observed. Anything less reports as a failure.
+//   Not the cause, though it was the first suspect: `-d` alone does open a real
+//   window, not a tab in the existing one (measured, 10 -> 11 top-level windows).
+//   `-w new` is kept anyway so a later windowingBehavior=useExisting setting
+//   cannot turn these into background tabs.
+//
 // RUN:  node scripts/mission-control/server.mjs
 //       then open http://127.0.0.1:7317
 
 import { createServer } from 'node:http';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, basename } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = join(HERE, 'mission-control.config.json');
@@ -85,14 +106,170 @@ function readBoard() {
 }
 
 // ── spawn ───────────────────────────────────────────────────────────────────
-function spawnTerminal(index) {
+// Resolve executables ONCE, at startup, to absolute paths — via `where.exe`,
+// deliberately, NOT by probing the filesystem.
+//
+//   wt.exe lives in %LOCALAPPDATA%\Microsoft\WindowsApps as an AppExecLink
+//   reparse point. Node's stat and lstat BOTH return ENOENT on that reparse tag,
+//   so existsSync() reports the file as missing even though CreateProcess runs
+//   it happily. Any resolver built on existsSync silently concludes "no Windows
+//   Terminal on this machine". `where.exe` performs the same search CreateProcess
+//   does, so it is the only resolver that agrees with reality here.
+//
+// PATHEXT preference matters too: `where claude` lists the extensionless shell
+// script before claude.cmd, and cmd.exe cannot run the former.
+const PATHEXTS = (process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD')
+  .split(';').filter(Boolean).map((e) => e.toLowerCase());
+
+function resolveExe(name) {
+  if (!name) return null;
+  if (!/[\\/]/.test(name)) {
+    try {
+      const out = execFileSync('where.exe', [name], {
+        encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      const hits = out.split('\n').map((s) => s.trim()).filter(Boolean);
+      const runnable = hits.find((h) => PATHEXTS.includes((h.match(/\.[A-Za-z0-9]+$/) || [''])[0].toLowerCase()));
+      if (runnable || hits[0]) return runnable || hits[0];
+    } catch { /* where.exe exits 1 when nothing matches — fall through */ }
+  }
+  return existsSync(name) ? name : null;   // absolute path configured by hand
+}
+
+const WINDOWS_APPS = process.env.LOCALAPPDATA
+  ? join(process.env.LOCALAPPDATA, 'Microsoft', 'WindowsApps')
+  : null;
+const SYSTEM_CMD = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'cmd.exe');
+
+// Fallback chain, because a thin PATH must degrade rather than fail:
+//   wt.exe on PATH  ->  the WindowsApps alias by its known path  ->  plain cmd.exe.
+// The middle rung cannot be confirmed on disk (AppExecLink, see above), so it is
+// taken on trust and any real failure surfaces from the launch itself.
+function resolveTerminal() {
+  const onPath = resolveExe(cfg.terminal.exe);
+  if (onPath) return { path: onPath, kind: 'wt', how: 'PATH' };
+  if (/^wt(\.exe)?$/i.test(cfg.terminal.exe) && WINDOWS_APPS) {
+    return { path: join(WINDOWS_APPS, 'wt.exe'), kind: 'wt', how: 'WindowsApps fallback (not on PATH)' };
+  }
+  return { path: SYSTEM_CMD, kind: 'cmd', how: `fallback — ${cfg.terminal.exe} not found` };
+}
+
+const RESOLVED = {
+  terminal: resolveTerminal(),
+  // Bare 'claude' is a usable last resort: cmd.exe resolves it from the child's
+  // own PATH. Recorded as unresolved so startup says so out loud.
+  command: resolveExe(cfg.terminal.command),
+};
+
+// A console host appearing is the only honest evidence that a terminal opened —
+// wt.exe's own exit code is not. Returns null when the check itself is
+// unavailable, which is reported as "unverified", never as success.
+const HOST_RE = /^"(WindowsTerminal\.exe|OpenConsole\.exe|conhost\.exe)","(\d+)"/i;
+function consoleHostPids() {
+  try {
+    const out = execFileSync('tasklist.exe', ['/NH', '/FO', 'CSV'], {
+      encoding: 'utf8', windowsHide: true, maxBuffer: 1024 * 1024 * 8,
+    });
+    const pids = new Set();
+    for (const line of out.split('\n')) {
+      const g = line.match(HOST_RE);
+      if (g) pids.add(g[2]);
+    }
+    return pids;
+  } catch {
+    return null;
+  }
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function waitForNewHost(before, budgetMs) {
+  const deadline = Date.now() + budgetMs;
+  while (Date.now() < deadline) {
+    await sleep(250);
+    const now = consoleHostPids();
+    if (!now) return null;
+    for (const pid of now) if (!before.has(pid)) return true;
+  }
+  return false;
+}
+
+// Run the launcher and actually LISTEN to it. Never resolves to success on a
+// non-zero exit or a spawn error the way the old no-op callback did.
+function runLauncher(exe, args) {
+  return new Promise((resolve) => {
+    const child = execFile(exe, args, { windowsHide: false }, (err, stdout, stderr) => {
+      resolve({
+        error: err && err.code === 'ENOENT' ? `${basename(exe)} not found` : null,
+        code: err ? (typeof err.code === 'number' ? err.code : null) : 0,
+        stderr: (stderr || '').trim(),
+        stdout: (stdout || '').trim(),
+        message: err ? err.message : null,
+      });
+    });
+    child.on('error', () => {});   // surfaced through the callback above
+  });
+}
+
+// `command` is passed as ONE argv element holding an absolute path, so the shell
+// inside the terminal never has to resolve it either.
+const COMMAND = () => RESOLVED.command || cfg.terminal.command;
+
+function wtArgv(folder) {
+  return [
+    ...(cfg.terminal.newWindowArgs || []),   // `-w new nt` — a dedicated window, whatever the WT settings say
+    '--title', `MC ${folder.label}`,
+    '-d', folder.path,
+    ...(cfg.terminal.shellArgs || []),
+    COMMAND(),
+  ];
+}
+
+// Windows-Terminal-free fallback: `start` gives the console its own window, /D
+// sets the working directory, and /k holds it open so an error stays readable.
+function cmdArgv(folder) {
+  return ['/c', 'start', `MC ${folder.label}`, '/D', folder.path, 'cmd', '/k', COMMAND()];
+}
+
+async function attempt(exe, args, label, t0) {
+  const before = consoleHostPids();
+  console.log(`[spawn] ${label} :: ${exe} ${args.join(' ')}`);
+  const r = await runLauncher(exe, args);
+  if (r.error) return { ok: false, reason: r.error, hard: true };
+  if (r.code !== 0) {
+    return { ok: false, reason: `${basename(exe)} exited ${r.code}${r.stderr ? ` — ${r.stderr}` : ''}` };
+  }
+  const verified = before ? await waitForNewHost(before, Number(cfg.spawnVerifyMs) || 3000) : null;
+  console.log(
+    `[spawn] ${label} :: launcher exit 0 in ${Date.now() - t0}ms, terminal ` +
+    (verified === true ? 'CONFIRMED' : verified === false ? 'NOT CONFIRMED' : 'unverified (tasklist unavailable)') +
+    (r.stderr ? ` :: stderr ${r.stderr}` : ''),
+  );
+  if (verified === false) {
+    return { ok: false, reason: `${basename(exe)} exited 0 but no terminal appeared` };
+  }
+  return { ok: true, verified };
+}
+
+async function spawnTerminal(index) {
   const folder = cfg.folders[index];
   if (!folder) throw new Error('unknown folder index');           // validated, not trusted
   if (!existsSync(folder.path)) throw new Error(`folder missing on disk: ${folder.path}`);
-  const args = ['-d', folder.path, ...cfg.terminal.shellArgs];
-  const child = execFile(cfg.terminal.exe, args, { windowsHide: false }, () => {});
-  child.unref();
-  return folder.label;
+
+  const t0 = Date.now();
+  let r;
+  if (RESOLVED.terminal.kind === 'wt') {
+    r = await attempt(RESOLVED.terminal.path, wtArgv(folder), folder.label, t0);
+    if (r.ok) return { label: folder.label, verified: r.verified };
+    // wt.exe genuinely absent — drop to a plain console rather than leave the
+    // button dead. Anything else (non-zero exit, nothing opened) is a real
+    // failure and is reported as one.
+    if (!r.hard) throw new Error(r.reason);
+    console.error(`[spawn] ${folder.label} :: wt unusable (${r.reason}) — falling back to cmd.exe`);
+  }
+  r = await attempt(SYSTEM_CMD, cmdArgv(folder), folder.label, t0);
+  if (!r.ok) throw new Error(r.reason);
+  return { label: folder.label, verified: r.verified };
 }
 
 // ── page ────────────────────────────────────────────────────────────────────
@@ -143,8 +320,10 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
   </div>
   <div>
     <section><h2>Add Claude</h2><div class="wrap" id="spawn"></div>
-      <div class="note">Opens Windows Terminal in that folder with <code>claude</code> running.
-      Say <code>go</code> in the new window to claim. This page never claims for you.</div>
+      <div class="note">Opens a <b>new</b> Windows Terminal window in that folder with <code>claude</code>
+      running. Say <code>go</code> in the new window to claim. This page never claims for you.
+      The header says <span class="ok">opened</span> only when the server confirmed a terminal
+      actually appeared.</div>
     </section>
     <section style="margin-top:18px"><h2>Read-only</h2>
       <div class="note" style="padding:12px 14px">This board issues <b>SELECT only</b>.
@@ -216,17 +395,33 @@ async function boot() {
     .map((x, i) => '<button onclick="spawn(' + i + ')">+ ' + esc(x.label) + '</button>').join('');
   tick(); setInterval(tick, 10000);
 }
+// "opened" is only ever printed for a spawn the server actually CONFIRMED — a
+// launcher exit code is not evidence a window exists. Failures stay on screen
+// until the next click; only a confirmed open auto-clears.
 async function spawn(i) {
   const el = document.getElementById('flash');
   el.textContent = 'spawning…'; el.className = 'meta';
-  const r = await fetch('/api/spawn', {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ index: i }),
-  });
-  const j = await r.json();
-  el.textContent = j.ok ? ('opened ' + j.label) : ('spawn failed: ' + j.error);
-  el.className = 'meta ' + (j.ok ? 'ok' : 'err');
-  setTimeout(() => { el.textContent = ''; }, 6000);
+  let j;
+  try {
+    const r = await fetch('/api/spawn', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ index: i }),
+    });
+    j = await r.json();
+  } catch (e) {
+    j = { ok: false, error: 'server unreachable: ' + e.message };
+  }
+  if (j.ok && j.verified === true) {
+    el.textContent = 'opened ' + j.label;
+    el.className = 'meta ok';
+    setTimeout(() => { el.textContent = ''; }, 6000);
+  } else if (j.ok) {
+    el.textContent = 'launched ' + j.label + ' — UNVERIFIED, check for a window';
+    el.className = 'meta warn';
+  } else {
+    el.textContent = 'spawn failed: ' + j.error;
+    el.className = 'meta alert';
+  }
 }
 boot();
 </script></body></html>`;
@@ -257,12 +452,15 @@ const server = createServer(async (req, res) => {
     if (req.method === 'POST' && req.url === '/api/spawn') {
       let raw = '';
       req.on('data', (c) => { raw += c; if (raw.length > 1024) req.destroy(); });
-      req.on('end', () => {
+      req.on('end', async () => {
         try {
           const { index } = JSON.parse(raw || '{}');
-          const label = spawnTerminal(Number(index));
-          json(res, 200, { ok: true, label });
-        } catch (e) { json(res, 400, { ok: false, error: e.message }); }
+          const { label, verified } = await spawnTerminal(Number(index));
+          json(res, 200, { ok: true, label, verified });
+        } catch (e) {
+          console.error(`[spawn] FAILED :: ${e.message}`);
+          json(res, 400, { ok: false, error: e.message });
+        }
       });
       return;
     }
@@ -274,6 +472,13 @@ const server = createServer(async (req, res) => {
 
 // 127.0.0.1 only. This process can spawn terminals; it must never be reachable
 // from the network.
-server.listen(cfg.port, '127.0.0.1', () => {
-  console.log(`Mission Control on http://127.0.0.1:${cfg.port}  (read-only rail, ${cfg.folders.length} spawn targets)`);
+// MC_PORT lets a second instance run beside a live board for testing. It only
+// moves the listen port; it cannot reach the bind address, which stays 127.0.0.1.
+const PORT = Number(process.env.MC_PORT) || cfg.port;
+
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`Mission Control on http://127.0.0.1:${PORT}  (read-only rail, ${cfg.folders.length} spawn targets)`);
+  console.log(`  terminal : ${RESOLVED.terminal.path}   [${RESOLVED.terminal.how}]`);
+  console.log(`  command  : ${RESOLVED.command
+    ?? `'${cfg.terminal.command}' not found on this PATH — passing it bare, the terminal's shell must resolve it`}`);
 });

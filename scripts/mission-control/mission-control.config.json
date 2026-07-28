@@ -12,9 +12,13 @@
   "staleClaimAlertMinutes": 90,
   "reportHeadlines": 12,
   "terminal": {
+    "_comment": "OPS20: `exe` and `command` are resolved to absolute paths at server STARTUP (via where.exe) instead of being left to whatever PATH the child inherits — that PATH gap is what made the button report a false 'opened'. newWindowArgs pins `-w new` so these sessions get their own window even if windowingBehavior is later set to reuse one; it was not the cause of the original bug.",
     "exe": "wt.exe",
-    "shellArgs": ["cmd", "/k", "claude"]
+    "newWindowArgs": ["-w", "new", "nt"],
+    "shellArgs": ["cmd", "/k"],
+    "command": "claude"
   },
+  "spawnVerifyMs": 3000,
   "folders": [
     { "label": "TheMANUAL.tech",   "path": "C:\\Users\\Butch\\Documents\\HONEYCOMB\\TheMANUAL.tech" },
     { "label": "HONEYCOMB (root)", "path": "C:\\Users\\Butch\\Documents\\HONEYCOMB" },

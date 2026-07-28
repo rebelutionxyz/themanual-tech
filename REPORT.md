@@ -5,6 +5,1164 @@ Newest pass first.
 
 ---
 
+## HEARTBEAT-SMOKE2 — no-op proof for the canonical claim transport (2026-07-28) — **DONE**
+
+**Lane:** ops · **Scope:** oracle · **Dispatch:** acc795ea-582c-4e92-a199-37aeff3fc7f8
+**Terminal on the rail:** `HB:ops` (unattended prefix per OPS18 §Safety posture)
+
+### 0. Headline
+
+**The OPS19 wrapper performed the claim, unattended, with nothing auto-denied.** That was the one
+thing OPS19 could not prove about itself — the README's *"allowed-in-settings and allowed-in-fact are
+different claims, and only an unattended run can distinguish them."* This pass distinguishes them.
+
+The dispatch is a deliberate no-op. No code changed, no schema touched, no deploy, no git. The only
+artifacts are this section and the `ops_reports` row.
+
+### 1. Which transport performed the claim — the point of the pass
+
+```
+TheMANUAL.tech/scripts/heartbeat/claim.cmd
+```
+
+Invoked **bare** from the workspace root: no arg 1 (no lane filter), no arg 2 (no sticky lanes — this
+session had finished no pass yet, which is the `ARRAY[]::text[]` case R2 calls for). Result:
+
+```
+-[ RECORD 1 ]---
+id      | acc795ea-582c-4e92-a199-37aeff3fc7f8
+lane    | ops
+pass    | HEARTBEAT-SMOKE2
+title   | HEARTBEAT-SMOKE2 — no-op proof for the canonical claim transport
+workdir | TheMANUAL.tech
+scope   | oracle
+UPDATE 1
+```
+
+`UPDATE 1`, exit 0, first attempt, no retry, **no permission prompt and no auto-deny**. The
+quoted-absolute `"/c/Program Files/PostgreSQL/17/bin/psql.exe" …` form from CLAUDE.md R2 was **not**
+attempted — that is the form OPS19 established is auto-denied by prefix matching, and the run
+instruction named the wrapper explicitly. R3 FINISH went through the Node shim (`_claude_tmp/rail.mjs`)
+under `Bash(node *)`, unchanged.
+
+### 2. Evidence this ran unattended
+
+`logs/heartbeat/hb-20260728-061457.json` existed at size 0 while this pass was mid-flight — the
+in-progress marker `heartbeat.cmd` writes before invoking Claude. Prior completed runs in the same
+ledger:
+
+```
+20260727-143312,0,success,30,1.7958275
+20260728-055449,0,success,19,1.1246295
+20260728-061136,0,success,14,0.5796645
+```
+
+**Honest limit:** from inside the session I can see the wrapper's log artifact, not the process tree.
+I cannot prove from here that Task Scheduler rather than a hand-run `heartbeat.cmd` launched it. The
+distinction does not affect the claim-transport finding, which is what the dispatch asked for.
+
+### 3. CLAUDE.md loaded — confirmed
+
+Confirmed by behaviour, not by assertion. This session applied, without being told any of it in the
+prompt: R2's claim semantics (`UPDATE 0` = queue empty, never licence to invent work), R2b's CD rule
+(`workdir=TheMANUAL.tech`, and a **root session never bounces**), R5 lane ownership, R6's
+*"`REPORT.md` is ALWAYS in scope"* — which is why this section exists at all under a body that says
+*"nothing else authorized"* — and R3's dollar-quoted transport with post-write verification. The
+`--bare` risk OPS18 flagged (a future release silently dropping `CLAUDE.md`) is **not** realised on
+this build.
+
+### 4. File tree
+
+```
+TheMANUAL.tech/REPORT.md    MODIFIED — this section only
+```
+
+Nothing else written. No `logs/permission-needed.md` entry: nothing was denied this pass.
+
+### 5. Done-test
+
+| Test | Result |
+|---|---|
+| Claim via `claim.cmd`, bare form, from workspace root | **PASS** — `UPDATE 1`, exit 0 |
+| Nothing auto-denied during the claim | **PASS** |
+| Report filed with `terminal='HB:ops'` | **PASS** — see §6 |
+| Dispatch closed `done` | **PASS** — `RETURNING id` matched the claimed row |
+| Body verbatim: `md5` + `octet_length` + `right(body, N)` tail match local | **PASS** |
+
+### 6. Could not verify
+
+- Whether the launcher was Task Scheduler or a manual `heartbeat.cmd` (§2).
+- The run's own `total_cost_usd` — `log-cost.mjs` appends to `cost-ledger.csv` **after** Claude exits,
+  so this pass cannot read its own ledger line.
+
+---
+
+## OPS20 — mission control spawn button: "opened" over a spawn that never happened (2026-07-27) — **DONE**
+
+**Lane:** ops · **Scope:** oracle · **Dispatch:** 98a72a6a-9c6e-4f5d-b3f4-defa52649b42
+**Live bug (Butch, 4:34 PM):** clicking Add Claude → header shows `opened atlasJUSTICE.org`, no
+terminal appears.
+
+### 0. Headline
+
+**Reproduced, root-caused, fixed, and verified end-to-end through the endpoint.**
+
+`execFile('wt.exe', …)` fails **ENOENT** whenever the board process's `PATH` lacks
+`%LOCALAPPDATA%\Microsoft\WindowsApps` — the alias directory `wt.exe` lives in, which sits on the
+**user** `PATH` and is therefore missing from plenty of launch contexts. v1 passed a **no-op callback**
+to `execFile`, so that ENOENT went nowhere; the handler had already answered `{ok:true}` before the
+child did anything. Exact reproduction, with the old code verbatim and only the callback spied on:
+
+```
+PATH contains WindowsApps : true
+stripped PATH contains it : false
+   endpoint would answer   : {"ok":true,"label":"atlasJUSTICE.org"}  -> page prints "opened atlasJUSTICE.org"
+   [swallowed by the old no-op callback] -> ENOENT: spawn wt.exe ENOENT
+```
+
+That is the reported symptom character-for-character.
+
+### 1. File tree
+
+```
+TheMANUAL.tech/scripts/mission-control/
+├── server.mjs                     MODIFIED — resolution, awaited launch, spawn verification, honest UI
+├── mission-control.config.json    MODIFIED — terminal.newWindowArgs / .command, spawnVerifyMs
+└── README.md                      MODIFIED — new "Spawn honesty (OPS20)" section
+TheMANUAL.tech/REPORT.md           MODIFIED — this section
+```
+
+No other file created, modified or deleted. **Zero rail writes added** — the board still issues
+`SELECT` only, and `/api/spawn` remains spawn-only, as the dispatch required.
+
+### 2. What changed
+
+1. **Resolution at startup, not PATH luck at click time.** `wt.exe` and `claude` resolve once, to
+   absolute paths, and both print in the startup banner.
+2. **`where.exe`, not the filesystem.** The first resolver I wrote used `existsSync` and concluded
+   `terminal not found on this machine: wt.exe` on a machine where wt runs fine — `wt.exe` is an
+   **AppExecLink reparse point**, and Node's `stat` *and* `lstat` both return ENOENT on that tag:
+
+   ```
+   existsSync = false
+   statSync  ERR ENOENT
+   lstatSync ERR ENOENT
+   ```
+
+   `where.exe` performs the same search `CreateProcess` does, so it is the only resolver that agrees
+   with reality here. It also needs a PATHEXT preference: `where claude` lists the extensionless
+   shell script *before* `claude.cmd`, and `cmd.exe` cannot run the former.
+3. **Fallback chain, so a thin PATH degrades instead of dying:** `wt.exe` on PATH → the WindowsApps
+   path directly → a plain `cmd.exe` console window.
+4. **The launcher is awaited.** ENOENT and non-zero exits become real errors with the exe name and
+   stderr attached, logged to the server console and returned to the page.
+5. **Exit code is not treated as proof.** `wt.exe` is a stub that exits 0 in ~100 ms regardless
+   (measured: 105 ms, 114 ms, 286 ms across runs, always 0). A spawn counts as successful only when a
+   new console-host process is observed within `spawnVerifyMs`. Failure to observe one is reported as
+   a failure, not an "opened".
+6. **The header stops lying.** `opened <folder>` only on a confirmed spawn; `UNVERIFIED` if the check
+   itself is unavailable; `spawn failed: <reason>` otherwise. Failures no longer auto-clear after 6 s.
+7. **`MC_PORT`** env override so a test instance can run beside a live board. It cannot move the bind
+   address, which stays `127.0.0.1`.
+
+### 3. A theory I published in a comment and then disproved
+
+My first diagnosis was that `wt -d <folder>` drops the session in as a **tab** of the existing
+Windows Terminal window. Evidence looked strong — no new `WindowsTerminal.exe` process appeared, only
+`OpenConsole.exe` + `cmd.exe`. It was wrong. This WT build hosts every window in one process, so
+process count says nothing about windows. Counting top-level `CASCADIA_HOSTING_WINDOW_CLASS` windows
+around each spawn settles it:
+
+```
+A  old argv  (-d ... cmd /k)      windows 10 -> 11   delta 1
+B  new argv  (-w new nt -d ...)   windows 11 -> 12   delta 1
+```
+
+Both open a real window. I had already written the tab theory into the file header and the config
+comment as fact; both are corrected, and `-w new` is kept for a stated smaller reason — it pins a
+dedicated window so a later `windowingBehavior=useExisting` cannot turn these into background tabs.
+
+### 4. DONE-TEST — verbatim output
+
+**(a) Button click opens a working claude terminal in the right folder.** Driven through
+`POST /api/spawn`, which is exactly what the button calls:
+
+```
+GOOD (TheMANUAL.tech, index 0) -> HTTP 200  {"ok":true,"label":"TheMANUAL.tech","verified":true}
+
+Mission Control on http://127.0.0.1:7319  (read-only rail, 9 spawn targets)
+  terminal : C:\Users\Butch\AppData\Local\Microsoft\WindowsApps\wt.exe   [PATH]
+  command  : C:\Users\Butch\AppData\Roaming\npm\claude.cmd
+[spawn] TheMANUAL.tech :: C:\Users\Butch\AppData\Local\Microsoft\WindowsApps\wt.exe -w new nt --title MC TheMANUAL.tech -d C:\Users\Butch\Documents\HONEYCOMB\TheMANUAL.tech cmd /k C:\Users\Butch\AppData\Roaming\npm\claude.cmd
+[spawn] TheMANUAL.tech :: launcher exit 0 in 2205ms, terminal CONFIRMED
+```
+
+The window is real and claude is really running in it — window enumeration showed two new
+`✳ Claude Code` windows, and the process table showed
+`cmd /k C:\Users\Butch\AppData\Roaming\npm\claude.cmd`.
+
+**(b) A deliberately-broken folder path shows an error, not a false success.** A ninth target
+pointing at `NoSuchFolder.invalid` was added to the config for the test and **removed afterwards**:
+
+```
+BROKEN (index 8) -> HTTP 400  {"ok":false,"error":"folder missing on disk: C:\\Users\\Butch\\Documents\\HONEYCOMB\\NoSuchFolder.invalid"}
+[spawn] FAILED :: folder missing on disk: C:\Users\Butch\Documents\HONEYCOMB\NoSuchFolder.invalid
+```
+
+The page renders that as `spawn failed: …` in red and holds it on screen.
+
+**(c) The original failure condition, re-run against the fix.** Board started with `PATH` stripped of
+WindowsApps — the exact gap that produced the false "opened":
+
+```
+  srv| Mission Control on http://127.0.0.1:7321  (read-only rail, 9 spawn targets)
+  srv|   terminal : C:\Users\Butch\AppData\Local\Microsoft\WindowsApps\wt.exe   [WindowsApps fallback (not on PATH)]
+  srv|   command  : C:\Users\Butch\AppData\Roaming\npm\claude.cmd
+  srv| [spawn] AtlasVOTE.org :: …\wt.exe -w new nt --title MC AtlasVOTE.org -d …\AtlasVOTE.org cmd /k …\claude.cmd
+  srv| [spawn] AtlasVOTE.org :: launcher exit 0 in 2710ms, terminal CONFIRMED
+
+endpoint -> HTTP 200  {"ok":true,"label":"AtlasVOTE.org","verified":true}
+```
+
+**(d) Nothing else regressed.**
+
+```
+GET /            : 7706 bytes,  has spawn(): true , has verified check: true
+GET /api/folders : 8 targets: TheMANUAL.tech, HONEYCOMB (root), atlasJUSTICE.org, AtlasORACLE.to, TheWORKSHOP.to, AtlasVOTE.org, DingleBERRY.tech, FreedomBLiNGS.com
+GET /api/board   : 3 open dispatches, 12 report headlines
+```
+
+### 5. Deviations and judgement calls
+
+- **Scope.** The dispatch says `scope: oracle`; the code is `scripts/mission-control/`. The body names
+  this fix explicitly and there is no `oracle/` tree in this repo, so I read the body as authoritative
+  and touched nothing outside mission control. Flagging the label mismatch rather than papering it.
+- **Testing on a spare port.** Butch's live board holds 7317, so tests ran on 7319/7321/7322 via the
+  new `MC_PORT`. The live board was never touched.
+- **Verification by process observation.** Watching for a new console host is more machinery than a
+  spawn call usually deserves. It earns its place here because the entire bug was a false success and
+  the launcher's exit code is structurally incapable of detecting one. It degrades to `UNVERIFIED`,
+  never to a false `opened`, if `tasklist.exe` is unavailable.
+- **Config edited for a test.** The BROKEN entry was added and removed; the committed config is
+  identical to before plus the intended `terminal` / `spawnVerifyMs` changes.
+
+### 6. Could not verify
+
+- **The click itself in Butch's browser.** Everything was driven through `POST /api/spawn`, which is
+  precisely what the button's `fetch` issues, but no human clicked a button in this pass.
+- **Whether the new window takes keyboard FOREGROUND** when the click comes from a browser. Windows
+  foreground-lock rules can leave a new window behind the browser, and with ~10 terminal windows
+  already open that could still read as "nothing happened" even though the terminal exists. Nothing
+  in this pass could test that without a human at the desk. **If the button now says `opened` and you
+  still don't see a window, that is the remaining cause, and it is a different fix** (window
+  activation) — say so and it gets its own dispatch.
+- The five pre-existing `cmd /k claude` sessions were left alone. One of them may be a repro I
+  started early in the pass; I could not tell it apart from Butch's own, so I killed only the test
+  sessions I could positively identify by command line.
+
+### 7. Action required
+
+**Restart the board** — it is a long-lived process and PID 25324 on port 7317 is still running the v1
+code. `Ctrl+C` it and `node scripts/mission-control/server.mjs` again. The startup banner will now
+print the resolved `terminal` and `command` paths; that banner is the first thing to read if a button
+ever misbehaves again.
+
+---
+
+## DOCS6 — token-era canon reconciliation: pre-rail AtlasORACLE canon vs the rail (2026-07-27) — **DONE**
+
+**Lane:** docs · **Scope:** oracle · **Dispatch:** a8877f98-0737-46e2-b666-1ddc66774571
+**Posture:** read-only reconciliation. **EDIT NOTHING** per the dispatch. One new file; no existing
+file touched except this report.
+
+**Output:** `docs/atlasoracle-canon-reconciliation-2026-07-27.md`
+
+### 0. Headline
+
+All eleven pre-rail docs read against `ORACLE_MF` v0.1→v0.18 + `ORACLE_OUTLOOK` v0.1 +
+`ORACLE_TOS_VERIFIED` v0.1–v0.2. **The dispatch's four known conflicts are all confirmed**, and its
+instruction to treat the list as incomplete was correct — three more surfaced, one of which **closes
+an open rail question**:
+
+> **`whitepaper.md` §5 and §9 already contain the opt-in retention carve-out.** `MF v0.12` logged
+> "whether this mechanism already exists in older canon (whitepaper) is **UNVERIFIED** — docs hunt
+> available on request." It exists, twice: *"never the directive content … **except where the user
+> has explicitly enabled conversation history**."* That closes the item — and opens a real fork,
+> because honoring it requires a content column that `MF v0.4`'s "no content columns exist,
+> structurally enforced" says must not exist.
+
+### 1. File tree
+
+```
+TheMANUAL.tech/docs/
+└── atlasoracle-canon-reconciliation-2026-07-27.md   NEW — the reconciliation table
+```
+
+Nothing else created, modified or deleted.
+
+### 2. The four headline conflicts (dispatch's list, all confirmed)
+
+| # | Conflict | Old canon | Rail |
+|---|---|---|---|
+| **C1** | **Currency** — six of eleven docs price ORACLE in BLiNG! | `economic_constitution.md` §Denomination · `rate-cap-pricing.md` §4 · `bling-ledger-interface.md` (whole) · `atlasoracle-canonical-cache.md` §5 · `atlasoracle-patchboard-addendum.md` §2.1 · `whitepaper.md` §8 | `MF v0.5` r2/r3 · `MF v0.16` §1 (1,000 tokens = $1, permanent anchor) · `MF v0.15` (no treasury leg) |
+| **C2** | **Training** — "AtlasOracle does not train" | `platform_thesis.md` L13 · `whitepaper.md` §1, §3, §9, **§10 "What we will not do"** | `MF v0.6` OPEN-2 provenance rule · `OUTLOOK` learned-router · `TOS v0.1`/`v0.2` fuel ladder |
+| **C3** | **Free tier** — "permanent, never gated" as a *hard never* and a *required firewall term* | `economic_constitution.md` §Non-negotiables · `platform_thesis.md` principle 3 · `language_firewall.md` required term · `whitepaper.md` §3/§7/§9 | `MF v0.5` r5 — OPEN-8, "up for debate", still open at `MF v0.18` |
+| **C4** | **Dates** — launch keyed to July 4 / Sept 11 / Q4 / 2027 | `platform_thesis.md` §Operational status · `whitepaper.md` §10 (whole), §11 · `per-astra-surfaced-actions.md` gating | `MF v0.5` r1 · `OUTLOOK` WRONG #3 |
+
+**On C3 I took no side**, per the dispatch. The doc states the three shapes the ruling could take —
+including a third one the old canon already scripts (`whitepaper.md` §8's public-shortfall-and-
+restructure path, which is a permanence claim with an exit ramp already written).
+
+### 3. Conflicts the dispatch did not name
+
+- **Chatbot / assistant.** `platform_thesis.md` L14 ("There is no 'AtlasOracle assistant' persona")
+  and `language_firewall.md` (forbids "chatbot" and "AI assistant" as nouns for ORACLE) directly
+  contradict `MF v0.7`'s sealed positioning sentence — *"AtlasORACLE is the user's **EXECUTIVE
+  ASSISTANT AND DIRECTOR** of their entire AI experience"* — and vision #1's chat-app-shaped console.
+- **Who pays for free.** `whitepaper.md` §3: *"the free tier is **not subsidized by the paid one**."*
+  `MF v0.16` §2: free is *"subsidized by paid margin."* Flat contradiction, and **separate from C3** —
+  that one is about permanence, this one about who funds it.
+- **The opt-in retention carve-out** (§0 above).
+
+Plus six open questions for Butch that could not be resolved by reading: the chatbot/assistant
+ruling · what a non-Bee ORACLE customer is called (the firewall bans "user"; every rail ruling says
+"user") · opt-in retention vs no-content-columns · two competing runtime-value stores
+(`oracle_model_rates` vs `patchboard_switches`) · whether `BLiNG! = "Perks"` (`MF v0.4` §1) is real
+canon or a drafting artifact — the word appears in no master_plan doc · **26 or 28 Astras** (three
+canon sources, two numbers).
+
+### 4. Treasures — thirteen, ranked by value × readiness
+
+Top five: **the canonical response cache** (295-line complete spec — Butch re-surfaced this idea
+from memory at `MF v0.2` §2 without the doc in hand) · **patchboard runtime** (`OUTLOOK` RIGHT #4
+re-derived its principle two months later) · **~130 surfaced-action directives** across 26 Astras,
+whose badge component already exists and is mounted nowhere (`MF v0.9`) · **abuse/anomaly detection**,
+which answers the exposure `MF v0.10` independently named ("100% of usable traffic is unmetered
+spend bounded only by rate caps") · **the cost-preview UX modal**, whose server-side gate `MF v0.15`
+already built.
+
+Also: the whitepaper §2 extractive-AI indictment and §9 hard-nevers/threat-model are publishable
+prose that aged *up* — `TOS v0.1`/`v0.2` converted several of their claims into cited provider-by-
+provider facts.
+
+### 5. DB probe (read-only) — sharpens three "unbuilt" claims from assumption to fact
+
+`information_schema.tables` + `pg_extension`, 2026-07-27:
+
+- **Present:** `atlasoracle_canon_reads`, `atlasoracle_directives`, `atlasoracle_provider_pool`,
+  `bling_pots`, `oracle_model_rates`, `oracle_token_balances`, `oracle_token_ledger`.
+- **Absent:** `atlasoracle_canonical_responses` · `patchboard_switches` · the **`vector` extension**
+  (only `pg_trgm` installed).
+
+Two consequences worth naming: the cache spec's *"`pg_vector` … pre-installed on modern Supabase
+Postgres"* is **false on this project** — any build pass needs a migration first. And
+`atlasoracle_canon_reads` **exists and is never written to** (`MF v0.10`) — the schema shipped, the
+writer didn't; one of the cheapest wins on the board.
+
+### 6. Done-tests
+
+| # | Requirement | Result |
+|---|---|---|
+| 1 | Every doc in the folder appears in the table | **PASS — 11 of 11.** `platform_thesis` · `economic_constitution` · `language_firewall` · `categorization` · `rate-cap-pricing` · `bling-ledger-interface` · `atlasoracle-canonical-cache` · `canon-storage-paths` · `atlasoracle-patchboard-addendum` · `per-astra-surfaced-actions` · `whitepaper`. Each gets its own §2.N sub-table. |
+| 2 | Every CONFLICT row cites both sources | **PASS.** Old canon by file + § (or line number); rail by `MF` version, or `OUTLOOK` / `TOS` / root `CLAUDE.md` where that is the governing source. |
+| 3 | Edit nothing | **PASS.** Exactly one file written — the reconciliation doc itself. `REPORT.md` is always in scope per R6 and is not work product. |
+
+### 7. Deviations and judgement calls
+
+- **D1 — read v0.1–v0.4 and v0.17–v0.18 too**, not just the dispatch's v0.5–v0.16 range. v0.1–v0.4
+  carry the mission statement and the handoff corrections that several conflicts turn on (the
+  training leg originates in v0.1; the sovereignty "no content columns" rule in v0.4), and
+  v0.17/v0.18 shipped the heartbeat that makes the drift-detection treasure buildable. Reading the
+  named range alone would have mis-attributed two rows.
+- **D2 — ran a read-only DB probe** beyond the dispatch's letter. Three docs claim unbuilt state and
+  one claims a *precondition* (`pg_vector` pre-installed). Asserting "unbuilt" from prose alone would
+  have been a guess; the probe made it a fact and caught the false precondition. `SELECT` only.
+- **D3 — a verdict vocabulary of four, not three.** The dispatch names CONFLICT / COMPATIBLE /
+  TREASURE. A large class of rows is neither wrong nor right — model names, provider prices, Astra
+  counts that have simply moved. Filing those as CONFLICT would bury the real conflicts in noise, so
+  they are **STALE**: refresh, don't rethink.
+- **D4 — recommended a banner, not a rewrite, for `bling-ledger-interface.md`.** OPEN-7 is unruled,
+  `bling_pots` is live (confirmed present), and that file is the dormant infrastructure's only
+  documentation. `MF v0.5` says nothing touches it until ruled.
+- **D5 — flagged non-ORACLE canon conflicts** found inside these docs (MiniWaves alternating-caps
+  scrubbed 2026-07-25; "33-rank Bling Rank" superseded by the RiNG's 9-level system; 26-vs-28 Astra
+  count). Out of `oracle` scope to fix, in scope to notice — a cache seeded from these docs today
+  would generate factually wrong canon answers.
+
+### 8. Could not verify
+
+- **Badge prop contract** — `per-astra-surfaced-actions.md`'s `<AtlasOracleWalletBadge>` prop shape
+  was not compared against `src/components/AtlasOracleWalletBadge.tsx`. FRONT lane's file.
+- **`astra_registry` shape** — `canon-storage-paths.md` §2.2 depends on `astra_registry.slug`
+  (Lock 8, deferred per root `CLAUDE.md`). Not probed.
+- **`atlasoracle_directives` column list** — `whitepaper.md` §5's identity claims (hashed
+  email/phone, transient IP) were taken from `MF v0.4`'s metadata-only assertion, not re-read from
+  the catalog.
+- **Whether `provider_partnership_terms.md` exists elsewhere** — `categorization.md` references it as
+  "HONEYCOMB-wide … (to be drafted)"; only the `AtlasORACLE.to` tree was searched.
+
+---
+
+## OPS19 — heartbeat enable-gates closed + frontier threshold DRIFTED (2026-07-28) — **DONE**
+
+**Lane:** ops · **Scope:** oracle · **Dispatch:** c8b49d31-b397-4a70-b902-cd1ea5e60a50
+**Supersedes:** `OPS19-Q` (filed 2026-07-27, `c3866410`) — the blocking ask in it has been answered by Butch and the work it was waiting on is complete. That row stays on the rail as the record of the ask; this is the outcome.
+
+### 0. Headline
+
+**Both enable-gates are closed in fact, not in theory.** The heartbeat is now a deliberate switch away from running unattended, and nothing in the way is Code's.
+
+- **Gate 1 — the claim transport.** `claim.cmd` + `claim.sql` built, Butch added the one allow line and dropped `Bash(psql*)` in the same edit. **An unattended run then executed the canonical claim with nothing auto-denied** — allowed-in-fact, which is the only version of that claim worth anything.
+- **Gate 2 — push-park.** **PASSES, to the letter this time.** An unattended `dontAsk` session attempted `git push origin main`, was **auto-denied at the permission layer with no interactive prompt**, pushed nothing, attempted no workaround, and **continued running afterward.** The park-don't-hang property the whole experiment rests on is now observed rather than argued.
+- **Item 3 — the frontier gate.** **DRIFTED, and live.** Butch's 20:04 pricing ruling scaled every rate by exactly 1.25, lifting the estimate floor above the unchanged threshold of 700. Every frontier directive in production currently gates. Corrected constant: **875**. Not applied — money-path code, needs a dispatch naming the deploy.
+
+---
+
+### 1. Gate 1 — transport wrapper. **CLOSED.**
+
+**The problem, restated.** HEARTBEAT-SMOKE established that allow-list matching is a **prefix on the command string**. The canonical transport is invoked as `"/c/Program Files/PostgreSQL/17/bin/psql.exe" …` — begins with a quote, not `psql`, so it never matched `Bash(psql*)`. Bare `psql` matched the rule but exits 127 here. **Allowed by name, unreachable by path.**
+
+**Built:** `scripts/heartbeat/claim.cmd` + `claim.sql`. Full-path `psql.exe` · `-w` (pgpass, no password ever handled) · `-X` · `ON_ERROR_STOP=1` · `-f %~dp0claim.sql`. It takes no SQL, no host, no user, no database, no password. **One checked-in statement against one host** — the narrower grant, not a lateral move. Two no-op deviations from the R2 text, both documented in `claim.sql`: `string_to_array(:'lanes', ',')` in place of a hand-edited array literal, and `go <lane>` as a vacuously-true predicate instead of shell-assembled SQL. Both parameters use psql's `:'name'` literal quoting, so neither can inject.
+
+**Butch's edit landed, both halves.** `"Bash(TheMANUAL.tech/scripts/heartbeat/claim.cmd*)"` added; `"Bash(psql*)"` removed. Verified this pass — 25 entries, one `claim.cmd` match, zero `psql` matches.
+
+**Probes — 6 total, none claimed anything.**
+
+| Probe | Result |
+|---|---|
+| `claim.cmd zzz` — arg validation | exit 64, psql never launched. Confirms Git Bash executes the `.cmd` by relative path; no `cmd //c` shim needed. |
+| `claim.cmd db` — full transport | `UPDATE 0`, exit 0. Absolute-path psql resolved, pgpass auth, `claim.sql` via `%~dp0`. |
+| `claim.cmd db ops,docs` — sticky-lane var | `UPDATE 0`, exit 0. `string_to_array` parses and type-checks. |
+| `claim.cmd front "o'ps,docs"` — injection | `UPDATE 0`, exit 0. Embedded quote inert. |
+| `claim.cmd` bare — **post-edit, attended** | `UPDATE 0`, exit 0, **no prompt, no denial.** |
+| `claim.cmd` bare — **post-edit, UNATTENDED** | **executed, nothing auto-denied.** §2. |
+
+**The last row is the one that closes the gate.** The README's own standard: *"Allowed-in-settings and allowed-in-fact are different claims, and only an unattended run can distinguish them."*
+
+**★ The wrapper also proved the `after_pass` chain works.** The bare form is the only one that could have grabbed `HEARTBEAT-SMOKE2` — and it correctly did **not**, because that row's `after_pass=OPS19` guard held while OPS19 was `claimed`. It picked up `DOCS7` instead. The R2 statement's chaining logic is now exercised against real rows, not just read.
+
+---
+
+### 2. Gate 2 — push-park. **PASSES. Done-test 4 closed.**
+
+Done-test 4 cannot be satisfied attended: the same call hits the user-layer `ask` rule and **prompts**, which is the opposite of the property under test. It needed an unattended `dontAsk` session.
+
+**How:** `heartbeat.cmd` gained an optional first argument. Passing `probe-push` appends a one-shot probe clause to the prompt. **The scheduled task passes no arguments, so the standing heartbeat is unaffected and this cannot fire on a schedule.** Run directly, once. Full transcript at `logs/heartbeat/push-park-probe.md`, written by the unattended session itself.
+
+**Result — verbatim from the probe's own record:**
+
+> **Command attempted:** `git push origin main` — exactly one attempt, no retries, no alternate route.
+>
+> **Outcome:** `Permission to use Bash has been denied because Claude Code is running in don't ask mode.` *Auto-denied at the permission layer. No interactive prompt was raised, and the session did not hang waiting on one.*
+>
+> **Did anything get pushed?** **NO.** *The command never reached git — it was refused before execution. No commits left this machine. No workaround was attempted: no `gh`, no second `git push`, no `git -C`, no remote manipulation, no script wrapper, no MCP route.*
+>
+> **Did this session survive the denial?** **YES.** *The denial returned as an ordinary tool error. The session continued directly into the `go` protocol afterward.*
+>
+> **Canon breach?** **No breach.** *The R7 rule — the human's push click is canon, never automated — held under `dontAsk`.*
+
+**Three further findings the probe produced for free, all from the same unattended run:**
+
+1. **The canonical R3 transport is *still* auto-denied** — now that `Bash(psql*)` is gone, the quoted-absolute form matches nothing. The probe confirmed the denial keys on the **command prefix**, not on the SQL file: it was denied with both an absolute and a root-relative `-f` path. This is expected and is why the wrapper exists; it also means **an unattended run's only rail route is `claim.cmd` plus the Node shim under `Bash(node *)`.** R3 FINISH and R4 QUESTION still work through Node — but that is now the *only* way, which should be written down rather than rediscovered.
+2. **`git -C` was auto-denied too**, correctly. R7 denies it at this root because the flag prefixes past every other pattern. The probe classified it properly as canon-denied-by-design rather than an allow-list gap, and did **not** file it as a permission request. That is the judgement the parking rule is supposed to produce.
+3. **Queue empty → stopped.** Claim and the R2-mandated single retry both returned `(0 rows)` at exit 0. No pass claimed, no report filed, **no work invented.** The healthy no-work path — and distinguishable from the silent-no-op failure mode precisely because the transport is now proven reachable.
+
+**Cost:** $1.12 for the probe run, 19 turns (`logs/heartbeat/cost-ledger.csv`). The first heartbeat was $1.80 / 30 turns.
+
+---
+
+### 3. Item 3 — frontier threshold arithmetic. **VERDICT: DRIFTED.**
+
+**Rates live** (`oracle_model_rates`, newest active `claude-opus-5` row, effective 2026-07-27 20:04:26Z, `source_note` = "BUTCH PRICING RULING 2026-07-27 (ORACLE_MF v0.16)"):
+
+| leg | placeholder (OPS15) | ruled | ratio |
+|---|---|---|---|
+| input /MTok | 10,000 | **12,500** | 1.25 |
+| cached /MTok | 1,000 | **1,250** | 1.25 |
+| output /MTok | 50,000 | **62,500** | 1.25 |
+
+The estimator is unchanged, so the cost function keeps its shape and only its coefficients move. For frontier, with base output 8,000, scale 2, cap 32,000, and `cached = 0` at estimate time:
+
+```
+input(chars) = ceil(chars / 4) + 1,529          canon prefix rides on EVERY request
+output(i)    = min(32,000, 8,000 + 2·i)         cap unreachable in range - needs i = 12,000
+
+OPS15 (placeholder):  cost = 400 + 0.11·i
+RULED:                cost = 500 + 0.1375·i     <- exactly 1.25x the above
+```
+
+**All three legs scaled by the same 1.25, so the whole curve scaled — floor included.** That is what pushed the floor through the threshold:
+
+| | input tokens | OPS15 cost | RULED cost |
+|---|---|---|---|
+| floor — 1-char directive | 1,530 | 568.30 | **710.38** |
+| ceiling — `MAX_DIRECTIVE_CHARS` 10,000 | 4,029 | 843.19 | **1,053.99** |
+
+**The floor is now 710.38 against a threshold of 700.**
+
+| threshold | fires at directive chars ≥ | verdict |
+|---|---|---|
+| **700 (live)** | **0** — always, including a one-character directive | **DRIFTED — always-on** |
+| **875 (corrected)** | **4,793** | **SANE** |
+
+Answering the dispatch's question literally — *state the character-length at which the gate now fires* — **it fires at zero.** There is no directive short enough to avoid it. This is OPS15 §5 Bug 1 regressed exactly: *"a gate that never fires and a gate that always fires are the same bug wearing different clothes."*
+
+**Live impact, confirmed:** `atlasoracle-route` is deployed at **v19** (functions API), so the constant in production is 700 and the rates it reads are the ruled ones. **Every frontier directive without `confirm_cost: true` returns a `cost_preview` instead of executing.** No money is at risk — the gate fails toward *not* spending — but frontier is two-call-only for every Bee until the constant moves.
+
+**The corrected constant is 875.** Two independent routes land on it:
+
+- **Arithmetic.** Every rate moved by 1.25 and nothing else changed, so the threshold must move by 1.25: `700 × 1.25 = 875`.
+- **Design intent.** OPS15 placed the gate at ≈48% of the [floor, ceiling] band. 875 sits at `(875 − 710.38) / (1,053.99 − 710.38)` = **47.9%**. Same position.
+
+The strongest evidence is that the **trip point is identical to OPS15's**: both fire at directive length **≥ 4,793 characters** (`i > 2,727.27`). Roughly 1,200 words — pasted-document scale, not a paragraph. Squarely in the sane band.
+
+**Not applied.** `FRONTIER_PREVIEW_THRESHOLD_TOKENS` is money-path code; changing it means a deploy under the DEPLOY AMENDMENT, which requires a dispatch naming that deploy. Filed per the dispatch's own instruction. **The fix is a one-constant change plus a comment rewrite — the block is authorization, not difficulty.**
+
+**Second-order, for the lead not me:** the same ruling hit *standard* harder — Sonnet 5 went 4,000/400/20,000 → 9,000/900/45,000, a **2.25×**, not 1.25×. Standard has no preview gate so nothing is broken, but any canon figure derived from the old Sonnet rates is off by more than the frontier drift was. Not audited.
+
+---
+
+### 4. Done-tests
+
+| # | Requirement | Result |
+|---|---|---|
+| 1 | HEARTBEAT-SMOKE2 done via canonical transport by an unattended run | **SUBSTANTIALLY MET, completion recorded elsewhere.** The unattended run executed the canonical claim through `claim.cmd` with nothing auto-denied — the transport half is proven. It could not *claim that row* because `HEARTBEAT-SMOKE2.after_pass = OPS19`, and OPS19 was still `claimed` at the time. That gating is the lead's own design ("gated after OPS19 so it exists on the board when the re-run fires"), so the row becomes claimable the moment this report closes the dispatch. **Its completion lands in HEARTBEAT-SMOKE2's own report, which is where it belongs.** |
+| 2 | Push-poke park recorded verbatim | **PASS.** §2, quoted verbatim from the unattended session's own file. |
+| 3 | Threshold arithmetic with a SANE/DRIFTED verdict | **PASS — DRIFTED**, with the corrected constant, both bounds, and the trip character-length. |
+
+### 5. Files changed
+
+| File | Status |
+|---|---|
+| `scripts/heartbeat/claim.sql` | **new** — the R2 claim, parameterised, checked in so the grant is auditable |
+| `scripts/heartbeat/claim.cmd` | **new** — the transport, and nothing else |
+| `scripts/heartbeat/heartbeat.cmd` | one-shot `probe-push` arg; **no change to unargumented behaviour** |
+| `scripts/heartbeat/README.md` | C3 section rewritten to three states; `claim.cmd` usage; Files table |
+| `logs/heartbeat/push-park-probe.md` | **new** — written by the unattended probe session itself |
+| `logs/permission-needed.md` | OPS19 entry (supersedes the two 2026-07-27 psql entries) |
+| `REPORT.md` | this section |
+
+No code outside `scripts/heartbeat/`. No schema, no migration, no deploy, no commit, no push.
+
+### 6. Deviations and judgement calls
+
+- **D1 — `claim.sql` as a separate checked-in file** rather than SQL embedded in the batch. Hand-escaping a statement inside a `.cmd` makes "verbatim" a claim rather than a fact. A checked-in `.sql` is auditable, diffable, and cannot be reshaped by an argument — the grant is to run *that text*.
+- **D2 — validated the lane argument** against the four known lanes, beyond the dispatch's letter. A typo'd lane would return `UPDATE 0`, which R2 reads as "queue empty" — a wrong stop that looks exactly like a right one.
+- **D3 — probes aimed at empty lanes, never bare, until after Butch's edit.** The bare form would have consumed `HEARTBEAT-SMOKE2` before the run that was supposed to prove something with it.
+- **D4 — the `probe-push` argument, rather than editing the standing prompt.** The dispatch authorizes poking a push-class action during the supervised run; it does not authorize changing what every future scheduled heartbeat does. An argument the scheduler never passes is the smallest form of that.
+- **D5 — did not change the threshold constant.** Dispatch instruction and DEPLOY AMENDMENT agree.
+- **D6 — did not edit `~/.claude/settings.json`.** Outside the Write scope by design; presented as a copy-paste line, and Butch made the edit.
+
+### 7. Could not verify
+
+- **The gate's live behaviour.** §3 is arithmetic against the deployed constant, the live rate rows and the confirmed deployed version 19. I did **not** call `atlasoracle-route` to watch it gate a short frontier directive — that spends real provider tokens and the dispatch authorized arithmetic, not a battery. Reproducible from the numbers; not a live observation.
+- **`CANON_BUNDLE_LENGTH`** taken as 6,116 chars → 1,529 tokens from OPS15's corrected measurement and the code comment; not re-measured. If the bundle has grown, the floor rises and 875 needs re-checking — the floor is `500 + 0.1375 × (canon + 1)`, and it crosses 875 once the prefix passes ~2,727 tokens.
+- **Whether the scheduled task still resolves `claude` on PATH** after the settings edit. HEARTBEAT-SMOKE proved it once on 2026-07-27; the probe this pass ran `heartbeat.cmd` **directly**, not through Task Scheduler, so it did not re-exercise the non-interactive-context question. The next scheduled fire does.
+- **Concurrent heartbeats.** `FOR UPDATE SKIP LOCKED` says two simultaneous runs cannot double-claim. Still untested in fact — only one heartbeat has ever run at a time.
+- **Whether removing `Bash(psql*)` broke anything attended.** It matched only a form that exits 127, so it should not have. Attended sessions in this workspace reach psql by absolute path, which was never covered by that entry and is governed by the project `settings.local.json`.
+
+---
+
+## OPS21 — Groq free-tier adapter — **QUESTION FILED (OPS21-Q). Precondition not met; nothing built.**
+
+**Lane:** ops · **Scope:** oracle · **Dispatch:** 36a42871-7bf5-4033-a33a-778b2f516331
+**Run type:** attended. Dispatch left `claimed` per R4.
+
+### 0. Headline — the named blocker
+
+> **`GROQ_API_KEY` is ABSENT from Supabase edge secrets.**
+
+That is the dispatch's own stop condition, verbatim: *"PRECONDITION: GROQ_API_KEY present in Supabase edge secrets — if absent, file OPS21-Q naming exactly that and STOP (Butch creates the account/key; never improvise credentials)."* Filed, stopped, **no code written, no deploy, no schema touched.**
+
+Verified with `supabase secrets list --project-ref anxmqiehpyznifqgskzc` — **names and digests only; no secret value was read, printed, or logged.** 16 secrets are configured: `ANTHROPIC_API_KEY`, three `LIVEKIT_*`, three `STRIPE_*`, six `SUPABASE_*`, two `VAPID_*`. **No `GROQ_*` entry of any kind.**
+
+**But "create a free Groq key" may not be sufficient — read §2 before signing up.** Two further blockers surfaced that the dispatch did not anticipate, and one of them changes what Butch should actually go and do.
+
+---
+
+### 1. Dispatch item 5 — the STANDING RULE check. **PASSES, with a real subtlety.**
+
+The dispatch requires citing Groq's current input-training posture from the matrix's VERIFIED cell before building. Done, from `docs/atlasoracle-provider-expansion-matrix-2026-07-27.md` §3.1 and finding **F4** (sources fetched 2026-07-27 — today):
+
+- **Groq does not train on customer inputs or outputs.** (`console.groq.com/docs/your-data`)
+- **No retention of inference data by default** — usage metadata only, excluding inputs and outputs.
+- **Zero Data Retention is self-serve to all customers**, no approval gate — unlike OpenAI's. (`console.groq.com/settings/data-controls`)
+- Corroborated by the Groq Services Agreement (modified 2026-06-22): Groq may not use Inputs or Outputs to train or fine-tune, absent customer instruction. *(`SEARCH-DERIVED`, not human-read.)*
+
+**`MF v0.11`'s ratified standing rule — no Bee directive text to any provider that trains on inputs by default — is satisfied.** Nothing has changed since DOCS1; no stop-and-Q on rights grounds.
+
+**The subtlety that matters for model choice.** The matrix states it plainly: *"Training verdict on Groq's own terms: **N/A — Groq does not own the models.** The constraint that binds is the *weights licence* of whatever model you run."* So clearing Groq-the-host does **not** clear whichever model gets pinned. That splits the two candidates:
+
+| Candidate | Cost / 1,000 free directives | vs Haiku | Weights licence status |
+|---|---|---|---|
+| **Llama 3.1 8B Instant** | **$0.12** | **33.9× cheaper** | **`VERIFIED` training-permissive** — `ORACLE_TOS_VERIFIED v0.2` §1.b.i |
+| gpt-oss-20B | $0.27 | 15.2× cheaper | **not verified** in the matrix |
+
+**Recommendation: Llama 3.1 8B Instant** — it is simultaneously the cheapest route in the entire matrix *and* the only candidate whose weights licence has been affirmatively verified. Rights and price point the same way, which is rare enough to take. **The build pass must still re-verify the model ID against Groq's live catalogue** (dispatch: "zero from-memory model IDs"); the figures above come from `groq.com/pricing` fetched 2026-07-27.
+
+---
+
+### 2. ⚠ TWO BLOCKERS THE DISPATCH DID NOT ANTICIPATE
+
+#### 2a. A **free** Groq plan is probably too small to serve ORACLE's free tier
+
+Groq's free plan for Llama 3.1 8B is **30 RPM / 6,000 TPM** (`console.groq.com/docs/rate-limits`, fetched 2026-07-27).
+
+ORACLE's canon prefix rides on **every** request at ~1,529–1,643 tokens, plus the directive itself. So:
+
+```
+6,000 TPM  ÷  ~1,700 tokens per directive  ≈  3.5 directives per minute, PLATFORM-WIDE
+```
+
+**TPM binds long before RPM does** — the 30 RPM allowance is unreachable. And ORACLE's own free-tier cap is **2 directives/minute per Bee**, so **two concurrent free Bees saturate the entire Groq free plan.** At three, the free tier starts failing.
+
+That inverts the fallback design in dispatch item 2. "Haiku FALLBACK on Groq failure" is written for a Groq *hiccup*; on a free Groq plan the fallback would be the **normal** path under any real concurrency, and the free tier would quietly cost the same USD it costs today while appearing to have been migrated. **That is the failure mode this build exists to eliminate.**
+
+**The Developer plan raises these limits substantially, and its minimum spend is `UNKNOWN`** — the matrix flags that explicitly; Groq does not disclose it in the rate-limit docs. **This is the thing to find out at signup**, and it is a spend decision, which is Butch's, not mine.
+
+*Honest counterweight:* at present traffic this is theoretical — ORACLE has served a handful of directives in its life, and the matrix's own read is that below ~100k free directives/month the whole subsidy is a rounding error at either price. A free key would demonstrate the adapter end-to-end perfectly well. The point is that **the free key proves the code, not the capacity**, and canon should not record "free tier migrated to OSS" on the strength of a plan that supports 3.5 directives a minute.
+
+#### 2b. `atlasoracle_provider_pool` **cannot** carry multi-provider routing — dispatch item 4 is unbuildable as written
+
+Live schema, read this pass:
+
+```
+id · provider_name · provider_category · selection_weight · drift_flag · last_drift_check_at · active · created_at
+```
+
+**No endpoint URL. No auth-secret reference. No per-provider price fields.** The matrix already reached this conclusion independently (§4, step 2): *"Multi-provider routing needs schema work, which is a `db`-lane dispatch, not this one."*
+
+So item 4 — *"provider_pool row activated for real this time or explicitly noted still-inert"* — has only one honest outcome available: **still-inert**. The table can be flipped to `active=true` but nothing reads it, and it cannot express where Groq lives or which secret authenticates it. Making the row *actually* load-bearing is a `db` dispatch that should be queued in parallel with getting the key, not discovered mid-build.
+
+**Related, and worth fixing whenever that dispatch runs:** the pool already contains a row `groq-mixtral` (category `fast`, weight 1.000, **active**). **Mixtral does not appear on Groq's current catalogue** — today's fetched pricing page lists gpt-oss 20B/120B, Llama 3.3 70B Versatile, Llama 3.1 8B Instant and Qwen 3.6. That row is a from-memory model ID already sitting in production data, which is precisely what the dispatch's "zero from-memory model IDs" rule exists to prevent. It has been inert, so it has done no harm — but it would be the first thing a naive "activate the pool" pass picked up.
+
+---
+
+### 3. What else I checked, so the build pass doesn't re-derive it
+
+- **Zero Groq scaffolding exists.** `grep -rn -i groq` across `supabase/functions/` and `src/` returns exactly one hit: the word "Groq" inside the language-firewall text bundled in `canon.ts`. The adapter is a from-scratch build.
+- **The adapter is worth more than this one provider.** Matrix §4 step 1: `atlasoracle-route` hard-codes `ANTHROPIC_URL` and the Anthropic request/response envelope, and **every** candidate provider in the matrix is OpenAI-wire-compatible. So an **OpenAI-compatible adapter covers Groq, Together, Fireworks, DeepSeek, xAI, Mistral, Qwen and OpenRouter — one adapter, eight providers.** Building a Groq-shaped adapter instead of an OpenAI-wire-shaped one would be the expensive mistake here, and it costs nothing extra to get right the first time.
+- **Cost of the migration, for the record** (matrix §4c, at the measured directive shape): Haiku 4.5 $4.14 per 1,000 free directives; Llama 3.1 8B on Groq **$0.12**. At 1M free directives/month that is $4,137 vs $122 — about **$3,900/month**. The matrix's judgement, which I agree with: not urgent now, urgent at ~1M free directives/month. **That is a dependency statement; the date is OG HUMAN's.**
+
+---
+
+### 4. ⇒ OPS21-Q — what I need
+
+1. **Create the Groq account and put `GROQ_API_KEY` into Supabase edge secrets.** Nothing in this pass can start without it, and I will not improvise a credential.
+2. **At signup, find out the Developer-plan minimum spend** (§2a) and rule on free-vs-Developer. If the answer is "free plan for now," say so explicitly and I will build to it and **record in canon that the free tier's OSS route is capacity-limited to ~3.5 directives/minute platform-wide** — which is fine at today's traffic and must not be written down as "migrated."
+3. **Rule on the model pin:** Llama 3.1 8B Instant (recommended — cheapest *and* the only `VERIFIED` training-permissive weights licence) vs gpt-oss-20B. I will re-verify the live model ID at build time either way.
+4. **Queue a `db` dispatch for `atlasoracle_provider_pool`** — endpoint URL, auth-secret reference, per-provider price fields — and retire the stale `groq-mixtral` row. Without it, item 4 can only ever be answered "still-inert."
+
+**On my read, 1 unblocks the build; 2–4 shape it. If you want the adapter built against a free key while 2–4 are pending, say so and I will — with the capacity limit stated plainly in the report rather than papered over.**
+
+---
+
+### 5. Done-tests
+
+| # | Requirement | Result |
+|---|---|---|
+| — | Precondition: `GROQ_API_KEY` in edge secrets | **NOT MET.** Absent. Named exactly, per the dispatch. |
+| 1 | Live free directive served **by Groq** end-to-end | **NOT ATTEMPTED — blocked.** No credential, no adapter. |
+| 2 | Forced Groq failure falls back to Haiku with success | **NOT ATTEMPTED — blocked.** |
+| 3 | Paid tiers untouched (hash-diff scoped) | **VACUOUSLY TRUE — no file was modified.** `atlasoracle-route` is unchanged at deployed **v19**; no deploy ran. |
+| 5 | Standing-rule check cited from the VERIFIED cell | **MET — PASSES.** §1, with the weights-licence subtlety that splits the two model candidates. |
+
+One of five met, and it is the one that needed no credential. Stating that plainly rather than dressing the prep work up as progress.
+
+### 6. Deviations and judgement calls
+
+- **D1 — read secret NAMES to test the precondition.** The dispatch makes the presence of a secret a gate, so the gate has to be readable. `supabase secrets list` returns names and digests only; **no value was read, printed, or logged**, consistent with `CLAUDE.md` §Secrets. Digests are one-way hashes and are not reproduced here.
+- **D2 — did item 5 before stopping.** R4 says do independent work first. The standing-rule check needs no credential, and it changed the recommendation (the weights-licence split in §1), so it was worth doing rather than deferring.
+- **D3 — did not re-fetch Groq's pricing or rate-limit pages.** The matrix's figures were fetched **today**, 2026-07-27. Re-fetching would have added a network round-trip and no information. The build pass must re-verify the model ID at build time regardless — that requirement is unchanged.
+- **D4 — raised §2a and §2b even though neither is in the dispatch.** Both would have been discovered mid-build, after the key existed, at which point the pass would have stopped anyway with more work thrown away. §2a in particular changes what Butch does at signup, so it is worth more before the account exists than after.
+- **D5 — did not touch the stale `groq-mixtral` pool row.** It is a production data row and R7 confines me to my dispatched scope; the dispatch authorizes activating a row, not correcting one. Flagged for the `db` dispatch.
+
+### 7. Could not verify
+
+- **Whether a Groq account exists at all.** The absent secret proves no key reached Supabase; it does not distinguish "no account" from "account exists, key never uploaded." Butch knows which.
+- **Groq Developer-plan minimum spend.** `UNKNOWN` in the matrix, not disclosed in Groq's public rate-limit docs. Only discoverable from inside the console — hence ask 2.
+- **The Groq Services Agreement is `SEARCH-DERIVED`, not human-read.** The training prohibition in §1 rests partly on it. The stronger and independently sufficient source is `console.groq.com/docs/your-data`, which DOCS1 read directly — so the verdict does not hang on the search-derived leg, but the corroboration is weaker than it reads.
+- **gpt-oss weights licence.** Not verified in the matrix; the reason the recommendation goes to Llama 3.1 8B rather than the higher-tier gpt-oss-20B.
+- **Groq's real-world throughput against ORACLE's directive shape.** §2a's arithmetic is TPM ÷ measured token count. It is arithmetic, not a measurement — no Groq request has ever been made from this platform.
+
+---
+
+## DOCS7 — the RULED canon edits applied (2026-07-27) — **DONE**
+
+**Lane:** docs · **Scope:** oracle · **Dispatch:** 00bb8120-596f-442c-b0be-85e1a8f3a848
+**Posture:** documentation only. No code, no schema, no database writes beyond the rail report itself.
+**Path note:** the dispatch names `HONEYCOMB/AtlasORACLE.to/master_plan/` + mirrors. **11 files changed** — 8 in `master_plan/`, 3 mirrors in `shared/canon/`. Full list with hashes in §6.
+
+### 0. Headline
+
+The four ruled edits are applied and every one of them traces to a named rail ruling. **No BLiNG!-denominated price survives in the three money docs** — the four remaining `BLiNG!` + number hits are struck-through records of what the price *used to be*, which is the point of an amendment rather than a rewrite (§5).
+
+Two judgement calls shaped the pass and both are worth reading before the diff:
+
+1. **`bling-ledger-interface.md` was NOT re-denominated wholesale.** It documents infrastructure that is **live and dormant** — `bling_pots` is present in production and OPEN-7 is unruled ("until ruled, **NOTHING touches it**"). Re-denominating the escrow *mechanism* into tokens would falsify the spec of real infrastructure. What was re-denominated is every place the file quoted an **ORACLE price to a Bee**, plus the reconciliation queries. §2.3.
+2. **`whitepaper.md` is untouched and that is a real gap**, not an oversight — it sits at `AtlasORACLE.to/whitepaper.md`, one level above the `master_plan/` path the dispatch names. It carries the largest share of items 2 and 4. §4 says exactly what is left in it and why it needs its own dispatch.
+
+---
+
+### 1. Rulings applied — the trace table
+
+Every edit below cites the ruling that authorizes it. Nothing was edited that a ruling did not cover; §3 lists what that discipline left behind.
+
+| # | Ruling | Source | Where applied |
+|---|---|---|---|
+| 1 | Money language → Oracle Tokens; anchor 1,000 = $1 permanent; 3.0×/2.5× margins; packs; charge-the-lesser; no minimums; house eats rounding | `ORACLE_MF v0.16` §1–§6; `v0.5` rulings 2–3 | `economic_constitution.md`, `rate-cap-pricing.md`, `bling-ledger-interface.md` |
+| 1b | No treasury leg — one append-only debit row, revenue = SUM | `ORACLE_MF v0.15` | `economic_constitution.md` §Reconciliation, `rate-cap-pricing.md` §7, `bling-ledger-interface.md` §11 |
+| 2 | 2a — "AtlasOracle never trains on Bee directives", model plan permitted under the provenance rule | `ORACLE_MF v0.19` ruling 2a; `v0.6`; `ORACLE_OUTLOOK v0.1` | `platform_thesis.md` L13 |
+| 3 | 3a — free tier PERMANENT (OPEN-8 closed); free = **free/OSS providers**, platform cost ≈ 0 by construction; free→Haiku is **interim** | `ORACLE_MF v0.19` ruling 3a | `platform_thesis.md` principle 3, `economic_constitution.md` §Free tier + non-negotiables, `rate-cap-pricing.md` §1/§4.1, `categorization.md`, `language_firewall.md` |
+| 4 | No timelines or due dates — phase language, not calendar keys | `ORACLE_MF v0.5` ruling 1 | `platform_thesis.md` §Operational status, `atlasoracle-canonical-cache.md` §6/§11, `per-astra-surfaced-actions.md`, `bling-ledger-interface.md` §2/§13 |
+
+Every edited section carries an inline annotation naming its ruling, in the form the dispatch asked for — *token-era per rail `ORACLE_MF v0.16`/`v0.19`* for the money edits, and the specific ruling for the rest.
+
+---
+
+### 2. What changed, by document
+
+#### 2.1 `platform_thesis.md`
+
+- **L13 (2a).** "Not an AI model. AtlasOracle does not train." → **"AtlasOracle never trains on Bee directives"**, plus one line stating the provenance rule positively: it trains on its own routing exhaust and on platform-native data whose provenance we own. The sacred part is kept and made *sharper* — the old sentence was a blanket claim that `v0.6` had already reversed; the new one is narrower, true, and better marketing.
+- **Principle 3 (3a).** Permanence kept verbatim. The funding clause — "sustained by OPS allocation against OSS provider costs" — is replaced with the ruled semantics: free is sustained **by construction**, because it routes to free/OSS providers. The interim Haiku pin is named in place so nobody reads the principle as a description of what v1 does.
+- **§Operational status (4).** Both dates gone. "from soft launch (2026-07-04)" → "once the badge is wired into the spines"; "ships post-Swarm (after 2026-09-11)" → ships when ORACLE is carrying real directive load, with the gate sequence named (infrastructure-carrying-load → standalone-destination → public-builder-API).
+- **`atlasoracle.to` left exactly as written**, with a note saying so. The reconciliation flags it STALE (`MF v0.2`/`v0.4`), but no ruling in scope covers the domain, and item 4 is date-stripping — not name-fixing. Enumerated in §3.
+
+#### 2.2 `economic_constitution.md`
+
+- **§Denomination** rewritten to Oracle Tokens with the **permanent 1,000 = $1 anchor**. The original intent survives inverted and is called out: a fixed $1 relation is what keeps Bees from doing float math, which is what "Bees never see dollar prices" was protecting. Adds the explicit non-relationship to BLiNG! (not convertible, no bonding curve) and the firewall note that "Oracle Token" is compliant per `MF v0.12`.
+- **§Free tier** — permanence reaffirmed with the ruling cited, plus the ruled semantics as its own bullet: **free because of where it routes, not because someone pays for it.** The interim Haiku pin is flagged as *as-built* and separated from the rule.
+- **§Standard / §Frontier** — the BLiNG! price targets (0.5–2, 5–50) are gone, replaced by the **margin multiples** (3.0× / 2.5×) and an explicit statement that **rates are data, not prose**: the card lives in `oracle_model_rates`, the router refuses with a 503 rather than guessing a missing rate, and this document deliberately does not restate the numbers. *A price written in two places drifts in one of them.*
+- **New: §Pricing to durable cost, §Packs, §Goodwill rules** — `v0.16` §3/§5/§6 committed to canon, with the pack ladder as a table and the "no purchase flow exists yet, this is its spec" caveat kept attached.
+- **§Treasury reconciliation → §Reconciliation.** The three-source USD story (order-book fee, frontier top-ups, OPS umbrella) is retired with the coupling that produced it. Replaced with: buy tokens → one append-only debit row → **no treasury leg, revenue is the SUM** → providers billed directly. Adds the adjustment-not-delete correction path.
+- **§OPS allocation → §Provider-cost coverage.** The ~$18M/year projection is retired — **both** its funding source (`v0.5` r2) and its premise that free costs money (`v0.19` 3a) are gone. **The method is kept explicitly** (population × cap × marginal cost) because it is still the right way to size any future obligation; only the inputs died.
+- **§Reporting cadence** — "BLiNG!-vs-USD reconciliation" → tokens sold vs tokens debited vs USD paid. The **>30% provider-concentration target is kept** (it is the metric that would have caught single-vendor concentration automatically); its "post-Swarm" date key is stripped.
+
+#### 2.3 `bling-ledger-interface.md` — banner + prices + queries, **not** a rewrite
+
+Added a **SUPERSEDED-pending-OPEN-7 banner** at the top stating: what superseded it, what ORACLE runs on now, why the file is neither deleted nor converted, and — recorded deliberately — that `atlasoracle_debit`/`atlasoracle_credit` **structurally cannot succeed** (two legs sharing one `source_ref` against a unique partial index) and are **broken by decision, not oversight**. That last line exists so nobody "fixes" it later and quietly revives a superseded path.
+
+Re-denominated in place, because these are ORACLE prices shown to a Bee and are dead in any currency:
+
+| § | Was | Now |
+|---|---|---|
+| §5 cold-start | "costs 1 BLiNG!"; Fund 10 / 50 / 200 BLiNG! | "~2 Oracle Tokens"; the ruled pack ladder ($5/$10/$25 + custom). **UX shape kept verbatim** — presets + custom, one tap, auto-resume the blocked directive — it is portable and nothing else specifies it. |
+| §7 cache hits | 0.25 / 0.5 / 1.0 BLiNG! per band | **50% of the metered token cost** for standard. The 50% policy choice is preserved exactly; only the currency moved. Notes the cache is unbuilt (table absent, `vector` not installed). |
+| §8 cost calculation | "preview for frontier >10 BLiNG!" | metered against `oracle_model_rates`, three legs billed separately, confirm-cost gate, charge-the-lesser. **The threshold number is deliberately not quoted** — see §7 below. |
+| §9 wallet history | escrow balance "41.20 BLiNG!" | Oracle Token history with a **Purchase** row and an **Adjustment** row. The two-surface split is kept — it is good UX and unspecified elsewhere — but is now cleaner: there is no escrow leg to show, because ORACLE never touches BLiNG! at all. |
+| §13 Q2, Q6 | open questions on top-up amounts and a first-deposit promo | **both struck as ANSWERED** — the pack ladder settled Q2, and prepay bonuses shipped *as pricing structure* rather than a promo, which answers Q6 better than the question asked. |
+
+**§11 reconciliation — the substantive fix.** DOCS3 corrected the retired `cost_bling` column here but left the queries joining `bling_transactions`, **the table the live economy no longer writes** — so they returned zero rows forever regardless of state. Re-pointed at `oracle_token_ledger` (verified against the live 16-column schema): paid-directives-without-debit, debits-without-directive, a balance-integrity check against the `oracle_token_balances` view, and an all-time revenue query with the anchor conversion inline. The escrow-integrity query is **kept, and relabelled** as a dormant-infrastructure audit, with the useful inversion stated: it should return the same rows forever, and **a new row appearing means something has revived a superseded path.**
+
+The escrow *mechanism* (§2, §3.1–3.5, §10, §12) stays denominated in BLiNG!. That is what the dormant machinery actually moves.
+
+#### 2.4 `categorization.md` · `language_firewall.md`
+
+- **`categorization.md`** — the free-tier routing rule ("route to `oss` first, `fast` second") is **confirmed correct** by 3a and annotated as such, with the interim Haiku pin named. The reconciliation had this as a CONFLICT; the ruling resolved it in the *document's* favour. **The code is the thing that is wrong, not the rule** — that is worth stating plainly, because the reflex is to edit the doc to match the build.
+- **`language_firewall.md`** — the required term **"Free tier as floor" is retained and reaffirmed** (3a), and gains the semantics clause so copy generated from the term is accurate: free is free because of free/OSS routing, **not** a subsidy out of paid margin, and copy should never describe it as one. The reconciliation had flagged this term as *load-bearing* — every AI generating ORACLE copy is instructed to assert permanence — which is exactly why it needed the clause rather than deletion.
+
+#### 2.5 `rate-cap-pricing.md`
+
+Token-era amendment banner at the top naming what changed and what deliberately did not. Then:
+
+- **§1** — the two dead framing bullets struck with reasons: the free-tier subsidy curve **dissolved** (3a: cost ≈ 0 by construction), and **BLiNG!↔USD float dissolved** (the token anchor is permanent, so the problem the bullet managed no longer exists).
+- **§4 rewritten.** The old ladder (0.5/1.0/2.0 by shape; 5-base + surcharges; 50 cap) is superseded by **metered pricing at a margin multiple**, and the section says so explicitly — *what replaced it is not another ladder*. Adds price-to-durable-cost, the goodwill rules, the pack table, and the `v0.16` **flagship sanity check** (~14 tokens ≈ $0.014 for a first directive; $3–9/month casual) framed as the test to re-run whenever the card moves.
+- **The 50-BLiNG! frontier cap is retired**, not converted: the confirm-cost gate is the control, and a cap on top of a gate is belt-and-braces that only ever blocks a Bee who already consented.
+- **§5 rate caps — untouched**, and the banner says why: they are currency-independent and were always the more durable half of this file. Only the intro sentence changed (`@combtreasury` → the direct provider invoice, since there is no treasury leg to protect).
+- **§6 cost-preview UX** — re-denominated; notes that the **server-side gate now exists and works** while **the modal has never been built**, so this section remains its only spec.
+- **§7 settlement** — daily BLiNG!→treasury replaced with the per-directive debit row. The **variance >10% → cost-model retune trigger is kept verbatim.** The quarterly "+35% Opus 4.7 tokenizer buffer" review is retired with that model generation, and records the measured figure: **~6.5%, not 35%**, and it belongs per-model in the rate row rather than as one global constant.
+- **§8 Q4 and Q6 struck as ANSWERED/MOOT** — the cap question went the way the file recommended; the BLiNG!-appreciation question dissolved with the currency.
+- **§9 rewritten** — canon no longer commits prices to prose at all. It commits the **rules that generate** prices (anchor, margins, basis, metering, missing-rate refusal, goodwill, packs). The rate-cap half of the original diff block **did** ship and is restated unchanged.
+- **§2's USD provider-cost table is deliberately left stale.** Opus 4.7 / Sonnet 4.6 are retired generations, but no ruling in scope covers a provider-cost table and the live card is `oracle_model_rates`. Flagged in the banner rather than silently refreshed.
+
+#### 2.6 `atlasoracle-canonical-cache.md` · `per-astra-surfaced-actions.md` (item 4 only)
+
+- **Cache §11** — four calendar-keyed phases → four **readiness gates** (seed-live → gap-queue-live → auto-promotion → third-party contribution), each with its gate condition stated.
+- **Cache §6 seed list** — "Founding Bee window (July 4 → Sep 11) mechanics" → dates stripped, **plus a warning not to seed the entry until a non-date definition of the window exists**. A cache entry is worse than no entry when it answers confidently and wrongly.
+- **Surfaced actions** — "no Bee-facing surface at soft launch" / "SurfacedActions land post-Swarm" → readiness-gate language, twice.
+- **Ledger §2 / §13 Q4** — two "soft launch" scope keys stripped; Q4 gains the OPEN-7 consequence the reconciliation flagged (if OPEN-7 rules *remove*, extract the purpose-locked-pot **pattern** to platform canon first — three named future Astras were designed against it).
+
+---
+
+### 3. UNRULED — enumerated, untouched, and waiting on Butch
+
+The dispatch says apply ruled edits **strictly**. These are everything the reconciliation surfaced that no ruling in scope covers. **None were edited.**
+
+**The six open questions DOCS6 raised, all still open:**
+
+1. **Chatbot / assistant.** `platform_thesis.md` L14 and `language_firewall.md`'s forbidden-terms list ban the exact nouns `MF v0.7`'s sealed positioning sentence uses ("executive assistant **and director**"). Which wins? Both files still say the old thing.
+2. **What is a non-Bee ORACLE customer called?** The firewall says never "user"; every rail ruling says "user"; a standalone destination has customers who are not Bees.
+3. **Opt-in retention vs. no-content-columns.** `v0.19` accepted DOCS6's finding that the carve-out is pre-existing canon (`whitepaper.md` §5/§9) — it did **not** rule the fork that creates: honoring it requires a content column that `MF v0.4` says must not exist.
+4. **Two runtime-value stores.** `oracle_model_rates` vs `patchboard_switches`. Cheap to decide now, expensive after a third appears.
+5. **"Perks."** `MF v0.4` states the firewall as `BLiNG! = "Perks"`; the word appears in no master_plan doc.
+6. **Astra count: 26 or 28?** `per-astra-surfaced-actions.md` says 26; root `CLAUDE.md` and the whitepaper say 28.
+
+**Other unruled items left as written:**
+
+- **`economic_constitution.md` — 30-day advance notice on tier price changes.** An unenforceable promise: `v0.16` seeded a live card the same day it was ruled and no notice mechanism exists. Untouched; needs either a build or a scoping ruling.
+- **`economic_constitution.md` — "provider contracts exclude training rights."** `MF v0.11`'s ratified supply-chain rule is strictly stronger (it binds providers we have no contract with) and `v0.15` OPEN-9 adds informed-consent. Not in the ruled set; untouched.
+- **`platform_thesis.md`** — the missing fourth constituency (**the other Astras**, ORACLE's most load-bearing customer); principle 2's canon-reader architecture that the running router does not use; the `atlasoracle.to` domain claim.
+- **`rate-cap-pricing.md` §2** — stale USD provider-cost table (retired model generations).
+- **`atlasoracle-patchboard-addendum.md`** — **not edited at all.** 7 of its 24 switches are denominated in the dead currency and `tokenizer_buffer_opus_4_7` names a retired model. It is not in the dispatch's three money docs and re-deriving a switch inventory is a design pass, not a re-denomination.
+- **`categorization.md` / `per-astra-surfaced-actions.md` / `canon-storage-paths.md`** — the "33-rank Bling Rank" references (superseded by **the RiNG**, 9-level), the Waggles open question, `MiNiWaVeS` brand casing in `canon-storage-paths.md`, and the provider-category taxonomy nothing reads.
+
+---
+
+### 4. ⚠ `whitepaper.md` — untouched, and it is the biggest remaining gap
+
+`AtlasORACLE.to/whitepaper.md` (690 lines) sits **one level above** the `master_plan/` path the dispatch names, so it is outside this pass. It is also where the largest share of items 2 and 4 actually live. Left in it:
+
+| Ruling | What is still wrong in the whitepaper |
+|---|---|
+| **2a** | §1 "Not a model. We don't train."; §3 "We do not train. There is no model to feed, no corpus to harvest"; §10 "**Training our own model.** AtlasOracle is a router; it does not aspire to become a model." All reversed by `v0.6`/`v0.19`. §9's hard-never ("never train on Bee directives") is **intact and should stay verbatim.** |
+| **4** | §10 in its entirety is calendar-keyed (pre-launch "now through July 4, 2026"; soft launch July 4; Full Swarm September 11; post-Swarm Q4 2026; Federation Tier 3 "2027+"); §11 "that is the question July 4, 2026 answers"; §6/§11 Founding Bee window dates. |
+| **1** | §8 Economics — BLiNG! denomination throughout. Largest single rewrite left. Its **structure** (tiers → denomination → reconciliation → sustainability → partnership) is the right outline for the token version. |
+| **3a** | ★ §3's "the router's overhead is low enough that the free tier is **not subsidized by the paid one**" — the reconciliation called this the sharpest single-sentence contradiction in the set, against `v0.16` §2's "subsidized by paid margin". **Ruling 3a resolves it in the whitepaper's favour**: free routes to free/OSS providers, so it genuinely is not subsidized. The sentence that looked most wrong turned out to be right. |
+| **2 of 4** | §10's "What we will not do" — two of its four negative commitments have been reversed by ruling (own model, chat-style assistant). A stale "we will not" list is a liability. |
+
+**Handle §9's hard-nevers with the most care in the whole reconciliation.** Five of seven are compatible (two strengthened); the two free-tier nevers are now *reaffirmed* by 3a rather than at risk. A publicly-stated "never" that quietly changes is the one failure mode this platform cannot afford — so the whitepaper pass should be explicit about which nevers are being kept, which are being strengthened, and which are being retired, rather than editing around them.
+
+`shared/canon/atlasoracle-whitepaper.md` exists but is **not a byte-identical mirror** (687 lines vs 690, different hash) — whichever dispatch takes the whitepaper must reconcile that divergence first, the way this pass did for `rate-cap-pricing.md`.
+
+---
+
+### 5. Done-test
+
+| # | Requirement | Result |
+|---|---|---|
+| 1 | Every edit traces to a named ruling | **PASS** — §1 trace table; every edited section carries an inline ruling citation. |
+| 2 | `grep` shows no BLiNG!-denominated price left in the three money docs | **PASS** — see below. |
+| 3 | Unruled items enumerated | **PASS** — §3 (12 items incl. all six DOCS6 open questions) + §4 (whitepaper). |
+
+**Done-test 2, verbatim output** (`grep -n "[0-9][0-9.]* *BLiNG\|BLiNG! *[0-9]"`):
+
+```
+--- economic_constitution.md ---
+  (clean)
+--- rate-cap-pricing.md ---
+102: ... The old fixed-price ladder — 0.5/1.0/2.0 BLiNG! by shape, 5-base + surcharges with a
+     50 cap — is superseded. ...
+241: 4. ~~**Frontier cap of 50 BLiNG!/directive.**~~ **ANSWERED, ...**
+--- bling-ledger-interface.md ---
+463: 2. ~~**Default top-up amounts.** 10 / 50 / 200 BLiNG! at cold start~~ — **ANSWERED.** ...
+467: 6. ~~**First-deposit promotional.** +10% bonus BLiNG! (up to 20 BLiNG!)~~ — **ANSWERED, ...**
+```
+
+**Four hits, zero live prices.** Every one is a struck-through or explicitly-superseded record of the *former* price. Reported rather than scrubbed to grep-clean: an amendment that deletes what it replaced leaves the next reader unable to tell a decision from an omission. If a literally-zero grep is wanted, say so and I will strike the four to prose.
+
+The dormant-infrastructure audit query in `bling-ledger-interface.md` §11 still references the `amount_bling` **column**, which is correct — that is the real column name of the live-but-dormant BLiNG! escrow table, and renaming it in the doc would break the query.
+
+---
+
+### 6. Files changed — 11, with hashes
+
+`AtlasORACLE.to/master_plan/<file>.md` is canonical (it is what syncs to the `themanual-canonical` bucket per `canon-storage-paths.md` §2.3); `shared/canon/` is the mirror.
+
+| File | sha256 (16) | Mirror |
+|---|---|---|
+| `master_plan/platform_thesis.md` | `e3fd5334145c96ad` | none |
+| `master_plan/economic_constitution.md` | `884cf08c9b5afee0` | none |
+| `master_plan/rate-cap-pricing.md` | `458c9b026e9e1858` | see note |
+| `master_plan/bling-ledger-interface.md` | `c5a9bb1ea825697c` | ✅ identical |
+| `master_plan/categorization.md` | `a4740112b3842396` | none |
+| `master_plan/language_firewall.md` | `bf34b167fdb256c8` | none |
+| `master_plan/atlasoracle-canonical-cache.md` | `a59a60da547fe2a7` | ✅ identical |
+| `master_plan/per-astra-surfaced-actions.md` | `5ed4c154dde49275` | none |
+| `shared/canon/bling-ledger-interface.md` | `c5a9bb1ea825697c` | mirror |
+| `shared/canon/atlasoracle-canonical-cache.md` | `a59a60da547fe2a7` | mirror |
+| `shared/canon/rate-cap-pricing.md` | `a6325ebc6ea70dbb` | mirror **+ banner** |
+
+**⚠ `rate-cap-pricing.md`'s mirrors were already divergent before this pass** — `shared/canon/` carried two extra lines (a Patchboard runtime-values banner) that `master_plan/` never had. DOCS3's convention is "edit one, copy over the other", and blindly copying would have **deleted that banner** — a deletion no ruling covers. Instead the mirror was rebuilt as *master_plan + the banner re-inserted*, and verified: `diff <(sed '2,3d' mirror) master_plan` is empty. So the pair now differs by **exactly** the pre-existing banner and nothing else. Which copy should own that banner is a question for whoever next touches the file; I preserved the status quo rather than resolving it silently.
+
+Nothing outside these 11 files was modified. No code, no schema, no migration, no deploy.
+
+### 7. Judgement calls
+
+- **D1 — `bling-ledger-interface.md` re-denominated at the price layer only.** §0. The alternative readings were "convert the whole file" (falsifies the spec of live dormant infra, and OPEN-7 says nothing touches it) or "banner only, no body edits" (leaves dead Bee-facing prices and permanently-broken queries in canon that routed models read). The done-test's wording — *no BLiNG!-denominated **price***, not *no BLiNG!* — is the line I cut on.
+- **D2 — struck-through rather than deleted.** Four superseded prices and four answered open questions are struck with their answers rather than removed. Canon that deletes its own history cannot be audited, and "ANSWERED, and it went the recommended way" is information the next reader wants.
+- **D3 — did not restate rates in prose anywhere.** `v0.16` §4 lists the card, and it was tempting to mirror it into `economic_constitution.md`. I pointed at `oracle_model_rates` instead: the card was re-ruled once already today, and a number in two places drifts in one of them. This is the same principle `OUTLOOK` RIGHT #4 calls "rates as data".
+- **D4 — brand casing fixed inside lines I was already rewriting.** Two UI mockups said "Mini Waves Motion"; both became **MiniWaves** per root `CLAUDE.md` (the alternating-caps form was never ratified). I did **not** go hunting for the same string elsewhere — `canon-storage-paths.md` and `per-astra-surfaced-actions.md` still carry it, listed in §3. Fixing what I was retyping is hygiene; a casing sweep is a different dispatch.
+- **D5 — kept the `atlasoracle.to` domain claim** even though the reconciliation flags it STALE. Item 4 is date-stripping. Annotated in place so the next reader knows it was seen and left.
+- **D6 — did not touch `whitepaper.md`.** §4. The dispatch names `master_plan/`; the whitepaper is not in it. Flagged loudly rather than quietly widening scope.
+
+### 8. Could not verify
+
+- **The canon bucket is not re-synced by this pass.** These are the git-side source files. Whether `themanual-canonical` now serves the corrected text depends on a sync pipeline that **does not exist** — OPS9 found no `.github/workflows/` and no sync script. So the bucket copy, if one was ever uploaded, is still pre-DOCS3, let alone pre-DOCS7. **Routed models read the bucket, not git.** This is the single highest-leverage unbuilt thing touching canon accuracy, and it has now been flagged by OPS9, DOCS3 and this pass.
+- **`per-astra-surfaced-actions.md`'s badge prop contract** — still not compared against the real `AtlasOracleWalletBadge.tsx`. FRONT lane's file; unchanged from DOCS6's could-not-verify.
+- **Whether the four struck-through BLiNG! references satisfy the intent of done-test 2** as opposed to its letter. §5 states the reading I took and offers the alternative.
+- **`shared/canon/atlasoracle-whitepaper.md` vs `AtlasORACLE.to/whitepaper.md`** — confirmed divergent (687 vs 690 lines, different hashes) but **not diffed**. Out of scope this pass; named in §4 so the whitepaper dispatch starts from it rather than discovering it.
+- **Nothing in this pass was rendered or read back through a router.** These are documents; the check that they read correctly to a model is a directive against the canon bundle, which no dispatch authorized.
+
+---
+
+## OPS19 — heartbeat enable-gates + frontier threshold arithmetic (2026-07-27) — **QUESTION FILED (OPS19-Q)**
+
+**Lane:** ops · **Scope:** oracle · **Dispatch:** c8b49d31-b397-4a70-b902-cd1ea5e60a50
+**Run type:** attended. Dispatch left `claimed` per R4.
+
+### 0. Headline
+
+Item 1 is **built and probed green**; it now needs one line only Butch can add. Item 2 is **blocked
+behind that line** and cannot be faked. Item 3 is **answered, and the answer is bad**:
+
+> **The frontier gate is DRIFTED — and drifted the wrong way. Butch's pricing ruling at 20:04 UTC
+> today multiplied every Oracle Token rate by exactly 1.25, which lifted the frontier cost estimate
+> above the unchanged threshold of 700 for *every possible directive, including a one-character
+> one*. The gate that OPS15 §5 Bug 1 fixed is broken again, identically, in production right now.**
+
+`atlasoracle-route` is live at **version 19** (confirmed via the functions API), so the constant in
+production is `FRONTIER_PREVIEW_THRESHOLD_TOKENS = 700` and the rates it reads are the ruled ones.
+Every frontier directive without `confirm_cost: true` therefore returns a `cost_preview` instead of
+executing. Not a money loss — the gate fails toward *not* spending — but the frontier tier is
+effectively two-call-only for every Bee until the constant moves. **§3 has the corrected number; I
+did not apply it**, because the dispatch says to file rather than change money-path code
+unilaterally, and I agree with that instruction.
+
+---
+
+### 1. Item 1 — transport wrapper (enable-gate 1) — BUILT, PROBED, awaiting one settings line
+
+**The problem, restated exactly.** HEARTBEAT-SMOKE §2 established that allow-list matching is a
+**prefix on the command string**. The canonical transport is invoked as
+`"/c/Program Files/PostgreSQL/17/bin/psql.exe" …` — that string begins with a quote, not with
+`psql`, so it does not match `Bash(psql*)` and is auto-denied under `--permission-mode dontAsk`.
+Re-confirmed this pass: bare `psql --version` → **exit 127, command not found**. So `Bash(psql*)`
+matches only a form that does not exist on this machine. **It authorizes nothing reachable.** That
+is not an opinion about whether the grant is wise; it is the observed behaviour of the one command
+form the pattern can match.
+
+**Two new files, both in `scripts/heartbeat/`:**
+
+| File | Role |
+|---|---|
+| `claim.sql` | The R2 claim statement, checked in, parameterised by `:lane` and `:lanes`. The **only** SQL the wrapper can run. |
+| `claim.cmd` | Full-path `psql.exe` · `-w` (pgpass, never a password argument) · `-X` · `ON_ERROR_STOP=1` · `-f %~dp0claim.sql`. Nothing else. |
+
+**Why this is the narrower grant, not a lateral move.** `Bash(psql*)` authorizes *every statement
+psql can carry* against any database. Allowing `claim.cmd` by name authorizes **one checked-in
+statement against one host**. The wrapper accepts no SQL (the file is resolved relative to itself
+via `%~dp0`, so no argument can redirect it), no password, no host, no user, no database. It cannot
+FINISH a pass, file a report, or touch any other table — R3 and R4 still go through the normal
+transport. This is the shape the C3 ruling anticipated.
+
+**Deviations from the R2 text in `CLAUDE.md`, both no-ops, both documented in `claim.sql`:**
+
+- `ARRAY['<lanes finished this session>']` → `string_to_array(:'lanes', ',')`. Same array, supplied
+  as a parameter instead of hand-edited into the statement. The empty case stays clean:
+  `string_to_array('', ',')` = `{''}`, and no lane equals `''`, so every row sorts FALSE —
+  identical behaviour to `ARRAY[]::text[]`.
+- `go <lane>` is expressed as a permanently-present predicate `(:'lane' = '' OR d.lane = :'lane')`
+  that is vacuously true when the argument is empty, rather than a clause the shell concatenates.
+  Nothing is assembled by string-building.
+
+Everything else — the `author`/`status` filter, the `after_pass` EXISTS guard, `ORDER BY`,
+`LIMIT 1`, `FOR UPDATE SKIP LOCKED`, the outer `AND status='queued'` re-check, and the `RETURNING`
+list — is the R2 statement verbatim.
+
+Both parameters are interpolated with psql's `:'name'` form, which applies psql's own literal
+quoting, so neither can terminate the string literal. `claim.cmd` additionally rejects any arg-1
+that is not one of `front`/`db`/`docs`/`ops`, because a hard lane filter that silently matches
+nothing is indistinguishable from an empty queue.
+
+**Dry probes — all run against production, none claimed anything.** The only queued row on the rail
+is `HEARTBEAT-SMOKE2`, which is the lead's row for the supervised run and is deliberately not mine
+to take, so every probe was aimed at a lane with nothing queued.
+
+| Probe | Command | Result |
+|---|---|---|
+| Wrapper is invocable from the Bash tool at all | `TheMANUAL.tech/scripts/heartbeat/claim.cmd zzz` | **exit 64**, arg rejected, psql never launched. Confirms Git Bash executes the `.cmd` directly by relative path — no `cmd //c` shim needed. |
+| Full transport, empty lane | `… claim.cmd db` | **`UPDATE 0`, exit 0.** psql resolved by absolute path, pgpass auth succeeded, `claim.sql` loaded via `%~dp0`, `:lane` filter applied. Nothing claimed. |
+| Sticky-lane parameter | `… claim.cmd db ops,docs` | **`UPDATE 0`, exit 0.** `string_to_array` interpolation parses and type-checks. |
+| Quote-injection safety | `… claim.cmd front "o'ps,docs"` | **`UPDATE 0`, exit 0.** An embedded single quote did not terminate the literal. |
+
+**Not probed, deliberately:** the bare `claim.cmd` form with no lane filter, because that would have
+claimed `HEARTBEAT-SMOKE2` into *this* attended session and destroyed the very thing the supervised
+run is meant to prove.
+
+#### ⇒ THE ONE SETTINGS LINE — Butch's call
+
+Add to `permissions.allow` in `~/.claude/settings.json`:
+
+```json
+"Bash(TheMANUAL.tech/scripts/heartbeat/claim.cmd*)"
+```
+
+**And in the same edit, I recommend deleting:**
+
+```json
+"Bash(psql*)"
+```
+
+The path is **root-relative on purpose**. The R2 claim always runs before the R2b `cd`, and
+`heartbeat.cmd` sets the working directory to `HONEYCOMB\` before invoking Claude, so the claim is
+always issued from the workspace root and this is the exact string a session types. A session whose
+cwd is a repo folder would not reach the wrapper by this path — noted, and out of scope for the
+heartbeat, which never starts anywhere else.
+
+**Why dropping `Bash(psql*)` costs nothing:** the only command form it can match is bare `psql`,
+which exits 127 here. Every transport that actually works today is either the absolute-path form
+(never matched it) or the Node shim `node …/rail.mjs` (covered by `Bash(node *)`), so R3 FINISH and
+R4 QUESTION remain reachable for an unattended run either way. Removing it narrows the blast radius
+of a `dontAsk` session from "any SQL psql can carry" to "the claim, and whatever a reviewed Node
+script does" — without removing a single working path. **Butch's call; I have not touched the file
+and cannot.**
+
+---
+
+### 2. Item 2 — push-class park (enable-gate 2) — **BLOCKED, not attempted**
+
+Done-test 4 requires an **unattended** run to meet a push-class action and park. It cannot be
+satisfied from this attended session: a push-class call here would hit the user-layer `ask` rule and
+prompt Butch, which is the opposite of the property under test. Under `dontAsk` the same rule is
+expected to **auto-deny and let the session continue**, and only a real heartbeat can demonstrate
+that.
+
+The sequence is blocked on §1's settings line, and is exactly:
+
+1. Butch adds the wrapper line (and, if he agrees, drops `Bash(psql*)`).
+2. Re-probe the canonical claim path — one `claim.cmd db`, expect `UPDATE 0` with no prompt and no
+   denial, which proves the *match* rather than only the *mechanics* the probes above proved.
+3. Brief enable → `schtasks /Run` → immediate re-disable, per `README.md`.
+4. The heartbeat claims **HEARTBEAT-SMOKE2** through `claim.cmd`, performs its no-op, attempts
+   `git push origin main`, and records the outcome verbatim — **to the letter this time**: the exact
+   denial text, that it did not push, and that the session survived. If the push *succeeds*, that is
+   a canon breach and the report must say so in the loudest terms and stop.
+5. Confirm `Scheduled Task State: Disabled` afterward.
+
+I have not enabled, run, or modified the scheduled task.
+
+---
+
+### 3. Item 3 — frontier threshold arithmetic — **VERDICT: DRIFTED**
+
+**Rates now live** (`oracle_model_rates`, newest active row for `claude-opus-5`, effective
+2026-07-27 20:04:26 UTC, `source_note` = "BUTCH PRICING RULING 2026-07-27 (ORACLE_MF v0.16)"):
+
+| leg | placeholder (OPS15) | ruled | ratio |
+|---|---|---|---|
+| input /MTok | 10,000 | **12,500** | 1.25 |
+| cached /MTok | 1,000 | **1,250** | 1.25 |
+| output /MTok | 50,000 | **62,500** | 1.25 |
+
+**The estimator is unchanged**, so the cost function keeps its shape and only its coefficients move.
+For frontier, with `TIER_BASE_OUTPUT_TOKENS = 8,000`, `TIER_OUTPUT_SCALE = 2`, `TIER_MAX_TOKENS =
+32,000`, and `cached = 0` at estimate time:
+
+```
+input(chars) = ceil(chars / 4) + 1,529          canon prefix rides on every request
+output(i)    = min(32,000, 8,000 + 2·i)         cap reached only at i = 12,000, far above range
+
+OPS15 (placeholder):  cost = 400 + 0.11·i
+RULED:                cost = 500 + 0.1375·i     ← exactly 1.25 × the above
+```
+
+Because **all three legs scaled by the same 1.25**, the whole curve scaled by 1.25 — not just its
+slope. That is what moved the floor through the threshold:
+
+| | input tokens | OPS15 cost | RULED cost |
+|---|---|---|---|
+| floor — 1-char directive | 1,530 | 568.30 | **710.38** |
+| ceiling — `MAX_DIRECTIVE_CHARS` = 10,000 | 4,029 | 843.19 | **1,053.99** |
+
+**The floor is now 710.38 against a threshold of 700.** The gate fires on everything.
+
+| threshold | fires at directive chars ≥ | verdict |
+|---|---|---|
+| **700 (live)** | **0** — i.e. always, on a one-character directive | **DRIFTED — always-on** |
+| **875 (corrected)** | **4,793** | **SANE** |
+
+**Answering the dispatch's question literally — "state the character-length at which the gate now
+fires":** it fires at **zero** directive characters. There is no directive short enough to avoid it.
+This is OPS15 §5 Bug 1 exactly: *"a gate that never fires and a gate that always fires are the same
+bug wearing different clothes."*
+
+**The corrected constant is 875.** Two independent routes land on it:
+
+- **Arithmetic.** Every rate moved by 1.25 and nothing else changed, so the threshold must move by
+  1.25 to preserve behaviour: `700 × 1.25 = 875`.
+- **Design intent.** OPS15 placed the gate at ≈48% of the [floor, ceiling] band so it covers roughly
+  the upper half of the permitted directive range, clear of both bounds. 875 sits at
+  `(875 − 710.38) / (1,053.99 − 710.38)` = **47.9%** of the new band. Same position.
+
+The trip point is **identical to OPS15's**, which is the strongest evidence the number is right:
+both thresholds fire at **directive length ≥ 4,793 characters** (`i > 2,727.27`). Roughly 1,200
+words — pasted-document scale, not a paragraph. Squarely inside the sane band the dispatch names.
+
+Sanity bounds under 875: floor 710.38 → no gate ✓ · ceiling 1,053.99 → gate ✓.
+
+**Not applied.** `FRONTIER_PREVIEW_THRESHOLD_TOKENS` is money-path code and changing it means a
+deploy under the DEPLOY AMENDMENT, which requires a dispatch naming that deploy. Filed instead, per
+the dispatch's own instruction. **The fix is a one-constant change plus a comment rewrite; the block
+is authorization, not difficulty.**
+
+**Second-order note the lead should decide on, not me:** the same 1.25 scaling hit the *standard*
+tier harder — Sonnet 5 went 4,000/400/20,000 → 9,000/900/45,000, a **2.25×**, not 1.25×. Standard
+has no preview gate, so nothing is broken by it, but any figure elsewhere in canon derived from the
+old Sonnet rates is now off by more than the frontier drift was. I did not audit for those.
+
+---
+
+### 4. ⇒ OPS19-Q — what I need
+
+1. **Add the settings line** in §1 (and rule on dropping `Bash(psql*)`). Only Butch can.
+2. **Then dispatch the supervised heartbeat run** for §2 — or say "go" once the line is in and I
+   will drive steps 2–5 myself; they need no new authorization beyond the settings edit.
+3. **Rule on 875**, and if it stands, queue a dispatch that names the `atlasoracle-route` deploy so
+   the constant can ship under the DEPLOY AMENDMENT. Until then the frontier tier gates every
+   directive in production.
+
+---
+
+### 5. Done-tests
+
+| # | Requirement | Result |
+|---|---|---|
+| 1 | HEARTBEAT-SMOKE2 done via canonical transport by an unattended run | **NOT MET — blocked.** Wrapper built and green on four probes; the settings line is Butch's and the run cannot precede it. Row untouched and still `queued`. |
+| 2 | Push-poke park recorded verbatim | **NOT MET — blocked on the same line.** Not attempted; an attended attempt would prompt rather than park and would prove nothing. |
+| 3 | Threshold arithmetic shown with a SANE/DRIFTED verdict | **MET — DRIFTED.** §3, with the corrected constant, both bounds, and the trip character-length. |
+
+Two of three done-tests are unmet and the dispatch stays `claimed`. Stating that plainly rather than
+claiming a partial pass.
+
+### 6. Deviations and judgement calls
+
+- **D1 — `claim.sql` is a second file, not SQL embedded in the `.cmd`.** Generating the statement
+  inside a batch file means escaping it, and a hand-escaped statement is a claim about being verbatim
+  rather than a fact. A checked-in `.sql` is auditable, diffable, and cannot be reshaped by an
+  argument. It also keeps the wrapper honest: the grant is to run *that text*.
+- **D2 — parameterised the two dynamic bits instead of shell-assembling the SQL.** R7 says structure
+  shell commands expansion-free. `:'lane'` / `:'lanes'` move both variables inside psql's own quoting
+  and leave the statement a fixed string. Probe 4 shows an embedded quote is inert.
+- **D3 — validated the lane argument against the four known lanes.** Beyond the dispatch's letter. A
+  typo'd lane would otherwise return `UPDATE 0`, which R2 reads as "queue empty" — a wrong stop that
+  looks exactly like a right one.
+- **D4 — probed against `db`/`front`, never bare.** The correct probe is the one that exercises the
+  whole transport without consuming the lead's smoke row.
+- **D5 — did not change the threshold constant.** Dispatch instruction and DEPLOY AMENDMENT agree.
+- **D6 — did not edit `~/.claude/settings.json`.** Outside the Write scope by design; presented as a
+  copy-paste line instead.
+
+### 7. Could not verify
+
+- **That the wrapper is *allowed*, as opposed to *working*.** The probes ran in an attended session.
+  Whether the string `TheMANUAL.tech/scripts/heartbeat/claim.cmd …` matches the new allow entry under
+  `dontAsk` can only be observed by an unattended run — that is step 2 of §2, and it is the whole
+  point of doing it before trusting the schedule.
+- **The gate's live behaviour.** §3 is arithmetic against the deployed constant and the live rate
+  rows, plus the confirmed deployed version 19. I did **not** call `atlasoracle-route` to watch it
+  gate a short frontier directive — that spends real provider tokens and the dispatch authorized
+  arithmetic, not a battery. The reasoning is reproducible from the numbers above; it is not a
+  live observation.
+- **`CANON_BUNDLE_LENGTH`.** Taken as 6,116 chars → 1,529 tokens from OPS15's corrected measurement
+  and the code comment. Not re-measured this pass. If the canon bundle has grown since, the floor
+  rises further and 875 needs re-checking — the floor is `500 + 0.1375 × (canon + 1)`, and it
+  crosses 875 once the canon prefix passes ~2,727 tokens.
+- **Whether any other canon figure depends on the old placeholder rates.** Flagged in §3's
+  second-order note; not audited.
+
+---
+
 ## HEARTBEAT-SMOKE — first unattended heartbeat, end to end (2026-07-27) — **DONE. OPS18 done-test 3 PASSES.**
 
 **Lane:** ops · **Scope:** oracle · **Dispatch:** c7994b7e-bf82-4c85-95d7-33545772bdf2

@@ -38,6 +38,35 @@ and scope; flags stale claims and `after_pass`-blocked rows; lists recent report
 server validates the index and calls `execFile` with an argv array — no shell. There is no string a
 page can send that becomes a command. Extra fields in the request body are ignored.
 
+**Spawn honesty (OPS20).** The header says `opened <folder>` **only** when the server watched a new
+console-host process appear. Everything else is reported as a failure or as `UNVERIFIED`, and
+failures stay on screen instead of auto-clearing.
+
+That check exists because an exit code proves nothing here: `wt.exe` is a launcher stub that exits 0
+in ~100 ms whatever happens downstream. v1 also passed a no-op callback to `execFile`, so when
+`wt.exe` was not on the server's `PATH` the resulting `ENOENT` went nowhere and the page announced
+`opened` over a spawn that never occurred. Both halves are fixed: the launcher's result is awaited
+*and* a spawn must be observed.
+
+`wt.exe` and `claude` are resolved to absolute paths **once, at startup**, and both are printed in
+the startup banner — check there first if a button misbehaves. Resolution uses `where.exe`, not the
+filesystem: `wt.exe` is an AppExecLink reparse point in `%LOCALAPPDATA%\Microsoft\WindowsApps`, and
+Node's `stat` *and* `lstat` both return `ENOENT` on that tag, so `existsSync` reports it missing on a
+machine where it runs fine. If `PATH` has no `wt.exe`, the server falls back to that WindowsApps
+path, and under that to a plain `cmd.exe` console window — a thin `PATH` degrades instead of
+producing a dead button.
+
+`newWindowArgs` (`-w new nt`) pins each session to its own window. Note this was **not** the cause of
+the v1 bug — measured, `-d` alone already opens a real window rather than a tab (10 → 11 top-level
+windows). It is kept so a later `windowingBehavior` setting cannot quietly turn these into background
+tabs.
+
+`MC_PORT` overrides the listen port for a second instance beside a live board. It cannot move the
+bind address, which is always `127.0.0.1`.
+
+**After editing `server.mjs`, restart the board** — it is a long-lived process and holds the old code
+until you do.
+
 ## Palette
 
 ```
