@@ -41,6 +41,34 @@
 //   `-w new` is kept anyway so a later windowingBehavior=useExisting setting
 //   cannot turn these into background tabs.
 //
+// OPS22 — WHY THE WINDOW OPENED BEHIND THE BROWSER
+//   Not a spawn fault at all: it is Windows' foreground lock working as
+//   documented. SetForegroundWindow refuses a process that did not receive the
+//   last input event. The click landed in the BROWSER, so the browser holds
+//   foreground; this server did not get the input, and neither did the terminal
+//   it launched — so the new window opened behind and only flashed its taskbar
+//   button.
+//
+//   The fix is a post-spawn activation step, `focus-window.ps1`, handed the PIDs
+//   this file already observes for spawn verification. It walks an escalating
+//   ladder (AttachThreadInput -> topmost flip -> minimize/restore -> taskbar
+//   flash) and reports WHICH rung won, so the page can say "front" or "in front,
+//   not focused" or "flashing — click it" instead of guessing.
+//
+//   Two things that are not obvious and cost real time to find:
+//     * AttachThreadInput fails outright unless BOTH threads have a message
+//       queue, and a console PowerShell thread has none until something forces
+//       one. Measured here: without the PeekMessage primer the clean rung failed
+//       100% of the time and the ladder fell through to the flickery
+//       minimize/restore. With it, rung 1 wins.
+//     * The PID that owns the window is NOT the launcher's. wt.exe is a stub
+//       that exits immediately; the window belongs to the WindowsTerminal.exe
+//       that appears during verification, which is why the pids collected there
+//       are the ones handed to the activator.
+//
+//   Focus is attempted ONLY in response to a deliberate button click, and the
+//   activator synthesises no input — no key or click injection anywhere.
+//
 // RUN:  node scripts/mission-control/server.mjs
 //       then open http://127.0.0.1:7317
 
@@ -154,11 +182,17 @@ function resolveTerminal() {
   return { path: SYSTEM_CMD, kind: 'cmd', how: `fallback — ${cfg.terminal.exe} not found` };
 }
 
+const SYSTEM_PS = join(process.env.SystemRoot || 'C:\\Windows',
+  'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+
 const RESOLVED = {
   terminal: resolveTerminal(),
   // Bare 'claude' is a usable last resort: cmd.exe resolves it from the child's
   // own PATH. Recorded as unresolved so startup says so out loud.
   command: resolveExe(cfg.terminal.command),
+  // OPS22's activator host. PATH first, then the fixed System32 location — a
+  // thin PATH must not silently cost us window focus.
+  powershell: resolveExe('powershell.exe') || (existsSync(SYSTEM_PS) ? SYSTEM_PS : null),
 };
 
 // A console host appearing is the only honest evidence that a terminal opened —
@@ -183,15 +217,27 @@ function consoleHostPids() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function waitForNewHost(before, budgetMs) {
+// Returns the PIDs that appeared, [] if none did, or null when the check itself
+// is unavailable. OPS22 needs the pids themselves, not just a yes/no: the window
+// to activate belongs to one of them.
+//
+// A terminal materialises as more than one process (WindowsTerminal.exe plus its
+// OpenConsole/conhost), and they do not appear in one tick. After the first
+// sighting we keep watching for a short settle so the activator gets the whole
+// set — otherwise we might hand it only the console host, which owns no window.
+async function waitForNewHosts(before, budgetMs) {
   const deadline = Date.now() + budgetMs;
+  const fresh = new Set();
+  let settleUntil = null;
   while (Date.now() < deadline) {
     await sleep(250);
     const now = consoleHostPids();
     if (!now) return null;
-    for (const pid of now) if (!before.has(pid)) return true;
+    for (const pid of now) if (!before.has(pid)) fresh.add(pid);
+    if (fresh.size && settleUntil === null) settleUntil = Date.now() + 600;
+    if (settleUntil !== null && Date.now() >= settleUntil) break;
   }
-  return false;
+  return [...fresh];
 }
 
 // Run the launcher and actually LISTEN to it. Never resolves to success on a
@@ -231,24 +277,105 @@ function cmdArgv(folder) {
   return ['/c', 'start', `MC ${folder.label}`, '/D', folder.path, 'cmd', '/k', COMMAND()];
 }
 
+// ── focus (OPS22) ───────────────────────────────────────────────────────────
+// The activation ladder lives in focus-window.ps1 so the Win32 sequence is
+// auditable on its own terms rather than buried in a template string here. This
+// function's only jobs are: hand it the pids, bound its runtime, and refuse to
+// invent an outcome if it fails.
+//
+// Failure to focus is NEVER promoted to a spawn failure. The terminal is open;
+// where it sits in the Z-order is a lesser problem and is reported as its own
+// field.
+const FOCUS_SCRIPT = join(HERE, 'focus-window.ps1');
+const FOCUS_CFG = cfg.focus || {};
+const focusEnabled = () => FOCUS_CFG.enabled !== false;
+const focusAvailable = () => Boolean(RESOLVED.powershell) && existsSync(FOCUS_SCRIPT);
+
+function runActivator(args, budgetMs) {
+  return new Promise((resolve) => {
+    execFile(
+      RESOLVED.powershell,
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', FOCUS_SCRIPT, ...args],
+      // windowsHide matters here: a visible helper console would take foreground
+      // itself and defeat the thing it was launched to do.
+      { windowsHide: true, timeout: budgetMs, maxBuffer: 1024 * 256 },
+      (err, stdout) => {
+        const line = (stdout || '').trim().split('\n').pop() || '';
+        try { resolve(JSON.parse(line)); }
+        catch {
+          resolve({ ok: false, rung: 'error', reason: err ? err.message : 'activator returned no JSON' });
+        }
+      },
+    );
+  });
+}
+
+// Taken BEFORE the launcher runs. See focus-window.ps1's header for why the
+// window is identified by handle-diff and not by the spawned pid: Windows
+// Terminal hosts new windows inside an ALREADY-RUNNING process, so the pid that
+// owns the window is typically one that predates the click entirely.
+async function windowSnapshot() {
+  if (!focusEnabled() || !focusAvailable()) return null;
+  const r = await runActivator(['-Snapshot'], 8000);
+  return Array.isArray(r.hwnds) ? r.hwnds : null;
+}
+
+// Failure to focus is NEVER promoted to a spawn failure. The terminal is open;
+// where it sits in the Z-order is a lesser problem and gets its own field.
+async function focusWindow(snapshot, pids, title) {
+  if (!focusEnabled()) return { ok: false, rung: 'disabled', reason: 'focus disabled in config' };
+  if (!RESOLVED.powershell) return { ok: false, rung: 'skipped', reason: 'powershell not found' };
+  if (!existsSync(FOCUS_SCRIPT)) return { ok: false, rung: 'skipped', reason: 'focus-window.ps1 missing' };
+  if (!snapshot) return { ok: false, rung: 'skipped', reason: 'pre-spawn window snapshot unavailable' };
+
+  const timeoutMs = Number(FOCUS_CFG.timeoutMs) || 4000;
+  const args = [
+    '-Exclude', snapshot.join(','),
+    '-Pids', (pids || []).join(','),
+    '-Title', title,
+    '-TimeoutMs', String(timeoutMs),
+  ];
+  if (FOCUS_CFG.flashFallback === false) args.push('-NoFlash');
+  return runActivator(args, timeoutMs + 8000);
+}
+
 async function attempt(exe, args, label, t0) {
-  const before = consoleHostPids();
+  // Both "before" pictures are taken together, and both must precede the
+  // launcher: the pid set proves a terminal appeared, the handle set identifies
+  // which window it is.
+  const [before, snapshot] = [consoleHostPids(), await windowSnapshot()];
   console.log(`[spawn] ${label} :: ${exe} ${args.join(' ')}`);
   const r = await runLauncher(exe, args);
   if (r.error) return { ok: false, reason: r.error, hard: true };
   if (r.code !== 0) {
     return { ok: false, reason: `${basename(exe)} exited ${r.code}${r.stderr ? ` — ${r.stderr}` : ''}` };
   }
-  const verified = before ? await waitForNewHost(before, Number(cfg.spawnVerifyMs) || 3000) : null;
+  const pids = before ? await waitForNewHosts(before, Number(cfg.spawnVerifyMs) || 3000) : null;
+  // null = tasklist unavailable (unverified), [] = nothing appeared (failure),
+  // non-empty = confirmed. Same three-state honesty as before, now carrying the
+  // pids OPS22 needs.
+  const verified = pids === null ? null : pids.length > 0;
   console.log(
     `[spawn] ${label} :: launcher exit 0 in ${Date.now() - t0}ms, terminal ` +
-    (verified === true ? 'CONFIRMED' : verified === false ? 'NOT CONFIRMED' : 'unverified (tasklist unavailable)') +
+    (verified === true ? `CONFIRMED (pid ${pids.join(',')})`
+      : verified === false ? 'NOT CONFIRMED' : 'unverified (tasklist unavailable)') +
     (r.stderr ? ` :: stderr ${r.stderr}` : ''),
   );
   if (verified === false) {
     return { ok: false, reason: `${basename(exe)} exited 0 but no terminal appeared` };
   }
-  return { ok: true, verified };
+
+  const focus = await focusWindow(snapshot, pids || [], `MC ${label}`);
+  console.log(
+    `[focus] ${label} :: rung ${focus.rung}` +
+    (focus.focused ? ' — FRONT + focused' : focus.raised ? ' — in front, NOT focused' : ' — not raised') +
+    (focus.how ? ` :: matched by ${focus.how}` : '') +
+    (focus.title ? ` :: "${focus.title}"` : '') +
+    (focus.reason ? ` :: ${focus.reason}` : '') +
+    (focus.attachDiag ? ` :: ${focus.attachDiag}` : ''),
+  );
+
+  return { ok: true, verified, focus };
 }
 
 async function spawnTerminal(index) {
@@ -260,7 +387,7 @@ async function spawnTerminal(index) {
   let r;
   if (RESOLVED.terminal.kind === 'wt') {
     r = await attempt(RESOLVED.terminal.path, wtArgv(folder), folder.label, t0);
-    if (r.ok) return { label: folder.label, verified: r.verified };
+    if (r.ok) return { label: folder.label, verified: r.verified, focus: r.focus };
     // wt.exe genuinely absent — drop to a plain console rather than leave the
     // button dead. Anything else (non-zero exit, nothing opened) is a real
     // failure and is reported as one.
@@ -269,7 +396,7 @@ async function spawnTerminal(index) {
   }
   r = await attempt(SYSTEM_CMD, cmdArgv(folder), folder.label, t0);
   if (!r.ok) throw new Error(r.reason);
-  return { label: folder.label, verified: r.verified };
+  return { label: folder.label, verified: r.verified, focus: r.focus };
 }
 
 // ── page ────────────────────────────────────────────────────────────────────
@@ -323,7 +450,9 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
       <div class="note">Opens a <b>new</b> Windows Terminal window in that folder with <code>claude</code>
       running. Say <code>go</code> in the new window to claim. This page never claims for you.
       The header says <span class="ok">opened</span> only when the server confirmed a terminal
-      actually appeared.</div>
+      actually appeared, and it states where the window <b>ended up</b> — Windows can refuse to hand
+      focus away from the browser you clicked in, and when it does you get a flashing taskbar button
+      instead of a lie.</div>
     </section>
     <section style="margin-top:18px"><h2>Read-only</h2>
       <div class="note" style="padding:12px 14px">This board issues <b>SELECT only</b>.
@@ -412,9 +541,24 @@ async function spawn(i) {
     j = { ok: false, error: 'server unreachable: ' + e.message };
   }
   if (j.ok && j.verified === true) {
-    el.textContent = 'opened ' + j.label;
-    el.className = 'meta ok';
-    setTimeout(() => { el.textContent = ''; }, 6000);
+    // OPS22: say where the window actually ended up. "in front" is a claim the
+    // server measured with GetForegroundWindow, not an assumption.
+    const f = j.focus || {};
+    if (f.focused) {
+      el.textContent = 'opened ' + j.label + ' — in front, ready for go';
+      el.className = 'meta ok';
+      setTimeout(() => { el.textContent = ''; }, 6000);
+    } else if (f.raised) {
+      el.textContent = 'opened ' + j.label
+        + ' — raised in front but Windows kept keyboard focus here; click the window'
+        + (f.flashed ? ' (its taskbar button is flashing)' : '');
+      el.className = 'meta warn';
+    } else {
+      el.textContent = 'opened ' + j.label + ' — BEHIND this window'
+        + (f.flashed ? ', taskbar button flashing' : '')
+        + (f.reason ? ' (' + esc(f.reason) + ')' : '');
+      el.className = 'meta warn';
+    }
   } else if (j.ok) {
     el.textContent = 'launched ' + j.label + ' — UNVERIFIED, check for a window';
     el.className = 'meta warn';
@@ -455,8 +599,8 @@ const server = createServer(async (req, res) => {
       req.on('end', async () => {
         try {
           const { index } = JSON.parse(raw || '{}');
-          const { label, verified } = await spawnTerminal(Number(index));
-          json(res, 200, { ok: true, label, verified });
+          const { label, verified, focus } = await spawnTerminal(Number(index));
+          json(res, 200, { ok: true, label, verified, focus });
         } catch (e) {
           console.error(`[spawn] FAILED :: ${e.message}`);
           json(res, 400, { ok: false, error: e.message });
@@ -481,4 +625,9 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`  terminal : ${RESOLVED.terminal.path}   [${RESOLVED.terminal.how}]`);
   console.log(`  command  : ${RESOLVED.command
     ?? `'${cfg.terminal.command}' not found on this PATH — passing it bare, the terminal's shell must resolve it`}`);
+  console.log(`  focus    : ${cfg.focus && cfg.focus.enabled === false
+    ? 'disabled in config — spawned windows will open behind the browser'
+    : RESOLVED.powershell
+      ? `${RESOLVED.powershell} + focus-window.ps1`
+      : 'UNAVAILABLE — powershell not found; windows will open behind the browser'}`);
 });

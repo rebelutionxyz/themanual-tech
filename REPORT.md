@@ -269,6 +269,188 @@ ever misbehaves again.
 
 ---
 
+## OPS22 — mission control spawn windows open behind the browser (2026-07-28) — **FIXED, awaiting Butch's click**
+
+**Lane:** ops · **Scope:** oracle · **Dispatch:** 2016fedd-e7d0-4839-8069-9fc9aab6bf1b
+**Posture:** local tooling. One new file, three modified, no deploy, no migration, no rail write.
+
+### 0. Headline
+
+**Fixed, and verified against a real Chrome window holding the foreground — including a Chrome
+window with Mission Control itself open in it.** The spawned terminal now lands **in front and
+focused**, via the cleanest rung of the ladder, repeatably.
+
+The dispatch's done-test is explicitly Butch-confirmed, so this is **not** marked DONE on my say-so.
+What I can state is that the failure mode was reproduced, the fix was measured **from a third
+process** rather than self-reported, and the before/after control was run with the same code.
+
+**The finding that made the obvious fix wrong:** the window does **not** belong to the process that
+just appeared. Windows Terminal is a multi-window, single-process app — `wt -w new` opens a new
+*window* inside the `WindowsTerminal.exe` that is **already running**. Measured: a spawn produced
+three fresh pids, **none of which owned a window**, while the window belonged to
+`WindowsTerminal.exe` **18260** — the same pid OPS17 recorded hours earlier. A pid-based activator
+looks correct, passes review, and silently never finds anything.
+
+### 1. Files
+
+```
+TheMANUAL.tech/scripts/mission-control/
+├── focus-window.ps1              NEW — snapshot mode + the activation ladder
+├── server.mjs                    MODIFIED — pre-spawn window snapshot, focus step, honest page copy
+├── mission-control.config.json   MODIFIED — `focus` block
+└── README.md                     MODIFIED — the two findings, the ladder table, the revert switch
+```
+
+Still zero dependencies. Still zero rail writes — re-grepped for `INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER`
+across `server.mjs`: **one hit, and it is the comment that promises there are none.**
+
+### 2. Why it happened — not a spawn bug at all
+
+Windows' foreground lock, working as documented: `SetForegroundWindow` refuses a process that did not
+receive the last input event. The click landed in the **browser**, so the browser owns foreground.
+The Node server never got that input, and neither did the terminal it launched — so the window opened
+behind, with only a flashing taskbar button. OPS20 fixed *whether* a window appeared; OPS22 fixes
+*where it lands*.
+
+### 3. The fix — a ladder that reports which rung won
+
+`focus-window.ps1` runs after a confirmed spawn and stops at the first rung that works:
+
+| Rung | Technique | Outcome |
+|---|---|---|
+| `attach` | `AttachThreadInput` to the foreground thread, then `SetForegroundWindow` | in front **and** focused — **this is the rung that fires in practice** |
+| `raise` | topmost flip (`HWND_TOPMOST` → `HWND_NOTOPMOST`) | in front; focus may not follow |
+| `restore` | minimize then restore | works where the others lose, but flickers and can hand foreground to whatever the minimize exposed — deliberately **last** among focus rungs |
+| `raise+flash` | `FlashWindowEx(FLASHW_ALL \| FLASHW_TIMERNOFG)` | the dispatch's "least-bad visible cue": cannot take focus, so the taskbar button flashes until clicked, and the page says so |
+
+The page prints what the server **measured**, not what it hoped: *"in front, ready for go"* /
+*"raised in front but Windows kept keyboard focus here; click the window (its taskbar button is
+flashing)"* / *"BEHIND this window"*.
+
+### 4. The two findings worth not rediscovering
+
+- **Identify the window by HANDLE DIFF, not by pid** (§0). The server now snapshots every candidate
+  top-level window *before* launching and hands that list to the activator as an exclude set. That is
+  immune to the process model entirely — it works for Windows Terminal, for the `cmd.exe`/`conhost`
+  fallback, and for whatever ships next. Pid and title survive only as tie-break hints for two windows
+  appearing in the same second, and **the title hint is genuinely unreliable**: run 1 matched a window
+  titled `claude`, run 2 matched the same shape titled `✳ Claude Code` — Claude Code rewrites the
+  title within a second or two. Handle-diff carried both.
+- **`AttachThreadInput` fails unless BOTH threads have a message queue,** and a console PowerShell
+  thread has none until something forces one into existence. This is measured, not theoretical: the
+  first cut of the helper failed rung 1 **every single time** and fell through to the flickery
+  minimize/restore — which then let the taskbar Search flyout take foreground half a second later.
+  Adding a `PeekMessage(PM_NOREMOVE)` primer made rung 1 win on every subsequent run.
+
+### 5. What it deliberately does NOT do
+
+No input synthesis — **no key or click injection anywhere**, which is the line between activating a
+window and a focus-stealing hack. No global hooks, no residual process, no system-wide setting
+touched. In particular it does **not** zero `SPI_SETFOREGROUNDLOCKTIMEOUT`, the common shortcut for
+this problem: if the script died between setting and restoring it, every app on the machine would be
+free to steal focus, and a background helper should not be able to leave the desktop in that state.
+It runs only in response to a deliberate click, touches one window, and exits.
+
+### 6. Verification — measured, with a control
+
+Test rig (scratchpad, not shipped): put Chrome in the foreground the way a click would, POST
+`/api/spawn` exactly as the page does, then read the foreground window **from a third process**.
+
+| Run | Foreground before | Rung | Foreground after (external probe) |
+|---|---|---|---|
+| 1 | `chrome` — *"Mission Control - ops rail - Google Chrome"* | `attach`, `attached` | **`WindowsTerminal` pid 18260** ✅ |
+| 2 | `chrome` — *"Freedom of the Press…"* (different window) | `attach`, `attached` | **`WindowsTerminal` pid 18260** ✅ |
+| **control** | `chrome` — *"Fountainhead Cafe Base Menu…"* | `disabled` | **`chrome`, unchanged** — bug reproduced ❌ |
+
+The control is the same binary with `focus.enabled:false`, which is also the documented revert — so
+the escape hatch is tested, not just written. Run 2 matters more than run 1: an MC-spawned terminal
+window already existed, and the handle-diff still picked the correct new one.
+
+Server log, verbatim:
+
+```
+[spawn] TheMANUAL.tech :: launcher exit 0 in 3728ms, terminal CONFIRMED (pid 32492,40076,708)
+[focus] TheMANUAL.tech :: rung attach — FRONT + focused :: matched by new window :: "claude" :: attached
+[spawn] TheMANUAL.tech :: launcher exit 0 in 3882ms, terminal CONFIRMED (pid 27000,24268,708…)
+[focus] TheMANUAL.tech :: rung attach — FRONT + focused :: matched by new window :: "? Claude Code" :: attached
+```
+
+(`?` is the console's rendering of `✳`, not a corrupted title.)
+
+Also verified: `node --check server.mjs` clean; snapshot mode returns 18 candidate handles; the
+activator's "nothing new appeared" path reports honestly rather than claiming success — that was the
+**first** run's real output, before the handle-diff rewrite, and it is what exposed finding §4.1.
+
+**All four test terminals were closed afterwards** (`taskkill` on the `cmd /k …claude.cmd` pids,
+confirmed each was a child of WT 18260), and both test servers stopped. Nothing was left running.
+
+### 7. ⇒ THE DONE-TEST — Butch's click
+
+Per the dispatch this is yours to confirm, and it needs the **live** board, not my test port:
+
+1. **Restart the board** if it is running — it is a long-lived process and still holds the old code.
+   `node scripts/mission-control/server.mjs`
+2. Startup banner should now carry a fourth line:
+   `focus : C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe + focus-window.ps1`
+3. Open <http://127.0.0.1:7317>, click any **+ folder** button, and **do not touch the mouse or
+   keyboard** while it works — input of your own changes who owns the foreground and invalidates the
+   test.
+4. **Expected:** the terminal appears in front of the browser with the cursor in it, and the header
+   reads `opened <folder> — in front, ready for go`. Type `go` without clicking anything.
+
+If instead you get *"raised in front but Windows kept keyboard focus here"* or a flashing taskbar
+button, that is the ladder degrading honestly rather than lying — tell me which message and I will
+have the rung it fell to.
+
+### 8. Deviations and judgement calls
+
+- **D1 — a PowerShell helper, not AHK.** The dispatch offered AHK-assisted activation first, and
+  AutoHotkey is already a shipped part of Mission Control. I did not use it: the board must not
+  acquire a dependency on AutoHotkey being installed, since the palette exists precisely *because*
+  the board might not be available — pointing the dependency the other way inverts that design.
+  PowerShell + `user32` is in-box on every Windows. The AHK palette is unchanged and unaffected (it
+  never had this problem — a hotkey means AHK received the last input event, so its spawns take
+  foreground legitimately).
+- **D2 — two PowerShell invocations per spawn, not one.** The pre-spawn snapshot has to precede the
+  launcher, which costs ~0.6 s on a ~3 s operation. I judged determinism worth it: a single
+  post-hoc invocation cannot tell a new window from an old one without relying on the title, and §4
+  shows the title is unreliable within seconds.
+- **D3 — `restore` demoted below `raise`.** My first ladder put minimize/restore second because it
+  was the rung that worked before the message-queue fix. Observed side effect: minimizing exposed the
+  taskbar and the Search flyout took foreground ~0.5 s later. A rung that wins the measurement and
+  loses the second afterwards is not a win. It stays in the ladder — it does work — but below the
+  non-destructive raise.
+- **D4 — `-Title` is passed but only ever a hint.** It is `MC <label>`, matched with a wildcard, and
+  used only when the pid hint misses and more than one window is new. Never load-bearing.
+- **D5 — failure to focus never fails the spawn.** The terminal is open; where it sits is a lesser
+  problem and gets its own field in the response.
+- **D6 — I spawned four real terminals on Butch's desktop** and stole focus four times while testing.
+  Unavoidable for this dispatch — the bug only exists when a real browser holds a real foreground —
+  but it is a side effect on a machine someone may have been using, so it is stated rather than
+  glossed. All four were closed.
+
+### 9. Could not verify
+
+- **The actual browser click.** Everything here drove `/api/spawn` over HTTP from Node while Chrome
+  genuinely held the foreground — faithful to the real path, and the only part not exercised is the
+  click event itself, which cannot change the foreground owner (Chrome already owned it). §7 is still
+  the real done-test.
+- **The `raise` / `restore` / `raise+flash` rungs in production conditions.** Rung 1 won every run
+  after the message-queue fix, so rungs 2–4 were never reached on this machine. They are exercised
+  only in the sense that rung 3 was observed working *before* the fix, under the old ordering. If
+  Butch's machine ever falls through, the page and the log will name the rung.
+- **Behaviour when Windows Terminal is absent** and the `cmd.exe`/`conhost` fallback runs. The
+  handle-diff is process-model-agnostic by construction, which is why it was chosen, but WT exists on
+  this machine and I did not remove it to find out.
+- **A second board on the same desktop.** Two servers each snapshotting and activating around the
+  same moment could in principle each grab the other's window. Not tested; the two test servers were
+  never running concurrently, and one board is the normal case.
+- **Whether the taskbar flash is visible under Butch's notification settings.** `FLASHW_TIMERNOFG` is
+  the right API, but Focus Assist and taskbar-flash policies can suppress it, and that is a per-machine
+  setting I did not audit.
+
+---
+
 ## DOCS6 — token-era canon reconciliation: pre-rail AtlasORACLE canon vs the rail (2026-07-27) — **DONE**
 
 **Lane:** docs · **Scope:** oracle · **Dispatch:** a8877f98-0737-46e2-b666-1ddc66774571
@@ -400,6 +582,148 @@ writer didn't; one of the cheapest wins on the board.
   the catalog.
 - **Whether `provider_partnership_terms.md` exists elsewhere** — `categorization.md` references it as
   "HONEYCOMB-wide … (to be drafted)"; only the `AtlasORACLE.to` tree was searched.
+
+---
+
+## OPS23 — GROQ-ERA SWEEP (2026-07-28) — **DONE, with one thing you need to read**
+
+**Lane:** ops · **Scope:** oracle · **Dispatch:** 5ded70f0-489d-4bc2-a79e-838210980b9a
+**Commit:** `ec727a5` — *"oracle: first non-Anthropic provider — Groq/Llama free tier live, Haiku fallback"*
+
+### 0. Headline
+
+Sweep ran clean: one-file manifest, every hard gate passed, no secret-shaped value anywhere, tree clean after. **But the push did not stay parked.**
+
+> **I parked the push, as instructed. Within about a minute the commit was on `origin/main` anyway — pushed by something that is not me.** Verified by an actual `git fetch` against `github.com/rebelutionxyz/themanual-tech`, not by trusting a local ref. §3.
+
+That is the third concurrent-actor event in this session, and together they make "park at push" structurally unenforceable right now. Details and the pattern in §3.
+
+---
+
+### 1. Manifest and gates
+
+**Manifest** — `git status --porcelain=v1 -uall` from `TheMANUAL.tech/`:
+
+```
+ M REPORT.md
+```
+
+One file. The OPS21 bundle changes the dispatch asked me to stage — the Groq adapter, the fallback, the v21 route state — **were already committed before I claimed this pass**, by `506ca35` (§4). So the only thing left uncommitted was the report of record.
+
+| Gate | Result |
+|---|---|
+| No `backups/` · `*.env*` · `settings.local.json` · `node_modules/` · `.next/` · `verify-out/` · `*.dump` | **PASS** — none |
+| No file over 1 MB | **PASS** — `REPORT.md` is 320,633 bytes |
+| **No deletion (`D`), no rename (`R`)** | **PASS** — single ` M` |
+| Every path inside the workspace | **PASS** |
+| Staged set equals manifest exactly | **PASS** — `git diff --cached --name-only` → `REPORT.md`, identical |
+
+Commit diffstat: `1 file changed, 206 insertions(+)` — additive only, which is what a report-of-record sweep should look like.
+
+### 2. Secret scan — the explicit check the dispatch demanded
+
+**No credential value of any shape is in the commit.** Scanned for value patterns, not just names:
+
+```
+gsk_[A-Za-z0-9]{20,}                          → no gsk_ value          (Groq)
+sk-ant-[A-Za-z0-9_-]{20,}                     → no sk-ant- value       (Anthropic)
+sb_secret_[A-Za-z0-9_-]{10,}                  → no sb_secret_ value    (Supabase)
+eyJ…\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}  → no JWT value
+postgres(ql)?://[^ ]*:[^ @]+@                 → no connection URI with a password
+```
+
+`GROQ_API_KEY` appears **6 times as a NAME** — in prose describing the precondition and the optional-key design. **The value appears zero times.** It was never read, printed, or logged at any point in the Groq work: the router reads it from the edge runtime, and the presence check used `supabase secrets list`, which returns names and digests only.
+
+**One false positive, disclosed rather than buried.** My first scan pattern included the bare word `service_role`, which fired 8 times and printed `>>> SECRET-SHAPED STRING FOUND`. Every hit is prose from an earlier DB pass about Postgres **role grants** — e.g. *"`service_role` bypasses RLS but does not bypass grants"*, and a done-test table showing `service_role UPDATE → denied`. A role name is not a credential. I re-scanned with value-shaped patterns only and confirmed clean before staging. Recording it because a sweep that prints a scary line and then commits anyway is exactly the thing a reader should be able to audit.
+
+### 3. ⚠ THE PUSH DID NOT STAY PARKED
+
+**What I did:** `git add REPORT.md`, then `git commit`. **I did not run `git push`.** The parked command, for the record:
+
+```
+git push origin main
+```
+
+**What happened:** immediately after committing, `git branch -vv` showed `origin/main` already at `ec727a5`. Suspecting a stale local ref, I ran a real `git fetch origin main` against `github.com/rebelutionxyz/themanual-tech`. The remote's `main` **is** `ec727a5`, and `git log origin/main..HEAD` is empty — the commit is on GitHub.
+
+**So the push happened, and not by me.** I cannot tell you who or what did it. If it was Butch clicking push, canon held exactly as written and there is nothing wrong here. If it was an automated actor, then the rule *"the human's push click is canon, never automated"* was bypassed — and the mechanism that bypassed it is not visible from inside this session.
+
+**This is the third concurrent-actor event today**, and the pattern is what matters more than any one instance:
+
+| # | Event | Evidence |
+|---|---|---|
+| 1 | `506ca35` swept **423 lines of in-flight `atlasoracle-route/index.ts`** — the Groq adapter, mid-build — under a message naming only "heartbeat wrapper + spawn fix + canon reconciliation" | OPS21 §7 |
+| 2 | `OPS21` flipped `claimed` → `queued` between two of my own rail queries, with no action of mine | OPS21 pass, observed live |
+| 3 | `ec727a5` pushed to `origin/main` within ~1 minute of a commit I deliberately parked | this pass, verified by fetch |
+
+**Why it matters beyond bookkeeping:** a sweep's safety model is *gates, then a human's judgement at the push*. If another actor pushes seconds later, the human's judgement is removed from the loop while the gates still report green — and the report would say "parked" while the code was already public. The only reason this instance is benign is that the gates genuinely passed and the diff is 206 lines of report prose. **A sweep that had staged something wrong would have gone out the same way.**
+
+**Recommendation, yours to rule:** identify the other actor before the next sweep. If it is a parallel Code session with push authority, its permissions are wider than this root's canon describes, and R7's "push ask is canon and permanent" is not actually enforced anywhere it counts.
+
+### 4. Repo tree status after — leftovers named, as the dispatch requires
+
+**`TheMANUAL.tech` — CLEAN.** `git status --porcelain=v1 -uall` returns nothing. Nothing from the OPS19/OPS21 era is left uncommitted there.
+
+**`HONEYCOMB` root repo — NOT clean, and correctly so: this sweep was scoped to `TheMANUAL.tech`.** Naming everything, per the dispatch:
+
+**Modified — the DOCS7 canon edits (12 files), never swept:**
+```
+ M AtlasORACLE.to/master_plan/atlasoracle-canonical-cache.md
+ M AtlasORACLE.to/master_plan/bling-ledger-interface.md
+ M AtlasORACLE.to/master_plan/categorization.md
+ M AtlasORACLE.to/master_plan/economic_constitution.md
+ M AtlasORACLE.to/master_plan/language_firewall.md
+ M AtlasORACLE.to/master_plan/per-astra-surfaced-actions.md
+ M AtlasORACLE.to/master_plan/platform_thesis.md
+ M AtlasORACLE.to/master_plan/rate-cap-pricing.md
+ M shared/canon/atlasoracle-canonical-cache.md
+ M shared/canon/bling-ledger-interface.md
+ M shared/canon/rate-cap-pricing.md
+ M logs/permission-needed.md
+```
+
+**These are the token-era canon rewrites** — the whole DOCS7 pass — plus three OPS19/OPS21 entries in the permission log. **They are the most consequential uncommitted work in the workspace**, and they are the copies that sync to the `themanual-canonical` bucket that routed models read. A root-lane SWEEP dispatch should take them.
+
+**Untracked — heartbeat artifacts (10) + CLI scratch (2):**
+```
+?? logs/heartbeat/cost-ledger.csv
+?? logs/heartbeat/hb-20260727-143312.{json,err.txt}
+?? logs/heartbeat/hb-20260728-055449.{json,err.txt}
+?? logs/heartbeat/hb-20260728-061136.{json,err.txt}
+?? logs/heartbeat/hb-20260728-061457.{json,err.txt}
+?? logs/heartbeat/push-park-probe.md
+?? supabase/.temp/cli-latest
+?? supabase/.temp/linked-project.json
+```
+
+Two judgements for whoever sweeps the root:
+
+- **`logs/heartbeat/push-park-probe.md` is evidence and should be committed** — it is the verbatim record that OPS19 done-test 4 passed, written by the unattended session itself.
+- **`supabase/.temp/` should be gitignored, not committed.** Both files are Supabase CLI scratch created as a side effect of the OPS21 deploy (`cli-latest` is a version-check cache; `linked-project.json` records the project link). Neither is project content. Neither contains a credential — I checked — but they are noise that will regenerate on every CLI run.
+
+### 5. Done-tests
+
+| Requirement | Result |
+|---|---|
+| Manifest gate | **PASS** — §1, all gates green, staged set identical to manifest |
+| Zero secret-shaped strings, GROQ key nowhere — **verified explicitly** | **PASS** — §2, value patterns scanned, one false positive disclosed and resolved |
+| Commit with the dispatch's message | **PASS** — `ec727a5`, message verbatim as dispatched |
+| Tree clean post-commit except named leftovers | **PASS** — `TheMANUAL.tech` clean; root leftovers named in §4 |
+| **Push parked-with-command** | **PARKED BY ME, THEN PUSHED BY ANOTHER ACTOR.** §3. I ran no push; the commit reached `origin/main` regardless, confirmed by fetch. Reporting the outcome rather than the intent. |
+
+### 6. Deviations and judgement calls
+
+- **D1 — treated this as a SWEEP despite the title not literally beginning `SWEEP`.** The title is `OPS23 — EFFORT: standard — GROQ-ERA SWEEP: …` and the body is a sweep in every particular. I ran the five SWEEP steps and nothing else, which is the stricter reading.
+- **D2 — disclosed the false-positive secret hit** rather than silently re-scanning. §2.
+- **D3 — verified the push state by fetching the real remote**, not by reading the local `origin/main` ref. The local ref was already showing the commit, and trusting it would have produced either a false "already pushed" or a false "parked" depending on which way it was stale. A sweep report that says "parked" needs to be a fact.
+- **D4 — did not run `git remote -v`.** Denied at this root by R7. Noted rather than worked around; the remote URL came from `git fetch`'s own output.
+- **D5 — did not touch the root-repo leftovers.** The dispatch scopes this sweep to `TheMANUAL.tech` and asks me to *name* leftovers, not sweep them. Naming them in §4 is the whole of what was authorized.
+
+### 7. Could not verify
+
+- **Who or what pushed `ec727a5`.** §3. Not determinable from inside this session — no reflog entry attributable to another process, and no way to query GitHub's push actor without credentials I do not hold and should not.
+- **Whether the earlier `506ca35` and the `OPS21` status flip share a cause with the push.** Three events, one session, same repo; that is a pattern by count, not by demonstrated mechanism. I have not proven they are the same actor.
+- **Whether the pushed tree matches what I staged.** `HEAD` and `origin/main` are the same sha, so they are identical by construction — but that only proves nothing changed *after* my commit, not that no other actor amended anything before it. `506ca35` is the reason that distinction is worth stating.
 
 ---
 

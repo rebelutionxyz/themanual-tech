@@ -19,6 +19,12 @@
     "command": "claude"
   },
   "spawnVerifyMs": 3000,
+  "focus": {
+    "_comment": "OPS22: after a confirmed spawn, hand the new window's pid to focus-window.ps1 so it comes to the FRONT of the browser you clicked in. Windows' foreground lock blocks a background process from taking focus, so the activator walks a ladder and reports which rung won. enabled:false reverts to the old behaviour (window opens behind). flashFallback:false suppresses the taskbar-flash cue when no rung can take focus — leave it true, it is the only signal left at that point.",
+    "enabled": true,
+    "timeoutMs": 4000,
+    "flashFallback": true
+  },
   "folders": [
     { "label": "TheMANUAL.tech",   "path": "C:\\Users\\Butch\\Documents\\HONEYCOMB\\TheMANUAL.tech" },
     { "label": "HONEYCOMB (root)", "path": "C:\\Users\\Butch\\Documents\\HONEYCOMB" },
