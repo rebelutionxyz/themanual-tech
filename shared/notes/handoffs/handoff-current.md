@@ -13,11 +13,12 @@ This block is ops_docs slug BOOT_BLOCK; regenerate snapshots rather than editing
 
 ======================================================================
 
-REFRESHED 2026-07-28 10:54 local (2026-07-28T16:54Z) FROM THE OPS RAIL — this file IS the living handoff. The rail is canon; this is a snapshot of it.
+REFRESHED 2026-07-28 18:21 local (2026-07-29T00:21Z) FROM THE OPS RAIL — this file IS the living handoff. The rail is canon; this is a snapshot of it.
 Regenerate: node atlasJUSTICE.org/scripts/pull-rail.mjs  (or double-click pull-rail.cmd). Edits here are overwritten — change the rail, not this file.
 
 DOCS ON THE RAIL - latest version per slug
   BOOT_BLOCK      v0.1   2026-07-27 10:46 UTC  Universal boot block — prepended to the MMF and every master snapshot
+  GAMES_MF        v0.3   2026-07-29 00:14 UTC  GAMES MASTER FILE v0.3 — honeycomb-not-hive language sweep applied to v0.2 wording; no substantive changes
   JMF             v0.5   2026-07-26 21:02 UTC  JUSTICE MASTER FILE v0.5 — day one sealed: commit 08074d0 pushed
   LEAD_PROTOCOL   v0.5   2026-07-27 11:05 UTC  Lead protocol v0.5 — per-handle broadcast reads (delta on v0.4)
   ORACLE_MF       v0.19  2026-07-28 00:03 UTC  ORACLE MASTER FILE v0.19 — 2a/3a ruled; free tier semantics clarified: free = FREE PROVIDERS, permanent, near-zero platform cost
