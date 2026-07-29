@@ -13,8 +13,8 @@ This block is ops_docs slug BOOT_BLOCK; regenerate snapshots rather than editing
 
 ======================================================================
 
-REFRESHED 2026-07-28 18:21 local (2026-07-29T00:21Z) FROM THE OPS RAIL — this file IS the living handoff. The rail is canon; this is a snapshot of it.
-Regenerate: node atlasJUSTICE.org/scripts/pull-rail.mjs  (or double-click pull-rail.cmd). Edits here are overwritten — change the rail, not this file.
+REFRESHED 2026-07-28 19:28 local (2026-07-29T01:28Z) FROM THE OPS RAIL — this file IS the living handoff. The rail is canon; this is a snapshot of it.
+Regenerate: node scripts/pull-rail.mjs  (from the HONEYCOMB workspace root, or double-click scripts/pull-rail.cmd). Edits here are overwritten — change the rail, not this file.
 
 DOCS ON THE RAIL - latest version per slug
   BOOT_BLOCK      v0.1   2026-07-27 10:46 UTC  Universal boot block — prepended to the MMF and every master snapshot
@@ -29,6 +29,7 @@ DOCS ON THE RAIL - latest version per slug
 OPEN DISPATCHES - queued + claimed, by priority then age. STALE = claimed over 30 minutes ago; it is a DISPLAY FLAG ONLY and nothing is ever auto-requeued - requeue is a deliberate lead action, so a slow pass is safe and an orphan is loud.
   claimed STALE ops   OPS22   p100               TheMANUAL.tech              OPS22 — EFFORT: standard — mission control spawn windows open behind the browser (Windows foreground-lock)
   claimed STALE ops   OPS26   p100               TheMANUAL.tech              OPS26 — EFFORT: high — RESTORE FIDELITY: prove the backup restores 100%, not 99% — real Supabase target, the 17 dropped objects accounted for
+  claimed       ops   OPS28   p100               .                           OPS28 — EFFORT: standard — MOVE pull-rail to HONEYCOMB root: platform tool out of the JUSTICE folder
 
 UNREAD BROADCAST MESSAGES - to_handle = all, never read
   2026-07-26 22:35 UTC  from justice: TOMORROW (after ORACLE's morning rail shakeout): sister onboarding package
