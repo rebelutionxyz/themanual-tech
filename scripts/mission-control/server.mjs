@@ -244,9 +244,9 @@ async function waitForNewHosts(before, budgetMs) {
 
 // Run the launcher and actually LISTEN to it. Never resolves to success on a
 // non-zero exit or a spawn error the way the old no-op callback did.
-function runLauncher(exe, args) {
+function runLauncher(exe, args, env) {
   return new Promise((resolve) => {
-    const child = execFile(exe, args, { windowsHide: false }, (err, stdout, stderr) => {
+    const child = execFile(exe, args, { windowsHide: false, env: env || process.env }, (err, stdout, stderr) => {
       resolve({
         error: err && err.code === 'ENOENT' ? `${basename(exe)} not found` : null,
         code: err ? (typeof err.code === 'number' ? err.code : null) : 0,
@@ -263,10 +263,44 @@ function runLauncher(exe, args) {
 // inside the terminal never has to resolve it either.
 const COMMAND = () => RESOLVED.command || cfg.terminal.command;
 
-function wtArgv(folder) {
+// ── window naming (OPS32) ───────────────────────────────────────────────────
+// Butch had TRIV22 and TRIV23 running side by side, both titled "claude code",
+// could not tell which was which, and stopped both — costing a stopped pass and
+// a lead round-trip.
+//
+// Two halves to the fix, and only the first belongs to this process:
+//
+//   1. STOP CLAUDE OVERWRITING THE TITLE. Claude Code titles the terminal from
+//      an auto-generated topic summary, and it does so with an OSC escape AFTER
+//      the window exists — so whatever the launcher set is simply replaced a
+//      second or two later. OPS22 hit this and logged it as an unreliable focus
+//      hint: the same window read `claude` on one run and `✳ Claude Code` on the
+//      next. `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` in the spawned environment
+//      turns that off; see SPAWN_ENV below.
+//   2. GIVE THE WINDOW A NAME WORTH KEEPING. That is the tag below.
+//
+// The tag is NOT the pass code, and it cannot be: this endpoint spawns a
+// terminal in a FOLDER, and the pass is claimed later by the session itself when
+// Butch types `go`. Nothing here knows, or can know, which pass that will be.
+// See the OPS32 report — the pass-code half needs a protocol decision.
+//
+// So the tag is what the spawner genuinely owns: a per-spawn serial plus the
+// folder. `MC3 · TheHoneycomb.games` distinguishes two terminals in the SAME
+// folder, which is exactly the case that bit him — TRIV22 and TRIV23 were both
+// TheHoneycomb.games, so a folder-only title would still have been ambiguous.
+let spawnSerial = 0;
+const nextTag = (folder) => `MC${++spawnSerial} · ${folder.label}`;
+
+// Inherit everything, then suppress Claude's own titling. Measured on this box:
+// an env var set on the wt.exe launcher DOES reach the shell inside the new tab
+// (probe read it back), which was not obvious — wt.exe is an AppExecLink stub
+// and OPS22 found it hands off to an already-running WindowsTerminal.exe.
+const SPAWN_ENV = () => ({ ...process.env, CLAUDE_CODE_DISABLE_TERMINAL_TITLE: '1' });
+
+function wtArgv(folder, tag) {
   return [
     ...(cfg.terminal.newWindowArgs || []),   // `-w new nt` — a dedicated window, whatever the WT settings say
-    '--title', `MC ${folder.label}`,
+    '--title', tag,
     '-d', folder.path,
     ...(cfg.terminal.shellArgs || []),
     COMMAND(),
@@ -275,8 +309,10 @@ function wtArgv(folder) {
 
 // Windows-Terminal-free fallback: `start` gives the console its own window, /D
 // sets the working directory, and /k holds it open so an error stays readable.
-function cmdArgv(folder) {
-  return ['/c', 'start', `MC ${folder.label}`, '/D', folder.path, 'cmd', '/k', COMMAND()];
+// `start`'s first quoted argument IS the window title, so the tag lands the same
+// way on this path.
+function cmdArgv(folder, tag) {
+  return ['/c', 'start', tag, '/D', folder.path, 'cmd', '/k', COMMAND()];
 }
 
 // ── focus (OPS22) ───────────────────────────────────────────────────────────
@@ -341,13 +377,15 @@ async function focusWindow(snapshot, pids, title) {
   return runActivator(args, timeoutMs + 8000);
 }
 
-async function attempt(exe, args, label, t0) {
+async function attempt(exe, args, label, t0, tag) {
   // Both "before" pictures are taken together, and both must precede the
   // launcher: the pid set proves a terminal appeared, the handle set identifies
   // which window it is.
   const [before, snapshot] = [consoleHostPids(), await windowSnapshot()];
   console.log(`[spawn] ${label} :: ${exe} ${args.join(' ')}`);
-  const r = await runLauncher(exe, args);
+  // OPS32: SPAWN_ENV suppresses Claude Code's own terminal titling, so the tag
+  // this launcher sets is still there an hour later.
+  const r = await runLauncher(exe, args, SPAWN_ENV());
   if (r.error) return { ok: false, reason: r.error, hard: true };
   if (r.code !== 0) {
     return { ok: false, reason: `${basename(exe)} exited ${r.code}${r.stderr ? ` — ${r.stderr}` : ''}` };
@@ -367,7 +405,7 @@ async function attempt(exe, args, label, t0) {
     return { ok: false, reason: `${basename(exe)} exited 0 but no terminal appeared` };
   }
 
-  const focus = await focusWindow(snapshot, pids || [], `MC ${label}`);
+  const focus = await focusWindow(snapshot, pids || [], tag || `MC ${label}`);
   console.log(
     `[focus] ${label} :: rung ${focus.rung}` +
     (focus.focused ? ' — FRONT + focused' : focus.raised ? ' — in front, NOT focused' : ' — not raised') +
@@ -386,19 +424,22 @@ async function spawnTerminal(index) {
   if (!existsSync(folder.path)) throw new Error(`folder missing on disk: ${folder.path}`);
 
   const t0 = Date.now();
+  // One tag per spawn, reused across the wt attempt and the cmd fallback so a
+  // window that came up the long way still carries the same name.
+  const tag = nextTag(folder);
   let r;
   if (RESOLVED.terminal.kind === 'wt') {
-    r = await attempt(RESOLVED.terminal.path, wtArgv(folder), folder.label, t0);
-    if (r.ok) return { label: folder.label, verified: r.verified, focus: r.focus };
+    r = await attempt(RESOLVED.terminal.path, wtArgv(folder, tag), folder.label, t0, tag);
+    if (r.ok) return { label: folder.label, tag, verified: r.verified, focus: r.focus };
     // wt.exe genuinely absent — drop to a plain console rather than leave the
     // button dead. Anything else (non-zero exit, nothing opened) is a real
     // failure and is reported as one.
     if (!r.hard) throw new Error(r.reason);
     console.error(`[spawn] ${folder.label} :: wt unusable (${r.reason}) — falling back to cmd.exe`);
   }
-  r = await attempt(SYSTEM_CMD, cmdArgv(folder), folder.label, t0);
+  r = await attempt(SYSTEM_CMD, cmdArgv(folder, tag), folder.label, t0, tag);
   if (!r.ok) throw new Error(r.reason);
-  return { label: folder.label, verified: r.verified, focus: r.focus };
+  return { label: folder.label, tag, verified: r.verified, focus: r.focus };
 }
 
 // ── backup age (OPS25) ──────────────────────────────────────────────────────
@@ -653,27 +694,31 @@ async function spawn(i) {
   } catch (e) {
     j = { ok: false, error: 'server unreachable: ' + e.message };
   }
+  // OPS32: lead with the TAG, not the folder — the tag is what is written on the
+  // window, so the message and the taskbar button say the same thing. With two
+  // terminals open in the same folder the folder name alone identifies neither.
+  const who = j.tag || j.label;
   if (j.ok && j.verified === true) {
     // OPS22: say where the window actually ended up. "in front" is a claim the
     // server measured with GetForegroundWindow, not an assumption.
     const f = j.focus || {};
     if (f.focused) {
-      el.textContent = 'opened ' + j.label + ' — in front, ready for go';
+      el.textContent = 'opened ' + who + ' — in front, ready for go';
       el.className = 'meta ok';
       setTimeout(() => { el.textContent = ''; }, 6000);
     } else if (f.raised) {
-      el.textContent = 'opened ' + j.label
+      el.textContent = 'opened ' + who
         + ' — raised in front but Windows kept keyboard focus here; click the window'
         + (f.flashed ? ' (its taskbar button is flashing)' : '');
       el.className = 'meta warn';
     } else {
-      el.textContent = 'opened ' + j.label + ' — BEHIND this window'
+      el.textContent = 'opened ' + who + ' — BEHIND this window'
         + (f.flashed ? ', taskbar button flashing' : '')
         + (f.reason ? ' (' + esc(f.reason) + ')' : '');
       el.className = 'meta warn';
     }
   } else if (j.ok) {
-    el.textContent = 'launched ' + j.label + ' — UNVERIFIED, check for a window';
+    el.textContent = 'launched ' + who + ' — UNVERIFIED, check for a window';
     el.className = 'meta warn';
   } else {
     el.textContent = 'spawn failed: ' + j.error;
@@ -715,8 +760,8 @@ const server = createServer(async (req, res) => {
       req.on('end', async () => {
         try {
           const { index } = JSON.parse(raw || '{}');
-          const { label, verified, focus } = await spawnTerminal(Number(index));
-          json(res, 200, { ok: true, label, verified, focus });
+          const { label, tag, verified, focus } = await spawnTerminal(Number(index));
+          json(res, 200, { ok: true, label, tag, verified, focus });
         } catch (e) {
           console.error(`[spawn] FAILED :: ${e.message}`);
           json(res, 400, { ok: false, error: e.message });
