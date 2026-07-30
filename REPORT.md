@@ -5,6 +5,543 @@ Newest pass first.
 
 ---
 
+## OPS34 — /mc ON THE WEB — **GATE NOT MET + RLS POLICY PROPOSED. QUESTION FILED (OPS34-Q).**
+
+**Dispatch.** OPS34, lane `ops`, workdir `TheMANUAL.tech`, scope *(empty)*. Two stop conditions
+were written into it and **both fired**, so this pass deliberately ends without UI:
+
+1. *"do not start until the lead has reviewed OPS33-Q and the build-steps table is applied."*
+2. *"Stop for lead review on the policy before shipping anything readable."*
+
+**Posture: zero production writes, zero UI.** Every production statement was a `SELECT`. No
+route was added, no component written. `scripts/mission-control/server.mjs` shows modified in
+this repo — **that is OPS33's terminal, not this pass**; it was not opened or touched here.
+
+### 1. The gate is NOT met — the table does not exist
+
+```
+$ SELECT table_name FROM information_schema.tables WHERE table_schema='public'
+    AND (table_name LIKE '%build%' OR '%step%' OR '%phase%' OR 'ops_%')
+ops_dispatches
+ops_docs
+ops_messages
+ops_reports
+```
+
+**Four rows. `ops_build_steps` is absent, and so are all three of OPS33-Q's views** —
+`ops_pass_durations`, `ops_effort_stats`, `ops_build_progress`. On the rail, OPS33's dispatch
+is still `claimed` and its only filed report is `OPS33-Q`, i.e. a question **awaiting** lead
+review, not a reviewed-and-applied model.
+
+So the precondition is unmet on both halves: not reviewed, not applied. Modelling a UI now is
+precisely the failure the dispatch names — *"the TRIV22 mistake from earlier today"* — and the
+warning is well aimed: TRIV22 shipped five files of client code against a schema whose row
+shape has never had a single instance. **Nothing was built here.** OPS34 should be re-queued
+once `ops_build_progress` exists, and it should re-verify rather than trust this note.
+
+### 2. What the app authenticates as — asked and answered
+
+`TheMANUAL.tech/src/lib/supabase.ts`:
+
+```ts
+const url = import.meta.env.VITE_SUPABASE_URL;
+const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+createClient(url, anonKey, { auth: { persistSession: true, autoRefreshToken: true, … } })
+```
+
+- **Anon key only** — there is no service-role key in the browser bundle, which is correct and
+  must stay that way.
+- A visitor is PostgREST role **`anon`**. A signed-in Bee carries a Supabase Auth JWT and is
+  **`authenticated`**, with `auth.uid()` = the Bee's id.
+- Both `VITE_` vars are build-time inlined, so any change here means a rebuild and redeploy,
+  not a restart.
+
+### 3. RLS on the four ops_ tables — currently a double lock, and nothing leaks today
+
+```
+    relname     | rls_enabled | forced        policies: (0 rows)
+----------------+-------------+--------       grants to anon/authenticated: (0 rows)
+ ops_dispatches | t           | f
+ ops_docs       | t           | f
+ ops_messages   | t           | f
+ ops_reports    | t           | f
+```
+
+**RLS is on with zero policies, AND there are zero table grants to `anon` or `authenticated`.**
+Two independent locks, either sufficient. The practical consequence matters for the decision:
+
+- **themanual.tech cannot read one byte of the rail today.** Not the dispatch bodies, not the
+  report bodies. There is no leak to close — the question is purely whether to open something,
+  deliberately.
+- The rail works because `psql` connects as `postgres`, which has `rolbypassrls = t`. Nothing
+  the browser holds comes close to that.
+
+Volume, for scale: **89 dispatches · 106 reports · 37 docs · 7 messages**. Report bodies are
+the sensitive mass — several are 10 kB of operational narrative, credentials-adjacent
+reasoning, and unreviewed findings.
+
+### 4. There is already an admin primitive — do not invent one
+
+```sql
+CREATE OR REPLACE FUNCTION public.is_platform_admin() RETURNS boolean
+  LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
+AS $$ SELECT EXISTS (SELECT 1 FROM public.bees WHERE id = auth.uid() AND is_admin = true) $$;
+```
+
+`bees.is_admin` (boolean) exists and **exactly 1 of 18 bees carries it.** Sibling astras
+already do this per-astra (`justice_is_admin`, `press_is_admin`), so `is_platform_admin()` is
+the platform-wide one and is the right gate to reuse.
+
+### 5. PROPOSAL — the narrow option, endorsed, with the SQL
+
+The lead's recommendation is right and I would go slightly narrower. **Recommended policy:**
+
+**(a) The four raw ops_ tables change in no way. No policy, no grant, not now and not for
+this feature.** The web board never reads `ops_dispatches` or `ops_reports` directly.
+
+**(b) Expose exactly one object: the derived view `ops_build_progress`** — and only once
+OPS33's model is applied, with a column list the lead signs off. It must carry **no `body`
+column** from either dispatches or reports. Phase, step, title, derived status, the linked
+pass *code*, and the estimate range with its sample size are enough to answer "where does the
+build stand". A pass code is a label; a pass body is the operational detail the dispatch is
+protecting.
+
+**(c) The gate lives inside the view, because a view cannot carry RLS policies.** That is a
+Postgres constraint, not a preference:
+
+```sql
+-- after ops_build_progress exists, redefine with the gate inside:
+CREATE OR REPLACE VIEW public.ops_build_progress
+  WITH (security_barrier = true) AS
+SELECT …                                  -- lead-approved columns only, no body
+  FROM …
+ WHERE public.is_platform_admin();        -- non-admins select zero rows, not an error
+
+REVOKE ALL ON public.ops_build_progress FROM anon;      -- explicit, not assumed
+GRANT SELECT ON public.ops_build_progress TO authenticated;
+```
+
+**Why this works, stated precisely so the lead can check me:** the view is owned by `postgres`
+and Postgres views default to `security_invoker = false`, so the view body reads its base
+tables **with the owner's privileges** — it does not need, and must not be given, any grant on
+the raw tables. That is the whole point: the view is the only door, its column list is the
+only thing visible through it, and `WHERE is_platform_admin()` is the lock. `security_barrier`
+stops a hostile predicate being pushed down past the gate.
+
+**The alternative I considered and reject:** `security_invoker = true` plus real policies on
+`ops_dispatches`/`ops_reports`. It is more idiomatic, and it is worse here — it requires
+`GRANT SELECT` on the raw tables, so a single mistaken policy exposes every report body. Option
+(a)+(c) keeps the raw tables at "no grant at all", which fails safe.
+
+**(d) The UI must say it is read-only, in the UI.** Per the dispatch: local mission control
+spawns Windows Terminal windows through `node:child_process`; an https page cannot and must
+not reach a terminal on Butch's desk, and an https→localhost bridge is the wrong thing to
+build. The spawn half **was not attempted and should never be**. `/mc` on the web says
+"read-only mirror — spawning lives in local mission control" so nobody hunts for the buttons.
+
+**(e) Model once, render twice.** OPS33 Half 2's local panel and this route must both read
+`ops_build_progress`. If the web route ends up needing a different shape, that is a signal the
+view is wrong — fix the view, do not fork the model.
+
+### 6. Three questions the lead / Butch must answer before UI
+
+1. **Is the single `is_admin = true` bee Butch's?** The done-test is *"Butch opens
+   themanual.tech/mc on his phone"* — which under this proposal requires him **signed in on
+   that phone** as that Bee. If it is a different bee, or he is usually signed out on mobile,
+   the board is an empty page and the done-test fails for a reason that has nothing to do with
+   the code. **I did not go looking through bee emails to guess which one it is.**
+2. **Admin-only, or public?** Recommended: admin-only for v1, because it is the reversible
+   direction. A build-progress board is arguably good public marketing later; a leaked report
+   body is not retractable. Butch's call, not mine.
+3. **The final column list**, once `ops_build_progress` exists. I will not guess it — that is
+   the review the dispatch asks for.
+
+### 7. Could not verify
+
+- **Anything about the build-steps model.** It does not exist yet; §5's SQL is written against
+  the object OPS33-Q *describes*, and its column list is deliberately left to the lead.
+- **That `/mc` is absent from the deployed bundle.** Taken from the dispatch's own
+  reconnaissance (single-page shell, client-side routes in `assets/index-*.js`). Not
+  re-fetched — no route was being added, so it would have been a spend for nothing.
+- **The proposed SQL was not executed anywhere**, not even in a scratch database — the object
+  it redefines does not exist to redefine. It is a proposal, not a verified migration, and it
+  needs the usual pre-flight when it becomes real.
+- **Nothing was rendered.**
+
+### Manifest
+
+```
+ M REPORT.md                              <- this section
+ M scripts/mission-control/server.mjs     <- OPS33's terminal, NOT this pass
+```
+
+`HEAD` is `2ef2821`. Nothing committed; the dispatch stays `claimed` pending the policy review
+it asks for.
+
+---
+
+## OPS32 — SPAWNER NAMES THE WINDOW — **spawner half DONE; the pass-code half is not the spawner's to give**
+
+**Dispatch.** OPS32, lane `ops`, workdir `TheMANUAL.tech`, scope *(empty)*. Local tooling only:
+no deploy, no migration, no rail write beyond this report.
+
+**Collision check first.** Three passes are claimed against this repo — **OPS22** (spawn
+focus, same file), **OPS33** (build panel, same file), and this one. OPS22's work is
+**committed** (tree was clean at `2ef2821`), so I built on top of it rather than beside it.
+OPS33's terminal is writing `REPORT.md` concurrently; I appended above its section and
+touched nothing else of its work.
+
+**Manifest (uncommitted):**
+
+```
+ M scripts/mission-control/server.mjs   | 83 +++++++++++++++-----   <- MINE
+ M REPORT.md                            | this section + OPS33's    <- SHARED, two passes writing
+```
+
+`REPORT.md` carries **OPS33's Half-1 section as well as mine.** Stage by path and read the
+diff before committing — this is not all one pass's work.
+
+---
+
+### 1 · The premise is right, and I verified it rather than trusting it
+
+The dispatch said *"CLAIMER VERIFIES THE MECHANISM FIRST — do not trust this dispatch on it."*
+Good instruction. Four things needed proving on Butch's actual box, and one of them I
+expected to fail.
+
+**1a. Does an env var set on the `wt.exe` launcher reach the shell inside the new tab?**
+I expected **no**. `wt.exe` is an AppExecLink stub, and OPS22 established that it hands the
+window off to a **WindowsTerminal.exe that is already running** — a long-lived process with
+its own frozen environment. If the tab inherited *that*, the entire env-var approach was dead
+on arrival.
+
+Probed it: set `OPS32_PROBE=REACHED` on the launcher, had the tab echo its own environment to
+a file.
+
+```
+OPS32_PROBE=REACHED
+TITLE_VAR=[1]
+WT_SESSION=[1fcf8d84-e6c6-4f88-83e5-c55150b68b35]
+```
+
+**It reaches.** The concern was wrong, and it was worth ten minutes to know rather than
+assume.
+
+**1b. Which of the three title mechanisms work here?** All three, and — the part that
+actually explains the bug — **each one overrides the last**:
+
+```
+[ 1500ms] after --title only        -> OPS32-A-WTFLAG - <command line>
+[ 4500ms] after cmd `title` builtin -> OPS32-B-CMDBUILTIN
+[ 8000ms] after OSC 0 escape        -> OPS32-C-OSC
+[12000ms] settled                   -> OPS32-C-OSC
+```
+
+So `wt --title` is not "ignored" by Claude Code — it is **set, then overwritten**, because
+Claude emits an OSC title escape *after* the window exists. That is exactly what OPS22 tripped
+over and logged as an unreliable focus hint: the same window read `claude` on one run and
+`✳ Claude Code` on the next, seconds apart.
+
+**1c. Does `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` actually stop the overwrite?** This is the
+whole premise, and the only way to know is to run a real Claude session. Enumerated every
+visible top-level window before the spawn, launched with the env var set, and diffed:
+
+```
+windows before: 21
+t+ 4s  new windows: "OPS32-VERIFY"
+t+10s  new windows: "OPS32-VERIFY"
+t+18s  new windows: "OPS32-VERIFY"
+t+30s  new windows: "OPS32-VERIFY"
+```
+
+**Held for the full 30 seconds with Claude Code live in the window.** The fix works. (The
+title is also clean by then — `cmd` briefly appends its command line, and Windows Terminal
+settles back to the tab title within a few seconds.)
+
+**1d. A first probe of mine was wrong and I want that on the record.** I initially read titles
+with `Get-Process | MainWindowTitle`, which returns **one title per process** — and every
+Windows Terminal window on this box belongs to a single `WindowsTerminal.exe` (pid 18260).
+That probe reported "no MC1 window" and briefly looked like evidence the fix had failed. It
+was a broken instrument, not a broken fix. The `EnumWindows` diff above is the sound
+measurement and is the one I acted on.
+
+### 2 · What I changed (`server.mjs`)
+
+| Change | Why |
+|---|---|
+| `SPAWN_ENV()` — inherits `process.env`, adds `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` | §1c. Passed via a new `env` argument on `runLauncher`, which previously took none and so inherited silently. |
+| `nextTag(folder)` → `` `MC${n} · ${label}` `` | A per-spawn serial plus the folder. |
+| `wtArgv(folder, tag)` / `cmdArgv(folder, tag)` | Both paths carry the same tag; `start`'s first quoted argument *is* the window title, so the cmd fallback names windows too — it previously did not. |
+| One tag per spawn, reused across the wt attempt **and** the cmd fallback | A window that came up the long way still carries the same name. |
+| `focusWindow(..., tag)` instead of the hardcoded `` `MC ${label}` `` | The focus ladder's title hint now matches what was actually set. |
+| `/api/spawn` returns `tag`; the page leads with it | The browser message and the taskbar button now say the same string. |
+
+**Why the serial and not just the folder:** the folder alone would not have helped Butch at
+all. **TRIV22 and TRIV23 were both `TheHoneycomb.games`** — two terminals, same folder. A
+folder-only title leaves them identical, which is the exact failure being fixed.
+
+### 3 · The pass code cannot come from the spawner — and this is the real finding
+
+The dispatch asks for windows titled *"TRIV22 · TheHoneycomb.games"* and states that the fix
+*"belongs to the spawner, not to Claude Code, and not to a prompt instruction."* The first
+half is achievable; **the pass code half is not, and no amount of spawner work will get it.**
+
+`/api/spawn` accepts `{ index }` — an index into `cfg.folders`. That is all it has:
+
+```json
+{ "label": "TheMANUAL.tech", "path": "C:\\Users\\Butch\\Documents\\HONEYCOMB\\TheMANUAL.tech" }
+```
+
+**Mission control does not dispatch passes. It opens a terminal in a folder.** The pass is
+claimed *later*, by the session itself, when Butch types `go` and the R2 claim query returns
+whatever the rail hands out — priority order, `after_pass` gates, `SKIP LOCKED` and all.
+At spawn time the pass code does not exist yet, and it is not knowable, because it depends on
+the state of the queue at the moment the human types a word.
+
+Three ways to close that gap, none of which is a spawner change:
+
+1. **The session renames its own window after claiming.** One OSC escape carrying the pass
+   code, emitted right after the R2 claim — measured working in §1b, and it now *sticks*
+   because §1c stopped Claude overwriting it. This is the cheapest correct answer, but it is
+   a **Terminal Protocol change** (root `CLAUDE.md`, R2) — i.e. exactly the "prompt
+   instruction" the dispatch ruled out. I did not make it unilaterally; root canon is the
+   lead's and Butch's.
+2. **Spawn *for* a specific queued pass.** Mission control already renders the board, so it
+   could offer "spawn for TRIV24" and pass the code through. But then the session must claim
+   *that* pass rather than whatever `go` returns — a change to the claim protocol itself, and
+   a much larger job than this dispatch's `EFFORT: light`.
+3. **Leave it at the serial.** `MC1 · TheHoneycomb.games` / `MC2 · TheHoneycomb.games` are
+   distinguishable, which solves Butch's stated problem — *"could not tell two running
+   terminals apart"* — without solving the stated wish.
+
+**I shipped (3) and left (1) ready.** (3) is entirely within the spawner and fixes the harm;
+(1) needs a ruling I do not get to make. If the lead wants (1), the mechanism is verified and
+it is a two-line addition to R2.
+
+### 4 · Done-test — partial, and honestly so
+
+The dispatch's done-test is *"spawn two passes simultaneously; both taskbar entries read
+their pass codes; titles persist with no Claude override; Butch confirms at the desk."*
+
+| Clause | Status |
+|---|---|
+| titles persist, no Claude override | **VERIFIED** — §1c, 30s with Claude live |
+| both entries readable and distinct | **VERIFIED by construction** — the serial guarantees it; not yet seen with two side by side |
+| entries read their **pass codes** | **NOT MET, and cannot be** — §3 |
+| Butch confirms at the desk | **OUTSTANDING** — needs him |
+
+Also verified: `node --check scripts/mission-control/server.mjs` clean; a real spawn through
+the modified `/api/spawn` returned
+`{"ok":true,"label":"TheMANUAL.tech","tag":"MC1 · TheMANUAL.tech","verified":true,"rung":"attach"}`
+and the focus ladder logged the window it matched as `"MC1 · TheMANUAL.tech - …claude.cmd"` —
+so the tag reaches the window, the focus hint, and the browser.
+
+**I ran the test server on port 7318, not 7317.** Butch's mission control is live on 7317
+(pid 26304) running the old code; restarting his instance to test mine would have been
+rude and would have proved nothing extra. **His running board still has the old behaviour
+until he restarts it** — that is the last step before this is real, and it is his to take.
+
+### 5 · Two windows I left on the desktop
+
+I opened real terminals while testing, and I am not going to kill console processes on a
+desk where TRIV22 is mid-pass — picking the wrong one is worse than leaving two open. Both
+are unambiguously mine by title, which is a small demonstration of the point:
+
+- **`OPS32-VERIFY`** — a live Claude session, idle at the prompt, nothing in it. Safe to close.
+- **`OPS32-C-OSC`** — a plain `cmd` window from the title-mechanism test. Safe to close.
+
+A third, `MC1 · TheMANUAL.tech`, is **gone** and I cannot account for it. It was confirmed
+open (pids logged, focus attached, `OpenConsole` 51680 alive on a later check) and had
+vanished by the next enumeration. The one hypothesis worth recording: **it may have died when
+I stopped the test mission-control server**, which if true means spawned terminals do not
+survive the server that launched them. That would be its own defect and it would matter for
+long sessions. **Unverified — I am flagging a suspicion, not a finding**, and it would need a
+deliberate test (spawn, stop server, watch) that I did not run.
+
+### 6 · Deviations and judgement calls
+
+1. **Built on OPS22's committed work rather than waiting for it.** Its dispatch is still
+   `claimed` because it filed a question (OPS22-Q), but its code is in `main` and the tree was
+   clean. Editing the same functions was unavoidable — `wtArgv`/`cmdArgv`/`attempt` are the
+   spawn path.
+2. **Did not restructure the launched command to use `cmd`'s `title` builtin.** It produces a
+   marginally cleaner title, but it would mean merging `COMMAND()` into a compound string and
+   OPS20 deliberately made that one argv element holding an absolute path so the child shell
+   never resolves it. Not worth reopening a solved bug for cosmetics.
+3. **Serial resets on server restart.** `MC1` after every restart. Deliberate — a serial that
+   survives restarts needs state on disk, and within one session it is unique, which is all
+   the disambiguation requires.
+4. **Did not implement the pass-code rename.** §3. It needs a root-canon ruling.
+5. **Used port 7318 for testing.** §4.
+
+### 7 · Could not verify
+
+- **Two terminals side by side, as the dispatch's done-test specifies.** Requires Butch.
+- **Whether Butch's running instance picks this up** — it will not until he restarts the
+  server on 7317.
+- **The `cmd.exe` fallback path.** `wt.exe` resolved fine on this box, so `cmdArgv` never ran.
+  The tag placement there is correct by `start`'s documented argument order, but it is
+  reasoned, not executed. OPS22 left the same path unverified for the same reason.
+- **Whether `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` holds for a long session.** Measured to 30
+  seconds under a live Claude. A session that runs for an hour and changes topic several times
+  was not observed.
+- **Whether spawned terminals die with the server** — §5, suspicion only.
+
+🐝🍯
+
+---
+
+## OPS33 — BUILD PROGRESS PANEL — **HALF 1 DONE. STOPPED FOR LEAD REVIEW (OPS33-Q).**
+
+**Dispatch.** OPS33, lane `ops`, workdir `TheMANUAL.tech`. Butch: *"full arch build phases and
+steps of the TheTRIVIA build overview at the bottom of mission control… check mark each step.
+Time estimates would not hurt either."* The dispatch splits it: **Half 1 = the model, and stop
+for lead review before building UI.** That stop is honored — **no UI was written.**
+
+**Posture: zero production writes.** Every production statement was a `SELECT`. All SQL ran in
+a local scratch database, `ops_o33_probe`, since dropped. No repo file was edited except this
+`REPORT.md`.
+
+### 1. The dispatch is right that the model is the hard part — and the rail is missing a column
+
+Building the panel off the dispatch board would give Butch a flat to-do list he already has.
+So: a new rail-wide table, plus two views that derive truth instead of asking anyone to tick
+boxes.
+
+**Rail-wide, not `games_*`** — recommended and taken. Every astra will want this panel; a
+`games_build_steps` would be copied five times. `astra` is the filter column.
+
+**⚠ The estimate quality is capped by a missing column, and no query can fix it.** The
+dispatch's own caveat — *"claimed_at is reset if a lead re-queues a stalled pass, so some
+durations are wrong low (TRIV23 reads 4.3 min but actually ran twice)"* — is not a filtering
+problem. `ops_dispatches` stores **one** `claimed_at` and overwrites it. Once a re-queue
+happens the earlier claim is **gone**; the rail cannot distinguish "ran fast" from "ran twice".
+My `suspect` flag catches what is visible (a `-Q` was filed, or a sub-2-minute duration) and
+**it does not catch TRIV23** — 4.3 min, one report, no question, indistinguishable from a
+genuinely quick pass.
+
+The fix is one column and it should land before the panel claims precision:
+
+```sql
+ALTER TABLE public.ops_dispatches ADD COLUMN claim_count integer NOT NULL DEFAULT 1;
+ALTER TABLE public.ops_dispatches ADD COLUMN first_claimed_at timestamptz;
+-- claim sets first_claimed_at on first claim only; requeue increments claim_count.
+```
+
+Seeded as step 8.4. Until it exists, every estimate is "median of passes we think ran once."
+
+### 2. The measurement — real, and it disagrees with a hardcoded number in three ways
+
+Computed live across **81 passes** that have both a claim and a report:
+
+```
+effort   |  n | min |  p25 | median |  p75 |   max | total_min
+untagged | 34 | 2.3 |  6.4 |    9.4 | 12.4 |  37.0 |  360
+standard | 31 | 2.3 |  6.7 |   11.7 | 17.5 |  72.3 |  489
+light    |  8 | 1.4 |  3.4 |    4.4 |  9.7 |  13.0 |   50
+high     |  7 | 8.4 | 13.3 |   15.0 | 19.9 | 216.8 |  307
+deep     |  1 |19.3 | 19.3 |   19.3 | 19.3 |  19.3 |   19
+```
+
+Three things the lead's 19-pass games-lane sample could not see:
+
+1. **`light` is a real, separate bucket** — median **4.4 min**, less than half of `standard`'s
+   11.7. Bucketing by the EFFORT tag is worth doing; those two are not the same work.
+2. **`high` is a legacy tag** with 7 passes, and it is *not* `deep` — it predates the
+   light/standard/deep vocabulary. Its `max` of **216.8 min (OPS15)** is 3.5 hours and almost
+   certainly an overnight or stalled pass; it single-handedly makes `high`'s mean useless while
+   its median (15.0) stays sane. **Report medians and quartiles, never means.**
+3. **`deep` still has n=1.** The dispatch said not to pretend that bucket is calibrated; it
+   still is not. The view exposes `est_sample_n` precisely so the panel can refuse to show a
+   range it cannot support.
+
+**Render rule I recommend, and it is a product decision not a query one:** show a range only
+when `est_sample_n >= 5`. Below that, print `not calibrated (n=1)` — not a number. A single
+made-up figure is worse than no figure, and `deep` is the bucket every remaining moat step
+falls into.
+
+### 3. What was built and verified
+
+`ops_build_steps` (table) · `ops_pass_durations` (view) · `ops_effort_stats` (view) ·
+`ops_build_progress` (view — the one the panel reads).
+
+**Status is derived from the rail wherever a pass exists; the stored `status` column is
+consulted only for steps with no `dispatch_pass`.** Verified against five cases:
+
+```
+V5 blocked is now distinct from done | pass  | derived | dispatch
+Channel v1 / TV + play surfaces      | TRIVA | done    | done
+Night DB lifecycle                   | TRIVB | in_progress | claimed
+Night client                         | TRIVC | not_started | queued
+Blocked example                      | TRIVD | blocked | claimed
+Cross-venue fixtures                 | (none)| done    | -        <- manual tick, allowed
+Seasons + promotion                  | (none)| parked  | -
+```
+
+**A flaw the test caught in my own first draft.** V1 derived the blocked pass as **done**,
+because a report existed for it — but that report was its `-Q`, a *question*. The panel would
+have shown Butch a green check on work that is stopped and waiting on him. Fixed: done means a
+report at the **exact** pass name; a `-Q`-only pass derives `blocked`, a fifth status. That
+distinction matters right now — OPS30 and TRIV22 are both in it.
+
+A manual `status='done'` on a step **with** a linked pass is correctly ignored (`TRIVC` stayed
+`not_started`); on a pass-less step it is honored. That is the "do not ask a human to tick
+boxes the rail already knows" requirement, enforced rather than documented.
+
+### 4. The seed — 31 steps, 8 phases, 18 rail-linked
+
+Sources: GMF v0.3 §3/§4 (shipped), GMF v0.5 §6 batch (next, in order), TRIV4's ratified Night
+spec, the four-part moat sequence, MMF §41.
+
+| Phase | Steps | Shape |
+|---|---|---|
+| 1 · Channel v1 — live | 7 | all rail-linked; this is what exists |
+| 2 · Integrity + trust | 5 | 3 linked, 2 future (server timing, submit caller verification) |
+| 3 · Money rails | 4 | 2 linked, 2 **Butch** (Stripe keys, grace ruling) |
+| 4 · Night v0 — single venue | 5 | 3 linked, 2 future (brackets, disputes) |
+| 5 · Moat — cross-venue | 2 | future |
+| 6 · Moat — seasons | 2 | future |
+| 7 · Moat — player house | 2 | future |
+| 8 · Ops + platform | 4 | 3 linked incl. this pass, 1 = the claim-history column |
+
+`seed loaded|31|18|8`. Full seed SQL is in the rail report.
+
+**Two seed judgement calls, flagged not buried.** Steps 3.3 (Stripe keys) and 3.4 (grace
+ruling) carry no effort tag because they are **not terminal work** — they are Butch's, and
+estimating them from pass durations would be nonsense. And the moat phases are deliberately
+coarse: one step per moat stage rather than invented sub-steps, because a made-up decomposition
+would read as more planned than it is.
+
+### 5. Half 2 — scoped, not started
+
+The surface is `scripts/mission-control/server.mjs` (749 lines): a Node HTTP server rendering
+`<section>` panels polled by `tick()`. Half 2 is a new `<section>` at the bottom, one data
+endpoint reading `ops_build_progress`, one `render` function. **`mission-control.ahk` is only
+a 110-line launcher palette — the board is the browser page on port 7317**, which is worth
+saying because "bottom of mission control" could reasonably have meant the AHK GUI.
+
+**OPS32 collision check:** OPS32 (spawner names the window) touches `spawnTerminal` / `wtArgv`
+/ focus — not board rendering. Same file, different regions. `git status` on TheMANUAL.tech was
+clean at claim.
+
+### 6. Could not verify
+
+- **Nothing was applied.** The model and seed ran only in scratch, against mirrored
+  `ops_dispatches` / `ops_reports` tables with synthetic rows. The measurement numbers in §2 are
+  live production reads.
+- **`CREATE OR REPLACE VIEW` cannot rename a column.** Applying my corrected
+  `ops_build_progress` over an earlier version needs `DROP VIEW` first — hit in scratch, noted
+  so the lead does not.
+- **The seed's completeness is a judgement, not a fact.** It is drawn from GMF, TRIV4 and the
+  moat sequence as written; if there is a build overview document I did not find, phases 5–7
+  are thinner than they should be.
+- **No UI, no rendering, no browser.** Half 2 by definition.
+- **Whether the `high` tag should be folded into `deep`** before the panel buckets by effort.
+  I left them separate because they are different vocabularies from different weeks, but seven
+  passes stranded in a dead bucket is a real choice to make.
+
+---
+
 ## OPS25 — BACKUP RESTORATION (2026-07-28) — **DONE. BOTH TIERS GREEN.**
 
 > **Supersedes the OPS25-Q filing below.** That question was filed with item (1) blocked on Butch's
