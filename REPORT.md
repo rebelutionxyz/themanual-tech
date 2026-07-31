@@ -5,6 +5,1045 @@ Newest pass first.
 
 ---
 
+## OPS46-CORRECTION - my SET LOCAL sweep was incomplete. Conclusion holds, one stated fact did not.
+
+**Correcting OPS46, filed earlier this session.** New row rather than an edit, per R3.
+
+### What was wrong
+
+OPS46 section 3 stated: **"`HONEYCOMB/.claude/`: no matches."** That is false.
+
+The sweep behind it used a search tool that **respects `.gitignore`**. Both `.claude/` and
+`backups/` are gitignored, so the tool reported clean on files it could not open. A plain recursive
+`grep` over the same tree - which had been running in the background and finished after OPS46 was
+filed - returned six more rows.
+
+### The six that were missed
+
+| Location | What it is | Live defect? |
+|---|---|---|
+| `.claude/settings.local.json:552, 556` | Permission-allowlist entries recording `psql -c "SET LOCAL ops.session = ...; SELECT ..."` | **No.** Both are `-c`, the transport where `SET LOCAL` genuinely works. **These are OPS41's own test commands, frozen in the allowlist - they are the direct evidence that the original test was run on `-c` and never on `-f`** |
+| `backups/post-justice-v1_1-20260726-211018.sql:11250, 11275` | `EXECUTE format('SET LOCAL realtime.topic TO %L', topic)` in a Supabase `realtime` PL/pgSQL body, inside a DB dump | **No, and not ours.** A function body always runs in a transaction, so `SET LOCAL` is correct there |
+| `backups/pre-session-20260726-130618.sql:10548, 10573` | Same clause, same reason, different dump | **No** |
+
+Also matched and discarded: a line inside `atlasJUSTICE.org/.next/server/chunks/*.js`, a minified
+build artifact where the string appears incidentally.
+
+### What is unchanged
+
+**The conclusion stands: there is still no second live `-f` defect.** Everything the second sweep
+added is either a `-c` invocation, a PL/pgSQL function body, or a build artifact. The corrected
+count is **fifteen occurrences across nine files**, all inert, none fixed - rather than nine across
+five.
+
+The paste-ready block, the line range (`CLAUDE.md` 397-410), and both proofs are untouched and
+still correct.
+
+### The transferable lesson, which is the reason this is worth a row
+
+**A gitignore-respecting search is the wrong instrument for a "does this pattern exist anywhere"
+sweep.** `.claude/`, `backups/`, `node_modules/` and every other ignored path are precisely where
+operational commands, credentials-adjacent config and database dumps live. For a defect sweep the
+right tool is a plain recursive grep with explicit excludes, not a source-code search that silently
+inherits `.gitignore`.
+
+**And there is a small irony worth recording:** the two rows the first sweep could not see are the
+allowlist entries that prove OPS41 tested this on `-c`. The evidence for how the bug shipped was
+sitting in the one directory the sweep was blind to.
+
+### Manifest
+
+```
+ M docs/ops46-claude-md-set-local-fix-2026-07-31.md   (section 3 corrected in place, correction noted inline)
+ M REPORT.md
+```
+
+Nothing else changed. Root `CLAUDE.md` and `.claude/` remain untouched.
+
+---
+
+## OPS46 - CORRECTED CLAUDE.md DIFF PARKED. Fix proven under -f, not -c.
+
+**Dispatch.** OPS46, lane `ops`, workdir `TheMANUAL.tech`, scope *(empty)*. Produce a clean
+paste-ready diff and park it. **Root `CLAUDE.md` NOT edited; nothing under `HONEYCOMB/.claude/`
+edited** - both verified clean in git status at the end. ASCII only, verified 0 non-ASCII.
+
+**Deliverable:** `docs/ops46-claude-md-set-local-fix-2026-07-31.md`.
+
+### The fix is proven on the transport that actually breaks it
+
+Both halves run under `psql -f`. Never `-c`, because testing it the easy way is how it shipped
+broken.
+
+**A - the defect, reproduced exactly as LEAD_PROTOCOL v0.8 C-1 describes:**
+
+```
+WARNING:  SET LOCAL can only be used in transaction blocks
+ A: after SET LOCAL, read in a LATER statement | (NULL - evaporated)
+ A: claimed_by written by the claim | OPS46 | claimed | (NULL)
+```
+
+**B - plain SET, same transport:**
+
+```
+ B: after plain SET, read in a LATER statement | MC9/OPS46-PROOF
+ B: claimed_by written by the claim | OPS46 | claimed | MC9/OPS46-PROOF
+ B: session GUC still set after ROLLBACK       | MC9/OPS46-PROOF
+ B: rail unchanged after rollback | OPS46 | (NULL - correctly rolled back)
+```
+
+`claimed_by` populated. Plain `SET` is session-scoped and survives the separate implicit
+transactions a `-f` run creates - that is the whole difference.
+
+**On test posture, because R7 is absolute here.** The dispatch said "throwaway row", and OPS41 did
+create one. **I did not insert into `ops_dispatches`** - R7 says NEVER, and a dispatch body cannot
+grant an authority not written in CLAUDE.md. Instead the proof `UPDATE`s `claimed_by` on **this
+pass's own claimed row** inside `BEGIN ... ROLLBACK`, which is the one exception R7 does name. The
+last query confirms the rail is unchanged afterward. Same proof, no rule bent.
+
+### Three things I changed beyond the one word
+
+The dispatch asked for one word. Three more were needed to make the block actually pasteable:
+
+1. **The SQL is written out in full.** OPS41's parked diff carried
+   `... (WHERE clause and FOR UPDATE SKIP LOCKED unchanged)` as an ellipsis. Correct in a diff,
+   **impossible to paste**. The block is now complete.
+2. **A three-line prose note explaining why it is plain `SET`.** Without it, the next pass tidying
+   this file will "helpfully" restore `SET LOCAL` - it is the more careful-looking form. **The
+   comment is the guard against a well-intentioned regression**, and this bug has already shipped
+   once.
+3. **ASCII throughout** - OPS41's prose had em dashes, and this block is destined for the exact
+   argv path where OPS43 found one U+2014 blanks all three panels.
+
+Unchanged: WHERE clause, `FOR UPDATE SKIP LOCKED`, the outer `AND status='queued'` re-check,
+`LIMIT 1`, the lanes placeholder. **Only the transport and the announce line differ; the claim's
+semantics are untouched.**
+
+**Target: `CLAUDE.md` lines 397-410 inclusive** - the blank line, the ```sql fence, ten SQL lines,
+closing fence. Line 396 and line 411 are the boundaries and stay.
+
+### Other SET LOCAL occurrences: nine, across five files, none live
+
+Swept the workspace including `.claude/` (no matches), both `scripts/` trees (none), and
+`TheMANUAL.tech/supabase/`. **Every hit is inside a SQL comment or is prose. No second live defect
+exists.** Reported, not fixed, per the dispatch.
+
+**The one worth your attention is not a migration.**
+`shared/notes/audits/v9-security-production-verification-2026-05-06.md:119,211` carries
+`SET LOCAL ROLE anon;` in an RLS verification transcript. Copied into a `-f` file, **the role
+switch silently does not happen and the checks run as the connecting superuser** - the audit would
+report "RLS holds" having never tested it as anon. It is a document, so nothing is broken today,
+but it is a loaded footgun for whoever re-runs that audit.
+
+**And one that predicted this bug months ago.** `shared/canon/lock-8-c-disposition-research.md:377`
+already reads: *"Postgres LOCAL is transaction-scoped, and Edge Functions may not preserve a
+transaction across the GUC-set and the subsequent query. Worth validating in a smoke test before
+counting on the pattern."* Same insight, different transport, written down and never acted on. The
+pattern here is not carelessness - **`SET LOCAL`'s scope depends on the transport, and every
+transport in this stack has to be tested separately.** If `set_astra_context` is ever authored,
+that smoke test is still owed.
+
+### Done-test
+
+| Requirement | Status |
+|---|---|
+| Paste-ready block, file and line range named | Met - `CLAUDE.md` 397-410, full SQL, no ellipsis |
+| Fix proven under `-f` specifically | Met - A shows WARNING + NULL, B shows the value written |
+| `claimed_by` shown populated | Met - `MC9/OPS46-PROOF`, rail unchanged after rollback |
+| Other occurrences reported or none found | Met - nine listed with per-file risk |
+| Zero protocol files edited | Met - git status on `CLAUDE.md` and `.claude/` is empty |
+
+### Manifest
+
+```
+?? docs/ops46-claude-md-set-local-fix-2026-07-31.md
+ M REPORT.md
+```
+
+Uncommitted. No insert into `ops_dispatches`; the only write was a rolled-back `UPDATE` of this
+pass's own row.
+
+---
+
+## OPS47 — TERMINAL ADDRESSING — **built and proven. Two bugs found in my own drafts.**
+
+**Dispatch.** OPS47, lane `ops`, workdir `TheMANUAL.tech`, EFFORT deep. Build three of OPS42's
+four things. **Auto-continue explicitly out of scope.**
+
+**AUTO-CONTINUE WAS NOT BUILT.** No observation signal, no self-declaration, no code path that
+continues without a human `go`. Stated first because the dispatch asked for it explicitly.
+
+**Root `CLAUDE.md` and `.claude/` untouched** — `git status` on both is empty. **Zero rail rows
+written**; every claim test ran against a local scratch mirror, never production.
+
+### 1. The OPS46 gate — cleared, and it changed the deliverable's shape
+
+OPS46 is `done` and filed, **plus an `OPS46-CORRECTION`** I read as well. The correction admits
+a gitignore-respecting sweep missed six occurrences, but confirms *"the paste-ready block, the
+line range (CLAUDE.md 397-410), and both proofs are untouched and still correct."*
+
+**Consequence the dispatch did not anticipate: OPS46 and OPS47 edit the same 14 lines.** Two
+separate pastes would depend on paste order and on nobody re-wrapping the region between them.
+So my parked block **contains OPS46's fix verbatim** and supersedes it — one paste, no ordering
+risk, and it applies cleanly whether or not OPS46's has already gone in. Carried through
+unchanged and checked line by line: plain `SET`, the announce line, the `claimed_by` expression,
+full SQL with no ellipsis, ASCII throughout.
+
+### 2. No migration needed — the schema already carries this
+
+`ops_dispatches.terminal` exists, is `NOT NULL`, and is already populated:
+
+```
+terminal|count
+ANY     |108
+A       |6
+B       |3
+TL      |2
+```
+
+`claimed_by` exists too (OPS41/OPS46). **This pass is a claim-statement and panel change with
+zero schema change**, which is also why OPS42-Q's `priority`-within-terminal recommendation is
+the right mechanism — I adopted it as argued, no substitution.
+
+### 3. ⚠ BUG ONE, in my own first draft: the agenda ran out of order
+
+First `go a`, three times, against an agenda of priority 40/41/42:
+
+```
+[CLAIMED] A-FIRST  | t=A | p40 | ops
+[CLAIMED] A-THIRD  | t=A | p42 | ops     <- WRONG
+[CLAIMED] A-SECOND | t=A | p41 | db
+```
+
+**40, 42, 41.** `A-SECOND` is lane `db`; my ORDER BY had lane-stickiness ahead of priority, so a
+sticky-`ops` session sorted it last regardless of its agenda position.
+
+**This is OPS39's finding resurfacing inside an agenda** — and there it is not a curiosity, it
+defeats the entire feature. An agenda that does not run in order is not an agenda.
+
+**Fix, and the reasoning matters more than the SQL:** an agenda is an **explicit human
+ordering**; lane-stickiness is a **heuristic**. Explicit must beat heuristic. But I scoped the
+inversion to the named terminal only, so pool ordering is untouched:
+
+```sql
+ORDER BY (d.terminal = '<TERMINAL>') DESC,
+         CASE WHEN d.terminal = '<TERMINAL>' THEN d.priority END ASC NULLS LAST,
+         (d.lane = ANY(ARRAY['<lanes>'])) DESC NULLS LAST,
+         d.priority ASC, d.created_at ASC
+```
+
+For an agenda row the CASE supplies the order. For an `ANY` row it is NULL, so the remaining
+terms behave exactly as canon does today. **I did not quietly change pool semantics** — OPS39
+raised that as a question for Butch and it is still his.
+
+Re-run, correct:
+
+```
+[CLAIMED] A-FIRST  | t=A | p40 | ops
+[CLAIMED] A-SECOND | t=A | p41 | db
+[CLAIMED] A-THIRD  | t=A | p42 | ops
+```
+
+### 4. The done-test, item by item — all under `psql -f`, never `-c`
+
+**`go a` claims a terminal-A row** — §3 above, three times in agenda order.
+
+**`go a` falls through to ANY when A is empty** — the mandatory behaviour:
+
+```
+=== T2 A agenda now empty -> MUST fall through to ANY ===
+[CLAIMED] POOL-1 | t=ANY | p100 | ops
+```
+
+**Terminal B untouched throughout** — `B-ONLY` still `queued` after every A claim. A soft filter
+that leaked into other terminals' agendas would be pinning by accident.
+
+**`go a db` composes** — terminal soft (includes ANY), lane hard:
+
+```
+=== T4 go a db composes ===
+[CLAIMED] POOL-DB | t=ANY | p100 | db
+```
+
+**The header:**
+
+```
+terminal|current_pass|counter|header
+A       |A-THIRD     |2/3    |[A] A-THIRD | 2/3 | ops | TheMANUAL.tech
+```
+
+which is OPS42-Q's mock exactly.
+
+**The counter excludes `ANY`, proven:** two `ANY` rows exist in the harness; terminal A's
+denominator is 3, counting only its own agenda. Pool work a terminal picks up never inflates it.
+
+### 5. ⚠ BUG TWO, also mine: the header attributed one terminal's work to another
+
+First header draft matched `c.terminal IN (t.terminal,'ANY')` and produced:
+
+```
+B|POOL-DB|...|0/1|[B] POOL-DB | 0/1 | db | TheMANUAL.tech
+```
+
+**Terminal B shown working `POOL-DB` — a row terminal A had just claimed.** Any pool row appeared
+as *every* terminal's current job.
+
+**Root cause, and it is a genuine limit rather than a typo:** an `ANY` row carries no terminal,
+and `claimed_by` records a **session id** (`MC9/OPS47-TEST`), not a terminal letter. There is no
+mapping to join on. The rail simply cannot say which terminal holds a pool row.
+
+**Fixed by matching the terminal exactly and showing nothing otherwise.** A terminal working only
+pool rows gets no current-pass line. That is the honest failure, and the alternative —
+guessing — **is precisely the mis-assignment that killed pinning on 2026-07-26, 3 of 11 wrong.**
+Reproducing it inside the feature built to replace it would have been the worst possible outcome.
+
+**Closing it properly needs `MC_SESSION` to encode the terminal letter** — a spawner change, and
+its own pass. Named, not smuggled in here.
+
+### 6. What is parked, and what is NOT
+
+**Parked:** `docs/ops47-claude-md-terminal-addressing-2026-07-31.md` — the paste-ready block for
+`CLAUDE.md` **lines 397-410**, containing OPS46's fix, the terminal filter, the agenda ordering
+with its measured justification, and the ADDRESSING-IS-NOT-OWNERSHIP ruling written into the
+prose so the next pass cannot mistake it for a preference. **0 non-ASCII characters**, verified —
+it is destined for the argv path where OPS43 found one em dash blanks the board.
+
+**NOT done, deliberately:** root `CLAUDE.md` is unedited (Butch pastes); the mission-control
+panel render is not modified — the dispatch scoped this pass to the addressing half and the
+header **query** is delivered in §2 of the parked doc for the panel pass to consume; and
+auto-continue does not exist in any form.
+
+### 7. Manifest
+
+```
+?? docs/ops47-claude-md-terminal-addressing-2026-07-31.md   <- MINE
+ M REPORT.md                                                <- SHARED
+```
+
+No other file touched. No `ops_dispatches` insert, no status change on any row but this pass's.
+
+### 8. Could not verify
+
+- **Nothing ran against the production rail.** All claim behaviour is proven on a scratch mirror
+  seeded to match production's terminal distribution. The real `go a` has never executed.
+- **`TL` is a terminal value in production (2 rows) and I did not investigate it.** It predates
+  the A/B convention — probably the retired window labels R1 mentions. If it is live, `go tl`
+  works by the same rule; if it is dead, those two rows are unreachable by any named `go` and
+  will only ever be taken by a pool claim.
+- **The header query has not been rendered anywhere.** It returns correct rows; no panel displays
+  it yet.
+- **I did not test two terminals claiming concurrently.** `FOR UPDATE SKIP LOCKED` is unchanged
+  from canon and the terminal filter does not interact with it, but the reasoning is inherited,
+  not measured.
+- **The 40/41/42 agenda convention is not enforced anywhere.** A lead who numbers an agenda 100
+  gets pool-priority ordering and no error. OPS42-Q called it a convention not schema; that is
+  right, but it means the feature depends on a human remembering.
+
+---
+
+## DB13 — REPORT HEADERS — **DB12 reviewed and AGREED. Migration written; apply HELD under R7.**
+
+**Dispatch.** DB13, lane `db`, workdir `TheMANUAL.tech`. Review DB12, apply the additive half,
+demonstrate the waiting-on-a-human query, hand-backfill only.
+
+**Nothing was applied to production.** Every production statement was a `SELECT`. The migration
+file is written, ASCII-clean, and scratch-applied. The hold is explained in §3 and costs one
+turn to clear.
+
+### 1. Step 1 — DB12 reviewed. **I AGREE**, and one of its findings corrects me.
+
+The dispatch invites disagreement. I do not have any. Three things DB12 got right that I would
+have got wrong:
+
+**(a) `pass` is not unique in `ops_reports`, so `DISTINCT ON` is required, not defensive.**
+Confirmed live: **149 rows, 3 duplicate passes.** And its consequence is the best part of the
+design — *a row leaves the panel when a NEWER report says otherwise, not when someone ticks it
+off.* No dismiss button, so the panel cannot drift from the rail.
+
+**(b) The `-Q` suffix cannot be the index — and this refutes the approach I used in OPS40.**
+DB12 names reports that are waiting without a `-Q` (`DOCS13`, `TRIV21`, `OPS40`) and `-Q`-less
+rows that are not passes at all (`LANG-RULING`, `PARKING`, `HANDOFF-0730-PM`). OPS40's sweep —
+which I wrote — leaned on exactly that convention. It happened to be right that night because
+every open row had a `-Q`; it would have missed `TRIV21` the moment one did not. **A column is
+needed. DB12 is right and my earlier pass was lucky.**
+
+**(c) text + CHECK, not an enum.** Matches `ops_dispatches.status` and `trivia_sessions.phase`.
+An enum needs `ALTER TYPE` on production every time the rail learns a shape.
+
+**And `decisions_owner` earns its place — I can prove it empirically.** DB12 argued you cannot
+filter a sentence. I built the regex owner-guess anyway, to test the claim honestly, and ran it
+against the four live open rows:
+
+```
+pass  |guessed_owner
+TRIV26|butch          <- WRONG, it is lead
+TRIV29|butch          <- WRONG, it is lead
+OPS35 |butch          <- WRONG, it is lead
+OPS44 |unclear        <- no answer at all
+```
+
+**Three of four wrong, one unanswered.** Machine-guessing the owner from prose does not work,
+which is the whole argument for the column and for DB12's ban on machine backfill. That
+sentence is now a `COMMENT ON COLUMN` so the next pass does not retry it.
+
+### 2. Step 3 — the query, demonstrated on real data. It surfaces OPS35.
+
+**Interim form, run against production right now** (no new columns needed — this is what the
+rail can answer today):
+
+```
+pass  |lane |hours_claimed|newest_report_title
+TRIV26|games|24.0         |TRIV26-Q - HALF 1 DESIGN DONE, stopped for lead review...
+TRIV29|games|24.0         |TRIV29-Q - FRANCHISE SPINE DRAFTED, NOTHING APPLIED...
+OPS35 |ops  |12.9         |OPS35-Q - token pack purchase design...
+OPS44 |db   | 0.1         |OPS44-Q - APPLY HELD by the dispatch own stop condition...
+```
+
+**OPS35 surfaces**, as the done-test requires. Four rows open; OPS22, OPS30, OPS37 and OPS34
+have closed since OPS40's sweep.
+
+**Final column-backed form**, demonstrated in scratch with the four rows hand-populated:
+
+```sql
+WITH newest AS (
+  SELECT DISTINCT ON (regexp_replace(pass,'-Q$',''))
+         regexp_replace(pass,'-Q$','') AS base_pass,
+         headline, outcome, decisions_required, decisions_owner, blocked_on, created_at
+    FROM public.ops_reports
+   ORDER BY regexp_replace(pass,'-Q$',''), created_at DESC
+)
+SELECT n.decisions_owner AS waiting_on, d.pass, d.lane,
+       round(extract(epoch FROM (now() - d.claimed_at))/3600.0,1) AS hours_waiting,
+       n.decisions_required, coalesce(n.blocked_on,'-') AS blocked_on
+  FROM public.ops_dispatches d
+  JOIN newest n ON n.base_pass = d.pass
+ WHERE d.status <> 'done' AND n.decisions_required IS NOT NULL
+ ORDER BY d.claimed_at;
+```
+
+```
+waiting_on|pass  |lane |hours_waiting|decisions_required
+lead      |TRIV26|games|24.0         |Approve the code scheme, and rule on 3g disclosure...
+lead      |TRIV29|games|24.0         |Apply the drafted schema or queue a dispatch naming it
+lead      |OPS35 |ops  |13.0         |Answer the five lead questions in section 9
+lead      |OPS44 |db   | 1.0         |Re-queue with the amended rollback, or rule the partial...
+
+V3 a DONE pass with no decision does not surface | rows_for_OPS43 = 0
+V4 PASS - rejected: violates check constraint "ops_reports_decisions_owner_chk"
+```
+
+The column-backed version says **who** and **what**, which the interim one cannot.
+
+### 3. ⚠ Step 2 — the apply is HELD. R7, and the lead's own correction one dispatch ago.
+
+R7 permits a production apply *"only via an explicit dispatch that names the migration file"*
+and *"the rollback statement must be stated in the dispatch before the apply runs."*
+
+This dispatch does neither. It says *"A migration file… with a stated rollback captured BEFORE
+the apply"* — the file does not exist until I write it, and rollback authorship is delegated to
+me. **That is the exact pattern the lead corrected in OPS44's R7 AMENDMENT, filed hours ago:**
+
+> *"the dispatch, not the pass, states the rollback. OPS34-Q asked for a dispatch 'naming the
+> file with rollback stated' and the first version of this dispatch delegated rollback
+> derivation to you. That was wrong under R7."*
+
+Applying here would contradict a ruling the lead made one dispatch earlier. **I am aware this is
+my third hold in a row, and I do not think that is a good sign — but the fix is one line in a
+re-queue, and inventing an exception to a rule the lead just reaffirmed is worse than waiting a
+turn.** ADD COLUMN nullable is genuinely low-risk; R7 grades process, not risk, and the process
+here is one field short.
+
+**Everything needed to clear it is below.** Name the file, paste the rollback, re-queue.
+
+**FILE:** `supabase/migrations/20260731050000_ops_reports_headers_v1.sql`
+
+**PRE-STATE, measured before writing anything** — `ops_reports` has exactly six columns and
+four CHECK constraints plus its PK:
+
+```
+id uuid NOT NULL | terminal text NOT NULL | pass text NOT NULL
+title text NOT NULL | body text NOT NULL | created_at timestamptz NOT NULL
+ops_reports_body_check | ops_reports_pass_check | ops_reports_terminal_check | ops_reports_title_check
+```
+
+**ROLLBACK, exact — ready to pin:**
+
+```sql
+BEGIN;
+ALTER TABLE public.ops_reports
+  DROP CONSTRAINT IF EXISTS ops_reports_outcome_chk,
+  DROP CONSTRAINT IF EXISTS ops_reports_decisions_owner_chk;
+ALTER TABLE public.ops_reports
+  DROP COLUMN IF EXISTS headline,
+  DROP COLUMN IF EXISTS applied,
+  DROP COLUMN IF EXISTS decisions_required,
+  DROP COLUMN IF EXISTS decisions_owner,
+  DROP COLUMN IF EXISTS blocked_on,
+  DROP COLUMN IF EXISTS outcome;
+COMMIT;
+```
+
+**One honest caveat on that rollback, which the lead should know before pinning it:** it DROPs
+columns, so it destroys anything written to them. That is free **only** while the migration
+ships with no backfill — at apply time all six are NULL across all 149 rows. Once passes start
+populating them the rollback stops being free, and the lead should be told at that point rather
+than discovering it.
+
+### 4. The migration — what it does, and two judgement calls
+
+Six nullable columns: `headline`, `applied`, `decisions_required`, `decisions_owner`,
+`blocked_on`, `outcome`. Plus two CHECKs. **Nothing existing altered, nothing dropped, no NOT
+NULL, no DEFAULT** (a DEFAULT would rewrite 149 rows; cheap here, but additive means additive).
+
+**Scratch-applied clean** with the mandated invocation:
+
+```
+$ psql --single-transaction -v ON_ERROR_STOP=1 -f 20260731050000_ops_reports_headers_v1.sql
+ALTER TABLE
+ALTER TABLE
+COMMENT
+```
+
+and the columns land nullable with the six originals untouched (V1 above).
+
+**Judgement call 1 — the file carries no `BEGIN`/`COMMIT` of its own.** My first version did,
+and applying it under `--single-transaction` produced *"there is no transaction in progress"*.
+Harmless — but a warning readers learn to skim past is how a real one gets missed, and OPS43
+was exactly a case of noise hiding a fault. The file now states its required invocation instead.
+
+**Judgement call 2 — no ASCII CHECK on the new columns**, deliberately, and the migration says
+why: 98 of 145 existing report titles contain non-ASCII, so such a constraint would be
+unsatisfiable. OPS43's rule governs **code crossing the shell boundary**, not content. The
+migration file itself is **0 non-ASCII characters**, verified.
+
+### 5. Step 4 — hand-backfill, DRAFTED not applied, each with its sentence
+
+Machine-guessing is banned and §1 shows why. These four are hand-read, and **all four are
+`lead` — not one is Butch**, which is the opposite of what the regex concluded:
+
+| pass | `decisions_owner` | The sentence I read it from |
+|---|---|---|
+| `TRIV26-Q` | `lead` | *"STOPPED FOR LEAD REVIEW (TRIV26-Q). NOTHING APPLIED."* — with a Butch sub-item inside: *"## 3g · Refinement 2 — disclosure. **For Butch, not for me.**"* |
+| `TRIV29-Q` | `lead` | *"left `claimed` per R4. **The lead applies.**"* |
+| `OPS35-Q` | `lead` | *"STOPPED FOR LEAD REVIEW. NOTHING APPLIED."* and *"## 9 · LEAD QUESTIONS — filed, not decided (per dispatch)"* |
+| `OPS44-Q` | `lead` | *"report it before applying rather than proceeding"* — needs a re-queue with the amended rollback |
+
+**TRIV26 is the one the schema handles imperfectly.** Its next move is lead review, but §3g is
+explicitly Butch's. `decisions_owner` is a single value, so it reads `lead` and the Butch
+sub-item lives in `decisions_required` prose. Not a flaw worth a fifth owner value — but the
+first case where one row genuinely has two owners, and worth watching for a second.
+
+These UPDATEs are **not written into the migration** — DB12 is right that backfill and schema
+should not ship together, and they cannot run until the columns exist anyway.
+
+### 6. Could not verify
+
+- **Nothing is applied**, so the column-backed query has never run against production data. It
+  ran in scratch against the four real rows hand-populated; the interim query is what ran live.
+- **`applied` will be answered inconsistently until the protocol states its two rules.** DB12
+  named them (uncommitted files are not "applied"; closing your own dispatch does not count) and
+  I copied them into the migration comments — but a comment in a file is not a protocol, and
+  LEAD_PROTOCOL should carry them before passes start setting the column.
+- **I did not check whether any surface reads `ops_reports` with `SELECT *`.** Six new columns
+  are additive, but a client doing `SELECT *` into a typed row will see fields it does not know.
+  Low risk, unchecked.
+- **The `outcome` value set is DB12's, adopted unexamined** — `done/blocked/question/design/
+  held/superseded`. `held` and `blocked` overlap in a way I would want to see used before
+  trusting; the CHECK makes adding a value cheap, removing one expensive.
+
+---
+
+## OPS45 — MIGRATION HISTORY DRIFT — **ORPHANS DUMPED. THE DRIFT IS 100x THE ESTIMATE. NOTHING APPLIED.**
+
+**Dispatch.** OPS45, lane `db`, workdir `TheMANUAL.tech`, EFFORT deep. ASCII only.
+**Zero migrations applied, zero rows written to `schema_migrations`, nothing replayed.**
+The only writes were two new repo files (dumps) and this report.
+
+---
+
+### 1 · The drift is not five. It is 110 and 471.
+
+The dispatch estimated TWO orphans and FIVE repo-only files. Measured across the full
+directory and the full table:
+
+```
+schema_migrations rows          636
+repo migration files            275
+  in BOTH (reconciled)          165
+  in DB but NOT in repo         471      <- dispatch estimated 2
+  in repo but NOT in DB         110      <- dispatch estimated 5
+```
+
+**Only 165 of 636 history rows have a repo file — 26%.** The dispatch was right that it
+would be deeper and right to say "do not assume it is five"; it is about 100x the estimate
+in one direction and 22x in the other.
+
+**And it is not last night's problem.** The orphans span `20260506191712` to
+`20260731030033` — 2026-05-06 to 2026-07-31, the entire life of the project. This is not
+drift introduced by terminals applying with psql over the last few days; **it is the normal
+state of this database and always has been.**
+
+Three of the 110 "repo-only" entries are artifacts of my filename parsing, not real drift:
+`23_v9_0_security.sql`, `24_v9_0_security_tightening.sql` and
+`20260616_geo_us_cities_geonames_pop_coords.sql` do not carry 14-digit timestamps, so they
+cannot correspond to a `version` at all. Real repo-only is ~107. **Those three files can
+never be replayed by the CLI in order** — a separate small defect, flagged not fixed.
+
+### 2 · The two named orphans, dumped and proven byte-faithful
+
+Both were applied by the lead through the Supabase management API, so their SQL is stored in
+`schema_migrations.statements`. This is a **dump, not a rewrite** — the file content is the
+stored statement, unmodified.
+
+| version | file written | bytes | md5 (stored) | md5 (file) | |
+|---|---|---|---|---|---|
+| `20260731020842` | `20260731020842_ops_dispatches_pass_uidx_full_coverage.sql` | 1,206 | `99c51ef8a4f2ddce54a40dd9298cc2e6` | `99c51ef8a4f2ddce54a40dd9298cc2e6` | **BYTE-FAITHFUL** |
+| `20260731030033` | `20260731030033_revoke_anon_writes_on_non_invoker_views.sql` | 1,990 | `29f454b51404ea57f6ec6d72e5ee3d1a` | `29f454b51404ea57f6ec6d72e5ee3d1a` | **BYTE-FAITHFUL** |
+
+Method: `array_to_string(statements, E'\n')` written verbatim; md5 of the file compared to
+md5 of the same expression computed **inside Postgres**. Both match exactly. Existing version
+strings kept as filenames so replay ordering is preserved.
+
+**A first attempt was NOT faithful and is worth recording:** joining with `E';\n'` and
+appending `';'` produced a trailing `;;`, because the stored statements already carry their
+terminator. Caught by reading the output, fixed, then proven by md5 rather than by eye.
+
+**Note on `20260731020842`, which concerns my own prior pass:** it is the lead's ruling that
+replaced OPS41's `WHERE status <> 'cancelled'` index with a full-coverage one, on the grounds
+that pass ids are permanent and recycling was the wrong goal. OPS41 flagged that predicate as
+inert; the flag was acted on. **The index OPS41 created no longer exists in that form** — the
+dumped file is now the record of what replaced it.
+
+### 3 · Single source of truth — recommendation and cost
+
+**Recommend: repo files are the source of truth, replayed by the Supabase CLI.
+`schema_migrations` becomes a derived log, never authored directly.**
+
+Why this direction and not the other:
+
+- **Repo files are reviewable, diffable, and in git.** `schema_migrations.statements` is a
+  text array in a database that a restore is supposed to rebuild — using it as the source of
+  truth makes the artifact depend on the thing it produces.
+- **471 orphans have no file, but they DO have stored SQL**, so the direction is recoverable:
+  every orphan can be dumped exactly as §2 dumped two. The reverse is not true — 110 repo
+  files have no history row, and no amount of reading the database recovers their *intent*.
+- Root CLAUDE.md already treats migration files as the artifact of record.
+
+**The mechanism, because a convention nobody can violate beats a rule everyone must
+remember:** the failure is that `psql -f` applies SQL and writes no history row. So do not
+let terminals run `psql -f` on a migration at all.
+
+1. **A wrapper script is the only sanctioned apply path** — e.g. `scripts/apply-migration.mjs
+   <file>`, which applies inside a transaction AND inserts the history row in the same
+   transaction. Either both happen or neither does. That single property is the whole fix.
+2. **Deny raw `psql -f supabase/migrations/*` in the permissions layer**, the same way
+   `git -C` is denied at this root. A rule in a document is advisory; a denied command is not.
+3. The MIGRATION AMENDMENT in root CLAUDE.md gains one line: *the named migration file is
+   applied by the wrapper, never by psql directly.*
+
+**Cost, stated honestly:**
+
+- **Reconciling the 471 is a real job, not a footnote.** Dumping is mechanical (§2 proves the
+  method) but 471 files land in the repo unreviewed, and some will be Supabase-internal or
+  superseded. **Recommend NOT bulk-dumping.** Dump forward from a chosen line — everything
+  from, say, 2026-07-01 — and declare everything earlier reconciled-by-fiat with the current
+  schema as the baseline. Cheaper and more honest than pretending 471 files were reviewed.
+- **The 110 repo-only files cannot be given history rows** — the dispatch is explicit and
+  right: *"writing fake history is worse than having none."* They stay unrepresented until a
+  baseline squash absorbs them.
+- **The wrapper is small** (one transaction, one insert) but every terminal's habit changes,
+  and the deny rule needs Butch to edit `~/.claude/settings.json`, which no agent can do.
+
+**The honest alternative I considered and rejected:** declare `schema_migrations` the truth
+and dump all 471. It is less work today and it makes the database self-describing — but it
+puts 471 unreviewed files in git in one commit, and it cements the management-API path as
+canonical, which is the path with no code review at all.
+
+### 4 · Restore fidelity — FLAGGED, not fixed
+
+OPS26 proved restore fidelity in July **against the assumption that migration history was the
+truth.** That assumption is now known false, and this is the plainest way to say why the old
+green result does not carry:
+
+- A restore replaying **`schema_migrations`** rebuilds production **without** `ops_build_steps`
+  and **without** the justice restore-safe trigger fix — both are repo-only.
+- A restore replaying **the repo** rebuilds production **without** last night's anon-write
+  revoke — an applied **security** fix that exists only as a history row until §2's dump.
+- **Neither source alone reproduces production.** With only 165 of 636 rows reconciled, the
+  gap is not two objects; it is most of the schema's history.
+
+**Restore fidelity must be re-tested after reconciliation, and the July result must not be
+cited as current.** The re-test also needs a new pass/fail definition: "the replay succeeds"
+is not enough, because both replays succeed and produce different databases. It has to be
+"the replayed schema matches production", object by object.
+
+### 5 · Done-test
+
+| Clause | Status |
+|---|---|
+| two orphans dumped to files | **done** — §2 |
+| proven byte-faithful | **done** — md5 match computed inside Postgres, both files |
+| full both-directions diff with counts and dates | **done** — §1, 471 / 110 / 165, 2026-05-06 to 2026-07-31 |
+| single-source-of-truth proposal with its cost | **done** — §3, repo + wrapper + deny rule; cost stated including the 471 |
+| restore-fidelity caveat stated | **done** — §4 |
+| zero migrations applied | **done** |
+| zero `schema_migrations` rows written | **done** |
+
+### 6 · Could not verify
+
+- **That the two dumped files replay cleanly.** They are byte-faithful to what was applied,
+  which is a different claim from "runs again on an empty database". Neither was executed.
+- **Whether all 471 orphans have usable `statements`.** I read the two named ones. Some may
+  be Supabase-internal (auth, storage, realtime) and not belong in this repo at all — that
+  triage is exactly the cost in §3 and I did not do it.
+- **Whether the 110 repo-only files were ever actually applied.** They are *believed* applied
+  because terminals ran them, but with no history row there is no record; only object-by-object
+  comparison against production would confirm it, and that is the §4 re-test.
+- **The three non-timestamp filenames.** Flagged in §1; I did not check whether their contents
+  are already covered elsewhere.
+- **The exact boundary date for a forward-only dump.** I suggested 2026-07-01 as a shape, not
+  a recommendation — picking it needs to know when the current schema baseline was taken.
+
+🐝🍯
+
+---
+
+## OPS44 — APPLY `20260731040000_ops_rail_admin_read_v1.sql` — **PRE-APPLY RECORD (written before the migration ran)**
+
+**Dispatch.** OPS44, lane `db`, workdir `TheMANUAL.tech`, scope *(empty)*. One named file, applied
+verbatim, rollback pinned by the dispatch under the R7 amendment of 2026-07-31 04:4xZ.
+
+**This section was written to disk BEFORE the migration was executed**, as the dispatch's step 1
+requires — *"A rollback derived after the fact is a guess."* The results section follows below it
+and was appended afterwards.
+
+### P0 · Authorization — R7 is satisfied in full this time
+
+Unlike OPS31, both literal requirements are met by the dispatch itself:
+
+| R7 requires | OPS44 dispatch |
+|---|---|
+| names the migration file | `supabase/migrations/20260731040000_ops_rail_admin_read_v1.sql` |
+| rollback stated **in the dispatch** before the apply | pinned verbatim, name-independent, with a written ruling on what it must *not* undo |
+| pre-flight recorded in `REPORT.md` | this section |
+
+The dispatch also carries an explicit lead adjudication of the two deviations OPS44-Q raised
+(`ops_build_steps` no-op; the view REVOKEs being one-way). **Nothing here was derived by me.**
+
+### P1 · Pre-state, measured live at claim time — matches the dispatch exactly
+
+```
+       relname       | kind  |        invoker        | rls |                        anon_pre                         |                        auth_pre
+---------------------+-------+-----------------------+-----+---------------------------------------------------------+---------------------------------------------------------
+ ops_build_honeycomb | view  | security_invoker=true | f   | DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE | DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+ ops_build_progress  | view  | security_invoker=true | f   | DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE | DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+ ops_build_rollup    | view  | security_invoker=true | f   | DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE | DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+ ops_effort_stats    | view  | security_invoker=true | f   | DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE | DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+ ops_pass_durations  | view  | security_invoker=true | f   | DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE | DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+ ops_build_steps     | table | ABSENT                | t   | (none)                                                  | SELECT
+ ops_dispatches      | table | ABSENT                | t   | (none)                                                  | (none)
+ ops_messages        | table | ABSENT                | t   | (none)                                                  | (none)
+ ops_reports         | table | ABSENT                | t   | (none)                                                  | (none)
+
+     relname     |          polname           | polcmd |     using_expr
+-----------------+----------------------------+--------+---------------------
+ ops_build_steps | ops_build_steps_admin_read | r      | is_platform_admin()
+```
+
+Every line of the dispatch's `PRE-STATE` block is confirmed, including the trap it warns about:
+**`ops_build_steps` already carries its grant and its admin policy from OPS33** — pre-existing
+state this migration did not create, which the pinned rollback deliberately does not touch.
+
+**The dispatch's hard stop condition is NOT triggered:** all five views the migration touches are
+`security_invoker=true`. Had any been `ABSENT`, this pass stops instead of applying.
+
+**The migration's own standing condition holds:** `admin_bees = 1` (`butch`,
+`ab696a36-e3aa-4c78-8137-eb46d3b4e9c6`). `is_platform_admin()` is
+`STABLE SECURITY DEFINER SET search_path TO 'public'`, reading `bees.is_admin` for `auth.uid()`.
+
+### P2 · The file, unmodified
+
+```
+supabase/migrations/20260731040000_ops_rail_admin_read_v1.sql
+sha256  81a86d60c5f2693f8e292faf197bf867639d77bc336fa4c8aeff4ab542ac9ee1
+bytes   4376
+```
+
+**Zero edits.** The hash above is recorded pre-apply and re-checked post-apply in the results
+section. Read in full and matched against the dispatch's description: `GRANT SELECT` only, to
+`authenticated` only, on `ops_dispatches` / `ops_reports` / `ops_build_steps`; `REVOKE ALL … FROM
+anon` on those three plus the five views; two `CREATE POLICY … FOR SELECT TO authenticated USING
+(public.is_platform_admin())`. **No `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` grant anywhere. No
+mention of `ops_messages`.** Confirmed by reading, not assumed.
+
+**One observation, not a deviation, reported before applying per the dispatch's standing
+instruction:** the dispatch header says *"ASCII only"*, and the file contains **342 non-ASCII
+bytes** — em-dashes and box-drawing characters, all inside `--` comments, none in an executable
+statement. I read "ASCII only" as binding on what I write, not as licence to edit a file the
+dispatch says to apply verbatim, so **the file is applied untouched**. `client_encoding` is
+`UTF8`, so the comments transmit cleanly. Flagged rather than silently resolved.
+
+### P3 · ROLLBACK — pinned by the dispatch, recorded here before the apply
+
+Execute **verbatim** if any probe disagrees with OPS34-Q's prediction, or if anything looks wrong:
+
+```sql
+BEGIN;
+REVOKE ALL ON public.ops_dispatches, public.ops_reports FROM anon, authenticated;
+DO $$
+DECLARE p record;
+BEGIN
+  FOR p IN SELECT c.relname, pol.polname
+             FROM pg_policy pol JOIN pg_class c ON c.oid = pol.polrelid
+            WHERE c.relname IN ('ops_dispatches','ops_reports')
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', p.polname, p.relname);
+  END LOOP;
+END $$;
+COMMIT;
+```
+
+**Two things the rollback deliberately does NOT do, both lead rulings, both recorded so nobody
+"completes" it later:**
+
+1. **It does not touch `ops_build_steps`.** That table's grant and policy predate this migration
+   (OPS33). Revoking them would destroy state this pass did not create.
+2. **It does not restore the views' blanket grants.** Those five views currently hand **both**
+   `anon` and `authenticated` `DELETE, INSERT, TRUNCATE, UPDATE, REFERENCES, TRIGGER, SELECT`.
+   They are inert only because `security_invoker=true` — the exact composition DB11 proved
+   dangerous on `trivia_topic_candidates` hours earlier. **Restoring that is a regression, not a
+   rollback.** If a rollback runs, the views stay revoked and this report says so.
+
+**Rollback verification, if executed:** `ops_dispatches` and `ops_reports` each RLS-on, zero
+policies, zero grants to `anon`/`authenticated`; `ops_build_steps` **unchanged** with its policy
+and grant intact. Losing either on `ops_build_steps` means over-rollback and must be restored.
+
+---
+
+---
+
+### R1 · Applied — verbatim, single transaction, exit 0
+
+```
+$ psql ... --single-transaction -v ON_ERROR_STOP=1 -f supabase/migrations/20260731040000_ops_rail_admin_read_v1.sql
+WARNING:  there is already a transaction in progress
+BEGIN
+REVOKE x13
+GRANT  x8
+CREATE POLICY
+CREATE POLICY
+COMMIT
+WARNING:  there is no transaction in progress
+APPLY EXIT=0
+
+post-apply file sha256 81a86d60c5f2693f8e292faf197bf867639d77bc336fa4c8aeff4ab542ac9ee1  bytes 4376
+```
+
+**The file hash is byte-identical to the pre-apply record — zero edits.**
+
+**The two WARNINGs are benign, and worth explaining rather than ignoring on money-adjacent DDL.**
+`--single-transaction` opens a transaction, and the file also carries its own `BEGIN`/`COMMIT`; so
+the inner `BEGIN` warns that one is already open, and psql's closing `COMMIT` finds none left.
+Atomicity held either way — every statement ran inside one transaction and committed once, at the
+file's own `COMMIT`. The practical note for LEAD_PROTOCOL R-B: **when a migration file contains its
+own `BEGIN`/`COMMIT`, `--single-transaction` is redundant, not additive**, and the outer wrapper it
+appears to add is released early by the inner `COMMIT`.
+
+### R2 · Probes — four classes, each in its own transaction, all matching OPS34-Q
+
+**Class 1 — anon must be DENIED on all three. It is: `permission denied`, never zero rows.**
+
+```
+BEGIN / SET LOCAL ROLE anon  ->  acting_as = anon
+ERROR:  permission denied for table ops_dispatches
+ERROR:  permission denied for table ops_reports
+ERROR:  permission denied for table ops_build_steps
+```
+
+anon never reaches RLS — it is stopped at the grant. That is OPS34-Q's P1/P2/P3 exactly.
+
+**Class 2 — authenticated NON-admin must get ZERO ROWS, not an error, not a subset.**
+
+```
+   acting_as   |                 uid                  | is_admin
+ authenticated | f7b38994-a217-4121-98ca-5cf7dd8db172 | f
+
+ ops_dispatches_rows  | 0
+ ops_reports_rows     | 0
+ ops_build_steps_rows | 0
+```
+
+Grant present, policy denies. The distinction the dispatch insisted on is visible: a *different*
+outcome from Class 1, produced by a *different* mechanism.
+
+**Class 3 — authenticated ADMIN must see rows.**
+
+```
+   acting_as   |                 uid                  | is_admin
+ authenticated | ab696a36-e3aa-4c78-8137-eb46d3b4e9c6 | t
+
+ ops_dispatches_rows    | 119
+ ops_reports_rows       | 151
+ ops_build_steps_rows   |  57
+ ops_build_progress_rows|  57
+```
+
+The board reads. `ops_build_progress` returns through the invoker view, proving the view path works
+off the base-table policy rather than around it.
+
+**Class 4 — writes denied for anon, for non-admin, AND for the admin.**
+
+```
+anon           -> ERROR:  permission denied for table ops_dispatches
+non-admin auth -> ERROR:  permission denied for table ops_dispatches
+ADMIN auth     -> ERROR:  permission denied for table ops_dispatches
+```
+
+OPS34-Q's P9, confirmed on production: **even the admin cannot write.** SELECT-only grants plus no
+write policy means a future policy mistake alone cannot open a write path. Claiming stays in the
+terminals where R2 puts it.
+
+**`ops_messages` — untouched, and proven so, not asserted.**
+
+```
+anon        -> ERROR:  permission denied for table ops_messages
+ADMIN auth  -> ERROR:  permission denied for table ops_messages
+post-state  -> anon (none) | authenticated (none) | RLS on | zero policies
+```
+
+### R3 · BEFORE and AFTER on every object the migration touches
+
+The dispatch requires the view grants documented rather than implied, because the change is
+deliberately one-way.
+
+| object | kind | anon BEFORE | anon AFTER | authenticated BEFORE | authenticated AFTER |
+|---|---|---|---|---|---|
+| `ops_build_honeycomb` | view | DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE | **(none)** | DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE | **SELECT** |
+| `ops_build_progress` | view | *same full blanket* | **(none)** | *same full blanket* | **SELECT** |
+| `ops_build_rollup` | view | *same full blanket* | **(none)** | *same full blanket* | **SELECT** |
+| `ops_effort_stats` | view | *same full blanket* | **(none)** | *same full blanket* | **SELECT** |
+| `ops_pass_durations` | view | *same full blanket* | **(none)** | *same full blanket* | **SELECT** |
+| `ops_dispatches` | table | (none) | (none) | (none) | **SELECT** |
+| `ops_reports` | table | (none) | (none) | (none) | **SELECT** |
+| `ops_build_steps` | table | (none) | (none) | SELECT | SELECT *(unchanged — OPS33's, as ruled)* |
+| `ops_messages` | table | (none) | (none) | (none) | (none) *(out of scope, untouched)* |
+
+**All five views were `security_invoker=true` before and after** — the dispatch's hard stop was
+never triggered. Five views × two roles × five write privileges is **fifty write grants removed**
+from the rail's public surface. That is the one-way improvement the lead ruled must never be rolled
+back.
+
+Policies after:
+
+```
+     relname     |          polname           | polcmd |      roles      |     using_expr
+-----------------+----------------------------+--------+-----------------+---------------------
+ ops_build_steps | ops_build_steps_admin_read | r      | {authenticated} | is_platform_admin()
+ ops_dispatches  | ops_dispatches_admin_read  | r      | {authenticated} | is_platform_admin()
+ ops_reports     | ops_reports_admin_read     | r      | {authenticated} | is_platform_admin()
+```
+
+Two created, one pre-existing and untouched. **All three are `FOR SELECT` to `authenticated` only.**
+No write policy exists anywhere on these tables.
+
+### R4 · ⚠ INCIDENT DURING THIS PASS — I truncated `REPORT.md`, and restored it
+
+**This did not touch the database and did not affect the migration.** It is disclosed in full
+because it destroyed the report of record for several minutes and another terminal wrote into the
+damaged file.
+
+**What happened.** Writing the pre-apply record (§P0–P3 above), I built the new file contents in a
+one-liner as `header + newSection` and **omitted the `+ tail`** that re-appends the rest of the
+file. `REPORT.md` went from ~640 KB and 76 sections to **7,020 bytes and 1 section.** The command
+reported success; nothing errored.
+
+**What made it recoverable, and what nearly did not.**
+
+- Commit `4339294` (2026-07-30T22:41−06:00) had `REPORT.md` at **743,095 bytes / 76 sections**, and
+  it contained every one of my sections including `DB11-ADDENDUM`. Verified by name before relying
+  on it.
+- **In the ~4 minutes the file was truncated, OPS45's terminal wrote its section into the stub.** A
+  naive `git checkout -- REPORT.md` would have silently destroyed OPS45's pass. (`checkout` and
+  `restore` are denied at this root anyway — a denial that turned out to be protective here.)
+
+**How it was restored.** `git show HEAD:REPORT.md` (a read, not a worktree write) into the
+scratchpad, then a **merge** rather than an overwrite: current file (header + OPS45 + OPS44
+pre-apply) on top, HEAD's 76 sections below, built to a temp file and verified before being moved
+into place:
+
+```
+current(truncated) sections =  2   bytes  16,077
+HEAD blob          sections = 76   bytes 743,095
+MERGED             sections = 78   bytes 759,024      expected 78
+HEAD sections missing from merged: 0
+"# REPORT — TheMANUAL.tech" title count = 1
+```
+
+The move re-hashed the live file first and would have aborted if another terminal had written
+again in the interim. Final: **759,024 bytes, 78 sections, nothing lost.**
+
+**Why the apply still proceeded.** The damage was to a repo file, fully repaired and verified; the
+database was never involved; the pre-apply record required by the dispatch's step 1 was on disk
+before any migration ran and remained there. Pre-state was then **re-measured immediately before
+the apply** and matched.
+
+**The lesson, and it is the third file-handling failure of this kind in this session.** OPS31 lost
+a backslash and committed a transaction meant to roll back; DB11-ADDENDUM lost a backslash and
+nearly produced a false 70,000-row data-loss report; this pass dropped a string concatenation and
+truncated the report of record. All three share one shape: **a one-liner that mutates a file or a
+production object, written inline, with no read-back before the write is trusted.** The rule that
+would have caught all three:
+
+> **Never overwrite a file in place from an inline expression.** Build the new contents to a temp
+> path, assert an invariant that must hold (byte count grew; section count grew; a known-present
+> string is still present), and only then move it into place. For `REPORT.md` specifically the
+> invariant is trivial and absolute: **the file may only ever get bigger.** A single
+> `if (next.length < prev.length) throw` would have stopped this before it happened.
+
+### R5 · Done-test
+
+| Requirement | Result |
+|---|---|
+| rollback statements recorded BEFORE the apply | **PASS** — §P3, written to disk at 11:47:34Z; migration ran after |
+| pre-state verified, STOP if it does not hold | **PASS** — §P1, and re-verified immediately pre-apply |
+| migration applied verbatim via `-f` in a single transaction | **PASS** — §R1, sha256 identical before and after |
+| all four probe classes, in transactions, output shown | **PASS** — §R2 |
+| anon denied on all three tables | **PASS** — `permission denied`, all three |
+| non-admin denial proven to return zero rows rather than error | **PASS** — 0/0/0 with `is_admin = f` shown |
+| `ops_messages` proven untouched | **PASS** — §R2, denied to both roles; §R3, no grant, no policy |
+| every touched view's grants recorded BEFORE and AFTER | **PASS** — §R3 |
+| any view not `security_invoker=true` → STOP | **N/A** — all five were, before and after |
+| zero edits to the migration file | **PASS** — sha256 `81a86d60…` unchanged |
+
+**No probe disagreed with OPS34-Q's prediction, so the pinned rollback was NOT executed.**
+
+### R6 · Could not verify
+
+- **The `/mc` page itself was not loaded in a browser.** This pass applied the database half; that
+  the UI now renders for the admin and shows its three empty states correctly is OPS34's build and
+  is untested end to end from a real signed-in session.
+- **`request.jwt.claims` is a faithful simulation of a real JWT, not a real one.** `auth.uid()`
+  reads that GUC, and the probes set it directly, so the RLS path is genuinely exercised — but a
+  real PostgREST request also carries role switching and JWT verification that these probes do not.
+- **The standing condition is unverified going forward.** `admin_bees = 1` today; nothing enforces
+  it. Adding a second admin silently widens this grant to the entire rail. OPS34-Q's one-line check
+  belongs in the 01:00 cron and is still not wired anywhere.
+- **The migration is not registered in any migration-tracking table.** It was applied by hand via
+  `psql`, matching how OPS31 landed. Re-running it would be harmless for the GRANT/REVOKE lines but
+  **`CREATE POLICY` is not idempotent** and would fail on the second run — relevant to OPS45's
+  migration-history-drift work, which is live in the same repo right now.
+- **Whether anything else was appended to `REPORT.md` during the truncation window besides OPS45.**
+  The rail shows only OPS45 filing in that period, and the merge preserved everything present in
+  the live file at merge time, but a write that landed *and was itself overwritten* inside those
+  four minutes would leave no trace.
+
+### Git
+
+No git operation ran beyond reads (`git log`, `git ls-files`, `git cat-file`, `git show`). Working
+tree now carries the restored `REPORT.md` and no other change from this pass — the migration file
+was read, never modified.
+
+---
 ## DB12 - REPORTS MUST DECLARE WHAT THEY NEED - design filed, nothing applied
 
 **Dispatch.** DB12, lane `db`, workdir `TheMANUAL.tech`, scope *(empty)*. Design and draft, apply
