@@ -90,7 +90,18 @@ const BOARD_SQL = `
 SELECT json_build_object(
   'server_now', now(),
   'dispatches', COALESCE((
-    SELECT json_agg(row_to_json(d) ORDER BY d.status, d.priority, d.created_at)
+    -- OPS41: this ORDER BY used to be (status, priority, created_at), which is
+    -- an order NOBODY would ever get. The canonical claim orders by sticky-lane
+    -- DESC, then priority, then created_at. The board cannot know a given
+    -- terminal's session lanes, so it shows the claim's order MINUS the sticky
+    -- term - and the UI says exactly that rather than faking certainty.
+    -- ASCII ONLY BELOW THIS LINE AND ABOVE IT. This text is handed to psql as a
+    -- command-line ARGUMENT; Windows converts argv to the child's codepage, so a
+    -- U+2014 em dash arrives as CP1252 0x97 and the server rejects the whole query
+    -- with: invalid byte sequence for encoding "UTF8": 0x97. One character blinded
+    -- the entire board (OPS43). Rail CONTENT keeps its em dashes - they travel the
+    -- other way, in stdout, and are fine. This rule is about CODE.
+    SELECT json_agg(row_to_json(d) ORDER BY d.priority, d.created_at)
       FROM (
         SELECT id, pass, lane, title, status, priority, workdir, scope,
                after_pass, created_at, claimed_at,
@@ -114,23 +125,73 @@ SELECT json_build_object(
          ORDER BY created_at DESC
          LIMIT ${Number(cfg.reportHeadlines) || 12}
       ) r
+  ), '[]'::json),
+  -- OPS33 build progress. Status is DERIVED from the rail wherever a step
+  -- carries a pass; nobody ticks a box the rail already knows the answer to.
+  'build_rollup', COALESCE((
+    SELECT json_agg(row_to_json(x) ORDER BY x.astra)
+      FROM (SELECT * FROM public.ops_build_rollup) x
+  ), '[]'::json),
+  'build_total', (SELECT row_to_json(h) FROM public.ops_build_honeycomb h),
+  'build_steps', COALESCE((
+    SELECT json_agg(row_to_json(s) ORDER BY s.astra, s.phase_no, s.step_no)
+      FROM (
+        SELECT astra, phase_no, phase, step_no, title, dispatch_pass, effort,
+               derived_status, rail_derived, notes,
+               est_median, est_p25, est_p75, est_sample_n
+          FROM public.ops_build_progress
+      ) s
   ), '[]'::json)
 ) AS board;`;
 
-function readBoard() {
+// OPS43 FAIL-SOFT, and this is the part that matters more than the byte fix.
+//
+// Before: ONE query fed all three panels, and any error rejected the whole read.
+// A single undecodable character blanked the board, recent reports AND build
+// progress at once — and a blank board looks exactly like an empty queue, which
+// is a lie the rail has already punished us for once.
+//
+// Now: the big query is tried first (one round trip, the fast path). If it fails
+// for ANY reason, each section is retried on its own, and whatever survives is
+// returned alongside a `failed` list the UI must show. One poisoned section can
+// no longer take the other two down with it.
+const SECTION_SQL = {
+  dispatches: "SELECT COALESCE(json_agg(row_to_json(d) ORDER BY d.status, d.priority, d.created_at), '[]'::json) FROM (SELECT * FROM public.ops_dispatches WHERE status IN ('queued','claimed')) d;",
+  reports:    "SELECT COALESCE(json_agg(row_to_json(r) ORDER BY r.created_at DESC), '[]'::json) FROM (SELECT pass, terminal, title, created_at FROM public.ops_reports ORDER BY created_at DESC LIMIT 12) r;",
+  build_steps: "SELECT COALESCE(json_agg(row_to_json(s)), '[]'::json) FROM (SELECT * FROM public.ops_build_progress) s;",
+};
+
+function psqlJson(sql) {
   return new Promise((resolve, reject) => {
     execFile(
       cfg.psql,
       ['-h', cfg.db.host, '-p', cfg.db.port, '-U', cfg.db.user, '-d', cfg.db.name,
-       '-w', '-t', '-A', '-v', 'ON_ERROR_STOP=1', '-c', BOARD_SQL],
+       '-w', '-t', '-A', '-v', 'ON_ERROR_STOP=1', '-c', sql],
       { maxBuffer: 1024 * 1024 * 8, windowsHide: true },
       (err, stdout, stderr) => {
-        if (err) return reject(new Error((stderr || err.message).trim()));
+        if (err) return reject(new Error((stderr || err.message).trim().split('\n')[0]));
         try { resolve(JSON.parse(stdout.trim())); }
         catch { reject(new Error('rail returned unparseable JSON')); }
       },
     );
   });
+}
+
+async function readBoard() {
+  try {
+    return await psqlJson(BOARD_SQL);           // fast path, unchanged shape
+  } catch (whole) {
+    // Degraded path. Each section stands or falls alone.
+    const board = { server_now: new Date().toISOString(), dispatches: [], reports: [], build_steps: [], build_rollup: [], build_total: null };
+    const failed = [{ section: 'combined', error: whole.message }];
+    for (const [name, sql] of Object.entries(SECTION_SQL)) {
+      try { board[name] = await psqlJson(sql); }
+      catch (e) { failed.push({ section: name, error: e.message }); }
+    }
+    board.failed = failed;
+    console.error(`[rail] degraded read :: ${failed.map((f) => f.section).join(', ')}`);
+    return board;
+  }
 }
 
 // ── spawn ───────────────────────────────────────────────────────────────────
@@ -295,7 +356,21 @@ const nextTag = (folder) => `MC${++spawnSerial} · ${folder.label}`;
 // an env var set on the wt.exe launcher DOES reach the shell inside the new tab
 // (probe read it back), which was not obvious — wt.exe is an AppExecLink stub
 // and OPS22 found it hands off to an already-running WindowsTerminal.exe.
-const SPAWN_ENV = () => ({ ...process.env, CLAUDE_CODE_DISABLE_TERMINAL_TITLE: '1' });
+//
+// OPS41 also exports the tag as MC_SESSION so the canonical claim can record
+// WHICH terminal holds a pass (ops_dispatches.claimed_by). Same identifier as
+// the window title — one naming scheme, not two.
+//
+// ASCII-ONLY on purpose. The window tag uses '·', which does NOT survive the
+// Windows console -> psql path: measured, `ERROR: invalid byte sequence for
+// encoding "UTF8": 0xb7`. So the session id substitutes '/' for the separator.
+// The window keeps its prettier form; the rail gets the transportable one.
+const sessionId = (tag) => (tag || '').replace(/\s*·\s*/g, '/').replace(/[^\x20-\x7E]/g, '');
+const SPAWN_ENV = (tag) => ({
+  ...process.env,
+  CLAUDE_CODE_DISABLE_TERMINAL_TITLE: '1',
+  ...(tag ? { MC_SESSION: sessionId(tag) } : {}),
+});
 
 function wtArgv(folder, tag) {
   return [
@@ -385,7 +460,7 @@ async function attempt(exe, args, label, t0, tag) {
   console.log(`[spawn] ${label} :: ${exe} ${args.join(' ')}`);
   // OPS32: SPAWN_ENV suppresses Claude Code's own terminal titling, so the tag
   // this launcher sets is still there an hour later.
-  const r = await runLauncher(exe, args, SPAWN_ENV());
+  const r = await runLauncher(exe, args, SPAWN_ENV(tag));
   if (r.error) return { ok: false, reason: r.error, hard: true };
   if (r.code !== 0) {
     return { ok: false, reason: `${basename(exe)} exited ${r.code}${r.stderr ? ` — ${r.stderr}` : ''}` };
@@ -564,8 +639,13 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
 </header>
 <main>
   <div>
-    <section><h2>Rail — queued &amp; claimed</h2><div id="board" class="wrap">…</div></section>
+    <section><h2>Rail — queued &amp; claimed</h2>
+      <div class="note" style="padding:0 0 6px">pool order — a terminal sticky on a lane may pull differently</div>
+      <div id="board" class="wrap">…</div></section>
     <section style="margin-top:18px"><h2>Recent reports</h2><div id="reports" class="wrap">…</div></section>
+    <!-- OPS33: the whole HONEYCOMB build, phases and steps, at the bottom. -->
+    <section style="margin-top:18px"><h2>Build progress — all HONEYCOMB</h2>
+      <div id="build" class="wrap">…</div></section>
   </div>
   <div>
     <section><h2>Add Claude</h2><div class="wrap" id="spawn"></div>
@@ -598,24 +678,68 @@ const cleanTitle = t => String(t).replace(/^\\s*\\S+\\s+—\\s*/, '').replace(/E
 
 let WARN = 45, ALERT = 90;
 
-async function tick() {
-  try {
-    const r = await fetch('/api/board');
-    const j = await r.json();
-    if (j.error) throw new Error(j.error);
-    WARN = j.staleWarn; ALERT = j.staleAlert;
-    render(j.board);
-    document.getElementById('stamp').textContent =
-      'rail read ' + new Date().toLocaleTimeString() + ' · ' + j.board.dispatches.length + ' open';
-  } catch (e) {
-    document.getElementById('board').innerHTML = '<div class="err">rail read failed: ' + esc(e.message) + '</div>';
-    document.getElementById('stamp').textContent = 'disconnected';
-  }
+// OPS43: never blank all three panels at once. A panel that cannot be drawn says
+// so IN PLACE and keeps its last good content; the panels that can be drawn are
+// drawn. A silent empty panel reads as "queue empty", which is the one lie this
+// viewer must never tell.
+function panelFail(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const stale = el.dataset.lastGood;
+  el.innerHTML = '<div class="err">' + esc(msg) + '</div>'
+    + (stale ? '<div class="note" style="padding:4px 0">showing the last good read ' +
+               esc(el.dataset.lastGoodAt || '') + ' — NOT current</div>' + stale : '');
+}
+function panelOk(id, html) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = html;
+  el.dataset.lastGood = html;
+  el.dataset.lastGoodAt = new Date().toLocaleTimeString();
 }
 
-function render(b) {
-  const d = b.dispatches;
-  document.getElementById('board').innerHTML = d.length === 0
+async function tick() {
+  let j;
+  try {
+    const r = await fetch('/api/board');
+    j = await r.json();
+    if (j.error) throw new Error(j.error);
+  } catch (e) {
+    // Transport or total failure: every panel says so, none goes silently blank.
+    const msg = 'rail read failed: ' + e.message;
+    ['board', 'reports', 'build'].forEach((id) => panelFail(id, msg));
+    document.getElementById('stamp').textContent = 'disconnected';
+    return;
+  }
+  WARN = j.staleWarn; ALERT = j.staleAlert;
+  const b = j.board || {};
+  const failed = b.failed || [];
+  const bad = (name) => failed.find((f) => f.section === name);
+
+  // Each panel independently. One throwing renderer cannot stop the next two.
+  const panels = [
+    ['board',   'dispatches', () => renderDispatches(b)],
+    ['reports', 'reports',    () => renderReports(b)],
+    ['build',   'build_steps', () => renderBuildHtml(b)],
+  ];
+  for (const [id, section, fn] of panels) {
+    const f = bad(section);
+    if (f) { panelFail(id, section + ' unavailable: ' + f.error); continue; }
+    try { panelOk(id, fn()); }
+    catch (e) { panelFail(id, section + ' failed to render: ' + e.message); }
+  }
+
+  const warn = failed.length
+    ? ' · DEGRADED (' + failed.filter((f) => f.section !== 'combined').length + ' section(s) failed)'
+    : '';
+  document.getElementById('stamp').textContent =
+    'rail read ' + new Date().toLocaleTimeString() + ' · '
+    + (b.dispatches ? b.dispatches.length : 0) + ' open' + warn;
+}
+
+function renderDispatches(b) {
+  const d = b.dispatches || [];
+  return d.length === 0
     ? '<div class="note" style="padding:4px 0">queue empty</div>'
     : '<table><tr><th>pass</th><th>lane</th><th>eff</th><th>status</th><th>age</th><th>title</th></tr>'
       + d.map(row => {
@@ -637,13 +761,80 @@ function render(b) {
           + '<div class="sub">' + esc(row.workdir ?? '') + (row.scope ? ' · ' + esc(row.scope) : '')
           + ' · p' + row.priority + '</div></td></tr>';
       }).join('') + '</table>';
+}
 
-  document.getElementById('reports').innerHTML =
-    '<table>' + b.reports.map(r =>
+function renderReports(b) {
+  const rs = b.reports || [];
+  if (rs.length === 0) return '<div class="note" style="padding:4px 0">no reports</div>';
+  return '<table>' + rs.map(r =>
       '<tr><td class="pass">' + esc(r.pass) + '</td>'
       + '<td class="sub">' + esc(r.terminal ?? '') + '</td>'
       + '<td class="sub">' + fmtAge(r.age_min) + ' ago</td>'
       + '<td class="title">' + esc(cleanTitle(r.title)) + '</td></tr>').join('') + '</table>';
+}
+
+// ── OPS33 build panel ───────────────────────────────────────────────────────
+// Phases collapsible, current step highlighted, checkmarks DERIVED from the
+// rail. The estimate is a RANGE with its sample size attached — a single
+// invented number would be worse than no number, and the deep bucket is barely
+// calibrated, so a thin bucket says so out loud instead of pretending.
+const MARK = { done: '✓', in_progress: '▶', blocked: '⏸', parked: '·', not_started: '☐' };
+
+function estText(s) {
+  if (s.derived_status === 'done') return '';
+  if (s.est_p25 == null || s.est_p75 == null) return '<span class="sub">no estimate</span>';
+  const n = s.est_sample_n ?? 0;
+  const thin = n < 5 ? ' <span class="warn">thin</span>' : '';
+  return '<span class="sub">' + Math.round(s.est_p25) + '–' + Math.round(s.est_p75)
+       + ' min · n=' + n + thin + '</span>';
+}
+
+function renderBuildHtml(b) {
+  const steps = b.build_steps || [], roll = b.build_rollup || [], tot = b.build_total;
+
+  if (steps.length === 0) return '<div class="note" style="padding:4px 0">no build steps seeded yet</div>';
+
+  let html = '';
+  if (tot) {
+    html += '<div class="note" style="padding:2px 0 8px">HONEYCOMB · '
+      + tot.done + '/' + tot.steps + ' steps done (' + tot.pct_done + '%) across '
+      + tot.astras + ' astras'
+      + (tot.blocked ? ' · <span class="warn">' + tot.blocked + ' blocked</span>' : '')
+      + ' · <span class="sub">' + tot.remaining_minutes_low + '–' + tot.remaining_minutes_high
+      + ' min of terminal time left</span></div>';
+  }
+
+  for (const r of roll) {
+    // An astra with zero steps never reaches here (the rollup groups on rows
+    // that exist), so the empty case is the whole-panel guard above.
+    html += '<details open><summary><b>' + esc(r.astra) + '</b> — '
+      + r.done + '/' + r.steps + ' (' + r.pct_done + '%)'
+      + (r.blocked ? ' · <span class="warn">' + r.blocked + ' blocked</span>' : '')
+      + ' <span class="sub">' + (r.remaining_minutes_low ?? 0) + '–'
+      + (r.remaining_minutes_high ?? 0) + ' min left</span></summary>';
+
+    const mine = steps.filter(s => s.astra === r.astra);
+    let lastPhase = null;
+    html += '<table>';
+    for (const s of mine) {
+      if (s.phase_no !== lastPhase) {
+        lastPhase = s.phase_no;
+        html += '<tr><td colspan="4" class="sub" style="padding-top:8px">'
+             + s.phase_no + ' · ' + esc(s.phase) + '</td></tr>';
+      }
+      const cur = s.derived_status === 'in_progress' || s.derived_status === 'blocked';
+      html += '<tr' + (cur ? ' style="background:rgba(255,209,102,.10)"' : '') + '>'
+        + '<td class="eff-' + (s.effort || '') + '">' + (MARK[s.derived_status] || '☐') + '</td>'
+        + '<td class="pass">' + esc(s.dispatch_pass || '—') + '</td>'
+        + '<td class="title">' + esc(s.title)
+        + (s.notes ? '<div class="sub">' + esc(s.notes) + '</div>' : '')
+        + '</td>'
+        + '<td>' + estText(s)
+        + (s.rail_derived ? '' : ' <span class="sub">manual</span>') + '</td></tr>';
+    }
+    html += '</table></details>';
+  }
+  return html;
 }
 
 // Backup age. Refreshed on a slower beat than the rail — it moves in days, and

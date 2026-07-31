@@ -82,6 +82,9 @@ const ThreadPage = lazy(() => import('@/pages/intel/ThreadPage').then((m) => ({ 
 // AtlasOracle console (the AI Astra). Distinct from AtlasOraclePage above,
 // which is the DingleBERRY security-copilot demo screen at /dingleberry/oracle.
 const OraclePage = lazy(() => import('@/pages/oracle/OraclePage').then((m) => ({ default: m.OraclePage })));
+// /mc — build-progress board (OPS34). Admin-only and READ-ONLY: spawning stays
+// in local mission control. Lazy so the rail types never reach a patron bundle.
+const MissionControlPage = lazy(() => import('@/pages/MissionControlPage'));
 const ChannelPage = lazy(() => import('@/pages/pulse/ChannelPage').then((m) => ({ default: m.ChannelPage })));
 const PulseHome = lazy(() => import('@/pages/pulse/PulseHome').then((m) => ({ default: m.PulseHome })));
 const WatchPage = lazy(() => import('@/pages/pulse/WatchPage').then((m) => ({ default: m.WatchPage })));
@@ -400,6 +403,10 @@ function AppContent() {
               catch-all SurfacePage swallows it. Not to be confused with
               /dingleberry/oracle, which is the DingleBERRY copilot demo. */}
             <Route path="/oracle" element={<OraclePage />} />
+            {/* Mission Control board. Gates on bees.is_admin like /hq, but the
+              real enforcement is RLS on the ops_ tables — the gate is courtesy.
+              MUST stay ahead of /:slug or SurfacePage swallows it. */}
+            <Route path="/mc" element={<MissionControlPage />} />
             <Route path="/groups" element={<ManualGroupsPlaceholder />} />
             <Route path="/cart" element={<CartPlaceholder />} />
             <Route path="/api/docs" element={<OpenAPIDocs />} />

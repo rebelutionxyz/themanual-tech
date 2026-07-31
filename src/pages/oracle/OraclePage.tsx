@@ -4,6 +4,12 @@ import {
   type Tier,
   isMocked,
 } from '@/lib/atlasoracle/client';
+import {
+  type ModelRateRow,
+  buildCostBreakdown,
+  formatTokensExact,
+  rateLiveAt,
+} from '@/lib/atlasoracle/reconcile';
 import { type RoutingLogEntry, fetchRoutingLog } from '@/lib/atlasoracle/routingLog';
 import { formatTokens } from '@/lib/atlasoracle/tokens';
 import { useOracleDirective } from '@/lib/atlasoracle/useOracleDirective';
@@ -43,21 +49,36 @@ export function OraclePage() {
     loaded: boolean;
     error: string | null;
     entries: RoutingLogEntry[];
-  }>({ loaded: false, error: null, entries: [] });
+    rates: ModelRateRow[];
+  }>({ loaded: false, error: null, entries: [], rates: [] });
+
+  // Which log rows have their cost breakdown open. Collapsed by default — the
+  // row itself now shows every figure the bill is made of, and the breakdown is
+  // for a Bee who wants to check the arithmetic rather than trust it.
+  const [openRows, setOpenRows] = useState<Set<string>>(new Set());
+  const toggleRow = useCallback((id: string) => {
+    setOpenRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const loadLog = useCallback(async () => {
     if (!bee) {
-      setLog({ loaded: true, error: null, entries: [] });
+      setLog({ loaded: true, error: null, entries: [], rates: [] });
       return;
     }
     try {
-      const entries = await fetchRoutingLog();
-      setLog({ loaded: true, error: null, entries });
+      const { entries, rates } = await fetchRoutingLog();
+      setLog({ loaded: true, error: null, entries, rates });
     } catch (e) {
       setLog({
         loaded: true,
         error: e instanceof Error ? e.message : String(e),
         entries: [],
+        rates: [],
       });
     }
   }, [bee]);
@@ -373,12 +394,19 @@ export function OraclePage() {
                 style={{ fontSize: '11.5px' }}
               >
                 <span>provider · {response.provider}</span>
+                {/*
+                  Cached shows UNCONDITIONALLY, including at zero. It used to
+                  appear only when > 0, which is the same lesson the routing log
+                  taught the hard way: a figure that vanishes when it is zero
+                  trains the reader to read its absence as "not applicable"
+                  rather than "none" — and then a Bee has no way to tell a
+                  directive with no cache read from one whose cache read was
+                  simply not displayed. Every leg of the bill, every time.
+                */}
                 <span>
                   tokens · {response.tokens.input.toLocaleString()} in /{' '}
-                  {response.tokens.output.toLocaleString()} out
-                  {response.tokens.cached > 0
-                    ? ` / ${response.tokens.cached.toLocaleString()} cached`
-                    : ''}
+                  {response.tokens.output.toLocaleString()} out /{' '}
+                  {response.tokens.cached.toLocaleString()} cached
                 </span>
                 <span className={response.costTokens > 0 ? 'text-honey' : undefined}>
                   cost ·{' '}
@@ -455,41 +483,184 @@ export function OraclePage() {
                     <th className="px-3 py-2 text-left font-medium">Kind</th>
                     <th className="px-3 py-2 text-left font-medium">Provider</th>
                     <th className="px-3 py-2 text-left font-medium">Status</th>
-                    <th className="px-3 py-2 text-left font-medium">Tokens</th>
+                    <th className="px-3 py-2 text-left font-medium">
+                      Tokens
+                      <span className="ml-1 font-normal opacity-70">in / out / cached</span>
+                    </th>
+                    <th className="px-3 py-2 text-left font-medium">Cost</th>
                     <th className="px-3 py-2 text-left font-medium">Latency</th>
                   </tr>
                 </thead>
                 <tbody className="text-text">
-                  {log.entries.map((e) => (
-                    <tr key={e.id} className="border-t border-border align-top">
-                      <td className="whitespace-nowrap px-3 py-2 text-text-silver">
-                        {new Date(e.createdAt).toLocaleString()}
-                      </td>
-                      <td className="px-3 py-2 font-mono">{e.tier}</td>
-                      <td className="px-3 py-2 font-mono text-text-silver">{e.category}</td>
-                      <td className="px-3 py-2 font-mono text-text-silver">{e.provider ?? '—'}</td>
-                      <td className="px-3 py-2">
-                        <span
-                          className={cn(
-                            'font-mono',
-                            e.success === true && 'text-kettle-sourced',
-                            e.success === false && 'text-kettle-unsourced',
+                  {log.entries.map((e) => {
+                    // The rate that was live when THIS directive ran — not the
+                    // newest rate. Re-pricing an old directive at today's card
+                    // would produce a number that never happened.
+                    const rate =
+                      e.provider === null ? null : rateLiveAt(log.rates, e.provider, e.createdAt);
+                    const breakdown =
+                      rate === null || e.costTokens === null
+                        ? null
+                        : buildCostBreakdown(
+                            rate,
+                            {
+                              input: e.inputTokens ?? 0,
+                              output: e.outputTokens ?? 0,
+                              cached: e.cachedTokens ?? 0,
+                            },
+                            e.costTokens,
+                          );
+                    const open = openRows.has(e.id);
+
+                    return [
+                      <tr key={e.id} className="border-t border-border align-top">
+                        <td className="whitespace-nowrap px-3 py-2 text-text-silver">
+                          {new Date(e.createdAt).toLocaleString()}
+                        </td>
+                        <td className="px-3 py-2 font-mono">{e.tier}</td>
+                        <td className="px-3 py-2 font-mono text-text-silver">{e.category}</td>
+                        <td className="px-3 py-2 font-mono text-text-silver">
+                          {e.provider ?? '—'}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={cn(
+                              'font-mono',
+                              e.success === true && 'text-kettle-sourced',
+                              e.success === false && 'text-kettle-unsourced',
+                            )}
+                            title={e.errorMessage ?? undefined}
+                          >
+                            {e.status}
+                          </span>
+                        </td>
+                        {/*
+                          Cached joins in / out here. Its omission was the whole
+                          FRONT18 defect: directive d37a7032 read "31 / 261" and
+                          debited 6.2468, because 2,257 cached tokens — 14.5 % of
+                          that bill — were never rendered.
+                        */}
+                        <td className="whitespace-nowrap px-3 py-2 font-mono text-text-silver">
+                          {e.inputTokens === null &&
+                          e.outputTokens === null &&
+                          e.cachedTokens === null
+                            ? '—'
+                            : `${(e.inputTokens ?? 0).toLocaleString()} / ${(e.outputTokens ?? 0).toLocaleString()} / ${(e.cachedTokens ?? 0).toLocaleString()}`}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 font-mono">
+                          {e.costTokens === null ? (
+                            <span
+                              className="text-text-silver"
+                              title={
+                                e.tier === 'free'
+                                  ? 'The free tier never debits.'
+                                  : 'No debit was written for this directive.'
+                              }
+                            >
+                              {e.tier === 'free' ? 'FREE' : '—'}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => toggleRow(e.id)}
+                              aria-expanded={open}
+                              className="text-honey underline decoration-dotted underline-offset-2 transition-colors hover:text-text"
+                              title="Show how this charge is made up"
+                            >
+                              {formatTokensExact(e.costTokens)}
+                            </button>
                           )}
-                          title={e.errorMessage ?? undefined}
-                        >
-                          {e.status}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 font-mono text-text-silver">
-                        {e.inputTokens === null && e.outputTokens === null
-                          ? '—'
-                          : `${(e.inputTokens ?? 0).toLocaleString()} / ${(e.outputTokens ?? 0).toLocaleString()}`}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 font-mono text-text-silver">
-                        {e.latencyMs === null ? '—' : `${e.latencyMs}ms`}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 font-mono text-text-silver">
+                          {e.latencyMs === null ? '—' : `${e.latencyMs}ms`}
+                        </td>
+                      </tr>,
+
+                      open && (
+                        <tr key={`${e.id}-detail`} className="border-t border-border bg-panel-2/50">
+                          <td colSpan={8} className="px-3 py-3">
+                            {breakdown === null ? (
+                              <p className="text-text-silver" style={{ fontSize: '11.5px' }}>
+                                Charged {formatTokensExact(e.costTokens ?? 0)} Oracle Tokens. The
+                                rate that was live for {e.provider ?? 'this provider'} at that
+                                moment is not on the current rate card, so the legs cannot be shown
+                                — the debit above is the ledger's own figure and stands.
+                              </p>
+                            ) : (
+                              <div className="flex flex-col gap-2">
+                                <table
+                                  className="w-full max-w-lg font-mono"
+                                  style={{ fontSize: '11.5px' }}
+                                >
+                                  <thead className="text-text-silver">
+                                    <tr>
+                                      <th className="py-1 text-left font-medium">Leg</th>
+                                      <th className="py-1 text-right font-medium">Tokens</th>
+                                      <th className="py-1 text-right font-medium">Rate / 1M</th>
+                                      <th className="py-1 text-right font-medium">Subtotal</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {breakdown.legs.map((leg) => (
+                                      <tr key={leg.label} className="border-t border-border">
+                                        <td className="py-1 text-text-silver">
+                                          {leg.label}
+                                          {leg.rateFallback && (
+                                            <span
+                                              className="ml-1 text-honey"
+                                              title="No cached rate is configured for this model, so cached tokens bill at the full input rate."
+                                            >
+                                              *
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="py-1 text-right">
+                                          {leg.tokens.toLocaleString()}
+                                        </td>
+                                        <td className="py-1 text-right text-text-silver">
+                                          {formatTokens(leg.ratePerM)}
+                                        </td>
+                                        <td className="py-1 text-right">
+                                          {formatTokensExact(leg.subtotal)}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                    {!breakdown.reconciles && (
+                                      <tr className="border-t border-border">
+                                        <td className="py-1 text-text-silver" colSpan={3}>
+                                          {breakdown.adjustment < 0
+                                            ? 'charged-the-lesser — capped at the estimate, platform absorbed the rest'
+                                            : 'adjustment'}
+                                        </td>
+                                        <td className="py-1 text-right text-honey">
+                                          {formatTokensExact(breakdown.adjustment)}
+                                        </td>
+                                      </tr>
+                                    )}
+                                    <tr className="border-t border-border-bright">
+                                      <td className="py-1 font-semibold" colSpan={3}>
+                                        debited
+                                      </td>
+                                      <td className="py-1 text-right font-semibold text-honey">
+                                        {formatTokensExact(breakdown.debit)}
+                                      </td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                                <p className="text-text-silver" style={{ fontSize: '11px' }}>
+                                  Priced at the rate card live on{' '}
+                                  {new Date(breakdown.rate.effectiveFrom).toLocaleString()}, the one
+                                  in force when this directive ran.
+                                  {breakdown.legs.some((l) => l.rateFallback) &&
+                                    ' * cached tokens billed at the input rate — no cached rate is configured for this model.'}
+                                </p>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ),
+                    ];
+                  })}
                 </tbody>
               </table>
             </div>
@@ -497,7 +668,8 @@ export function OraclePage() {
 
           <p className="text-text-silver" style={{ fontSize: '11px' }}>
             Metadata only. Directive text and routed responses are never stored — the columns do not
-            exist.
+            exist. Every charge shows the tokens it was made of; click a cost to see each leg, its
+            rate, and the subtotals adding up to the amount debited.
           </p>
         </section>
       </div>
