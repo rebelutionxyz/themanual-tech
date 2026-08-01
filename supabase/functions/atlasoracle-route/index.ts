@@ -578,7 +578,8 @@ Deno.serve(async (req) => {
 
   // OPS15: the user-scoped client is gone with the escrow path — it existed
   // only to call atlasoracle_get_escrow_balance as the Bee. Token balances are
-  // read server-side from the oracle_token_balances view instead.
+  // read server-side via the oracle_token_available RPC instead (OPS49; it was
+  // the oracle_token_balances view until that view was found expiry-blind).
   const service = serviceClient();
 
   // ─── Rate cap check (BEFORE astra lookup / balance check / directive insert). ───
@@ -696,24 +697,28 @@ Deno.serve(async (req) => {
 
   // ─── Oracle Token balance pre-check (using ESTIMATED cost). ───
   //
-  // Reads the oracle_token_balances view (DB8). Free tier costs 0 and skips it.
+  // Calls oracle_token_available (OPS49). Free tier costs 0 and skips it.
   // This runs BEFORE the directive row insert and before the provider call, so
   // an underfunded Bee costs the platform nothing.
   let balanceBefore = 0;
   if (estimatedCostTokens > 0) {
-    const { data: balRow, error: balErr } = await service
-      .from('oracle_token_balances')
-      .select('balance_tokens')
-      .eq('bee_id', beeId)
-      .maybeSingle();
+    // OPS49: read through oracle_token_available, NOT oracle_token_balances.
+    // The view sums every 'grant' row forever and has no notion of expires_at,
+    // so for a Bee whose plan cycle has ended it reports the expired plan
+    // tokens as spendable. Proven in the OPS49 dry run: same fixture, view
+    // says 800, truth is 100. Gating on the view would hand out 700 tokens
+    // of free compute before the debit refused it.
+    const { data: availRows, error: balErr } = await service
+      .rpc('oracle_token_available', { p_bee: beeId });
     if (balErr) {
       console.error('atlasoracle-route token balance lookup failed', {
         bee_id: beeId, message: balErr.message,
       });
       return errorResponse('Token balance lookup failed', 500);
     }
-    // No ledger rows yet = no view row = zero balance, not an error.
-    balanceBefore = Number(balRow?.balance_tokens ?? 0);
+    // No ledger rows yet = zeros, not an error. The RPC returns a one-row set.
+    const avail = Array.isArray(availRows) ? availRows[0] : availRows;
+    balanceBefore = Number(avail?.total_available ?? 0);
 
     if (balanceBefore < estimatedCostTokens) {
       console.log('atlasoracle-route insufficient tokens', {
@@ -891,14 +896,19 @@ Deno.serve(async (req) => {
   // atlasoracle_debit / _credit are NOT called and NOT modified (OPEN-7).
   let balanceAfter: number | null = null;
   if (finalCostTokens > 0) {
-    const { error: debitErr } = await service
-      .from('oracle_token_ledger')
-      .insert({
-        bee_id: beeId,
-        entry_type: 'debit',
-        amount_tokens: -finalCostTokens,
-        directive_id: directiveId,
-        memo: `${tier} directive via ${providerModel}`,
+    // OPS49: the debit is no longer written here. oracle_debit_tokens owns it.
+    //
+    // It computes availability server-side under a per-bee advisory lock,
+    // refuses an overdraft, and is idempotent per directive (the partial
+    // unique index is the backstop). TB-1 spend-plan-first is therefore
+    // un-bypassable from this file: there is no bucket for the route to
+    // choose and no balance for it to compute.
+    const { data: debitRes, error: debitErr } = await service
+      .rpc('oracle_debit_tokens', {
+        p_bee: beeId,
+        p_directive: directiveId,
+        p_amount_tokens: finalCostTokens,
+        p_memo: `${tier} directive via ${providerModel}`,
       });
     if (debitErr) {
       // The provider has already been paid at this point, so the token counts
@@ -914,12 +924,10 @@ Deno.serve(async (req) => {
       return errorResponse('Failed to debit Oracle Tokens', 500);
     }
 
-    const { data: afterRow } = await service
-      .from('oracle_token_balances')
-      .select('balance_tokens')
-      .eq('bee_id', beeId)
-      .maybeSingle();
-    balanceAfter = Number(afterRow?.balance_tokens ?? 0);
+    // The RPC already returned the post-debit position. No second read, and
+    // in particular NOT another read of oracle_token_balances, which does not
+    // understand expiry (OPS49: it reports 800 where the truth is 100).
+    balanceAfter = Number((debitRes as any)?.total_available ?? 0);
   }
 
   // ─── Finalize directive row. ───

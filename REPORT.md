@@ -5,6 +5,2274 @@ Newest pass first.
 
 ---
 
+## OPS49b - APPLIED. oracle_debit_tokens + oracle_token_available are LIVE and PROVEN.
+
+Lane `ops`. Workdir `TheMANUAL.tech`. Scope `oracle`. The R7 re-stamp of OPS49: migration file
+named, rollback stated in the dispatch before the apply. **Applied. Verified. Ledger untouched.**
+
+### W-1 - WHO OWNS THE NEXT MOVE, AND WHAT IT IS
+
+**Owner: LEAD.**
+
+**The single next action: dispatch the `oracle_token_balances` view replacement.** It is now the
+last thing standing between the token economy and a real overdraft. The view has no expiry
+predicate; on the OPS49 fixture it reports **800** where the truth is **100**. The route no longer
+reads it, so nothing is exposed *today* - but the view is still live, still wrong, and still
+readable by anything else that asks. OPS48 s7c drafted the replacement and it was never applied
+while its two sibling migrations were.
+
+**Second: the route edit is written but NOT deployed and NOT type-checked** (`deno` is not
+installed here). Under the DEPLOY AMENDMENT that is a named-deploy dispatch with a clean
+type-check as its gate. Until it ships, the applied RPC has no caller - production still runs the
+old direct-INSERT path from the deployed bundle.
+
+### 1. PRE-FLIGHT, RECORDED BEFORE THE APPLY (R7 / MIGRATION AMENDMENT)
+
+**File:** `supabase/migrations/20260801170000_oracle_debit_tokens_rpc.sql`
+promoted from `_drafts/` by `fs.renameSync`, content unchanged.
+sha256 `c4c374f96e2cc58493fecd743a51fc489bc02c535730f940d987d55eaabc1271`, 10,070 bytes,
+**0 non-ASCII**.
+
+**Rollback, as stated in the OPS49b dispatch before the apply ran:**
+```sql
+BEGIN;
+DROP FUNCTION IF EXISTS public.oracle_debit_tokens(uuid,uuid,numeric,text);
+DROP FUNCTION IF EXISTS public.oracle_token_available(uuid);
+COMMIT;
+```
+
+**Dependent objects, views, routines, constraints, indexes touching the target:** none. The
+migration creates two new function names and nothing else - no table altered, no row written, no
+constraint or index created or dropped. **Rows at risk: zero.**
+
+**Gate, verified live before the apply:**
+```
+functions named by this migration that already exist : 0
+migration 20260801170000 already recorded            : 0 rows
+oracle_token_ledger baseline                         : 16 rows
+```
+
+### 2. THE APPLY
+
+Generated from the migration file by `_claude_tmp/gen-ops49b-apply.mjs` - **never retyped**. The
+generator strips the file's own `BEGIN;`/`COMMIT;` and asserts it found **exactly two**, which is
+the mechanical guard against the OPS49 section-0 accident (a nested `COMMIT` ending the outer
+transaction). It refuses to build the script if the count differs.
+
+The script opens its own transaction containing, in order: a `DO` guard that raises if either
+function or the history row already exists, the migration body verbatim, and the
+`schema_migrations` insert. **DDL and history commit together or not at all**, which is what the
+dispatch required.
+
+```
+BEGIN
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+INSERT 0 1
+COMMIT
+```
+
+**Judgement call, stated with its reason:** I recorded the rollback in
+`schema_migrations.rollback` (the column exists and was unused by the five prior rows). A rollback
+that lives on the history row cannot drift from the migration it undoes. No prior migration used
+it; I did not retrofit the other five - that is not this pass's scope.
+
+### 3. POST-APPLY VERIFICATION, VERBATIM
+
+```
+      routine_name      | security_type | routine_type
+------------------------+---------------+--------------
+ oracle_debit_tokens    | DEFINER       | FUNCTION
+ oracle_token_available | INVOKER       | FUNCTION
+
+        proname         |                      acl
+------------------------+-----------------------------------------------
+ oracle_debit_tokens    | postgres=X/postgres | service_role=X/postgres
+ oracle_token_available | postgres=X/postgres | service_role=X/postgres
+
+    version     |          name           | stmts | rollback_stmts
+----------------+-------------------------+-------+----------------
+ 20260801170000 | oracle_debit_tokens_rpc |     1 |              2
+
+ ledger_rows_must_still_be_16 : 16
+```
+
+**Security posture is exactly as designed:** `oracle_debit_tokens` DEFINER, `oracle_token_available`
+INVOKER, and **neither is executable by `anon` or `authenticated`** - the ACLs list only `postgres`
+and `service_role`. A Bee cannot call the thing that debits tokens, and cannot read another Bee's
+balance through the helper.
+
+### 4. LIVE INVOCATION - THE THREE PROOFS THE DISPATCH ASKED FOR
+
+Functions confirmed live and committed *before* the test opened any transaction:
+
+```
+        proname         | prosecdef
+------------------------+-----------
+ oracle_debit_tokens    | t
+ oracle_token_available | f
+```
+
+**Deviation, stated with its reason:** the dispatch says "INVOKE ONCE after apply: call
+oracle_debit_tokens on a test bee ... paste the sequence." I invoked the live functions for real,
+but wrapped the **fixtures** in a transaction that rolls back. `oracle_token_ledger` is
+append-only money data with no DELETE grant to anyone but the owner - test grants, purchases and
+debits written to it could never be removed, only offset by more rows. Polluting the money ledger
+permanently to prove a function works is a worse outcome than proving it against fixtures that
+vanish. The functions under test were the applied ones, not copies.
+
+```
+################ 1. FIXTURES: 100 pack (durable) + 500 plan cycle (expires in 20d) ########
+  step   | plan_available | purchased_available | total_available
+---------+----------------+---------------------+-----------------
+ opening |     500.000000 |          100.000000 |      600.000000
+
+################ 2. PLAN SPENT FIRST - 200 must come entirely from plan ###################
+ { "debited": true, "duplicate": false,
+   "from_plan": 200, "from_purchased": 0, "amount_tokens": 200,
+   "plan_available": 300.000000, "purchased_available": 100.000000,
+   "total_available": 400.000000 }
+
+################ 3. CROSS INTO PURCHASED - 350 must split 300 plan / 50 purchased #########
+ { "debited": true, "duplicate": false,
+   "from_plan": 300.000000, "from_purchased": 50.000000, "amount_tokens": 350,
+   "plan_available": 0.000000, "purchased_available": 50.000000,
+   "total_available": 50.000000 }
+
+################ 4. IDEMPOTENT REPLAY - same directive, no second debit row ###############
+ { "debited": false, "duplicate": true,
+   "ledger_id": "1abb9f9e-5fba-4d2c-bd60-bd0716d4d8f8",
+   "plan_available": 0.000000, "purchased_available": 50.000000,
+   "total_available": 50.000000 }
+ debit_rows_for_directive_B : 1
+
+ final |       0.000000 |           50.000000 |       50.000000
+
+################ 5. POST-ROLLBACK: functions STILL LIVE, ledger untouched #################
+ functions_still_live : 2
+ ledger_rows          : 16
+ ops49b_test_rows     : 0
+ 20260801170000 | oracle_debit_tokens_rpc
+```
+
+Note the replay returns **the same `ledger_id`** as the original debit - it is reporting the row
+that already exists, not a new one. `debit_rows_for_directive_B = 1` is the proof that matters.
+
+### 5. STATE OF THE WORLD AFTER THIS PASS
+
+| Thing | State |
+|---|---|
+| `oracle_debit_tokens` | **LIVE**, DEFINER, service_role only |
+| `oracle_token_available` | **LIVE**, INVOKER, service_role only |
+| `schema_migrations` 20260801170000 | **recorded**, with rollback on the row |
+| `oracle_token_ledger` | **16 rows, unchanged since before OPS49** |
+| `atlasoracle-route/index.ts` | edited to call both RPCs. **NOT type-checked, NOT deployed** |
+| Deployed edge function | still the **old direct-INSERT path** - the RPC has no live caller yet |
+| `oracle_token_balances` view | **still expiry-blind.** No longer read by the route; still wrong |
+
+### 6. DONE-TEST
+
+| Requirement | Status |
+|---|---|
+| apply the file named in the dispatch | DONE - sha256 recorded, promoted unchanged |
+| land a `schema_migrations` row (20260801170000), same transaction as the DDL | DONE - single transaction, verified |
+| confirm neither function existed first; STOP if either did | DONE - gate returned 0, plus an in-transaction `DO` guard that would have aborted the apply |
+| invoke once: plan-spent-first, cross-into-purchased, idempotent replay | DONE - section 4, verbatim |
+| W-1 owner + next action at top | DONE |
+
+### 7. COULD NOT VERIFY
+
+- **The route still is not type-checked.** `deno` is not installed (`deno: command not found`).
+  Unchanged from OPS49 and it gates the deploy.
+- **Concurrency.** The advisory lock and the partial unique index are argued, not observed. No two
+  callers ever ran at once in any test. The replay proof exercised the pre-check path under the
+  lock; the `ON CONFLICT ... DO NOTHING` backstop has still never been the thing that fired.
+- **`auth.role()` through PostgREST with a real service-role key.** Both proofs set
+  `request.jwt.claims` by hand in psql. The guard behaves correctly there. It has not been called
+  the way the edge function will call it.
+- **Whether anything besides the route reads `oracle_token_balances`.** Not swept. Section 5 lists
+  the view as still wrong precisely because I do not know who else reads it.
+- **That the two functions behave identically once the route calls them over PostgREST.** Argument
+  shapes differ (named params, jsonb return, one-row set for the `RETURNS TABLE` helper). The
+  route code handles both shapes defensively but has never executed.
+
+---
+
+## OPS49 - oracle_debit_tokens BUILT AND PROVEN. APPLY BLOCKED ON R7. QUESTION FILED.
+
+Lane `ops`. Workdir `TheMANUAL.tech`. Scope `oracle`. Effort: deep. **The RPC is written and
+dry-run proven. It is NOT applied**, because the dispatch names no migration file and states no
+rollback, which root `CLAUDE.md` R7 (MIGRATION AMENDMENT) requires before an apply. `OPS49-Q`
+filed; dispatch left `claimed`.
+
+### W-1 - WHO OWNS THE NEXT MOVE, AND WHAT IT IS
+
+**Owner: LEAD.**
+
+**The single next action: re-stamp OPS49 with the two lines R7 needs** - the migration file named
+(`supabase/migrations/20260801170000_oracle_debit_tokens_rpc.sql`) and the rollback quoted (it is
+two `DROP FUNCTION` statements, written verbatim in section 7). Everything else is done: the RPC
+is written, dry-run proven against production data in a rolled-back transaction, and the route is
+already wired to call it.
+
+**Second, and it is bigger than this pass:** the dry run found that `oracle_token_balances` -
+the view the live 402 gate reads - **has no notion of expiry** and will report expired plan
+tokens as spendable. Section 4. It is latent today and becomes live the day the first plan cycle
+ends.
+
+### 0. DISCLOSURE - I COMMITTED TWO FUNCTIONS TO PRODUCTION BY ACCIDENT AND REVERTED THEM
+
+Stated first because it is the most important thing in this report.
+
+**What happened.** My first dry-run script wrapped everything in `BEGIN ... ROLLBACK` and pulled
+the migration in with `\i`. The migration file carries its own `BEGIN;` / `COMMIT;`. Under `psql`
+the inner `BEGIN` warned (`there is already a transaction in progress`) and was ignored - but the
+inner **`COMMIT` committed my outer transaction**, persisting both functions before the fixtures
+had even run.
+
+**Verbatim, from the failed run:**
+```
+BEGIN
+BEGIN
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMIT
+...
+psql:...:22: WARNING:  there is already a transaction in progress
+psql:...:17: ERROR:  insert or update on table "bees" violates foreign key constraint "bees_id_fkey"
+```
+
+**Blast radius, measured not assumed.** I checked immediately:
+```
+        proname         | prosecdef |                                args
+------------------------+-----------+--------------------------------------------------------------------
+ oracle_debit_tokens    | t         | p_bee uuid, p_directive uuid, p_amount_tokens numeric, p_memo text
+ oracle_token_available | f         | p_bee uuid
+ ops49_ledger_rows: 0     ops49_bees: 0     ledger_total: 16
+```
+Two functions created. **Zero rows written anywhere** - the run died on the very next statement
+because `bees.id` has an FK to `auth.users` and my synthetic test bee had no auth row. Nothing
+called the functions. `oracle_token_ledger` was 16 rows before and 16 rows after.
+
+**What I did.** Dropped both immediately, restoring the pre-pass catalog:
+```
+DROP FUNCTION
+DROP FUNCTION
+ functions_remaining: 0     ledger_rows: 16
+```
+
+**Why I am not treating "it was harmless" as the end of it.** It was an unauthorised apply. The
+functions were live in production for the duration of one round-trip. Nothing depended on them
+and nothing called them, so the damage was zero - but the control that was supposed to stop this
+is R7, and R7 did not stop it, because I ran the DDL myself inside what I believed was a
+throwaway transaction.
+
+**The rule that would have caught it, proposed for the ops canon:** *a migration file that
+carries its own `BEGIN;`/`COMMIT;` must never be pulled into another transaction with `\i`.*
+Strip the wrappers and inline the body instead. The v2 dry run does exactly that, mechanically -
+`_claude_tmp/gen-ops49-dryrun.mjs` reads the migration, asserts it finds **exactly two**
+wrappers, strips them, and refuses to build the script otherwise:
+```
+stripped transaction wrappers: ["BEGIN;","COMMIT;"]
+```
+That assertion is the fix. A hand-edited copy would have drifted from the file it is meant to
+prove.
+
+### 1. PREMISE VERIFIED, AS THE DISPATCH REQUIRED FIRST
+
+> *"read the route around line 894 and CONFIRM it is a direct INSERT and not already an RPC call.
+> If it already calls an RPC, report that and stop - the premise changed."*
+
+**The premise holds. It was a direct INSERT.** Verbatim, before my edit:
+
+```ts
+// atlasoracle-route/index.ts:894-902
+const { error: debitErr } = await service
+  .from('oracle_token_ledger')
+  .insert({ bee_id: beeId, entry_type: 'debit', amount_tokens: -finalCostTokens,
+            directive_id: directiveId, memo: `${tier} directive via ${providerModel}` });
+```
+
+And the balance read at `:704` was a direct view select, not an RPC either. `atlasoracle_debit`
+exists in the catalog and is SECURITY DEFINER, but the route does not call it - the route's own
+comment says so (`atlasoracle_debit / _credit are NOT called and NOT modified (OPEN-7)`).
+
+**One correction to the dispatch's verified list:** it credits `expires_at` to migration
+`20260801154515`. That version is `bees_anon_column_narrowing_step1`. `expires_at` arrived in
+**`20260801164907_oracle_token_ledger_add_expires_at`**. Both are applied; only the citation was
+wrong. Also applied since OPS48: `20260801164922_subscriptions_tier_widen_oracle_scout_sovereign`,
+so `subscriptions_tier_valid` now reads `scout|oracle|sovereign` - confirmed live.
+
+### 2. THE DISPATCH'S BALANCE FORMULA IS WRONG. DO NOT BUILD IT.
+
+The dispatch specifies:
+
+> *"Compute available balance server-side: sum of non-expired grants+purchases minus prior debits,
+> where 'non-expired' means expires_at IS NULL OR expires_at > now()."*
+
+**That under-reports every Bee who has ever held a plan, and drives balances negative.** When a
+cycle expires the grant leaves the sum, but the debits it paid for stay behind. The debits are
+then charged a second time, against durable purchased tokens.
+
+Fixture: 100 purchased, a 1,000 plan grant that has expired, 300 spent inside that cycle.
+
+| Formula | Result |
+|---|---|
+| Dispatch's ("non-expired credits minus all debits") | **-200** |
+| `oracle_token_available` (this pass) | **100** |
+
+The 300 came out of plan tokens that no longer exist. It must not be charged to the pack. This is
+the OPS48 s4b derived attribution, and the reason it exists.
+
+### 3. WHAT I BUILT
+
+Two functions, in `supabase/migrations/_drafts/20260801170000_oracle_debit_tokens_rpc.sql`.
+
+**`oracle_token_available(p_bee uuid)`** -> `(plan_available, purchased_available, total_available)`.
+`STABLE`, **SECURITY INVOKER on purpose**, `EXECUTE` to `service_role` only. A DEFINER here would
+be a per-Bee balance oracle waiting to be mis-granted; the only caller that needs it either holds
+service_role or is `oracle_debit_tokens`, which runs as owner anyway. Per cycle window
+`[grant.created_at, grant.expires_at)`:
+
+```
+plan_consumed      = LEAST(grant, spent_in_window)
+purchased_consumed = GREATEST(0, spent_in_window - grant)
+```
+Only `purchased_consumed` touches the durable balance. Debits inside no window are fully
+purchased. **Expiry performs zero writes** - it is a `WHERE` clause, so append-only is preserved
+by construction and there is no job to schedule.
+
+**`oracle_debit_tokens(p_bee, p_directive, p_amount_tokens, p_memo)`** -> `jsonb`.
+`SECURITY DEFINER`, `SET search_path = public`, `EXECUTE` to `service_role` only, service-role /
+admin guard in the body. **One `debit` row per directive** - the existing
+`one_debit_per_directive_uidx` is respected, never modified, and no second leg is written.
+
+**The advisory lock is not decoration.** `pg_advisory_xact_lock(hashtextextended(p_bee::text, 0))`
+serialises one Bee's debits. Without it two concurrent directives both read `available = 100` and
+both debit 100. That is the check-then-act shape OPS38 P3 flagged; a per-Bee transaction-scoped
+lock closes it without touching any other Bee. `ON CONFLICT ... DO NOTHING` on the partial index
+is the backstop that still holds if the lock is ever removed.
+
+The plan/purchased split in the return value is **display only** - a report of what the single
+debit row consumed, computed at read time. It is never a second row.
+
+### 4. THE FINDING THAT OUTLIVES THIS PASS: THE LIVE VIEW IS EXPIRY-BLIND
+
+`oracle_token_balances` is what `atlasoracle-route:704` gated on until this pass. Live definition,
+read this pass:
+
+```sql
+SELECT bee_id, sum(amount_tokens) AS balance_tokens, ...
+  FROM oracle_token_ledger GROUP BY bee_id;
+```
+
+No `expires_at` predicate anywhere. Same fixture as section 2, three-way:
+
+```
+              which                      | balance
+-----------------------------------------+-------------
+ CORRECT - oracle_token_available        |  100.000000
+ NAIVE - the dispatch formula            | -200.000000
+ STALE VIEW - what the route reads today |  800.000000
+```
+
+**The view would have authorised 700 tokens of compute that do not exist**, at the 402 gate,
+before any debit could refuse it. OPS48 s7c proposed replacing this view and it was not applied -
+`expires_at` and the tier widen landed, the view replacement did not.
+
+**Calibrated honestly: this is LATENT, not live.** Every ledger row in production today has
+`expires_at IS NULL` (16 rows: 5 grant, 6 debit, 4 adjustment, 1 purchase), and no plan grant has
+ever been written. The view and the correct function agree on every existing Bee. **It becomes a
+live overdraft the day the first plan cycle expires** - which is the day the plan product ships.
+
+This pass routes around it by making the route call `oracle_token_available` instead. **The view
+itself is still wrong and still readable by anything else.** Replacing it is not in this scope;
+it needs its own dispatch, and it should land before plans, not after.
+
+### 5. DRY RUN - VERBATIM
+
+One transaction, ended in `ROLLBACK`. Fixtures used two existing system Bees that hold no ledger
+rows (`combtreasury`, `combrewardspool`) because `bees.id` FKs to `auth.users` and a synthetic
+Bee cannot be created without an auth row.
+
+```
+################ PRE-STATE (both test bees must start empty) ################
+ bee A |              0 |                   0 |               0
+ bee C |              0 |                   0 |               0
+
+################ FIXTURES: bee A gets a 100 pack + an ACTIVE 500 plan cycle ################
+ bee A opening |     500.000000 |          100.000000 |      600.000000
+
+################ TEST 1 - PLAN SPENT FIRST: 200 of the 500 plan, purchased untouched ########
+ { "debited": true, "duplicate": false,
+   "from_plan": 200, "from_purchased": 0, "amount_tokens": 200,
+   "plan_available": 300.000000, "purchased_available": 100.000000,
+   "total_available": 400.000000 }
+
+################ TEST 2 - CROSSES INTO PURCHASED: 350 = 300 plan + 50 purchased ############
+ { "debited": true, "duplicate": false,
+   "from_plan": 300.000000, "from_purchased": 50.000000, "amount_tokens": 350,
+   "plan_available": 0.000000, "purchased_available": 50.000000,
+   "total_available": 50.000000 }
+
+################ TEST 3 - REPLAY SAME DIRECTIVE: idempotent, no second row #################
+ { "debited": false, "duplicate": true,
+   "ledger_id": "b9cbb32c-b557-45d8-bdd5-8828c0fe85aa",
+   "plan_available": 0.000000, "purchased_available": 50.000000,
+   "total_available": 50.000000 }
+ debit_rows_for_directive_2: 1
+
+################ TEST 4 - OVERDRAFT REFUSED: wants 100, has 50 #############################
+ ERROR:  insufficient tokens: need 100, available 50.000000
+ CONTEXT:  PL/pgSQL function oracle_debit_tokens(uuid,uuid,numeric,text) line 38 at RAISE
+
+ bee A final |       0.000000 |           50.000000 |       50.000000
+ total_debit_rows_bee_a: 2
+
+################ TEST 5 - EXPIRED PLAN ####################################################
+ CORRECT - oracle_token_available        |  100.000000
+ NAIVE - the dispatch formula            | -200.000000
+ STALE VIEW - what the route reads today |  800.000000
+
+ROLLBACK
+
+################ POST-ROLLBACK PROOF: nothing persisted ###################################
+ ops49_ledger_rows: 0
+ ledger_total_should_be_16: 16
+ functions_should_be_0: 0
+```
+
+**Three debits attempted, two rows written, one duplicate refused, one overdraft refused.
+Ledger back to 16 rows, both functions gone.**
+
+### 6. ROUTE WIRED - THREE EDITS, NOT ONE
+
+`supabase/functions/atlasoracle-route/index.ts`:
+
+| Line | Change |
+|---|---|
+| ~704 | 402 gate now calls `rpc('oracle_token_available')`. **Was reading the expiry-blind view** - section 4 |
+| ~896 | debit is `rpc('oracle_debit_tokens', {...})`. The direct INSERT is gone |
+| ~927 | `balanceAfter` comes from the RPC's return value. **The second view read is deleted**, not repointed |
+
+Plus two stale comments at `:581` and `:699` that still described the view as the balance source.
+
+**The route no longer computes, reads, or writes a token balance anywhere.** Verified by grep:
+every remaining mention of `oracle_token_balances` in that file is a comment explaining why it is
+no longer used.
+
+**The dispatch asked for one edit and the honest answer is three.** Replacing only the debit would
+have left the 402 gate authorising spend off the wrong number - a worse state than before, because
+the gate would say yes and the RPC would then raise after the provider had already been paid.
+
+### 7. THE APPLY, AND WHY IT IS BLOCKED
+
+**Migration file, written, NOT applied:**
+`supabase/migrations/_drafts/20260801170000_oracle_debit_tokens_rpc.sql`
+
+`_drafts/` because the Supabase CLI globs only the top level, so a correctly-named file sitting in
+`migrations/` is one `db push` from live. Promote by moving it up one level.
+
+**Rollback, exact - this is what the re-dispatch must quote:**
+```sql
+BEGIN;
+DROP FUNCTION IF EXISTS public.oracle_debit_tokens(uuid,uuid,numeric,text);
+DROP FUNCTION IF EXISTS public.oracle_token_available(uuid);
+COMMIT;
+```
+
+**Pre-flight, per R7.** The migration creates two functions and nothing else: no table altered,
+no row written, no constraint or index touched, no object dropped. Dependent objects: none - both
+functions are new names, confirmed absent from `pg_proc` before and after. Rows at risk: **zero**.
+The rollback cannot lose data. **One ordering constraint:** if the edge function has been deployed
+calling `oracle_debit_tokens`, dropping it makes every paid directive fail its debit. Roll the
+route back first, then the functions.
+
+**Why I stopped.** R7: *"applying a migration to production is permitted only via an explicit
+dispatch that names the migration file, and only after a pre-flight recorded in REPORT.md ... The
+rollback statement must be stated in the dispatch before the apply runs."* The OPS49 dispatch says
+"apply the RPC via the normal migration path" but **names no file and states no rollback**. R7
+also says an authorization not written in `CLAUDE.md` is not sufficient and to file a question
+instead. Section 0 is what happens when that gate is bypassed, even accidentally.
+
+### 8. DONE-TEST - HONEST STATUS
+
+| Requirement | Status |
+|---|---|
+| RPC applied + in `schema_migrations` | **NOT DONE - blocked on R7.** Written, proven, file named, rollback written. `OPS49-Q` filed |
+| dry-run proof pasted: plan-first, cross-into-purchased, idempotent replay | DONE - section 5, verbatim, plus an overdraft-refused and an expired-plan case the dispatch did not ask for |
+| route confirmed calling the RPC | DONE - section 6, three edits. **Not type-checked** - see below. Not deployed |
+| W-1 owner + next action at top | DONE |
+
+**Zero DDL and zero DML persist from this pass.** The catalog and `oracle_token_ledger` are
+byte-for-byte as I found them (16 rows, no `oracle_debit_tokens`, no `oracle_token_available`) -
+except for the accidental create-and-revert fully disclosed in section 0. Nothing was deployed.
+
+### 9. COULD NOT VERIFY
+
+- **The route edit is not type-checked.** `deno` is not installed in this environment
+  (`deno: command not found`) and the edge functions are Deno, not part of the Vite `tsc -b`
+  build. My `(debitRes as any)?.total_available` and the `Array.isArray(availRows)` narrowing are
+  unchecked. **Under the DEPLOY AMENDMENT a deploy requires a clean type-check, so the deploy is
+  blocked on this too, independently of R7.**
+- **The RPC has never run against the applied schema** - only inside a rolled-back transaction
+  where I had just created it. Behaviour under concurrent callers is argued from the advisory lock
+  and the partial unique index, **not observed**. No concurrency test was run.
+- **`ON CONFLICT (directive_id) WHERE (...)` inference against the partial index** is proven only
+  in the sense that TEST 3 returned `duplicate: true` via the pre-check path under the advisory
+  lock. The `ON CONFLICT` backstop itself was never the thing that fired, so it is written but
+  unexercised.
+- **Whether anything other than the route reads `oracle_token_balances`.** I did not sweep the
+  client or the other edge functions. Section 4's fix covers the route only.
+- **`auth.role()` under a real service-role JWT.** The dry run set
+  `request.jwt.claims = {"role":"service_role"}` by hand. The guard behaved correctly there;
+  it has not been exercised through PostgREST with an actual service-role key.
+- **`hashtextextended` collisions.** Two different bee UUIDs hashing to the same lock key would
+  serialise unrelated Bees. Harmless to correctness, a throughput matter only, and not measured.
+
+---
+
+## OPS48 - ONE CHECKOUT, TWO PRODUCTS: packs + Scout/Oracle/Sovereign plans. DESIGN ONLY.
+
+Lane `ops`. Workdir `TheMANUAL.tech`. Scope `oracle`. Effort: deep. Extends OPS35, does not
+restart it. **DESIGN ONLY: zero DDL, zero DML, zero deploys, zero Stripe objects created, no
+Stripe key read or referenced by value.**
+
+### W-1 - WHO OWNS THE NEXT MOVE, AND WHAT IT IS
+
+**Owner: LEAD.**
+
+**The single next action: dispatch the `oracle_debit_tokens` RPC as its own build pass, BEFORE
+any plan work ships.** TOKEN-BUCKETS cannot be implemented where the debit currently lives.
+`atlasoracle-route/index.ts:894-902` writes the debit as a **direct table INSERT from the edge
+function** using `service_role` - there is no debit RPC. Any rule about which bucket is spent
+first has to sit somewhere the route cannot bypass, and today no such place exists. Section 4
+shows how to make the ordering un-violable without touching that INSERT at all, but the balance
+read that gates it still has to move server-side.
+
+Second, and Butch's alone: **plan price points and token allowances are unruled** and section 7
+deliberately leaves those rows unseeded. The design does not need them; shipping does.
+
+### 0. WHAT I CHANGED FROM OPS35, AND WHY
+
+OPS35's pack design is ACCEPTED and I reuse it substantially unchanged. Changes, stated plainly
+as the dispatch requires:
+
+| OPS35 element | Status | Why |
+|---|---|---|
+| No `stripe_events` migration needed | **KEPT, re-verified** | `'oracle'` is in the CHECK. Still true |
+| `oracle_token_packs` table + seeds | **KEPT verbatim** | Values are ORACLE_MF v0.16 s5 canon |
+| `oracle_credit_token_purchase` RPC | **KEPT verbatim** | Nothing about plans changes the pack credit path |
+| Idempotency on the ledger row, keyed by Checkout Session id | **KEPT, and extended** | Plans need a second key on a different id. Section 5 |
+| Separate `oracle-token-webhook` | **CHANGED to `oracle-webhook`, handling both event families** | Section 3. One Stripe endpoint = one signing secret; splitting packs and plans across two endpoints would need two secrets for one product |
+| `oracle-token-checkout` | **CHANGED to `oracle-checkout`, two modes** | The ruling is one surface. Section 2 |
+| Inline `price_data`, zero Stripe objects | **KEPT, and it turns out to matter more than OPS35 knew** | Section 3b |
+| OPS35-Q q1 (refund policy) filed as unruled | **NOW RULED** | See correction C-1 |
+| OPS35-Q q2 (do tokens expire?) filed as unruled | **NOW RULED** | TOKEN-BUCKETS: plan tokens expire at reset, purchased never |
+
+**C-1. The dispatch is internally stale on the refund question.** Its body says *"STILL UNRULED
+AND NOT YOURS TO DECIDE: the REFUND POLICY (OPS35-Q q1). Design so that both an allow-negative
+and a clamp-at-zero answer remain implementable."* Its own later fold-in, and ORACLE_MF v0.26
+s2, rule it: **refund the unspent remainder only.** I designed the ruled shape, not both. The
+allow-negative machinery is not built and is not needed - see section 6.
+
+### 1. TWO FINDINGS THAT CHANGE THE SHAPE
+
+**F-1. There is no debit RPC. The debit is an edge-function table INSERT.**
+
+```ts
+// atlasoracle-route/index.ts:894-902
+const { error: debitErr } = await service
+  .from('oracle_token_ledger')
+  .insert({ bee_id: beeId, entry_type: 'debit', amount_tokens: -finalCostTokens,
+            directive_id: directiveId, memo: `${tier} directive via ${providerModel}` });
+```
+
+The dispatch asks how spend-plan-first is "enforced at the point of debit". Today that point is
+TypeScript holding a service-role key. Section 4 answers this by removing the need for
+enforcement rather than adding it - but the finding stands and it gates the build.
+
+**F-2. The existing debit guard forbids the obvious implementation.**
+
+```
+oracle_token_ledger_one_debit_per_directive_uidx
+  UNIQUE (directive_id) WHERE ((entry_type = 'debit') AND (directive_id IS NOT NULL))
+```
+
+The natural way to record a split spend is two debit rows per directive, one per bucket. **This
+index makes that raise `23505`.** And the route's own comment names this exact shape as a past
+outage:
+
+> *"the defect that killed atlasoracle_debit was precisely its second leg colliding with a
+> one-row-per-source_ref unique index."*
+
+So the obvious design repeats a known failure. Section 4 does not take that path.
+
+### 2. DELIVERABLE 1 - ONE CHECKOUT SURFACE, TWO PRODUCTS
+
+One function, `oracle-checkout`. `verify_jwt = true`. Body is exactly one of:
+
+```
+{ "pack_code": "plus" }        -> one-time payment
+{ "plan_tier": "sovereign" }   -> recurring subscription
+```
+
+**SHARED - one implementation, no duplication:**
+
+| Component | Detail |
+|---|---|
+| JWT verify + bee resolution | `userClient(jwt).auth.getUser()`, per OPS35 property 1 |
+| Server-side canon lookup | Client names a `pack_code` or a `plan_tier`, **never an amount**. OPS35 property 2, unchanged and load-bearing for both |
+| Inline `price_data` | No pre-created Stripe Price objects for either SKU. OPS35 property 3 |
+| Stripe customer resolution | One `stripe_customer_id` per bee, reused across both SKUs |
+| Metadata convention | `{ bee_id, product_type: 'oracle', sku_kind: 'pack'\|'plan', pack_code\|plan_tier }` pinned on `session.metadata` AND on `payment_intent_data.metadata` (packs) / `subscription_data.metadata` (plans) |
+| Success / cancel URLs | `ORACLE_CHECKOUT_SUCCESS_URL` / `_CANCEL_URL`, one pair |
+| Language firewall | `product_data.name` renders to the Bee on Stripe's page. "GET 30,000 Tokens", "SCOUT plan". Never buy/purchase/price/customer |
+
+**BRANCHED - exactly three branches, and no more:**
+
+| Branch | Pack | Plan |
+|---|---|---|
+| `mode` | `'payment'` | `'subscription'` |
+| `price_data` | `{currency, unit_amount, product_data}` | same **plus** `recurring: { interval: 'month' }` |
+| Canon table | `oracle_token_packs` | `oracle_token_plans` (section 7) |
+
+That is the whole branch surface. `mode` and one extra key on `price_data`.
+
+**THE COMPROMISE THE SHARED SURFACE FORCES - stated, not hidden.** Stripe Checkout in
+`mode: 'subscription'` creates an ad-hoc Price from `price_data`. **`price_data` has no
+`metadata` field** (only `product_data.metadata` does), so the Price that a plan checkout creates
+carries no `{product_type, tier}`. Section 3b shows this is load-bearing in both directions.
+
+### 3. THE WEBHOOK, AND A COLLISION WITH THE LIVE F6 RAIL
+
+**3a. One function, `oracle-webhook`, two event families.**
+
+| Event | SKU | Action |
+|---|---|---|
+| `checkout.session.completed` (mode=payment) | pack | `oracle_credit_token_purchase(...)` - OPS35 verbatim |
+| `invoice.paid` | plan | `subscription_sync(...)` then `oracle_grant_plan_tokens(...)` |
+| `customer.subscription.updated` / `.deleted` | plan | `subscription_sync(...)` only. **No token write** |
+
+OPS35's four reasons for not extending `stripe-subscription-webhook` all still hold, and I keep
+that separation. What changes is that the oracle function now owns both oracle event families
+instead of one, because **one Stripe endpoint has one signing secret**. Splitting packs and plans
+across two endpoints would mean two secrets for one product and no benefit.
+
+New env var, OPS35's convention unchanged: `STRIPE_WEBHOOK_SECRET_ORACLE`.
+
+**3b. THE COLLISION. Stripe delivers an event to EVERY subscribed endpoint.**
+
+The live F6 webhook subscribes to `customer.subscription.created/updated/deleted` and
+`invoice.paid`. It will therefore **also receive every oracle plan event.** What it does with
+them is decided entirely by `productFromPrice()`:
+
+```ts
+// stripe-subscription-webhook/index.ts:44-50
+const md = (price as any)?.metadata ?? {};
+const pt = md.product_type;
+const tier = md.tier;
+if (typeof tier !== 'string' || tier.length === 0) return null;
+```
+
+...and at line 165 a `null` product means `return jsonResponse({ received: true, ignored: 'no product_type/tier metadata' })`.
+
+**Because inline `price_data` cannot carry Price metadata, F6 ignores oracle plan events.** The
+isolation the design needs falls out of a decision OPS35 made for a completely different reason.
+
+**This is fragile and must be recorded as a constraint, not a happy accident.** If anyone later
+pre-creates Stripe Price objects for the three plans and tags them
+`metadata {product_type: 'oracle', tier: 'scout'}` - the obvious "tidy-up" - then F6 starts
+processing oracle events too, and:
+
+1. Two functions write the same `subscriptions` row. `subscription_sync` is `ON CONFLICT DO
+   UPDATE` so it survives, but there is no longer one writer.
+2. **F6 calls `subscription_sync` with `tier='scout'`, which fails `subscriptions_tier_valid`
+   with `23514` until the widen migration in section 7 lands** - and F6's failure path logs and
+   returns, so the symptom is a silently unrecorded paid subscription.
+
+**RULE FOR THE BUILD: oracle plans use inline `price_data` and resolve product identity from
+SESSION/SUBSCRIPTION metadata, never Price metadata. Do not create Stripe Price objects for
+oracle plans.** The two webhooks resolve product identity from different sources on purpose.
+
+### 4. DELIVERABLE 2 - TOKEN-BUCKETS LEDGER SEMANTICS
+
+**The ruling to implement:** plan tokens and purchased tokens are separate entry types on one
+ledger; plan tokens are granted per cycle, expire at reset, and are spent first; purchased tokens
+never expire and are spent only after plan tokens are exhausted; append-only, corrections are
+reversing entries only.
+
+**4a. Entry types - NO CHECK CHANGE NEEDED.**
+
+```
+oracle_token_ledger_entry_type_chk
+  CHECK (entry_type = ANY (ARRAY['purchase','debit','adjustment','grant']))
+```
+
+`grant` already exists and already requires `amount_tokens > 0`. Plan grants use it. The five
+existing `grant` rows (+7,026 tokens) are comps and seeds, not plan grants, and must not start
+expiring retroactively. **They are distinguished by a single new nullable column:**
+
+```sql
+ALTER TABLE public.oracle_token_ledger ADD COLUMN expires_at timestamptz;
+```
+
+`expires_at IS NULL` = never expires (every existing row, and every purchase). `expires_at IS NOT
+NULL` = a plan grant belonging to the cycle ending at that instant. **One column. No new entry
+type, no CHECK migration** - the same character of finding as OPS35's "no `stripe_events`
+migration needed".
+
+**4b. SPEND ORDER - derived, not enforced, and that is stronger.**
+
+Two designs were considered.
+
+- **Tagged debits (REJECTED).** Add `bucket` to every debit and write up to two debit rows per
+  directive. Requires replacing `oracle_token_ledger_one_debit_per_directive_uidx` with
+  `UNIQUE (directive_id, bucket)` - modifying an existing guard on a live money path - and it
+  reproduces exactly the two-rows-per-source shape the route's own comment blames for killing
+  `atlasoracle_debit`. Rejected on both counts.
+
+- **Derived attribution (RECOMMENDED).** Debits are never tagged. The route's INSERT at
+  `atlasoracle-route/index.ts:894` **does not change at all.** Because plan tokens are spent
+  first and expire at cycle end, the split is an accounting identity over the cycle window:
+
+```
+cycle          = the grant row G with expires_at > now(), for this bee   (at most one - see 7d)
+window         = [G.created_at, G.expires_at)
+spent_in_cycle = -SUM(amount_tokens) for entry_type='debit' with created_at in window
+
+plan_consumed      = LEAST(G.amount_tokens, spent_in_cycle)
+purchased_consumed = GREATEST(0, spent_in_cycle - G.amount_tokens)
+
+plan_available      = G.amount_tokens - plan_consumed
+purchased_available = SUM(purchase) + SUM(grant WHERE expires_at IS NULL)
+                      + SUM(adjustment) - SUM(purchased_consumed over all windows)
+```
+
+**Spend-plan-first cannot be violated, because the debit never chooses a bucket.** There is no
+code path that could choose wrong, no race between reading a balance and writing a debit, and no
+enforcement to bypass. With no active plan, `G` is absent, `plan_consumed` is 0, and every debit
+falls to purchased - the current behaviour exactly.
+
+**4c. EXPIRY AT RESET - zero writes, zero scheduled job.**
+
+The dispatch asks how expiry happens "without a scheduled job you have not got". **It happens by
+not being written.** `expires_at` is a read-time predicate: the instant `now()` passes it, that
+grant stops satisfying `expires_at > now()`, its window closes, and its unspent remainder stops
+counting. Nothing is inserted, nothing is updated, nothing is deleted.
+
+**Append-only is respected by construction** - the expiry mechanism performs no writes at all, so
+there is nothing for it to mutate.
+
+**4d. The balance view must be replaced.** Today `oracle_token_balances` sums the whole ledger
+and treats `grant` as permanent:
+
+```sql
+sum(amount_tokens) FILTER (WHERE entry_type = 'grant') AS granted_tokens
+```
+
+Under TOKEN-BUCKETS that over-reports every bee with an expired plan. The replacement is
+`security_invoker=true` like the current one (audited clean by OPS35 - keep that property) and
+exposes `plan_available`, `purchased_available`, `balance_tokens = plan + purchased`. **The 402
+gate in `atlasoracle-route` must read `balance_tokens` from the new view**, which is the only
+route change TOKEN-BUCKETS requires and the reason W-1 names the debit/balance pass as gating.
+
+### 5. DELIVERABLE 4 - IDEMPOTENCY ON BOTH PATHS
+
+**Two keys, because the two SKUs have two different invariants.**
+
+| Path | Key | Index |
+|---|---|---|
+| Pack | Checkout Session id `cs_...` | `oracle_token_ledger_one_purchase_per_payment_uidx UNIQUE (payment_ref) WHERE entry_type='purchase' AND payment_ref IS NOT NULL` (OPS35 verbatim) |
+| Plan | **Invoice id `in_...`** | `oracle_token_ledger_one_grant_per_invoice_uidx UNIQUE (payment_ref) WHERE entry_type='grant' AND expires_at IS NOT NULL AND payment_ref IS NOT NULL` |
+
+**Why the invoice id and not the subscription id for plans.** A subscription grants tokens every
+cycle, so the subscription id is not unique per grant - keying on it would credit the first cycle
+and silently refuse every renewal. The invoice is one-per-cycle, which is exactly the grain of a
+grant. The `expires_at IS NOT NULL` term keeps the five legacy `grant` rows (all with NULL
+`payment_ref`) outside the index.
+
+**Both keys are partial unique indexes on the money row itself**, per OPS35 s5, so double-credit
+is refused by Postgres regardless of what either webhook believes.
+
+**5b. THE OPS38 DEPENDENCY - stated as a dependency, NOT assumed away.**
+
+> OPS38 (P1, UNFIXED): *"neither checkout function sets a Stripe idempotency key."*
+
+**The ledger indexes above do not fix this and cannot.** They protect against Stripe *replaying*
+one payment. They do not protect against *two payments being created*. A Bee who double-clicks
+GET hits `oracle-checkout` twice, which creates **two Checkout Sessions with two different
+`cs_...` ids**. Both may be paid. Two distinct `payment_ref` values, two legal ledger rows, two
+charges. That is not a replay and no ledger constraint can see it.
+
+**This design has a hard dependency on the OPS38 P1 fix**: `oracle-checkout` must send a Stripe
+`Idempotency-Key` header derived from `(bee_id, sku, a client-supplied attempt nonce)` so a
+double-click returns the *same* Session. Until that ships, packs and plans carry the same
+double-charge exposure the press and venue rails carry today.
+
+For plans there is a second, cheaper guard that should ship regardless: the partial unique index
+in 7d permitting at most one active oracle subscription per bee.
+
+### 6. DELIVERABLE 3 - CANCELLATION, LAPSE, AND REFUND, AS RULES A BEE COULD READ
+
+> **Your Plan Tokens belong to the month that granted them.** They do not roll over. When your
+> month ends they stop working - whether you renewed, cancelled, or a payment failed.
+>
+> **If you cancel, you keep them until the end of the month you already paid for.** Cancelling
+> does not cut them off early.
+>
+> **Tokens you GET in a pack are yours. They never expire.** Ending a plan never touches them,
+> and when your Plan Tokens run out or run down, your pack Tokens carry on.
+>
+> **If you ask for a refund on a pack, we return what you have not used.** The part you already
+> spent on AI is not refundable.
+
+**Mechanically:**
+
+- **Cancel / lapse: nothing is written to the ledger.** `subscription_sync` records the status
+  change on `subscriptions`; the grant row already carries `expires_at = current_period_end` and
+  simply stops counting when it passes. **No clawback entry, no reversal, no job.** A cancellation
+  mid-cycle is therefore free of ledger effects, which is what "you keep them until the end of the
+  month you paid for" means in code.
+- **`past_due` / `unpaid`:** no new grant is written because no `invoice.paid` arrives. The
+  current cycle's tokens live out their `expires_at` and then stop. Correct by default.
+- **Refund** reverses only the unconsumed remainder, as an `adjustment` row (negative amount is
+  legal for `adjustment` under `amount_sign_chk`), clamped:
+
+```
+refund_tokens = GREATEST(0, LEAST(original_purchase.amount_tokens, purchased_available_now))
+```
+
+**`purchased_available` can never go negative**, because the clamp caps the reversal at what is
+actually there. No allow-negative machinery, no `bling_deficit` analogue, matching ORACLE_MF v0.26
+s2's rationale exactly.
+
+**THE SINGLE PLACE THE REFUND RULING LANDS:** the `refund_tokens` expression above, inside
+`oracle_refund_token_purchase`. If Butch ever reverses to allow-negative, that one expression
+becomes `LEAST(original.amount_tokens, ...)` without the `GREATEST(0, ...)` clamp, and nothing
+else in the design moves. Plan tokens are never refundable - they expire anyway.
+
+### 7. THE BUILD BLUEPRINT - NAMED MIGRATIONS, NOT APPLIED
+
+**Nothing in this section was executed.** `oracle_token_packs` and
+`oracle_credit_token_purchase` were re-checked live this pass and **still do not exist**
+(`to_regclass` / `to_regproc` both NULL) - OPS35 was never applied, so the build pass carries its
+migration too.
+
+**7a.** `20260801140000_oracle_token_packs_and_purchase.sql` - OPS35 s7a + s7b verbatim
+(packs table, seeds, purchase idempotency index, `oracle_credit_token_purchase`). Rollback:
+OPS35 s7e verbatim.
+
+**7b.** `20260801140100_oracle_ledger_plan_expiry.sql`
+```sql
+ALTER TABLE public.oracle_token_ledger ADD COLUMN expires_at timestamptz;
+CREATE UNIQUE INDEX oracle_token_ledger_one_grant_per_invoice_uidx
+  ON public.oracle_token_ledger (payment_ref)
+  WHERE (entry_type = 'grant' AND expires_at IS NOT NULL AND payment_ref IS NOT NULL);
+```
+Rollback:
+```sql
+DROP INDEX IF EXISTS public.oracle_token_ledger_one_grant_per_invoice_uidx;
+ALTER TABLE public.oracle_token_ledger DROP COLUMN IF EXISTS expires_at;
+```
+Safe on live data: all 16 existing rows get `expires_at = NULL`, and the index's predicate
+excludes every one of them.
+
+**7c.** `20260801140200_oracle_token_balances_buckets.sql` - `CREATE OR REPLACE VIEW
+public.oracle_token_balances` with the section 4b split, `security_invoker=true` preserved.
+Rollback: `CREATE OR REPLACE VIEW` with the current definition, which is recorded verbatim in
+this pass's working notes and reproduced in section 4d.
+
+**7d.** `20260801140300_oracle_plans_and_tier_widen.sql` - **the one-line CHECK widen the
+dispatch asks to be named.**
+```sql
+ALTER TABLE public.subscriptions DROP CONSTRAINT subscriptions_tier_valid;
+ALTER TABLE public.subscriptions ADD CONSTRAINT subscriptions_tier_valid CHECK (
+  ((product_type = 'membership') AND (tier = ANY (ARRAY['drone','worker','guardian','queen'])))
+  OR ((product_type = 'oracle')  AND (tier = ANY (ARRAY['scout','oracle','sovereign'])))
+  OR ((product_type = 'venue')   AND (tier = ANY (ARRAY['founding','standard'])))
+);
+
+CREATE UNIQUE INDEX subscriptions_one_active_oracle_per_bee_uidx
+  ON public.subscriptions (bee_id)
+  WHERE (product_type = 'oracle' AND status IN ('active','trialing'));
+
+CREATE TABLE public.oracle_token_plans (
+  plan_tier         text PRIMARY KEY CHECK (plan_tier IN ('scout','oracle','sovereign')),
+  usd_cents         integer NOT NULL CHECK (usd_cents >= 100),
+  tokens_per_cycle  numeric NOT NULL CHECK (tokens_per_cycle > 0),
+  display_name      text NOT NULL,
+  sort_order        integer NOT NULL,
+  active            boolean NOT NULL DEFAULT true,
+  created_at        timestamptz NOT NULL DEFAULT now()
+);
+-- NO SEED ROWS. Plan prices and token allowances are Butch's ruling and are
+-- explicitly out of this pass's scope (dispatch deliverable 5). The build pass
+-- inserts them from the ruling; the table ships empty and sells nothing.
+ALTER TABLE public.oracle_token_plans ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.oracle_token_plans FROM anon, authenticated;
+GRANT SELECT ON public.oracle_token_plans TO anon, authenticated, service_role;
+CREATE POLICY oracle_token_plans_public_read ON public.oracle_token_plans
+  FOR SELECT USING (active = true);
+```
+Rollback, with the ORIGINAL constraint restored verbatim as read from `pg_constraint` this pass:
+```sql
+DROP TABLE IF EXISTS public.oracle_token_plans;
+DROP INDEX IF EXISTS public.subscriptions_one_active_oracle_per_bee_uidx;
+ALTER TABLE public.subscriptions DROP CONSTRAINT subscriptions_tier_valid;
+ALTER TABLE public.subscriptions ADD CONSTRAINT subscriptions_tier_valid CHECK (
+  ((product_type = 'membership') AND (tier = ANY (ARRAY['drone','worker','guardian','queen'])))
+  OR ((product_type = 'oracle')  AND (tier = ANY (ARRAY['earth','water','wind','fire','ether'])))
+  OR ((product_type = 'venue')   AND (tier = ANY (ARRAY['founding','standard'])))
+);
+```
+**Pre-flight evidence the widen is safe:** `public.subscriptions` holds exactly **one row** -
+`venue / founding / canceled`. There is no oracle row and no membership row, so neither the widen
+nor its rollback can violate the constraint. Verified live this pass, not assumed.
+
+**7e.** `20260801140400_oracle_plan_grant_and_refund.sql` - `oracle_grant_plan_tokens(p_bee_id,
+p_plan_tier, p_invoice_ref, p_period_end)` and `oracle_refund_token_purchase(p_payment_ref)`,
+both `SECURITY DEFINER`, both `GRANT EXECUTE TO service_role` only, both catching
+`unique_violation` and returning `{credited:false, duplicate:true}` at HTTP 200 per OPS35 s5.
+
+**7f. Deployment prerequisites**, extending OPS35 s8: one Stripe webhook endpoint for
+`oracle-webhook` subscribed to `checkout.session.completed`, `invoice.paid`,
+`customer.subscription.updated`, `customer.subscription.deleted`; `verify_jwt = false` for the
+webhook and `true` for checkout; **and OPS35's replay test run for BOTH paths - re-send a paid
+invoice and assert the grant row count is unchanged.**
+
+### 8. DELIVERABLE 5 - THE R7 COLLISION, WITH A NAMED PROPOSAL
+
+`R7` currently means the apply-authorization rule in root `CLAUDE.md` **and** the plan-vs-purchased
+ruling in ORACLE_MF v0.25 s2. The collision is not a coincidence of numbering - it is a namespace
+error. `R<n>` belongs to the Terminal Protocol, which owns R1-R8 at the workspace root and is
+cited across every repo edition.
+
+**PROPOSAL: retire `R7` as a name for the token ruling entirely. Canonize it as `TB-1`**
+("TOKEN-BUCKETS ruling 1"), in the ORACLE_MF namespace where it belongs. `TB-` is free, it is
+self-describing, and the dispatch already writes TOKEN-BUCKETS in prose when it means this rule.
+Concretely: ORACLE_MF v0.25 s2 is retitled **TB-1**; the refund rule in v0.26 s2 becomes **TB-2**;
+`R7` is left to mean only the `CLAUDE.md` hard-limits rule. The lead canonizes.
+
+### 9. THE TWO-AXES QUESTION THE DISPATCH ASKED ME TO EVALUATE
+
+The lead's candidate reconciliation - elemental five as the plan bought, three bands as the models
+reached - **holds, and it survives the token-buckets ledger design.** It was superseded on the
+names (Scout/Oracle/Sovereign, ORACLE_MF v0.26) but not on the structure. Evidence:
+
+- `subscriptions.tier` and `oracle_model_rates.tier` are **different columns on different tables**
+  with no FK, no shared CHECK, and no join between them anywhere in the ledger design.
+- The ledger never records which band a directive used - `atlasoracle-route:901` writes the band
+  into the free-text `memo` only. **A grant knows its plan; a debit knows its cost. Neither knows
+  the other's axis.** Nothing in TOKEN-BUCKETS needs them related.
+- With NO BAND GATE ruled, there is no lookup from plan tier to permitted bands at all - the axes
+  do not merely coexist, they never meet.
+
+**The hazard the lead names is real and the design closes it structurally:** nothing in this
+design ever writes a band name into `subscriptions.tier`, because the only writer is
+`subscription_sync` and its `p_tier` comes from `oracle_token_plans.plan_tier`, a table whose
+PRIMARY KEY CHECK admits only `scout|oracle|sovereign`. A band name cannot reach that column
+without violating a CHECK first.
+
+### 10. CALIBRATION THE DISPATCH ASKED FOR, HONESTLY
+
+The dispatch says recurring billing "is modelled, and one row has exercised it", and asks me to
+calibrate. **One row, once, for `venue`, and it is `canceled`.** `invoice.paid` has never fired
+for an oracle product. `stripe_events` was empty as of OPS35 and no oracle event has landed since.
+`subscription_sync` has one successful historical call. The F6 webhook's oracle branch has never
+executed because no oracle Price metadata has ever existed. **Modelled is not proven, and for
+oracle it is not even exercised.** Treat the first paid oracle invoice as a first run, not a
+regression test.
+
+### 11. DONE-TEST
+
+| Requirement | Status |
+|---|---|
+| one checkout design covering both SKUs, shared parts and branches named | DONE - section 2, plus the compromise named in 2/3b rather than hidden |
+| TOKEN-BUCKETS ledger semantics with spend order and expiry mechanism, append-only respected | DONE - section 4. Spend order derived not enforced (4b), expiry is a read-time predicate with zero writes (4c) |
+| cancellation/lapse rule stated in plain language | DONE - section 6, block-quoted as Bee-readable copy |
+| the OPS38 idempotency dependency stated as a dependency, not assumed fixed | DONE - section 5b, with the reason the ledger indexes cannot cover it |
+| a named rename proposal for the R7 collision | DONE - section 8, `TB-1` |
+| zero applies, zero deploys | DONE - stated below |
+
+**Zero DDL, zero DML, zero deploys, zero Stripe API calls, zero Stripe objects created, zero
+migration files written.** Every database interaction this pass was a `SELECT` against
+`pg_catalog`, `information_schema`, `ops_docs`, `ops_reports`, or the oracle tables. Every SQL
+block above lives in this report only. The only file modified in the repo is this `REPORT.md`
+(R6). No Stripe key was read, printed, or referenced by value - I read function source that names
+env vars.
+
+### 12. COULD NOT VERIFY
+
+- **That any of this SQL or TypeScript runs.** Never executed, never deployed, never type-checked.
+  Same posture as OPS35, and the two designs now share that debt.
+- **That `price_data` rejects `metadata`.** My claim in section 2 is from the Stripe API shape as I
+  understand it (`product_data.metadata` exists, `price_data.metadata` does not). **The entire F6
+  isolation argument in 3b rests on this.** It is cheap to confirm against Stripe's API reference
+  and it should be confirmed before the build, because if `price_data` DOES accept metadata then
+  the collision in 3b is live rather than latent and the build must add an explicit
+  `product_type` filter to the F6 webhook.
+- **Stripe's delivery semantics to multiple endpoints.** I assert every subscribed endpoint
+  receives every matching event. Documented behaviour, not observed in this project.
+- **Deployed versions vs repo source.** I read repo source for `stripe-subscription-webhook` and
+  `atlasoracle-route`. OPS35 flagged the same gap and TRIV12 read a deployed v16. If the deployed
+  webhook has drifted, my line references are to the file.
+- **The affiliate pro-rating for plans.** TOKEN-BUCKETS says affiliate BLiNG! perks are
+  "pro-rated for plans". `subscription_sync` already calls `affiliate_on_payment` with
+  `p_invoice_amount_cents`, so the hook exists - but I did not read `affiliate_on_payment` and do
+  not know whether it pro-rates or treats a subscription invoice as a one-off. **Not designed
+  here; flagging that the dispatch's TOKEN-BUCKETS clause has an unexamined dependency.**
+- **Whether `oracle_token_balances` has other readers.** I found the 402 gate in
+  `atlasoracle-route`. I did not sweep the client for direct reads of the view, so section 4d's
+  "one route change" may undercount.
+
+---
+
+## DB14 - LIVE PII EXPOSURE ON public.bees: surface audit + narrowing blueprint
+
+Lane `db`. Workdir `TheMANUAL.tech`. Effort: deep. `scope` field on the dispatch was empty; the
+body defined the work. **APPLY-NOTHING pass: zero DDL, zero DML, zero deploys were executed.**
+Everything below is either a read-only catalog query, a read-only REST probe, or a file written
+to disk and left there.
+
+### W-1 - WHO OWNS THE NEXT MOVE, AND WHAT IT IS
+
+**Owner: LEAD (with one item that is Butch's alone).**
+
+**The single next action: queue the anon-only half as its own MIGRATION AMENDMENT dispatch.**
+Step 1 of the draft migration - revoking table SELECT from `anon` and granting back the ten
+public columns - is database-only, needs no client change, and closes the loud half of the hole
+today. It does not depend on the seam, the build pass, or any of the design work below. Splitting
+it out means the 18 exposed emails stop being anonymously readable without waiting for a client
+refactor.
+
+Step 2 (the `authenticated` half) must NOT ship with it. It 403s seven live call sites the moment
+it runs, and those seven need the client change first.
+
+**Butch's alone:** the merge rule flagged in section G - two astra rows, one Bee, sum scores or
+link-and-keep-separate. That is canon, not implementation.
+
+### 0. FOUR CORRECTIONS TO THE DISPATCH, ALL LOAD-BEARING
+
+The dispatch carried a LEAD AMENDMENT asserting findings from the deployed bundle. Three of the
+four are wrong, and one of them would have caused an outage. Stating them first because the
+"cheap half" the amendment authorised is not as cheap as written.
+
+**C-1. The lead scanned one chunk out of 121. The call-site count is not 14.**
+The amendment reports "14 client call sites hit bees" from `/assets/index-BEqUTGPO.js`. That is
+one Vite chunk. Crawling every chunk reachable from `https://themanual.tech` (121 fetched) finds
+**22** `from("bees")` call sites across five chunks:
+
+```
+/assets/index-BEqUTGPO.js       216069 bytes   from(bees)=14
+/assets/registry-CYZDQHO9.js    708305 bytes   from(bees)=3
+/assets/groups-BKekgUIb.js        8637 bytes   from(bees)=3
+/assets/intel-DStZDB-k.js         8227 bytes   from(bees)=2
+/assets/ProfilePage-B9sXFcDl.js  14457 bytes   bee_profiles=2
+```
+
+In the repo source the number is **34** client call sites plus 4 in edge functions. Deployed is
+behind repo.
+
+**C-2. `bling_deficit` IS read by the client. The authorised revoke would break two surfaces.**
+The amendment lists `bling_deficit` under "read by NOTHING in this bundle" and authorises
+revoking it "from anon AND authenticated ... breaks NOTHING". Both statements are false against
+the repo:
+
+- `src/lib/freedomblings/standing.ts:111-116` - `.select('name, handle, avatar_url, bio, created_at, bling_rank, honeycomb_ring, action_count, bling_deficit::text').eq('id', user!.id)`
+- `src/lib/freedomblings/ledger.ts:275-277` - `.select('bling_deficit::text').eq('id', user!.id)`
+
+Both are authenticated and self-scoped, so revoking from `anon` alone is safe. Revoking from
+`authenticated` - which is what the amendment authorised - breaks the FreedomBLiNGs standing badge
+and the ledger's `inGoodComb` computation. Neither appears in the deployed chunks I crawled, so
+this is a landmine that detonates on the next deploy rather than immediately. `bling_balance`,
+`bling_held` and `stripe_customer_id` are genuinely unread by any client - those three are safe.
+
+**C-3. "7 functions with from bees in prosrc" is an artifact of the search string.**
+`prosrc ILIKE '%from bees%'` returns 7. But 49 functions use `from public.bees`, and the real
+count of `public` functions that read, join, update or insert `bees` is **67**. The seven the
+amendment names are not a meaningful subset - they are the ones that happened to omit the schema
+qualifier. Full breakdown in section B.
+
+**C-4. `bee_profiles` is NOT empty of location data, and it has a live editor writing to it.**
+The dispatch calls it "a loaded gun with no round in it today - 18 rows, ZERO with any location
+populated." Measured this pass: **1 of 18 rows has `location_country` and `location_region`
+populated.** And `src/components/profile/ProfileLocationEditor.tsx` is a shipped surface on
+`/profile` that writes all four location columns. The round is chambered and the magazine is
+being fed. Detail in section 3.
+
+### 1. STEP 1 - SURFACE AUDIT
+
+#### 1a. The structural finding, re-verified independently
+
+```
+ rls_enabled | rls_forced
+-------------+------------
+ t           | f
+
+    policyname    |  cmd   |  roles   |       qual        |    with_check
+------------------+--------+----------+-------------------+-------------------
+ bees_insert_self | INSERT | {public} | (none)            | (auth.uid() = id)
+ bees_public_read | SELECT | {public} | true              | (none)
+ bees_update_self | UPDATE | {public} | (auth.uid() = id) | (auth.uid() = id)
+```
+
+Table-level grants: `anon` and `authenticated` each hold DELETE, INSERT, REFERENCES, SELECT,
+TRIGGER, TRUNCATE, UPDATE. The dispatch's read-only framing is correct in effect - writes are
+gated by RLS (`bees_insert_self` / `bees_update_self` both require `auth.uid() = id`, and there is
+no DELETE policy so DELETE denies) - but the *grants* are wide open and only RLS is holding the
+line. TRUNCATE is not subject to RLS at all; it is unreachable through PostgREST, which never
+emits it, so it is a latent issue and not a live one. Flagging, not fixing - out of scope.
+
+Zero views or matviews depend on `public.bees` (`pg_depend`/`pg_rewrite`, 0 rows). The lead's
+finding here is confirmed.
+
+#### 1b. The functional finding, re-verified live
+
+Probed `https://anxmqiehpyznifqgskzc.supabase.co/rest/v1/` with the anon key harvested from the
+deployed bundle (public by design - every browser receives it; never printed in this report or in
+the transcript). Verbatim result:
+
+```
+### A. anon SELECT * on bees
+  status : 200   content-range: 0-17/18
+  rows   : 18
+  keys   : id, handle, email, honeycomb_ring, action_count, created_at, updated_at, is_admin,
+           bio, name, avatar_url, bling_balance, bling_rank, bling_held, bling_deficit,
+           stripe_customer_id, handle_changed_at
+  email              : 18/18 non-null
+  is_admin           : 18/18 non-null
+  stripe_customer_id : 1/18 non-null
+  bling_balance      : 18/18 non-null
+  bling_deficit      : 18/18 non-null
+  bling_held         : 18/18 non-null
+
+### D. anon SELECT bee_profiles
+  status : 200   content-range: 0-17/18
+  rows   : 18
+  keys   : bee_id, location_country, location_region, location_city, location_neighborhood,
+           created_at, updated_at
+```
+
+**The hole does not require a client at all.** `select=*` over raw PostgREST with the public anon
+key returns every column of every row. The bundle analysis matters for what a *fix* would break;
+it is irrelevant to what an attacker can currently read.
+
+#### 1c. THE ANON-REACHABLE SET - this is the answer the dispatch asked for
+
+Across every repo in the workspace, exactly **one** client call site reads `bees` while
+unauthenticated:
+
+| Repo | File:line | Selects | Filter | Why anon |
+|---|---|---|---|---|
+| TheHoneycomb.games | `apps/trivia/src/lib/auth.ts:120` | `id` | `.eq('handle', clean)` | runs inside `signUp()`, before `auth.signUp` - there is no session yet |
+
+Its own comment reads `/* RLS may hide other bees - let signup proceed */`. The author assumed RLS
+would hide them. It does not.
+
+Plus the nine SECURITY INVOKER functions in section B, which carry `EXECUTE` to `anon` and run as
+the caller.
+
+Everything else is authenticated. **The split the dispatch asked for: 1 anon client site, 9 anon
+functions, 33 authenticated client sites.**
+
+#### 1d. THE AUTHENTICATED SET - all 34 TheMANUAL.tech sites, by what a narrowing does to them
+
+**Group 1 - reads a sensitive column, self-scoped. MUST CHANGE (7 sites).**
+
+| File:line | Sensitive column | Scope |
+|---|---|---|
+| `src/lib/auth.tsx:68` | `email` | `.eq('id', u.id)` |
+| `src/pages/MissionControlPage.tsx:69` | `is_admin` | `.eq('id', bee.id)` |
+| `src/components/hq/HQControlRoom.tsx:82` | `is_admin` | `.eq('id', bee.id)` |
+| `src/pages/dingleberry/DingleberryLayout.tsx:59` | `is_admin` | `.eq('id', user.id)` |
+| `src/components/hq/sections/AdminActions.tsx:129` | `is_admin` | `.eq('id', u.user.id)` |
+| `src/lib/freedomblings/standing.ts:111` | `bling_deficit` | `.eq('id', user!.id)` |
+| `src/lib/freedomblings/ledger.ts:275` | `bling_deficit` | `.eq('id', user!.id)` |
+
+Every one is already self-scoped. That is what makes `bees_me()` a drop-in.
+
+**Group 2 - public-projection columns only. NO CHANGE (25 sites).**
+
+`pulse.ts:581` , `intel.ts:643,662` , `groups.ts:203,316,525` , `comms.ts:641,781,978,1120` ,
+`forumMod.ts:79` , `campaigns.ts:231` , `events.ts:298,404` , `freedomblings/escrow.ts:113` ,
+`freedomblings/move.ts:39` , `freedomblings/earning.ts:153` , `hq/sections/ActiveBees.tsx:53,54,55,56,68` ,
+`hq/sections/AdminActions.tsx:211` , `admin/sections/ProfileSection.tsx:37,47`
+
+Columns used across all 25: `id, handle, name, avatar_url, bio, bling_rank, action_count,
+created_at, updated_at`. All retained in the public grant.
+
+**Group 3 - writes. NO CHANGE (2 sites).** `src/lib/auth.tsx:102` (INSERT id/handle/email on
+signup) and `src/admin/sections/ProfileSection.tsx:70` (UPDATE bio). Both governed by the existing
+self-scoped RLS policies, and this draft touches no write grant.
+
+**Other repos.** `AtlasVOTE.org/src/lib/data/supabase.ts:769` - `.select('name, handle, created_at').eq('id', beeId)`,
+authenticated and self-scoped, public columns only, no change. `TheHoneycomb.games apps/trivia/src/lib/auth.ts:198` -
+`.select('handle').eq('id', uid)`, no change. `FreedomBLiNGS.com`, `AtlasORACLE.to`, `DingleBERRY.tech`,
+`MiniWAVES.app`, `atlasJUSTICE.org`, `freedomofthe.press`, `TheWORKSHOP.to`, `honeycomb-ops`: zero
+`bees` reads in source.
+
+**No client call site anywhere uses `select('*')` on `bees`.** Verified twice - once across all 34
+repo sites, and once by extracting the `.select(...)` argument immediately following each of the 22
+`from("bees")` occurrences in the deployed chunks. Every deployed selector, verbatim:
+
+```
+index-BEqUTGPO.js    "id, handle, email, bling_rank, honeycomb_ring, created_at"
+                     (insert - no select)
+                     "id, handle, name"          "id, handle"        "id, handle"
+                     "id, handle, name"          "id",{head,count}   "id",{head,count}
+                     "id",{head,count}           "id",{head,count}
+                     "id, handle, name, bling_rank, action_count, created_at, updated_at"
+                     "id, handle, is_admin"      "id",{head,count}   "is_admin"
+intel-DStZDB-k.js    "id, handle"                "id, handle"
+registry-CYZDQHO9.js "handle, name, avatar_url, bio"   "handle, name, avatar_url"   (update - no select)
+groups-BKekgUIb.js   "id, handle"   "id, handle"   "id, handle"
+```
+
+The 15 `select("*")` calls that do exist in those chunks belong to `promotions`, `forum_threads`,
+`forum_posts` and `groups` - checked by walking back from each one to its preceding `from(...)`.
+**The lead's central conclusion survives, and now covers all 22 sites instead of 14.**
+
+### 2. STEP 1b - THE FUNCTIONS (section B of the dispatch)
+
+67 functions in `public` read/join/update/insert `bees`. **58 are SECURITY DEFINER and are
+completely unaffected by any grant change** - they run as `postgres`, the table owner. That is the
+per-function answer the dispatch asked not to assume: for all 58, a revoke on `anon` or
+`authenticated` changes nothing.
+
+**The 9 that ARE affected - SECURITY INVOKER, so they run as the caller:**
+
+| Function | `bees` columns it touches | EXECUTE granted to | Survives the draft? |
+|---|---|---|---|
+| `bazaar_browse` | id, handle, name, avatar_url | anon, authenticated | YES |
+| `bazaar_listing_get` | id, handle, name, avatar_url | anon, authenticated | YES |
+| `bazaar_my_listings` | id, handle, name, avatar_url | anon, authenticated | YES |
+| `bazaar_my_orders` | id, handle, name, avatar_url | anon, authenticated | YES |
+| `bazaar_my_sales` | id, handle, name, avatar_url | anon, authenticated | YES |
+| `bazaar_search` | id, handle, name, avatar_url | anon, authenticated | YES |
+| `entity_activity` | id, handle | anon, authenticated | YES |
+| `forum_thread_feed` | id, handle | anon, authenticated | YES |
+| `news_feed` | id, handle | anon, authenticated | YES |
+
+All nine need only columns the draft grants back. **A table-level revoke with no column grant
+would 500 all nine** - which is precisely the hazard the dispatch was written around, and it is
+real. The column-grant form avoids it.
+
+The seven the lead named (`bee_follow`, `bee_handle_available`, `bee_handle_check`,
+`bee_set_handle`, `press_is_admin`, `trivia_claim_player` x2) are six SECURITY DEFINER plus one
+SECURITY INVOKER (`bee_handle_check`). `bee_handle_check` reads `handle` only - retained, so it
+survives.
+
+### 3. STEP 1c - EDGE FUNCTIONS (section C of the dispatch)
+
+Four call sites across three functions, and **all three use `serviceClient()`** - service_role,
+which bypasses both RLS and the grant layer:
+
+| Function | Line | Reads | Client |
+|---|---|---|---|
+| `generate-questions` | `index.ts:168` | `is_admin` | `createClient(SUPABASE_URL, SERVICE_ROLE)` |
+| `fountain` | `index.ts:130` | `is_admin` | `serviceClient()` |
+| `stripe-subscription-webhook` | `index.ts:72, 80` | write + read | `serviceClient()` |
+
+**Unaffected by the draft.** Also checked `TheHoneycomb.games/apps/trivia/edge-proposed/venue-checkout/index.ts:78` -
+directory is named `edge-proposed` and is not deployed.
+
+### 4. KEY HYGIENE (dispatch section A)
+
+Crawled every reachable chunk on each live origin and decoded every JWT-shaped string to its
+`role`/`ref` claims only - tokens were never printed.
+
+| Origin | Chunks fetched | JWT claims found | `bees` sites |
+|---|---|---|---|
+| themanual.tech | 121 | `role=anon ref=anxmqiehpyznifqgskzc` (one, only) | 22 |
+| www.atlasvote.org | 2 | none found | 0 |
+| freedomblings.com | 0 | none found | 0 |
+| 406flyer.com | 0 | none found | 0 |
+| thehoneycomb.games | - | UNREACHABLE (connect timeout) | - |
+| miniwaves.app | - | UNREACHABLE (connect timeout) | - |
+| atlasjustice.org | - | UNREACHABLE (connect timeout) | - |
+
+**themanual.tech is clean** - exactly one JWT, `role=anon`, correct project ref. No service_role
+token, no `sb_secret_` string, across all 121 chunks. The lead's worst-case ruling-out holds and now
+covers the whole bundle graph rather than one file.
+
+**The other six rows are NOT a clean bill of health** - see could-not-verify below.
+
+### 5. STEP 2 - THE DRAFT (APPLY NOTHING)
+
+**File, written this pass and deliberately not applied:**
+
+```
+TheMANUAL.tech/supabase/migrations/_drafts/20260801130000_db14_narrow_bees_column_exposure.sql
+```
+
+**Deviation, stated with its reason:** the dispatch said "a NAMED migration file". I put it under
+`migrations/_drafts/` rather than at the top of `migrations/`. The Supabase CLI globs only the top
+level, so a correctly-named file sitting in the applied directory is one `db push` away from being
+live - and this is an APPLY-NOTHING pass. The promote instruction (move it up one level) is written
+into the file's header comment.
+
+**The mechanic that is easy to get wrong, and that the draft handles:** a column-level REVOKE is a
+no-op while the role still holds table-level SELECT. The table grant must be revoked *first*, then
+the permitted columns granted back. Both steps or neither.
+
+**Step 1 of the draft - `anon`. Database-only, breaks nothing.**
+```sql
+REVOKE SELECT ON public.bees FROM anon;
+GRANT SELECT (id, handle, name, avatar_url, bio,
+              honeycomb_ring, action_count, bling_rank,
+              created_at, updated_at) ON public.bees TO anon;
+```
+
+**Step 2 of the draft - `authenticated`. Requires the client change first.**
+Same shape against `authenticated`. Closes the quiet half: today any signed-up account can read
+every bee's email.
+
+**Step 3 of the draft - `public.bees_me()`**, SECURITY DEFINER, `STABLE`, `SET search_path = public`,
+`WHERE b.id = auth.uid()`, numerics cast to `text` to match the existing client string discipline
+(`bling_deficit` can exceed 2^53 - see the comment at `standing.ts:112`). `REVOKE ALL FROM PUBLIC`,
+`GRANT EXECUTE TO authenticated`. It deliberately does **not** return `stripe_customer_id` - nothing
+reads it and it has no business in a browser.
+
+**Exact rollback** is written out verbatim at the bottom of the draft file, with post-rollback
+verification queries. Summary: drop the column grants, re-grant table-level SELECT to both roles,
+`DROP FUNCTION IF EXISTS public.bees_me()`.
+
+**THE EXPLICIT SENTENCE THE DONE-TEST ASKS FOR:**
+
+> **A database-only fix IS possible for the anon half and IS NOT possible for the authenticated
+> half.** Revoking from `anon` requires zero client changes - no anon-reachable call site reads any
+> sensitive column. Revoking from `authenticated` requires changing seven client call sites, because
+> RLS is row-level and cannot express "you may read `email` on your own row only"; those seven reads
+> must move to the `bees_me()` RPC first.
+
+### 6. STEP 3 - THE NEIGHBOUR, `public.bee_profiles`
+
+Confirmed and corrected. 18 rows, and **1 of them has `location_country` and `location_region`
+populated** - not zero, as the dispatch states. `location_city` and `location_neighborhood` are 0/18.
+The column is spelled `location_neighborhood` (American), not `neighbourhood`. RLS is enabled and
+policy `bee_profiles_select_public` is `SELECT ... USING (true)` to `{public}` with `anon` holding
+table SELECT, so all 18 rows are anonymously readable - confirmed live in probe D above. And yes,
+**a surface writes to it**: `src/components/profile/ProfileLocationEditor.tsx:124-127` is shipped
+on `/profile` (and present in the deployed `ProfilePage-B9sXFcDl.js` chunk) and UPDATEs all four
+location columns self-scoped; `src/lib/geo/useGeoCascade.ts:99` reads it. So this is not a dormant
+table - it is a live, filling one whose only write path is the RLS-gated editor. The same
+`REVOKE SELECT / GRANT SELECT (bee_id, created_at, updated_at)` shape closes it, in a migration
+that should be named `20260801130100_db14_narrow_bee_profiles_location.sql` and drafted in the
+build pass rather than here - the dispatch asked for a paragraph, not a second audit.
+
+### 7. SECTION E - THE IDENTITY SEAM
+
+One module, `src/lib/identity.ts`. Every read of `bees` in TheMANUAL.tech routes through it.
+
+```ts
+export type PublicBee = {
+  id: string; handle: string; name: string | null; avatarUrl: string | null;
+  bio: string | null; blingRank: number; honeycombRing: number;
+  actionCount: number; createdAt: string; updatedAt: string;
+};
+export type MeBee = PublicBee & {
+  email: string; isAdmin: boolean;
+  blingBalance: string; blingHeld: string; blingDeficit: string;  // text - can exceed 2^53
+  handleChangedAt: string | null;
+};
+
+export const identity = {
+  me():                                    Promise<MeBee | null>,        // rpc bees_me
+  isAdmin():                               Promise<boolean>,             // me().isAdmin, memoised per session
+  byIds(ids: string[]):                    Promise<Map<string, PublicBee>>,
+  byHandle(handle: string):                Promise<PublicBee | null>,
+  searchByHandle(q: string, limit = 8):    Promise<PublicBee[]>,
+  handleFor(id: string):                   Promise<string | null>,
+  recentlyActive(since: string, n = 20):   Promise<PublicBee[]>,
+  count(since?: string):                   Promise<number>,
+  updateBio(bio: string):                  Promise<void>,
+  createOnSignup(r: {id,handle,email}):    Promise<void>,
+};
+```
+
+**Call-site mapping - all 34:**
+
+| Current | Replacement | Returns |
+|---|---|---|
+| `auth.tsx:68` (email, self) | `identity.me()` | `MeBee` |
+| `MissionControlPage:69`, `HQControlRoom:82`, `DingleberryLayout:59`, `AdminActions:129` (is_admin, self) | `identity.isAdmin()` | `boolean` |
+| `standing.ts:111`, `ledger.ts:275` (bling_deficit, self) | `identity.me()` | `MeBee` |
+| `pulse:581`, `forumMod:79`, `events:298`, `campaigns:231`, `groups:316,525`, `comms:641,781`, `intel:643,662`, `escrow:113` | `identity.byIds(ids)` | `Map<id, PublicBee>` |
+| `groups:203`, `comms:978`, `move.ts:39` | `identity.byHandle(h)` | `PublicBee \| null` |
+| `comms:1120` | `identity.searchByHandle(q, 8)` | `PublicBee[]` |
+| `events:404` | `identity.handleFor(id)` | `string \| null` |
+| `ActiveBees:68` | `identity.recentlyActive(cutoff, 20)` | `PublicBee[]` |
+| `ActiveBees:53,54,55,56`, `AdminActions:211` | `identity.count(since?)` | `number` |
+| `ProfileSection:37,47` | `identity.me()` | `MeBee` |
+| `ProfileSection:70` (update bio) | `identity.updateBio(s)` | `void` |
+| `auth.tsx:102` (insert on signup) | `identity.createOnSignup(r)` | `void` |
+| `earning.ts:153` (bling_rank, self) | `identity.me()` | `MeBee` |
+
+Twelve methods absorb thirty-four call sites. Three of the seven Group-1 sites collapse into
+`identity.isAdmin()` alone.
+
+### 8. SECTION F - THE SPLIT SEAM NOTE, AND THE LEAK THAT DEFEATS IT
+
+If the spine later moves to its own Supabase project, the only thing that changes inside
+`identity.ts` is which client each method holds: `supabase.from('bees')` and `supabase.rpc('bees_me')`
+become calls against a second client (or an HTTP call) pointed at the spine, with the row shape
+normalised back to `PublicBee`/`MeBee` at the module boundary. No call site outside the module
+changes, because none of them ever names a table or a column - they name a method and receive a
+typed object.
+
+**But that is only true of the client. It is not true of the database, and this is the leak Butch
+needs now rather than at split time:**
+
+**Nine SECURITY INVOKER functions and 49 SECURITY DEFINER functions JOIN `public.bees` inside
+SQL.** `bazaar_browse`, `bazaar_search`, `entity_activity`, `forum_thread_feed`, `news_feed` and the
+rest resolve handles and avatars by joining the table in the same database. A client-side seam
+cannot reach them. The moment `bees` lives in a different project, every one of those joins has to
+become a cross-project call or a replicated projection - and the same applies to every `bee_id`
+foreign key pointing at `bees` from the astra tables.
+
+**So: the client seam is worth building and it does what section F asks of it. It is not what makes
+the split possible.** The database join graph is the actual blocker, and it is a much larger piece
+of work than 34 call sites. The seam makes the split a *client* config change; it leaves the
+*server* split untouched. Anyone who reads "the seam makes future isolation a config change" as
+covering the whole split will be surprised.
+
+### 9. SECTION G - PROMOTION OPERATIONS
+
+Two named operations, both behind the seam:
+
+- **`identity.current()`** - read-current-identity across the three tiers. Resolves, in order:
+  Supabase session -> `identity.me()` (Bee); else `device_key` -> `trivia_players` row (astra
+  account); else anonymous. Returns a discriminated union so callers branch on tier instead of
+  guessing from nulls.
+- **`identity.promote(playerId, deviceKey)`** - wraps the existing
+  `trivia_claim_player(p_player_id uuid, p_device_key text)`, which is already SECURITY DEFINER and
+  already sets `bee_id` + `claimed_at`. The mechanism exists; the seam gives it a name and one
+  caller instead of raw table access.
+
+Both live *inside* `identity.ts`, not beside it - promotion is an identity operation, and putting it
+outside the module reintroduces exactly the direct coupling the seam removes.
+
+**OPEN CANON QUESTION FOR BUTCH (flagged, not designed):** when one human holds two astra rows and
+claims a single Bee, do the scores sum or do the rows link and stay separate?
+
+### 10. DONE-TEST
+
+| Requirement | Status |
+|---|---|
+| anon-reachable read sites enumerated with file and line, or evidenced claim of none | DONE - 1 client site (`TheHoneycomb.games apps/trivia/src/lib/auth.ts:120`) + 9 anon-EXECUTE functions; section 1c |
+| the functions listed with `prosecdef` each | DONE - 67 total, 58 DEFINER (unaffected), 9 INVOKER listed individually; section 2. The dispatch's "7" corrected in C-3 |
+| draft migration file NAMED, with the exact rollback written out | DONE - `supabase/migrations/_drafts/20260801130000_db14_narrow_bees_column_exposure.sql`, rollback verbatim at its foot |
+| explicit sentence on whether a database-only fix is possible | DONE - section 5, block-quoted |
+| zero DDL, zero DML, zero deploys | DONE - stated below |
+| W-1 owner + single next action near the top | DONE - section W-1 |
+
+**Zero DDL, zero DML, zero deploys were executed this pass.** Every database interaction was a
+`SELECT` against `information_schema`, `pg_catalog` or the two tables under audit, plus five
+read-only HTTP GETs against PostgREST. The only writes anywhere were two files on local disk: the
+draft migration and this report.
+
+### 11. COULD NOT VERIFY
+
+- **Three origins were unreachable** (`UND_ERR_CONNECT_TIMEOUT`): `thehoneycomb.games`,
+  `miniwaves.app`, `atlasjustice.org`. Their deployed bundles were not scanned and their key hygiene
+  is **unknown, not clean**. `thehoneycomb.games` matters most - its source contains the only
+  anon-reachable `bees` read found anywhere.
+- **`www.atlasvote.org`, `freedomblings.com` and `406flyer.com` returned 200 but my crawler found 0-2
+  JS chunks.** All three are Next.js; chunks live under `/_next/static/chunks/` and are referenced
+  through a build manifest my Vite-shaped crawler does not follow. Those three rows in section 4 mean
+  "not scanned", not "clean". Repo-source analysis for them is complete and shows one benign
+  authenticated read in AtlasVOTE; the deployed artifacts are unverified.
+- **Write paths were not functionally probed.** Probe E in my script was a filtered GET, not a DELETE.
+  The claim that writes are RLS-gated rests on the policy definitions and the absence of a DELETE
+  policy - structural evidence, not a live attempt. I did not attempt a write against production.
+- **Deployed-vs-repo drift is measured but not explained.** 22 deployed call sites vs 34 in source,
+  and `bling_deficit` reads present in source but absent from all 121 crawled chunks. Most likely the
+  deploy is behind `main`, but `.gitignore:87` ignores `TheMANUAL.tech/` wholesale at the workspace
+  root, so git provenance is unavailable from a root session and I could not confirm which commit is
+  live. The practical consequence is stated in C-2: the `bling_deficit` breakage is deferred, not
+  absent.
+- **`bees_me()` has never been executed.** It exists only as text in the draft file. Its column list
+  and casts are derived from `information_schema.columns` and the client selectors, not from a run.
+
+---
+
+## DB16 - press_record_payment made replay-safe: OPS38 drafts A + B APPLIED
+
+Lane `db`. Workdir `TheMANUAL.tech`. Effort: standard. Scope field on the dispatch was empty;
+the body defined the work. Drafts D/E/F/G explicitly out of scope and NOT touched.
+
+### W-1 - WHO OWNS THE NEXT MOVE, AND WHAT IT IS
+
+**Owner: LEAD.**
+
+**The single next action: queue the OPS38 draft D/E/F pass - the edge-function half of this fix.**
+The database can no longer double-credit a hold on a Stripe replay. The webhook handler above it
+still cannot, on its own, distinguish "recorded" from "already recorded" - it now gets an
+`idempotent` boolean back and nothing reads it yet. The P0 is closed; the P1 is now the exposed
+edge, and it is a DEPLOY AMENDMENT pass (named deploy, type-check clean, fetch the artifact back),
+not a DB pass.
+
+Two smaller things, both lead's:
+
+- **The two new migration files are not under version control.** Workspace `.gitignore:87` ignores
+  `TheMANUAL.tech/` wholesale, so `supabase/migrations/20260801100000_*.sql` and `...100100_*.sql`
+  exist on disk and in `supabase_migrations.schema_migrations` and nowhere else. Same condition
+  DB15 reported; it has now produced two more untracked money-path files. This is a standing
+  structural problem, not a DB16 deviation.
+- **The rollback for step 2 is free; the rollback for step 1 is not, in one direction.** Dropping
+  the index while the new function is live makes every `press_record_payment` call raise. Order is
+  stated below and must be obeyed.
+
+### 0. PRE-FLIGHT, recorded before the apply (MIGRATION AMENDMENT / R7)
+
+**FILES (named by this report, drafted from the SQL the dispatch carried verbatim):**
+
+- `supabase/migrations/20260801100000_press_payments_stripe_ref_uidx.sql`
+  sha256 `c4b7d215bd4cf2a9bf8006f5453b4af44d759846ca456e2d7066e4cb1471824a`, 887 bytes, 0 non-ASCII
+- `supabase/migrations/20260801100100_press_record_payment_replay_safe.sql`
+  sha256 `f10fc23ee06bcb735c40c7a82181daececb00562696303a66be9332b396690ec`, 3158 bytes, 0 non-ASCII
+
+**Judgement call, stated:** the dispatch carried the DDL inline rather than naming files on disk.
+I wrote the two files to match the dispatch text byte-for-byte in the executable statements (the
+files add header comments and the rollbacks; nothing executable differs), so the amendment's
+"names the migration file" requirement has an artifact to point at and the repo keeps a record.
+I did **not** add `IF NOT EXISTS` to draft A even though repo convention prefers idempotent
+migrations - the dispatch specified the statement verbatim and said do not redesign.
+
+**ROLLBACKS (stated by the dispatch before the apply, reproduced at the foot of each file). NOT EXECUTED.**
+
+Order matters, and it is the reverse of the apply:
+
+1. Restore the predecessor `press_record_payment` definition - captured verbatim from
+   `pg_get_functiondef()` during pre-flight, stored in
+   `supabase_migrations.schema_migrations.rollback` for version `20260801100100`, and quoted in
+   the migration file header.
+2. Then `DROP INDEX CONCURRENTLY public.press_payments_stripe_ref_uidx;`
+
+Dropping the index first, while the new function is live, makes every call raise
+`there is no unique or exclusion constraint matching the ON CONFLICT specification`.
+
+**PRE-STATE, measured live immediately before the apply:**
+
+```
+=== PF1 duplicate stripe external_ref ===  (dispatch gate 1: MUST be 0 rows)
+ external_ref | count
+--------------+-------
+(0 rows)
+
+=== PF3 existing indexes on press_payments ===
+       index_name        | indisvalid | indisunique
+-------------------------+------------+-------------
+ press_payments_pkey     | t          | t
+ press_payments_hold_idx | t          | f
+(2 rows)
+   -- no pre-existing index on external_ref; nothing to collide with
+
+=== PF4 press_payments ===
+ press_payments_rows = 1        method: stripe = 1
+ external_ref of that row: cs_test_a1TwqClsZKaJBh8rf9bwObbBljEtrU55SdIgG3DhnApElteywYskSdQg46
+ external_ref is nullable; method NOT NULL default 'manual'
+
+=== PF5 dependent objects on press_payments ===
+ constraints: press_payments_pkey, press_payments_hold_id_fkey -> press_holds(id),
+              press_payments_kind_check, press_payments_method_check (stripe|credit|manual)
+ triggers:    (0 rows)
+ -- no views, no routines other than press_record_payment reference the table's shape
+
+=== PF8 migration history tail ===
+ 20260731050000 | ops_reports_headers_v1     <- DB15's row, the previous head
+ total_migration_rows = 637
+```
+
+**Dispatch gate 2 - "confirm press_record_payment still matches the definition OPS38 quoted."**
+CONFIRMED. Live `pg_get_functiondef()` returned exactly the shape OPS38 described: SECURITY
+DEFINER, `SET search_path TO 'public'`, bare `insert into press_payments (...) values (...,
+p_external_ref)`, unconditional `paid_cents = paid_cents + p_amount_cents`, no idempotency key in
+the returned jsonb. It had not drifted since OPS38, so the stored rollback restores the right
+thing.
+
+**Rows at risk:** 1 row in `press_payments`, 3 in `press_holds`. Neither apply writes or deletes a
+data row - draft A is an index build, draft B is a function replacement. Zero rows mutated by the
+migrations themselves.
+
+### 1. STEP 1 - DRAFT A APPLIED
+
+Run as its own statement, outside any transaction block (`CONCURRENTLY` forbids one). psql
+autocommit, `ON_ERROR_STOP=1`.
+
+```
+CREATE INDEX
+INSERT 0 1
+           index_name           | indisvalid | indisunique |                                        def
+--------------------------------+------------+-------------+------------------------------------------------------------------------
+ press_payments_stripe_ref_uidx | t          | t           | CREATE UNIQUE INDEX press_payments_stripe_ref_uidx ON public.press_payments USING btree (external_ref) WHERE ((method = 'stripe'::text) AND (external_ref IS NOT NULL))
+
+    version     |              name
+----------------+--------------------------------
+ 20260801100000 | press_payments_stripe_ref_uidx
+```
+
+`indisvalid = t`. No rebuild needed.
+
+### 2. STEP 3 (taken here, at step 1) - HISTORY WITHOUT AN ORPHAN
+
+The dispatch forbids creating an orphan history row and requires the row land in the same
+transaction as the DDL where possible. Draft A cannot be transactional. What I did instead, and
+it is stronger than "immediately after":
+
+The history INSERT is `INSERT ... SELECT ... WHERE EXISTS (index present AND indisvalid)`. Same
+psql session, the very next statement. If the build had failed or landed INVALID, the insert
+matches zero rows and **no history row is written at all** - the orphan cannot exist. It reported
+`INSERT 0 1`, so the index was already valid at that instant.
+
+Draft B needed no such trick: `CREATE OR REPLACE FUNCTION` and its history INSERT ran inside one
+explicit `BEGIN; ... COMMIT;`.
+
+Both rows carry `statements` and the `rollback` array. `schema_migrations` now holds 639 rows
+(637 + 2).
+
+### 3. STEP 2 - DRAFT B APPLIED
+
+Applied only after A was confirmed `indisvalid = t`.
+
+```
+BEGIN
+CREATE FUNCTION
+INSERT 0 1
+COMMIT
+```
+
+Live `pg_get_functiondef()` read back after commit - the deployed body, verbatim:
+
+```
+CREATE OR REPLACE FUNCTION public.press_record_payment(p_hold uuid, p_kind text, p_amount_cents integer, p_method text DEFAULT 'manual'::text, p_external_ref text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_payment_id uuid;
+  v_ref text := nullif(btrim(coalesce(p_external_ref, '')), '');
+begin
+  perform 1 from press_holds where id = p_hold for update;
+  if not found then raise exception 'hold not found'; end if;
+
+  insert into press_payments (hold_id, kind, amount_cents, method, external_ref)
+  values (p_hold, p_kind, p_amount_cents, p_method, v_ref)
+  on conflict (external_ref) where method = 'stripe' and external_ref is not null
+  do nothing
+  returning id into v_payment_id;
+
+  if v_payment_id is null then
+    return jsonb_build_object(
+      'hold_id', p_hold,
+      'status', (select status from press_holds where id = p_hold),
+      'paid_cents', (select paid_cents from press_holds where id = p_hold),
+      'payment_id', null,
+      'idempotent', true);
+  end if;
+
+  update press_holds set paid_cents = paid_cents + p_amount_cents where id = p_hold;
+  perform press_advance_hold_status(p_hold);
+
+  return jsonb_build_object(
+    'hold_id', p_hold,
+    'status', (select status from press_holds where id = p_hold),
+    'paid_cents', (select paid_cents from press_holds where id = p_hold),
+    'payment_id', v_payment_id,
+    'idempotent', false);
+end $function$
+
+    version     |               name
+----------------+----------------------------------
+ 20260801100100 | press_record_payment_replay_safe
+```
+
+**SECURITY DEFINER and `search_path = public` both survived the replace.** OPS38's flagged risk -
+the `ON CONFLICT` partial-index inference failing to parse - did not materialise: the arbiter
+predicate matches the index predicate exactly and the function compiled.
+
+### 4. STEP 4 - THE IDEMPOTENCY PROOF
+
+Judgement call, stated: the whole probe ran inside `BEGIN; ... ROLLBACK;` on production. The
+dispatch asked for a fresh test hold; a rolled-back transaction gives identical function behaviour
+(nothing in the call path commits) and leaves **zero** test residue in a money table, rather than
+inserting rows I would then have to `DELETE`. Residue verified after the rollback, below.
+
+Test hold `00000000-0000-4d16-8000-000000000016`: total 1000, hold 200, deposit 600, balance 200,
+paid 0, status `pending`.
+
+I ran four calls, not two - the two the dispatch asked for, plus two more. The extra pair is the
+question the dispatch did not ask but the index raises: a partial unique index is easy to get
+subtly wrong in a way that breaks the *non*-stripe path. Calls 3 and 4 prove it does not.
+
+**Call 1 - stripe, ref `DB16-PROBE`:**
+```
+{"status": "held", "hold_id": "00000000-0000-4d16-8000-000000000016", "idempotent": false, "paid_cents": 200, "payment_id": "4c97d769-e276-44ba-9f4d-cffdc937db20"}
+```
+
+**Call 2 - stripe, SAME ref (the replay):**
+```
+{"status": "held", "hold_id": "00000000-0000-4d16-8000-000000000016", "idempotent": true, "paid_cents": 200, "payment_id": null}
+```
+
+`idempotent: true`, `payment_id: null`, and **`paid_cents` unchanged at 200** - the defect is
+closed. Under the old definition this call would have inserted a second row and taken
+`paid_cents` to 400, which on this hold also crosses `hold_cents + deposit_cents` and would have
+advanced the status.
+
+**Call 3 - manual, no ref:**
+```
+{"status": "held", "hold_id": "00000000-0000-4d16-8000-000000000016", "idempotent": false, "paid_cents": 300, "payment_id": "9af84d5a-de45-4848-bec6-e52ec5cb048d"}
+```
+
+**Call 4 - manual, no ref, again:**
+```
+{"status": "held", "hold_id": "00000000-0000-4d16-8000-000000000016", "idempotent": false, "paid_cents": 400, "payment_id": "c6f64435-c5ea-488c-a078-3c1bdfcd45f5"}
+```
+
+Both manual calls inserted and both incremented. The partial index does not touch the non-stripe
+path, and two legitimately distinct manual payments are still two rows.
+
+**Payment rows written against the probe hold:**
+```
+  kind   | amount_cents | method | external_ref
+---------+--------------+--------+--------------
+ hold    |          200 | stripe | DB16-PROBE
+ deposit |          100 | manual |
+ deposit |          100 | manual |
+(3 rows)
+```
+Three rows from four calls. The replay wrote nothing.
+
+**Final probe hold state:** `held`, paid_cents 400 (200 + 100 + 100 - the replay contributed 0).
+
+**Residue check after ROLLBACK:**
+```
+ probe_holds
+-------------
+           0
+ probe_payments
+----------------
+              0
+```
+
+### 5. DONE-TEST
+
+| Dispatch requirement | Result |
+| --- | --- |
+| pre-flight SELECTs run and clean | PASS - 0 duplicate refs; function undrifted |
+| index present, `indisvalid = true` | PASS - `press_payments_stripe_ref_uidx`, `indisvalid = t` |
+| `press_record_payment` replaced, returns idempotent key | PASS - read back from `pg_get_functiondef()` above |
+| a `schema_migrations` row per apply | PASS - `20260801100000` + `20260801100100`, both with `rollback` populated; orphan structurally impossible (section 2) |
+| double-call proof pasted, paid_cents unchanged on replay | PASS - call 2, `paid_cents` 200 -> 200 |
+| rollbacks NOT executed | PASS - stated only |
+| drafts D/E/F/G untouched | PASS - out of scope, no edge function opened |
+
+### 6. DEVIATIONS AND JUDGEMENT CALLS
+
+1. **Wrote migration files the dispatch did not name.** The dispatch carried SQL inline. Under the
+   MIGRATION AMENDMENT the artifact should exist; I created it, hashed it, and recorded the hashes
+   above. Executable content is the dispatch's, unchanged.
+2. **No `IF NOT EXISTS` on draft A**, against repo convention, because the dispatch gave the
+   statement verbatim and forbade redesign. Called out rather than silently "improved".
+3. **History insert guarded by `WHERE EXISTS (... indisvalid)`** instead of a bare INSERT after the
+   CONCURRENTLY build. Strictly safer against the orphan the dispatch was worried about.
+4. **Probe ran in a rolled-back transaction** rather than as committed test data in a money table.
+5. **Four probe calls instead of two** - the two extra cover the non-stripe path the partial index
+   could have broken.
+
+### 7. COULD NOT VERIFY
+
+- **Provenance by git.** `.gitignore:87` ignores `TheMANUAL.tech/` at the workspace root
+  (`git check-ignore -v` confirms), so neither new migration file is trackable there and
+  `git log` on these paths is empty. Same limitation DB15 recorded. The files' authority is their
+  hash in this report plus the `statements`/`rollback` arrays in `schema_migrations`.
+- **Behaviour under real Stripe webhook concurrency.** The proof is serial. Two simultaneous
+  deliveries of the same event now serialise on `perform 1 from press_holds ... for update`, so
+  the second waits and then hits the index - correct by construction, but not executed here.
+  Nothing in this pass can prove it without the edge function, which is the D/E/F pass.
+- **The old `bling_transactions.type='minted'` and `bling_credit_purchase` callsite debt** is
+  untouched and unrelated; noting only that nothing here changed them.
+- **Whether the webhook handler reads the new `idempotent` key.** Not opened - out of scope. That
+  is exactly what W-1 hands to lead.
+
+---
+
+## DB15 - report-headers migration APPLIED, stamped, and hand-backfilled
+
+**HEARTBEAT RUN** - unattended, scheduled, no human watching. Filed under terminal `HB:db`.
+
+### W-1 - WHO OWNS THE NEXT MOVE, AND WHAT IT IS
+
+**Owner: LEAD.**
+
+**The single next action: rule on `TRIV29` - the one row the column-backed query now returns.**
+It has been `claimed` and waiting **48.6 hours**, it says `decisions_owner = lead`, and what it
+wants is one line: apply the drafted franchise-spine schema, or queue a dispatch naming each file
+with its rollback stated. The board that says so is a query now, not a habit.
+
+Two smaller things, both also lead's:
+
+- **The rollback for this migration is no longer free.** Three rows now carry hand-written content
+  in the new columns, so the DROP-COLUMN rollback would destroy real content. DB13 asked to be told
+  at exactly this moment; this is the telling.
+- **`DB14` has been `claimed` for 0.7 h with no report filed** - the signature of a heartbeat killed
+  mid-pass (README: SIGTERM exits 143 and leaves the claim; not self-healing). It needs the R2b
+  abandon statement run by hand. **I did not touch it** - R7 permits status updates on my own claimed
+  row only.
+
+### 0. R7 PRE-FLIGHT, recorded before the apply
+
+**FILE (named by the DB15 dispatch, per R7):** `supabase/migrations/20260731050000_ops_reports_headers_v1.sql`
+- sha256 `77b5befffeca549f832919fac4da68b7661c3eb36c84b0c4004ef0b8ee3132d4`, 4897 bytes, **0 non-ASCII characters**
+- Content matches DB13's description exactly: six nullable columns, two CHECKs, one `COMMENT ON COLUMN`,
+  rollback at the foot, and no `BEGIN`/`COMMIT` of its own.
+- **Could not verify by git:** the workspace `.gitignore:87` ignores `TheMANUAL.tech/` wholesale, so
+  `git log` on this path is empty at the workspace root. Provenance is established by content match
+  against DB13-Q's report, not by history.
+
+**ROLLBACK (stated by the dispatch, before the apply):** DROP the two CHECK constraints, then DROP the
+six columns, in one transaction. Reproduced verbatim at the foot of the migration file. **NOT executed.**
+
+**PRE-STATE, measured live immediately before the apply:**
+
+```
+ops_reports columns (6): id uuid NOT NULL | terminal text NOT NULL | pass text NOT NULL
+                         title text NOT NULL | body text NOT NULL | created_at timestamptz NOT NULL
+constraints (5): ops_reports_pkey (PK) + body/pass/terminal/title length CHECKs
+rows: 156
+supabase_migrations.schema_migrations WHERE version='20260731050000' -> 0 rows
+```
+
+Identical to DB13's measured pre-state except the row count (149 -> 156), so nothing drifted between
+the two passes.
+
+**DEPENDENT OBJECTS touching `public.ops_reports`:**
+
+| kind | name | risk from ADD COLUMN |
+|---|---|---|
+| view | `ops_build_progress` | none - selects named columns only, never `SELECT *` |
+| view | `ops_pass_durations` | none - selects named columns only, never `SELECT *` |
+| index | `ops_reports_pkey`, `ops_reports_terminal_idx` | none - untouched |
+| trigger | (none) | - |
+| routine | (none - zero routines mention `ops_reports`) | - |
+| RLS | `ops_reports_admin_read` (SELECT, `is_platform_admin()`), RLS enabled, not forced | none - policy is unqualified by column |
+| grants | `authenticated` SELECT; `service_role`/`postgres` full | new columns inherit the table grant |
+
+**ROWS AT RISK: zero.** Six `ADD COLUMN` with no `NOT NULL` and no `DEFAULT` - no table rewrite, no
+existing value read or written. The two CHECKs are `NULL OR IN (...)`, so they are satisfied by all
+156 pre-existing rows without a scan failure.
+
+### 1. Step 2 - APPLIED, and the stamp is in the SAME transaction
+
+The dispatch's stop condition was explicit: if the apply path cannot write the `schema_migrations`
+row in the same transaction as the DDL, stop rather than create a 472nd orphan. **It can.** `psql`
+accepts multiple `-f` files and `--single-transaction` wraps *all* of them in one `BEGIN`/`COMMIT`,
+so the migration file (which deliberately carries no transaction control of its own) and the stamp
+`INSERT` commit or roll back together. Driver: `_claude_tmp/db15-apply.mjs`.
+
+```
+$ node _claude_tmp/db15-apply.mjs
+migration sha256=77b5befffeca549f832919fac4da68b7661c3eb36c84b0c4004ef0b8ee3132d4
+migration bytes=4897
+ALTER TABLE
+ALTER TABLE
+COMMENT
+INSERT 0 1
+psql exit=0
+```
+
+**POST-STATE, verified live:**
+
+```
+ ordinal | column_name        | type        | nullable
+       1 | id                 | uuid        | NO       <- original, untouched
+       2 | terminal           | text        | NO       <- original, untouched
+       3 | pass               | text        | NO       <- original, untouched
+       4 | title              | text        | NO       <- original, untouched
+       5 | body               | text        | NO       <- original, untouched
+       6 | created_at         | timestamptz | NO       <- original, untouched
+       7 | headline           | text        | YES
+       8 | applied            | boolean     | YES
+       9 | decisions_required | text        | YES
+      10 | decisions_owner    | text        | YES
+      11 | blocked_on         | text        | YES
+      12 | outcome            | text        | YES
+
+constraints (7): ops_reports_pkey + body/pass/terminal/title CHECKs (all four originals intact)
+                 + ops_reports_decisions_owner_chk  CHECK (decisions_owner IS NULL OR IN ('butch','lead','counsel','external'))
+                 + ops_reports_outcome_chk          CHECK (outcome IS NULL OR IN ('done','blocked','question','design','held','superseded'))
+
+supabase_migrations.schema_migrations:
+    version     |          name          | created_by | n_statements
+ 20260731050000 | ops_reports_headers_v1 |            |            1
+
+immediately post-apply, pre-backfill: 156 rows, 0 non-null in every one of the six new columns
+```
+
+**Two judgement calls on the stamp row, stated because nobody asked for them:**
+
+1. **`created_by` left NULL.** Every existing row carries `thewebmasteroftheuniverse@gmail.com`,
+   written by Studio/CLI. A rail apply is not that human, and stamping their address on a machine
+   apply would be a small lie in the audit trail. The column is nullable; NULL is the honest value.
+2. **`statements` carries the full file text as a single element**, matching the `n_statements = 1`
+   shape of every recent row. The row is self-describing: the migration can be read back off the rail
+   without the repo.
+
+**Drift note for OPS45:** this apply moved the count the other way for once - one repo-only file
+became one matched pair. 471 orphans and 109 repo-only remain untouched by this pass.
+
+### 2. Step 3 - HAND-BACKFILL. Three rows, each with the sentence it came from
+
+The dispatch's list (`TRIV26-Q`, `TRIV29-Q`, `OPS35-Q`, `OPS44-Q`) was correctly flagged stale and is
+**not** what I used. Re-derived live: of DB13's four, **three have since closed** - `TRIV26` (done),
+`OPS35` (done), `OPS44` (done). Only `TRIV29` survives. `DB13` itself closed, and `TRIV30` (the
+11:29 heartbeat) landed in between.
+
+Machine-guessing is banned by the dispatch and by the `COMMENT ON COLUMN`. Every value below was read
+by eye off the body it belongs to. Rows are targeted **by id**, because `pass` is not unique.
+
+| row | `outcome` | `applied` | `decisions_owner` | The sentence I read it from |
+|---|---|---|---|---|
+| `TRIV29-Q` | `design` | `false` | `lead` | *"Filed as `TRIV29-Q` per the dispatch's own instruction... **the dispatch is left `claimed`** per R4. **The lead applies.**"* - and for `blocked_on`: *"TRIV9's forgeable-score hazard is untouched and gates all of this."* |
+| `TRIV30` | `design` | `false` | `lead` | *"**Owner: LEAD.** **The single next action: queue a `games` dispatch against `TheHoneycomb.games` for the four client call-site changes.** Not the migration."* |
+| `DB13-Q` | `held` | `false` | `NULL` | *"**Everything needed to clear it is below.** Name the file, paste the rollback, re-queue."* - the DB15 dispatch did exactly that, so the decision is **made**: `decisions_required` is NULL, and per the column comment `decisions_owner` is NULL with it. |
+
+```
+   pass   | terminal | outcome | applied | decisions_owner |                 decisions_required
+----------+----------+---------+---------+-----------------+-------------------------------------------------
+ TRIV30   | HB:games | design  | f       | lead            | Queue a games dispatch against TheHoneycomb.games...
+ DB13-Q   | db       | held    | f       |                 | (null)
+ TRIV29-Q | games    | design  | f       | lead            | Apply the drafted franchise-spine schema, or queue...
+(3 rows)
+```
+
+**Why `TRIV30` is in the list even though its dispatch is `done`** - and this is a finding, not a
+footnote. Its W-1 names a human owner and an action nobody has queued, so it is open in the sense that
+matters. But **the column-backed query will never show it**, because the query filters
+`d.status <> 'done'`. DB12's original argument was that a `-Q` suffix is the wrong index; the same
+objection applies one layer down to dispatch status. A pass that finishes cleanly and *still* needs a
+human is invisible to this board. The row now carries the truth; the query does not yet ask for it.
+
+**`applied` is `false` on all three** under DB12's two rules, which the migration comments copy:
+uncommitted files in a tree are not "applied", and closing your own dispatch does not count. None of
+the three changed a live system.
+
+### 3. Step 4 - the column-backed query, run against production. Real output
+
+Query verbatim as DB13 wrote it (`DISTINCT ON` over `regexp_replace(pass,'-Q$','')`, because `pass`
+is not unique):
+
+```
+waiting_on | pass   | lane  | hours_waiting | decisions_required                                      | blocked_on
+-----------+--------+-------+---------------+---------------------------------------------------------+--------------------------------------------------
+lead       | TRIV29 | games |          48.6 | Apply the drafted franchise-spine schema, or queue a     | TRIV9 forgeable-score hazard: trivia_submit_answer
+           |        |       |               | dispatch that names each file and states its rollback.   | still accepts any player_id with no caller
+           |        |       |               | The drafts are introspection-accurate but were never     | verification, and every franchise draft makes
+           |        |       |               | executed.                                               | forged scores more valuable to forge.
+(1 row)
+```
+
+**One row, not DB13's four** - three of its four closed in the intervening day. The query does what it
+was built to do: it names **who** (`lead`) and **what** (one sentence), which the interim `-Q`-suffix
+version could not, and it has been waiting **48.6 hours** - two-thirds of the OPS22 record this whole
+design exists to prevent.
+
+**Second blind spot, measured rather than asserted.** The query `JOIN`s dispatches to reports, so a
+claimed dispatch that has filed **no report at all** cannot appear:
+
+```
+ pass  | lane | status  | hrs_claimed
+-------+------+---------+-------------
+ DB14  | db   | claimed |         0.7   <- report never filed; heartbeat killed mid-pass
+ DB15  | db   | claimed |         0.2   <- this pass, mid-flight at query time
+ OPS48 | ops  | queued  |               <- never claimed, correctly invisible
+(3 rows)
+```
+
+`DB14` is the live case: **claimed, no report, nobody waiting on anything because nothing was ever
+said.** That is the failure the header design does not cover - a silent claim is worse than a filed
+question, and the board shows neither. Named here rather than fixed, because fixing it means changing
+the query the dispatch told me to run.
+
+### 4. Done-test
+
+| Requirement | Result |
+|---|---|
+| `schema_migrations` contains version `20260731050000` | **PASS** - one row, `name = ops_reports_headers_v1`, written in the same transaction as the DDL |
+| six new columns present and nullable | **PASS** - positions 7-12, all `is_nullable = YES` |
+| six originals untouched | **PASS** - positions 1-6 identical to the measured pre-state, all four original CHECKs intact |
+| every currently-open row backfilled BY HAND with a quoted source sentence | **PASS** for the three rows that exist. **`DB14` cannot be backfilled - it has no report row**, and R7 forbids me writing one for another pass |
+| column-backed query runs on production, real output in the report | **PASS** - one row, `TRIV29`, above |
+| rollback NOT executed | **PASS** - never sent to the server |
+
+### 5. Could not verify
+
+- **File provenance by git.** `.gitignore:87` ignores `TheMANUAL.tech/` at the workspace root, so
+  `git log` on the migration path returns nothing. I verified the file by content against DB13-Q's
+  own description (six nullable columns, two CHECKs, comment, rollback at the foot, no `BEGIN`/`COMMIT`,
+  0 non-ASCII) and by sha256. **Nobody has verified it against DB13's own hash, because DB13 recorded
+  bytes and behaviour but not a hash.**
+- **The `applied` protocol rule is still only a comment.** DB13 flagged it and it is still true: the two
+  rules live in the migration's comments, not in LEAD_PROTOCOL. Passes will answer `applied`
+  inconsistently until the protocol carries them. I applied them to my three backfills; the next pass
+  has nothing binding it to the same reading.
+- **No surface was checked for `SELECT *` on `ops_reports`.** DB13 named this and I only closed half of
+  it: the two dependent **views** are safe (both select named columns, verified in §0), but I did not
+  grep the client for `.from('ops_reports').select('*')`. `authenticated` holds SELECT on the table.
+- **`outcome` value set still adopted unexamined.** `held` vs `blocked` still overlap. I used `held`
+  for DB13-Q and `design` twice; `blocked` went unused, which is weak evidence rather than a test.
+- **Whether `TRIV30`'s populated row is desirable.** I judged it open and populated it; the query
+  disagrees by construction (§2). If the lead's read is that a closed dispatch is closed, that one
+  `UPDATE` should be reverted to NULLs - it is the only backfill in this pass that is a judgement call
+  rather than a reading.
+
+### Git
+
+No git operation ran. Working tree changes from this pass: `TheMANUAL.tech/REPORT.md` (this section)
+and four scratch files under `_claude_tmp/` (`db15-apply.mjs`, `db15-backfill.sql`, `db15-stamp.sql`,
+plus the read-only query files). **Nothing committed** - the human commits.
+
+### Transport, stated because the heartbeat prompt asks
+
+- **R2 claim: `TheMANUAL.tech/scripts/heartbeat/claim.cmd`**, bare (no lane filter, no sticky lanes),
+  run from the workspace root. It returned DB15 on the first call. No hand-run `psql`.
+- **Everything else: `node _claude_tmp/rail.mjs <file.sql>`** - the Node shim, which spawns the
+  already-authorized `psql.exe` with `-w` against `pgpass.conf`. The apply used a purpose-built driver
+  of the same shape (`db15-apply.mjs`) because it needed `--single-transaction` across two `-f` files.
+- **One auto-denial, expected and logged:** a `cd TheMANUAL.tech && git log ...` chain (my error - the
+  workspace bans `cd X && cmd`). Re-run as a root-relative pathspec, no capability lost. Logged to
+  `logs/permission-needed.md`.
+
+## TRIV30 - guest identity fix DRAFTED. Nothing applied. Third finding, first fix.
+
+**HEARTBEAT RUN** - unattended, scheduled, no human watching. Filed under terminal `HB:games`.
+
+### W-1 - WHO OWNS THE NEXT MOVE, AND WHAT IT IS
+
+**Owner: LEAD.**
+
+**The single next action: queue a `games` dispatch against `TheHoneycomb.games` for the four
+client call-site changes.** Not the migration. The migration cannot be applied first - it is a
+flag day, and applying it against the currently deployed client breaks the game for every patron.
+Client ships, then a second dispatch applies the migration.
+
+The client changes are listed verbatim at the bottom of the drafted file. They are four edits in
+one file (`src/lib/trivia.ts`), no component changes, no prop threading.
+
+### The hole, restated at its real size
+
+The lead's two routes both hold. I re-derived them independently off the 2026-07-26 production
+dump rather than take them on faith, and the source is worse than the summary in one respect,
+which is section 3 below.
+
+**Calibration, honestly:** 2 active venues, 0 live sessions, 3 sessions ever, 17 players. Nobody
+is being robbed tonight. **The reason this is worth a pass is that venues are being SOLD a product
+whose scores cannot be trusted** - and separately, that "0 live sessions" is the only window in
+which the fix is free. Every hour of real usage narrows it.
+
+### 1. The trust anchor - what it should be, and why
+
+Patrons are guests. There is no `auth.uid()`. That is why the check was never written, and any fix
+has to name a different anchor.
+
+**Ruling: `device_key`, already present, already plumbed.** `trivia_join_session` ALREADY keys
+rejoin on `(session_id, device_key)`. The token exists, the client already mints and stores it
+(`localStorage.trivia_device_key`, `crypto.randomUUID()`), and both deployed callers already send
+it on join. The defect is not that there is no token - **it is that the token was never checked on
+the write path, and was published on the read path.** Both halves have to close together; either
+one alone is theatre.
+
+The three candidate shapes the dispatch named, evaluated:
+
+| Shape | Verdict |
+|---|---|
+| **device_key as an RPC argument, matched inside the definer function** | **ADOPTED.** Zero new state, zero new columns, and it reuses the exact token join already trusts. |
+| **Column-level REVOKE of `device_key` from anon** | **ADOPTED IN SUBSTANCE, REJECTED IN FORM.** The intent is right and necessary. The mechanism is not: the client calls `.select("*")`, which PostgREST expands to `SELECT *`, which needs privilege on **every** column - so a column revoke turns every standings read into `42501 permission denied`. Delivered as a definer view instead (`trivia_players_public`), the pattern this repo already runs for `question_bank_public`. A view also cannot be defeated by someone adding a column later. |
+| **A per-session token issued at join** | **REJECTED.** Functionally identical to a rotated `device_key` but costs a new column and a new client storage key. The one argument for it - that the existing 17 keys are burned, having been world-readable since June - does not survive contact: every seat holding one is in an **ended** session, and an ended session cannot be answered into. Nothing to rotate. |
+
+### 2. The reload / network-switch case - answered explicitly
+
+The dispatch is right that a fix which logs people out mid-round is worse than the hole. It does
+not.
+
+- **Page reload:** `trivia_device_key` and `trivia_seat` are both `localStorage`. Both survive a
+  reload. Same key goes back. **No regression.**
+- **Cellular to bar wifi:** `device_key` is client-minted and network-independent. No IP, no
+  cookie, no bound JWT. The switch is invisible to the check. **No regression.** This is the
+  positive reason to reject any IP-derived or session-derived anchor.
+- **The one path that does break** - cleared storage, incognito eviction, Safari ITP - **already
+  breaks today.** `trivia_seat` (the player id) and `trivia_device_key` live in the same store and
+  die together. A patron who loses one has already lost their seat and is already re-joining as a
+  new player. Enforcement adds **no new logout path.** That is the whole answer, and I checked it
+  rather than assumed it: `loadSeat()` returning null drops straight to `JoinForm`.
+- **Safari private mode, where `localStorage` throws:** `deviceKey()` falls back to an in-memory
+  UUID. Consistent within one page life, so answering works; lost on reload - but the seat is lost
+  on reload today too. **No regression.**
+
+### 3. A SECOND missing caller check, not in the dispatch, fixed here
+
+`trivia_claim_player(p_player_id uuid)` checks `auth.uid()` **for the claimant** and then:
+
+```
+  update trivia_players set bee_id = v_bee_id, claimed_at = now()
+  where id = p_player_id and bee_id is null;
+```
+
+It never checks that the seat belongs to the caller. **Any signed-in Bee can pass any unclaimed
+player id - and player ids are world-readable - and take that seat's score into their own account.**
+TRIV14's lifetime ledger is per-seat keyed, so this converts someone else's night into a permanent
+accrual under your handle.
+
+I fixed it in the same file. It is the identical defect class on the identical table, and splitting
+it out would have left the round trip open: forge a score with hole #1, then bank it with hole #2.
+
+### 4. The venue read surface (STEP 2)
+
+`owner_bee_id` and `subscription_id` are removed from the public read model per the lead ruling.
+Same view mechanism, same `.select("*")` reason.
+
+**What each closes, separately, since the dispatch asked:**
+
+- **`subscription_id`** closes cleanly and completely. It discloses which venues are paying. It
+  has exactly one consumer, `venueIsPaid()`, and that consumer is host-console-only. Nothing
+  patron-facing reads it. Done.
+- **`owner_bee_id`** closes the *join*, not the *target*. It links a public venue to a person;
+  removing it means an anonymous scrape can no longer walk venue to Bee. It does **not** fix what
+  is on the other end of that link - that is DB14, untouched here per the dispatch. **After this
+  migration a stranger can still enumerate bees; they just cannot start from the bar.**
+
+The host console still needs both columns, so a third view, `trivia_venues_owner`, scoped by
+`owner_bee_id = auth.uid()` inside a definer view, hands them back to the owner and nobody else.
+`getOwnedVenues()` drops its `.eq("owner_bee_id", beeId)` filter - the view already is the filter.
+
+### 5. The rule, written where it will be hit (STEP 3)
+
+`COMMENT ON COLUMN`, not only a doc. Four of them:
+
+- `trivia_venues.settings` - the lead ruling verbatim: *"PUBLIC FIELD... Anything private goes in
+  another table."*
+- `trivia_venues.owner_bee_id` - PRIVATE, owner-only, and it names the DB14 compounding
+- `trivia_venues.subscription_id` - PRIVATE, owner-only
+- `trivia_players.device_key` - **BEARER SECRET.** Added beyond the dispatch, and it is the one
+  that matters most going forward: this migration promotes `device_key` from "an incidental
+  column" to "the thing the whole guest security model rests on," and the next person to write a
+  view over `trivia_players` needs to be told that at the column.
+
+### Deviations and judgement calls
+
+| # | Call | Reason |
+|---|---|---|
+| 1 | **Views, not column-level REVOKE** | `.select("*")` in three client functions. A column revoke returns 42501 on every one. Verified in source, not assumed. |
+| 2 | **Fixed `trivia_claim_player` too, though the dispatch did not name it** | Same defect class, same table, and leaving it open leaves the round trip (forge, then bank) open. |
+| 3 | **Left `correct_idx` in the `trivia_submit_answer` return** | It is a real leak, and it is `lock_in_phase2_strip_correct_idx`'s job. Rewriting the body while a separate migration is pending against the same function is how two drafts collide. The body is byte-identical to production apart from the guard, deliberately. |
+| 4 | **Zero DML - no backfill, no rotation of the 17 burned keys** | Every seat holding one is in an ended session; an ended session cannot be answered into. A backfill would have been motion without effect, and it would have made the rollback stateful. |
+| 5 | **Null-`device_key` seats are left permanently unable to answer, rather than grandfathered** | Grandfathering null is the hole with extra steps. `trivia_join_session` now refuses to mint a null-key seat, so the set is closed, not growing. |
+| 6 | **Wrong key and wrong id raise the SAME message** | A distinct "bad device key" error confirms to an attacker that a guessed player id was real. |
+| 7 | **File parked in `docs/`, not `supabase/migrations/`** | So no `db push` can pick up an unapproved migration. Follows this repo's own precedent, `docs/20260704214721_reassert_handle_new_bee_as_deployed.sql`. It carries the exact filename it will have when moved. |
+| 8 | **One file, with a marked PART 1 / PART 2 split point** | The dispatch asked for one named file. PART 1 is additive and breaks nothing; PART 2 is the flag day. If the lead wants to de-risk, the file splits at the banner without an edit. |
+| 9 | **`p_device_key` added as a 5th argument, dropping the 4-arg overload, rather than a defaulted parameter** | A defaulted param makes the 4-arg call ambiguous at call time, and a defaulted null would have to be grandfathered - deviation 5 again. The flag day is explicit instead of hidden. |
+
+### The TV seat - a hole the fix does not close, stated plainly
+
+`Tv.tsx` joins with `deviceKey: "tv:{VENUE_CODE}"`. The venue code is **printed on the table
+tent**. So the TV's seat has a fully guessable "secret," and after this migration anyone can still
+forge that one seat.
+
+It does not matter today: the TV player is filtered out of standings (`neq("nickname", TV_NICKNAME)`)
+and never answers. But it is the one place the new model's assumption - device_key is unguessable -
+is knowingly false, and it is shared across every TV at the venue by design. **Recording it rather
+than fixing it**, because fixing it means changing how TVs attach and that is a separate design
+call, not a security patch.
+
+### Done-test
+
+| Item | Status |
+|---|---|
+| Player identity fix drafted, reload + network-switch answered explicitly | **DONE** - sections 1 and 2 |
+| `owner_bee_id` / `subscription_id` narrowing drafted | **DONE** - section 4, `trivia_venues_public` + `trivia_venues_owner` |
+| `settings` rule placed as a `COMMENT ON COLUMN` | **DONE** - section 5, four comments |
+| Migration file NAMED, rollback written out verbatim | **DONE** - `docs/20260801160000_trivia_identity_and_read_surface_v1.sql`, rollback block at the foot of the file, exact |
+| Zero DDL, zero DML, zero deploys | **DONE - I ASSERT IT.** Not one statement was executed against production this pass. The only database write is the R3 report INSERT and the dispatch status update, which R7 authorizes. No `psql -c`, no MCP `execute_sql` (the connector is read-only and exposes none), no `supabase db push`, no function deploy. |
+
+### Verbatim - the evidence I actually ran
+
+The two policies, from the 2026-07-26 production dump:
+
+```
+138356:CREATE POLICY "public read active venues" ON public.trivia_venues FOR SELECT USING ((status = 'active'::text));
+138384:CREATE POLICY "public read players" ON public.trivia_players FOR SELECT USING (true);
+138787:ALTER TABLE public.trivia_players ENABLE ROW LEVEL SECURITY;
+138845:ALTER TABLE public.trivia_venues ENABLE ROW LEVEL SECURITY;
+```
+
+The `.select("*")` calls that killed the column-REVOKE option:
+
+```
+TheHoneycomb.games/apps/trivia/src/lib/trivia.ts:354:    .from("trivia_venues")
+TheHoneycomb.games/apps/trivia/src/lib/trivia.ts:364:    .from("trivia_venues")
+TheHoneycomb.games/apps/trivia/src/lib/trivia.ts:428:    .from("trivia_players")
+TheHoneycomb.games/apps/trivia/src/lib/trivia.ts:489:    .from("trivia_venues")
+TheHoneycomb.games/apps/trivia/src/lib/trivia.ts:491:    .eq("owner_bee_id", beeId)
+```
+
+No client writes and no realtime subscriptions exist against either table - this returned nothing:
+
+```
+$ grep -rn "\.update(\|\.insert(\|\.upsert(\|\.delete(\|\.channel(" TheHoneycomb.games/apps/trivia/src
+(Bash completed with no output)
+```
+
+That is what makes the view swap safe: the client is RPC-for-writes, polling-for-reads, with no
+subscription to break.
+
+### COULD NOT VERIFY - read this before applying
+
+1. **The two function bodies I restated are from the 2026-07-26 dump, six days stale.** Trivia work
+   has shipped since (TRIV21 night-mode phase 4a at minimum) and some trivia DDL was authored
+   out-of-repo. **The apply dispatch must run `pg_get_functiondef` on `trivia_submit_answer` and
+   `trivia_claim_player`, diff against the file, and carry forward any drift.** Written into the
+   file as precondition P3. This is the single largest risk in the draft.
+2. **Live counts not re-verified.** I took 2 venues / 0 live sessions / 3 sessions / 17 players
+   from the dispatch. Precondition P2 requires re-checking `status='live'` at apply time regardless.
+3. **The `security_invoker = off` + `auth.uid()` combination in `trivia_venues_owner` is reasoned,
+   not tested.** `auth.uid()` reads the per-request JWT GUC and is independent of definer context,
+   so it should resolve correctly - but I could not execute it. Verify the owner view returns rows
+   for a signed-in owner and zero for anon before trusting the host console to it.
+4. **No `npm run build` was run.** No client code was changed this pass, so there was nothing to
+   build. The client changes are specified, not made.
+5. **PostgREST schema-cache reload** (`notify pgrst, 'reload schema'`) is noted in the file but
+   untested here; the new views and signatures are invisible to the API until it runs.
+
+### File tree
+
+```
+TheMANUAL.tech/
+  docs/
+    20260801160000_trivia_identity_and_read_surface_v1.sql   NEW - the deliverable, draft, unapplied
+  REPORT.md                                                  MODIFIED - this section
+```
+
+### Transport
+
+The R2 claim was performed by **`TheMANUAL.tech/scripts/heartbeat/claim.cmd`**, run bare from the
+workspace root, exactly as the heartbeat dispatch instructs. It returned one row, `UPDATE 1`. No
+hand-run `psql` was used for the claim. R3 goes through the Node shim.
+
+---
+
 ## OPS46-CORRECTION - my SET LOCAL sweep was incomplete. Conclusion holds, one stated fact did not.
 
 **Correcting OPS46, filed earlier this session.** New row rather than an edit, per R3.
