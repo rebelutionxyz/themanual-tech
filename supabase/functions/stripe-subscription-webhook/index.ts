@@ -10,10 +10,20 @@
 // JWT). The only trust anchor is the Stripe-Signature HMAC verified against
 // STRIPE_WEBHOOK_SECRET_SUBSCRIPTION.
 //
+// API SHAPE: account is on 2026-03-25.dahlia (basil+). Two fields moved, so we
+// read the new locations (with fallbacks to the legacy ones):
+//   - period end:    subscription.items.data[0].current_period_end
+//                    (was subscription.current_period_end)
+//   - invoice → sub: invoice.parent.subscription_details.subscription
+//                    (was invoice.subscription)
+// For invoice.paid we therefore RETRIEVE the subscription once and read
+// product/tier/status/period/customer/bee off that single object — same shape as
+// the subscription.* events, and it makes bee-resolution order-independent.
+//
 // IDEMPOTENCY — two independent layers:
-//   1. Event-level — stripe_events.event_id is UNIQUE. A row is only treated as
-//      done when status='processed', so a failed-then-retried event reprocesses
-//      (self-healing) while a truly-completed event short-circuits to 200.
+//   1. Event-level — stripe_events.event_id is UNIQUE. A row counts as done only
+//      at status='processed', so a failed-then-retried event reprocesses
+//      (self-healing) while a completed event short-circuits to 200.
 //   2. Invoice-level — invoiceRef(invoice.id) is a deterministic uuid; inside
 //      subscription_sync the affiliate trigger is skipped when an affiliate_hold
 //      already exists for that source_ref. Upline freed exactly once per invoice.
@@ -21,8 +31,13 @@
 // EVENTS HANDLED:
 //   customer.subscription.created | updated | deleted  → lifecycle/period upsert
 //   invoice.paid                                        → period upsert + affiliate
-// Unrecognised event types, and subscription items whose Stripe Price carries no
+// Unrecognised event types, and subscriptions whose Price/Product carries no
 // {product_type, tier} metadata, are ignored + logged (not stored).
+//
+// VENUE (2026-07-10): product_type 'venue' added — TheTRIVIA.app venue
+// subscriptions (F6 rail, canon thetrivia-venue-v2 A1). When checkout carried
+// metadata.venue_id, the trivia_venues row is linked to the subscription after
+// a successful sync (best-effort; sync is the source of truth).
 
 import { handleCors, jsonResponse, errorResponse } from '../_shared/cors.ts';
 import { serviceClient } from '../_shared/supabase.ts';
@@ -31,23 +46,39 @@ import { invoiceRef } from '../_shared/ids.ts';
 
 const WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET_SUBSCRIPTION') ?? '';
 
-type ProductType = 'membership' | 'oracle';
+type ProductType = 'membership' | 'oracle' | 'venue';
 
 interface Product {
   product_type: ProductType;
   tier: string;
 }
 
-// {product_type, tier} are read from Stripe Price metadata (D3 — tier CHECK
-// stays deferred). Returns null when the price is not a HONEYCOMB service price.
-function productFromPrice(price: unknown): Product | null {
-  // deno-lint-ignore no-explicit-any
-  const md = (price as any)?.metadata ?? {};
-  const pt = md.product_type;
-  const tier = md.tier;
-  if (pt !== 'membership' && pt !== 'oracle') return null;
+// {product_type, tier} come from Stripe Price metadata, falling back to the
+// Price's Product metadata (D3 — tier CHECK stays deferred). A Price that's been
+// used in a transaction can't take new metadata, so the Product is often the
+// editable surface; we read both, per-key. Returns null when neither carries a
+// HONEYCOMB service classification.
+// deno-lint-ignore no-explicit-any
+async function resolveProduct(stripe: ReturnType<typeof getStripe>, price: any): Promise<Product | null> {
+  if (!price) return null;
+  let pt = price?.metadata?.product_type;
+  let tier = price?.metadata?.tier;
+  if (!pt || !tier) {
+    try {
+      const product = (price.product && typeof price.product === 'object')
+        ? price.product
+        : await stripe.products.retrieve(price.product);
+      pt = pt ?? product?.metadata?.product_type;
+      tier = tier ?? product?.metadata?.tier;
+    } catch (err) {
+      console.error('stripe-subscription-webhook product retrieve failed', {
+        price: price?.id, message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  if (pt !== 'membership' && pt !== 'oracle' && pt !== 'venue') return null;
   if (typeof tier !== 'string' || tier.length === 0) return null;
-  return { product_type: pt, tier };
+  return { product_type: pt as ProductType, tier };
 }
 
 function unixToIso(seconds: unknown): string | null {
@@ -55,9 +86,23 @@ function unixToIso(seconds: unknown): string | null {
   return new Date(seconds * 1000).toISOString();
 }
 
+// dahlia: period end lives on the first subscription item; fall back to the
+// legacy top-level field for safety across versions.
+// deno-lint-ignore no-explicit-any
+function periodEndOf(sub: any): string | null {
+  const item = sub?.items?.data?.[0];
+  return unixToIso(item?.current_period_end ?? sub?.current_period_end);
+}
+
+// deno-lint-ignore no-explicit-any
+function customerIdOf(customer: any): string | null {
+  if (!customer) return null;
+  return typeof customer === 'string' ? customer : (customer.id ?? null);
+}
+
 // Resolve a Stripe customer id → Bee.
-//   1. metadataBeeId (from subscription.metadata.bee_id) is the source of truth
-//      on first contact; when present we pin bees.stripe_customer_id.
+//   1. metadataBeeId (subscription.metadata.bee_id) is the source of truth on
+//      first contact; when present we pin bees.stripe_customer_id.
 //   2. otherwise look the customer up in the bees cache.
 // Returns null when the customer cannot be mapped to a Bee.
 // deno-lint-ignore no-explicit-any
@@ -68,7 +113,6 @@ async function resolveBee(
 ): Promise<string | null> {
   if (metadataBeeId) {
     if (customerId) {
-      // Pin the mapping (idempotent; conflict on the partial unique index is fine).
       await sb.from('bees')
         .update({ stripe_customer_id: customerId })
         .eq('id', metadataBeeId)
@@ -123,11 +167,11 @@ Deno.serve(async (req) => {
   const sb = serviceClient();
   const obj = event.data.object;
 
-  // --- Derive product + the fields we need, per event family -----------------
   let product: Product | null = null;
   let customerId: string | null = null;
   let subscriptionId: string | null = null;
   let metadataBeeId: string | null = null;
+  let metadataVenueId: string | null = null;
   let invoiceId: string | null = null;
   let amountCents: number | null = null;
   let currency = 'usd';
@@ -135,30 +179,45 @@ Deno.serve(async (req) => {
   let periodEnd: string | null = null;
 
   if (event.type === 'invoice.paid') {
-    const line = obj?.lines?.data?.[0];
-    product = productFromPrice(line?.price);
-    customerId = obj?.customer ?? null;
-    subscriptionId = obj?.subscription ?? null;
     invoiceId = obj?.id ?? null;
     amountCents = typeof obj?.amount_paid === 'number' ? obj.amount_paid : null;
     currency = obj?.currency ?? 'usd';
-    status = 'active'; // a paid period implies the subscription is current
-    periodEnd = unixToIso(line?.period?.end);
-    // invoice doesn't carry subscription.metadata; if the customer isn't cached
-    // yet (event ordering), retrieve the subscription to read its bee_id.
+    // dahlia: subscription id sits under parent.subscription_details; legacy fallback.
+    subscriptionId =
+      obj?.parent?.subscription_details?.subscription ?? obj?.subscription ?? null;
     if (!subscriptionId) {
       console.log('stripe-subscription-webhook non-subscription invoice', { id: invoiceId });
       return jsonResponse({ received: true, ignored: 'invoice.paid (no subscription)' });
     }
+    // Retrieve the subscription for a consistent shape + product + period + bee.
+    // deno-lint-ignore no-explicit-any
+    let sub: any;
+    try {
+      sub = await stripe.subscriptions.retrieve(subscriptionId);
+    } catch (err) {
+      console.error('stripe-subscription-webhook subscription retrieve failed', {
+        subscription: subscriptionId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return errorResponse('subscription retrieve failed', 500); // transient → Stripe retries
+    }
+    product = await resolveProduct(stripe, sub?.items?.data?.[0]?.price);
+    customerId = customerIdOf(sub?.customer) ?? customerIdOf(obj?.customer);
+    metadataBeeId = sub?.metadata?.bee_id ?? null;
+    metadataVenueId = sub?.metadata?.venue_id ?? null;
+    // Real subscription status — a $0 trial-start invoice keeps the sub 'trialing',
+    // so it never occupies the (bee_id, product_type) WHERE status='active' slot.
+    status = sub?.status ?? 'active';
+    periodEnd = periodEndOf(sub);
   } else {
-    // customer.subscription.{created,updated,deleted}
-    const item = obj?.items?.data?.[0];
-    product = productFromPrice(item?.price);
-    customerId = obj?.customer ?? null;
+    // customer.subscription.{created,updated,deleted} — object IS the subscription.
+    product = await resolveProduct(stripe, obj?.items?.data?.[0]?.price);
+    customerId = customerIdOf(obj?.customer);
     subscriptionId = obj?.id ?? null;
     metadataBeeId = obj?.metadata?.bee_id ?? null;
+    metadataVenueId = obj?.metadata?.venue_id ?? null;
     status = obj?.status ?? 'active';
-    periodEnd = unixToIso(obj?.current_period_end);
+    periodEnd = periodEndOf(obj);
   }
 
   if (!product) {
@@ -168,23 +227,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ received: true, ignored: 'no product_type/tier metadata' });
   }
 
-  // Resolve Bee. For invoice.paid with a cold cache, fall back to retrieving the
-  // subscription so a bee_id in subscription.metadata still resolves regardless
-  // of Stripe's event-delivery order.
-  let beeId = await resolveBee(sb, customerId, metadataBeeId);
-  if (!beeId && event.type === 'invoice.paid' && subscriptionId) {
-    try {
-      const sub = await stripe.subscriptions.retrieve(subscriptionId);
-      // deno-lint-ignore no-explicit-any
-      const subBee = (sub as any)?.metadata?.bee_id ?? null;
-      beeId = await resolveBee(sb, customerId, subBee);
-    } catch (err) {
-      console.error('stripe-subscription-webhook subscription retrieve failed', {
-        subscription: subscriptionId,
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
+  const beeId = await resolveBee(sb, customerId, metadataBeeId);
 
   // --- Record the event (idempotent on event_id) -----------------------------
   await sb.from('stripe_events').upsert({
@@ -237,10 +280,27 @@ Deno.serve(async (req) => {
     console.error('stripe-subscription-webhook subscription_sync error', {
       event_id: event.id, type: event.type, bee_id: beeId, latency_ms: latencyMs, message: msg,
     });
-    await sb.from('stripe_events')
-      .update({ status: 'error' }).eq('event_id', event.id);
+    await sb.from('stripe_events').update({ status: 'error' }).eq('event_id', event.id);
     // 500 → Stripe retries; event row stays non-processed so the retry reprocesses.
     return errorResponse('subscription_sync failed', 500);
+  }
+
+  // --- Venue linkage (best-effort; sync above is the source of truth) --------
+  if (product.product_type === 'venue' && metadataVenueId) {
+    const syncedSubId = (data && typeof data === 'object' && 'subscription_id' in data)
+      ? (data as { subscription_id: string }).subscription_id
+      : null;
+    if (syncedSubId) {
+      const { error: linkErr } = await sb.from('trivia_venues')
+        .update({ subscription_id: syncedSubId })
+        .eq('id', metadataVenueId)
+        .eq('owner_bee_id', beeId);
+      if (linkErr) {
+        console.error('stripe-subscription-webhook venue link failed', {
+          event_id: event.id, venue_id: metadataVenueId, message: linkErr.message,
+        });
+      }
+    }
   }
 
   await sb.from('stripe_events')

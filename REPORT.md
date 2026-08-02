@@ -5,6 +5,2329 @@ Newest pass first.
 
 ---
 
+## OPS53 - BUILT. AtlasORACLE 12/20 now reads as itself and sorts first; claimed rows show elapsed.
+
+Lane `ops`. Workdir `TheMANUAL.tech`. Scope `ops`. Effort: focused.
+Both halves done in one file. **But the diagnosis in the dispatch was wrong**, and the difference
+matters: the oracle section was never missing. It was rendering as `ORACLE`, in alphabetical order,
+**below 37 games+ops rows** - so it was invisible by scroll position, not by omission. Fixing what
+was actually broken took a label map and a sort, not a new section.
+
+### W-1 - WHO OWNS THE NEXT MOVE, AND WHAT IT IS
+
+**Owner: BUTCH.** Same two steps as OPS51: look at **http://localhost:3000/mc** (the other
+terminal's dev server is still up) and then commit + push, since `/mc` on themanual.tech is the
+Railway build. **AtlasORACLE is now the first section under the queue panel.**
+
+**Second, and it is a decision not a chore: the board says 12/20, your dispatch said 10/20.** Neither
+number is wrong - they come from two different definitions of "done" that currently disagree on 7 of
+the 20 oracle rows (section 2). I rendered oracle **exactly like games and ops** rather than
+special-casing it, because the dispatch asked for "the exact same rendering as GAMES" and a board
+where one astra counts done differently from its neighbours is worse than either number alone. If
+you want the status column to be authoritative, that is a data fix (update the stale rows), not a
+render fix, and it is one dispatch.
+
+### 1. THE ACTUAL DIAGNOSIS - measured before writing any code
+
+The dispatch says the page "never renders astra='oracle'". The source says otherwise, at HEAD,
+before this pass:
+
+```
+$ git show HEAD:src/pages/MissionControlPage.tsx | grep -n "byAstra\|label={astra}"
+ 94:  const byAstra = useMemo(() => {          # groups whatever the query returns
+152:  {byAstra.map(([astra, rows]) => {        # renders EVERY astra, no filter
+157:                 label={astra} />          # label is the raw key
+```
+
+And the view was already serving the rows:
+
+```
+== what the PAGE sees (ops_build_progress) ==      == what the TABLE holds (ops_build_steps) ==
+ astra  | rows | done                                astra  | rows | status_done | with_pass
+--------+------+------                              --------+------+-------------+-----------
+ games  |   30 |   16                                games  |   30 |           0 |        18
+ ops    |    7 |    3                                ops    |    7 |           0 |         5
+ oracle |   20 |   12                                oracle |   20 |          10 |         9
+```
+
+So oracle rendered - as a section headed `ORACLE` (the `ProgressBar` label carries a Tailwind
+`uppercase` class, so the lowercase key already printed in caps), sorted alphabetically **last**,
+after 30 games rows and 7 ops rows. That is the whole bug: **you had to scroll past 37 checklist
+items to reach it.** No section was missing and no query needed changing.
+
+I am spelling this out rather than quietly building a "new" section, because a report claiming I
+added something that already existed would be false, and because the same misreading will recur if
+the board keeps printing raw lowercase keys.
+
+### 2. THE TWO DEFINITIONS OF DONE - 7 rows disagree, in BOTH directions
+
+The dispatch says "the oracle rows carry status-column truth". **Verified, and it does not hold.**
+`ops_build_progress` derives status per row:
+
+```sql
+CASE WHEN s.dispatch_pass IS NULL          THEN s.status        -- no rail link: trust the column
+     WHEN r.first_report_at IS NOT NULL    THEN 'done'          -- a report exists: it happened
+     WHEN q.asked_at IS NOT NULL           THEN 'blocked'       -- a -Q was filed
+     WHEN d.status = 'claimed'             THEN 'in_progress'
+     ... END AS derived_status
+```
+
+Row by row, `status` column vs `derived_status`, for astra='oracle':
+
+```
+ phase                | step                                          | status_col  | derived     | pass
+----------------------+-----------------------------------------------+-------------+-------------+-------
+ 1 Runtime — live     | First non-Anthropic provider live (Groq)       | not_started | done        | OPS21
+ 2 Token economy      | Purchase flow — checkout + credit webhook      | done        | blocked     | OPS35
+ 3 Provider matrix    | Music + audio provider matrix                  | not_started | done        | DOCS9
+ 3 Provider matrix    | AI persona stack + likeness rights             | not_started | done        | DOCS10
+ 4 Live hazards       | Rate-selection semantics proof                 | done        | blocked     | OPS37
+ 4 Live hazards       | Provider-pool truth (lists unwired models)     | not_started | blocked     | OPS37
+ 5 Autonomy           | Heartbeat enable-gate 1 — claim-only wrapper   | not_started | done        | OPS36
+                                                                       (7 disagreeing rows of 20)
+```
+
+**Five of the seven go the dispatch's way against it:** the status column says `not_started` for work
+the rail proves was reported and closed (OPS21, DOCS9, DOCS10, OPS36). The column is stale - nobody
+hand-updates it after a pass lands.
+
+**Two go the other way, and they are the interesting ones.** OPS35 and OPS37 filed `-Q` questions and
+**never filed a final report**, so the view marks them `blocked` while the column says `done`. For
+OPS37 the view is right and the column is wrong - REPORT.md's own OPS37 section is titled *"3 of 4
+done. Step 1 BLOCKED on a credential I must not hold."*
+
+**A real defect I am flagging, not fixing:** that `-Q` branch has no expiry. A pass that asks a
+question, gets an answer, and finishes clean still shows `blocked` forever, because the CASE checks
+`q.asked_at IS NOT NULL` and nothing ever clears it. **This will hit OPS52 immediately** - I filed
+`OPS52-Q`, you answered by closing the dispatch, and any build step pointing at OPS52 will now read
+blocked in perpetuity. The fix is one clause (a `-Q` should only block while no final report exists
+for the base pass), and it belongs in a `db`-lane dispatch against the view, not in a page render.
+
+### 3. WHAT WAS BUILT
+
+One file again: `src/pages/MissionControlPage.tsx`. No query changed except adding one column.
+
+**(a) Astra display names.** `ASTRA_LABEL` maps `oracle -> AtlasORACLE`, `games -> Games`,
+`ops -> Ops`, falling back to the raw key for anything new. `AtlasORACLE` is the brand spelling from
+root CLAUDE.md; the ProgressBar's `uppercase` class renders it **ATLASORACLE**.
+
+**(b) Explicit section order.** `ASTRA_ORDER` puts `oracle` at 0, `games` 1, `ops` 2, everything
+unlisted at 50 then alphabetical. The astra under active build is no longer buried.
+
+**(c) Elapsed on claimed dispatch rows.** `claimed_at` added to the queue `select`; `elapsedSince()`
+renders `just claimed` / `claimed 12m ago` / `claimed 3h 20m ago` / `claimed 2d 4h ago`. Shown
+**only while status is `claimed`** - on a closed pass it would be the age of a finished row, which
+means nothing.
+
+**(d) The pulse.** The `▶` mark on a claimed row gets `animate-pulse-slow`, the 3s pulse already
+defined in `tailwind.config.ts:57` and already used by this page's loading spinner. Existing
+vocabulary, no new animation.
+
+**(e) A clock, deliberately not a refresh.** `elapsed` computed once at mount would rot on a page
+left open all night, so a 60-second `setInterval` updates a `now` timestamp and nothing else. **It
+issues no queries** - the read posture from OPS51 is unchanged, and the rest of the board still
+loads once.
+
+**No percentage bar for a pass.** The dispatch ruled it out as fake precision and I agree - elapsed
+is a measurement, "47% through OPS53" would be a guess wearing a progress bar.
+
+### 4. THE RENDER - from the live rows it will draw
+
+Same limit as OPS51, stated the same way: `/mc` needs a signed-in admin Bee and the only admin is
+`@butch`, whose credentials I may not hold. **This is not a screenshot.** It is the page's own
+queries run against production, laid out the way the components lay them out:
+
+```
+DISPATCH QUEUE                                          1 claimed · 0 queued
+───────────────────────────────────────────────────────────────────────────
+ ▶(pulsing) OPS53 · ops OPS53 - EFFORT: focused - MC page: add an ATLASORACL…
+            claimed · p16 · CLAUDE 2 · Aug 2, 01:51 · claimed 5m ago
+            ^^^^^^^^ new this pass ──────────────────────────────┘
+
+     LAST 5 DONE
+ ✓   OPS51 · ops  OPS51 - EFFORT: focused - Mission Control: ADD THE DISPAT…
+ ✓   OPS50b · ops OPS50b - RE-STAMP per OPS50-Q W-1: APPLY the two proven b…
+ ...
+
+ATLASORACLE                                              12/20 steps · 60%     <- FIRST now
+████████████████████████░░░░░░░░░░░░░░░░
+  PHASE 1 · Runtime — live          3/3   ✓ ✓ ✓
+  PHASE 2 · Token economy           3/5   ✓ ✓ ⏸ ✓ ☐
+  PHASE 3 · Provider matrix         3/5   ✓ ✓ ✓ ☐ ☐
+  PHASE 4 · Live hazards            0/2   ⏸ ⏸
+  PHASE 5 · Autonomy                3/5   ✓ ✓ ✓ ☐ ☐
+
+GAMES                                                    16/30 steps · 53%     <- unchanged
+OPS                                                       3/7 steps · 43%
+```
+
+`GAMES unchanged` from the DONE-TEST holds literally: its rows, marks, counts and phase grouping are
+untouched. The only thing that moved is its position (second) and its label case.
+
+### 5. VERIFICATION
+
+```
+$ npx tsc --noEmit -p tsconfig.json
+TSC_EXIT=0
+
+$ GET http://localhost:3000/src/pages/MissionControlPage.tsx      # live Vite transform
+status 200   bytes 70528
+  AtlasORACLE        -> true
+  astraRank          -> true
+  elapsedSince       -> true
+  animate-pulse-slow -> true
+  claimed_at         -> true
+  just claimed       -> true
+
+$ grep -n "pulse-slow" tailwind.config.ts
+57:        'pulse-slow': 'pulse 3s ease-in-out infinite',      # the class exists; not invented
+```
+
+**Biome: 2 errors, and the count is unchanged from before this pass.** Measured, not asserted -
+`biome check` on the working file and on `git show HEAD:` both report exactly 2 (organizeImports +
+format, both pre-dating OPS51). My additions introduce none.
+
+**I did NOT run `npm run build`** - another terminal still owns port 3000 and stopping its dev server
+is not my call. So a production build has still not been run against `/mc`; `tsc --noEmit` plus the
+live Vite transform is the substitute, and I am flagging the gap rather than implying coverage.
+
+### 6. WHAT THIS PASS CHANGED
+
+- **One source file**, `src/pages/MissionControlPage.tsx` (label map, sort, elapsed, pulse, clock).
+- **No database change of any kind** - no view edit, no data fix, no policy, no row. The 7 disagreeing
+  rows and the `-Q`-blocks-forever defect are reported, not touched.
+- No deploy, no build, no git operation, no secrets read.
+
+### 7. COULD NOT VERIFY
+
+- **A signed-in screenshot** - admin credential wall, unchanged from OPS51. Section 4 is the page's
+  queries, not a picture. One click settles it.
+- **A full `npm run build`.**
+- **The elapsed string past the first minute** - `claimed 5m ago` is real (computed from
+  `claimed_at 2026-08-02 01:51:28`), but the 60s tick advancing it, and the hour/day branches, are
+  verified by reading the function, not by watching a screen for an hour.
+- **Which "done" is correct per row** - I measured the disagreement exactly and named the cause; I
+  did not adjudicate 7 rows of build history on my own authority.
+
+---
+
+## OPS51 - BUILT. /mc now renders the dispatch queue. Admin-gated; no RLS was loosened.
+
+Lane `ops`. Workdir `TheMANUAL.tech`. Scope `ops`. Effort: focused.
+The "Dispatch queue" panel exists on `/mc`, above the build-progress board. It reads
+`ops_dispatches` directly, shows queued + claimed ordered claimed-first then by priority, and
+carries the last 5 done underneath. Type-check clean, and the module compiles under the live Vite
+dev server with the panel present in the transformed output.
+
+### W-1 - WHO OWNS THE NEXT MOVE, AND WHAT IT IS
+
+**Owner: BUTCH, two steps.**
+
+1. **Look at it now, locally** - a Vite dev server for this repo is already running on
+   **http://localhost:3000/mc** (started by another terminal, not by me). Sign in as `@butch` and
+   the panel is the first thing under the header. That is the DONE-TEST, and it is one click.
+2. **Commit + push** - `/mc` on themanual.tech is served by the Railway build, so the panel does not
+   reach the live domain until the push. Nothing else in this pass is gated on that.
+
+**One correction to the dispatch's premise, and it changed the design:** the dispatch says
+"same auth posture as the rest of /mc (public page = anon read)". **`/mc` is not a public page.** It
+is admin-only, enforced in the database by `is_platform_admin()` RLS (migration
+`20260731040000_ops_rail_admin_read_v1.sql`), and the page says so in its own header comment. I took
+the dispatch's own fallback - panel in the authed view, RLS untouched - after proving the anon case
+live rather than reasoning about it.
+
+### 1. THE ACCESS QUESTION, ANSWERED WITH A LIVE QUERY (dispatch requirement)
+
+```sql
+SET LOCAL request.jwt.claims = '{"role":"anon"}';
+SET LOCAL ROLE anon;
+SELECT count(*) FROM public.ops_dispatches;
+ERROR:  permission denied for table ops_dispatches
+HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.ops_dispatches TO anon;
+```
+
+Not an RLS filter returning zero rows - `anon` has **no table grant at all**. The policy layer agrees:
+
+```
+    tablename    |         policyname         |  cmd   |      roles      |        qual
+-----------------+----------------------------+--------+-----------------+---------------------
+ ops_build_steps | ops_build_steps_admin_read | SELECT | {authenticated} | is_platform_admin()
+ ops_dispatches  | ops_dispatches_admin_read  | SELECT | {authenticated} | is_platform_admin()
+ ops_reports     | ops_reports_admin_read     | SELECT | {authenticated} | is_platform_admin()
+
+ table grants: ops_dispatches -> authenticated SELECT only (no anon row)
+```
+
+And the authenticated-admin path works, so the panel will actually have data:
+
+```sql
+SET LOCAL request.jwt.claims = '{"role":"authenticated","sub":"ab696a36-...-eb46d3b4e9c6"}';  -- @butch
+SET LOCAL ROLE authenticated;
+SELECT count(*) FROM public.ops_dispatches;   -->  132
+```
+
+**I did not loosen anything.** The dispatch said not to, and the standing condition in the page's own
+header - "wide is safe BECAUSE the admin set is one person" - is exactly the thing an anon grant
+would break. `SELECT id, handle, is_admin FROM bees WHERE is_admin` returns one row: `butch`.
+
+### 2. WHAT WAS BUILT
+
+One file: `src/pages/MissionControlPage.tsx` (+150 lines, no other file touched).
+
+- **`interface Dispatch`** - id, pass, title, status, lane, priority, after_pass, claimed_by, created_at.
+- **One `useEffect`, gated on `isAdmin`**, issuing two reads. Two rather than one deliberately: the
+  live queue sorts by urgency (claimed, then priority) and the finished tail by recency. One query
+  would mean pulling all 132 rows to the browser and sorting client-side to show five.
+- **`DispatchQueue`** - section with a header line matching the board's `ProgressBar` label style,
+  a live `N claimed · N queued` counter, its own error box, and a table.
+- **`DispatchRow`** - `▶`/`☐`/`✓` mark, then `PASS · lane title(<=70 chars, ellipsised)`, with a
+  dim second line: `status · pN · waits on X · CLAIMED_BY · Mon D, HH:MM`. `after_pass` renders as
+  **"waits on OPS50"**, as asked.
+- Placed **above** the build board: `ops_build_steps` is the plan, `ops_dispatches` is what is
+  moving right now, and the moving thing is what was invisible.
+
+**Empty-state honesty**, following the lesson already written into this file (OPS43): a failed read
+and an empty queue are rendered differently. `queue === null` -> "Reading the queue…"; a read error
+-> an amber "Queue read failed: <message>" box; genuinely empty -> *"Queue empty — nothing queued or
+claimed. That is a real empty queue, not a failed read."* This matters today, because the queue
+**is** empty apart from this pass.
+
+**Refresh:** on load only. The dispatch said "auto-refresh with the page's existing pattern if one
+exists; otherwise on load is fine" - the page has no polling of any kind, so I added none rather
+than inventing a cadence for a calm read-only screen.
+
+### 3. THE RENDER - described, from the live rows it will draw
+
+I cannot screenshot the panel: `/mc` requires a signed-in admin Bee, and the only admin is `@butch`
+whose credentials the Secrets rule forbids me to hold. **So this is not a screenshot and I am not
+calling it one.** It is the panel's own two queries run against production, formatted the way the
+component formats them:
+
+```
+DISPATCH QUEUE                                          1 claimed · 0 queued
+───────────────────────────────────────────────────────────────────────────
+ ▶   OPS51 · ops OPS51 - EFFORT: focused - Mission Control: ADD THE DISPATCH…
+     claimed · p15 · waits on OPS50 · CLAUDE 2 · Aug 1, 19:22
+
+     LAST 5 DONE
+ ✓   OPS50b · ops OPS50b - RE-STAMP per OPS50-Q W-1: APPLY the two proven bi…
+     done · p13 · CLAUDE 2 · Aug 1, 21:56
+ ✓   OPS52 · ops OPS52 - F-1 LIVE MONEY DEFECT: F6 stripe-subscription-webho…
+     done · p14 · waits on OPS50b · CLAUDE 2 · Aug 1, 21:56
+ ✓   OPS49d · ops OPS49d - EFFORT: focused - DEPLOY the route edit: wire atl…
+     done · p12 · CLAUDE 2 · Aug 1, 19:34
+ ✓   OPS49b · ops OPS49b - RE-STAMP: apply oracle_debit_tokens RPC (OPS49 bu…
+     done · p10 · Aug 1, 17:11
+ ✓   OPS49c · ops OPS49c - FIX the expiry-blind oracle_token_balances view (…
+     done · p11 · waits on OPS49b · Aug 1, 17:11
+```
+
+The single claimed row is this dispatch, holding itself open while it renders itself - which is as
+good a live proof as the panel can give without a login. Note `OPS52` shows **done**: the lead closed
+it after reading `OPS52-Q`, so that question is answered.
+
+### 4. VERIFICATION
+
+```
+$ npx tsc --noEmit -p tsconfig.json
+TSC_EXIT=0                       # clean, strict + noUnusedLocals + noUnusedParameters
+```
+
+**Compiled by the real bundler, not just the type-checker.** A Vite dev server for this repo is live
+on :3000 (title "The Manual", `/@vite/client` present, serves `src/main.tsx`), so I asked it to
+transform the edited module and inspected what came back:
+
+```
+GET http://localhost:3000/src/pages/MissionControlPage.tsx
+status 200   bytes 63262
+  DispatchQueue   -> true
+  DispatchRow     -> true
+  ops_dispatches  -> true
+  Dispatch queue  -> true
+  waits on        -> true
+  LAST            -> true
+```
+
+A 200 from Vite's transform pipeline means the TSX parsed and compiled; a syntax or resolution error
+returns 500 with an error payload. The panel is in the output.
+
+**I did NOT run `npm run build`.** That dev server belongs to another terminal, the standing rule
+here is not to build while dev serves, and stopping someone else's server is not my call. `tsc
+--noEmit` plus the live Vite transform is the honest substitute, and I am flagging that a full
+production build has not been run against this change.
+
+**Biome:** `npx biome check src/pages/MissionControlPage.tsx` reports 2 errors - `organizeImports`
+and `format`. **Both are pre-existing and neither is mine.** Verified rather than assumed by running
+biome against `git show HEAD:src/pages/MissionControlPage.tsx`: same 2 errors, before my change. They
+cite the file's import block, the existing `MARK` object, and the existing `ProgressBar` JSX. Running
+`--write` would reformat the whole file and bury a 150-line feature in a whole-file diff, so I
+matched the surrounding style instead and left the pre-existing violations alone. Worth its own
+cleanup pass; not this one.
+
+### 5. HOUSEKEEPING INHERITED FROM OPS52 - both items already satisfied
+
+**(1) The stale F6 repo copy is already refreshed.** I did it in OPS52, with exactly the command this
+dispatch names:
+
+```
+$ supabase functions download stripe-subscription-webhook --project-ref anxmqiehpyznifqgskzc \
+    --workdir "C:/Users/Butch/Documents/HONEYCOMB/TheMANUAL.tech"
+```
+
+`supabase/functions/stripe-subscription-webhook/index.ts` now matches deployed v16 (the `parent.
+subscription_details` / `periodEndOf` / `'venue'` markers are all present) and `deno check` is clean.
+The landmine is defused. **Carried warning from OPS52 §4:** that download also rewrote
+`_shared/ids.ts` with the older copy baked into the v16 bundle, deleting `refFor()`; I restored it
+by hand and `git diff` on that file is empty. Anyone repeating this command must re-check
+`_shared/`.
+
+**(2) The two migration files are present and non-empty** - written in OPS50b §8 from
+`schema_migrations.statements[1]`:
+
+```
+ 1298  supabase/migrations/20260801200948_oracle_token_balances_column_comments.sql
+ 1159  supabase/migrations/20260801212011_oracle_token_balances_invoker_and_grant.sql
+```
+
+**Deviation, stated:** I still have not run the blanket `supabase migration fetch`. Remote history
+holds 646 versions against 285 local files, so it would write ~469 files in one unreviewable sweep.
+The named files were the point and they are there.
+
+### 6. EVERYTHING WRITTEN THIS SESSION - Butch commits
+
+```
+ M REPORT.md                                                    (this + OPS52, OPS50b, OPS49d)
+ M src/pages/MissionControlPage.tsx                             (OPS51 - the queue panel)
+ M supabase/functions/stripe-subscription-webhook/index.ts      (OPS52 - repo synced to deployed v16)
+ M deno.lock                                                    (touched by deno check)
+?? supabase/functions/oracle-checkout/index.ts                  (OPS50, another terminal)
+?? supabase/functions/oracle-webhook/index.ts                   (OPS50, another terminal)
+?? supabase/migrations/20260801154515_bees_anon_column_narrowing_step1.sql
+?? supabase/migrations/20260801164907_oracle_token_ledger_add_expires_at.sql
+?? supabase/migrations/20260801164922_subscriptions_tier_widen_oracle_scout_sovereign.sql
+?? supabase/migrations/20260801193328_oracle_token_balances_expiry_aware.sql
+?? supabase/migrations/20260801200948_oracle_token_balances_column_comments.sql
+?? supabase/migrations/20260801212011_oracle_token_balances_invoker_and_grant.sql
+?? supabase/migrations/20260801220000_oracle_token_packs_and_purchase.sql   (APPLIED to prod, OPS50b)
+?? supabase/migrations/20260801220100_oracle_token_plans_grant_refund.sql   (APPLIED to prod, OPS50b)
+```
+
+`_drafts/` retains only `20260801130000_db14_narrow_bees_column_exposure.sql`, per the OPS49d ruling.
+
+### 7. WHAT THIS PASS CHANGED
+
+- **One source file.** No database change of any kind - not a policy, not a grant, not a row.
+- No deploy, no build, no git operation, no secrets read.
+- The panel reaches themanual.tech only when Butch commits and pushes.
+
+### 8. COULD NOT VERIFY
+
+- **A signed-in screenshot of the panel** - needs `@butch`'s credentials, which I may not hold.
+  Section 3 is the panel's own queries against production, not a picture. Butch settles it in one
+  click at localhost:3000/mc.
+- **A full `npm run build`** - not run, because another terminal's dev server owns :3000.
+- **The panel against a genuinely busy queue** - there is exactly 1 non-done dispatch right now, so
+  the claimed-above-queued sort is proven by construction and by the sort's unit logic, not by a
+  screen with ten rows on it.
+- **Auto-refresh behaviour** - none was added, so there is nothing to verify; a stale panel needs a
+  browser reload and that is by design this pass.
+
+---
+
+## OPS52 - QUESTION FILED. The premise is wrong: LIVE F6 IS ALREADY FIXED. The REPO is what is stale.
+
+Lane `ops`. Workdir `TheMANUAL.tech`. Scope `stripe`. **Nothing deployed. Dispatch left `claimed`.**
+Verify-first, as the dispatch asked - and verifying is what stopped this pass. The deployed
+`stripe-subscription-webhook` **v16 already reads the basil+ field locations**. The file in the repo
+is an older lineage that never reached production. **Deploying it, as instructed, would have
+REGRESSED a working live money path.**
+
+### W-1 - WHO OWNS THE NEXT MOVE, AND WHAT IT IS
+
+**Owner: LEAD.** One decision: **confirm that OPS52 needs no deploy and re-scope or close it.**
+
+The F-1 defect OPS50 reported is real *as a description of the repo file* and **not real in
+production**. I did the one safe half - the repo file now matches deployed source byte for byte and
+type-checks clean - and stopped before the deploy. What is left is a judgement call about a money
+path that is not mine to make: confirming the live handler is correct is a claim I can support with
+evidence (below), but retiring a dispatch that names a live money defect should be the lead's call.
+
+**If you want a deploy anyway, say so explicitly** - but note the deployed bundle is currently ahead
+of the repo on `_shared/ids.ts` in the other direction (see section 5), so a redeploy from the repo
+would ship a *different* shared file than production runs today. That is a second reason not to
+casually push.
+
+### 1. THE EVIDENCE - deployed v16 vs the repo file
+
+`stripe-subscription-webhook`, slug id `2f65b7fb-03c3-45da-812e-48bc1983f51c`, **version 16**,
+`ezbr_sha256 5bf9f92baf556620deba757e45efebb79ac93add9f3f51b4e714694d4dffe846`,
+`updated_at` 1783693438001 (2026-07-10, matching its own VENUE comment). Fetched from the live
+project, not inferred.
+
+**What the DEPLOYED function does (the three fields the dispatch says are broken):**
+
+```ts
+// dahlia: subscription id sits under parent.subscription_details; legacy fallback.
+subscriptionId =
+  obj?.parent?.subscription_details?.subscription ?? obj?.subscription ?? null;
+
+// dahlia: period end lives on the first subscription item; fall back to the
+// legacy top-level field for safety across versions.
+function periodEndOf(sub: any): string | null {
+  const item = sub?.items?.data?.[0];
+  return unixToIso(item?.current_period_end ?? sub?.current_period_end);
+}
+
+// invoice.paid: retrieve the subscription, read product/tier/status/period off it
+sub = await stripe.subscriptions.retrieve(subscriptionId);
+product = await resolveProduct(stripe, sub?.items?.data?.[0]?.price);
+```
+
+Its own header states the reasoning:
+
+> `// API SHAPE: account is on 2026-03-25.dahlia (basil+). Two fields moved, so we`
+> `// read the new locations (with fallbacks to the legacy ones)`
+
+**What the REPO file did (before this pass):**
+
+```ts
+const line = obj?.lines?.data?.[0];
+product = productFromPrice(line?.price);      // basil: line.price no longer exists
+subscriptionId = obj?.subscription ?? null;    // basil: moved to parent.subscription_details
+periodEnd = unixToIso(line?.period?.end);
+...
+periodEnd = unixToIso(obj?.current_period_end); // basil: moved onto items
+```
+
+The repo copy has **one** commit touching it - `6d34085 "Stripe Rail"` - and carries no `parent`,
+no `periodEndOf`, no `resolveProduct`, and no `'venue'` product type. The deployed function has all
+four. The venue work (2026-07-10) was deployed and never landed in git.
+
+### 2. THE REFERENCE, QUOTED PER FIELD (dispatch requirement)
+
+The account's client pin is `apiVersion: '2026-03-25.dahlia'` in `supabase/functions/_shared/stripe.ts`.
+I checked dahlia first and then basil, because the moves originate in basil and carry forward.
+
+**2026-03-25.dahlia** - [changelog](https://docs.stripe.com/changelog/dahlia). Its breaking changes
+are Checkout Session UI mode enums, Capabilities risk requirements, Address Element formatting,
+`elements.update()` returning a Promise, `options.layout.radios` booleans, deprecated Stripe.js
+methods, Checkout init renames, Issuing Token Visa reference, a Subscriptions retention-policy
+cancellation reason, and the `events_from` parameter. **None touches Invoice `parent`, invoice line
+`pricing`, subscription-item periods, or the `invoice.paid` / `customer.subscription.*` payload
+shapes.** So basil's rules are the operative ones.
+
+**Field 1 - `invoice.subscription`.**
+[basil / adds-new-parent-field-to-invoicing-objects](https://docs.stripe.com/changelog/basil/2025-03-31/adds-new-parent-field-to-invoicing-objects):
+replaced by **`invoice.parent.subscription_details.subscription`**, valid when
+`invoice.parent.type` is `subscription_details`:
+
+```json
+{ "parent": { "type": "subscription_details",
+              "subscription_details": { "subscription": "sub_1234567890" } } }
+```
+
+Deployed code reads exactly that path. ✔
+
+**Field 2 - invoice line item `price`.**
+[basil / invoice-pricing-configurations](https://docs.stripe.com/changelog/basil/2025-03-31/invoice-pricing-configurations):
+the top-level `price` field on Invoice Line Items is **replaced by `pricing`**; use
+`invoice_line_item.pricing.price_details.price`, valid when `pricing.type` is `price_details`. The
+[invoice line item reference](https://docs.stripe.com/api/invoice-line-item/object) confirms
+`pricing.price_details.price` is **a string id, expandable** - not an embedded Price object - and
+`pricing.price_details.product` is a string id that is **not** expandable. There is **no top-level
+`price` field**; `period.start` / `period.end` **do** still exist.
+
+This is the sharpest point: the old repo code called `productFromPrice(line?.price)` and read
+`price.metadata`. Under basil+ that is `undefined.metadata` - the metadata is *not in the payload at
+all*, so no amount of re-pathing inside the event object fixes it. Deployed v16 sidesteps it
+correctly by retrieving the subscription and reading the **subscription item's** price. The
+[subscription item reference](https://docs.stripe.com/api/subscription_items/object) confirms
+SubscriptionItem **still carries the full `price` object including `metadata`** - it was *not*
+converted to `pricing` - so that read is valid. ✔
+
+**Field 3 - `subscription.current_period_end`.**
+[basil / deprecate-subscription-current-period-start-and-end](https://docs.stripe.com/changelog/basil/2025-03-31/deprecate-subscription-current-period-start-and-end):
+`current_period_start` / `current_period_end` are **removed from Subscription and added to
+SubscriptionItem** - `subscription.items.data[].current_period_end`. Deployed `periodEndOf()` reads
+`items.data[0].current_period_end` with a legacy fallback. ✔
+
+**W-9 idempotency survives** in the deployed code, unchanged: `stripe_events.event_id` upsert with
+`ignoreDuplicates`, a `status='processed'` short-circuit, and `invoiceRef(invoice.id)` still fed to
+`subscription_sync` as `p_invoice_ref`. Nothing in this pass touched it.
+
+### 3. WHAT I DID DO - repo synced to production, no deploy
+
+```
+$ supabase functions download stripe-subscription-webhook --project-ref anxmqiehpyznifqgskzc \
+    --workdir "C:/Users/Butch/Documents/HONEYCOMB/TheMANUAL.tech"
+Downloaded Function stripe-subscription-webhook from project anxmqiehpyznifqgskzc.
+
+$ deno check supabase/functions/stripe-subscription-webhook/index.ts
+Check supabase/functions/stripe-subscription-webhook/index.ts     # clean
+
+$ git diff --stat -- supabase/functions/stripe-subscription-webhook/index.ts
+ 1 file changed, 110 insertions(+), 50 deletions(-)
+```
+
+The repo file is now the source production actually runs, recovered into version control where the
+venue work should have been all along. **This changes no live state** - `download` is a read; the
+function is still v16 and I did not call `deploy`. Butch commits.
+
+### 4. A MISTAKE I MADE AND CORRECTED - `_shared/ids.ts`
+
+`functions download` writes the whole deployed bundle, so it also overwrote `supabase/functions/_shared/ids.ts`
+with the copy baked into the v16 bundle - which is **older** than the repo's and silently deleted
+`refFor()`:
+
+```diff
+-export async function refFor(kind: string, id: string | number): Promise<string> {
+-  const data = new TextEncoder().encode(`${kind}:${id}`);
+-  return await v5.generate(HONEYCOMB_NS, data);
+-}
+```
+
+`refFor` is used elsewhere for `record_drop`/`record_drip` `source_ref` dedup, so losing it would
+have been a real regression in a shared file. I restored it by hand - `git checkout` / `git restore`
+are denied at this root, so reverting via git was not available to me - and verified the result:
+
+```
+$ git diff --stat -- supabase/functions/_shared/ids.ts
+(empty)          # byte-identical to HEAD
+```
+
+`git status` now shows only `stripe-subscription-webhook/index.ts` modified. **I should have expected
+a whole-bundle write and did not.** Stating it because a silent shared-file regression is exactly
+the class of thing that produced this dispatch in the first place.
+
+### 5. THE ROOT CAUSE, AND WHY IT WILL RECUR - edge-function drift
+
+The defect OPS50 found is not a Stripe defect. It is **repo/production drift**, measured:
+
+```
+DEPLOYED with NO repo folder:  venue-checkout, livekit-token, push-send
+REPO with NO deployed function: atlasoracle-log, atlasoracle-providers, bling-send, check-keyholder
+UNTRACKED locally, deployed today: oracle-webhook (v1), oracle-checkout (v1)
+SHARED FILE where the bundle is BEHIND the repo: _shared/ids.ts (missing refFor)
+```
+
+18 functions are deployed. Three have no source in the repo at all, and at least one repo copy
+(this one) was 110 lines behind production. **Any audit that reads the repo and concludes something
+about production is unsound right now** - which is precisely what happened here, and it cost a
+dispatch that nearly shipped a regression to the memberships/venue money path.
+
+Worth its own dispatch: pull all 18 deployed sources, diff against the repo, and reconcile. Cheap,
+read-only, and it retires a whole category of false findings.
+
+### 6. `oracle-webhook` - the other basil consumer, checked while here
+
+Deployed today (v1) and **already correct**; its header is explicit and its reads match the
+references above:
+
+```
+// pricing.price_details.price (a STRING id), not an expanded price object; the
+// current_period_end moved onto subscription ITEMS. Every read below uses the [new locations]
+subscriptionId = (typeof sd?.subscription === 'string' ? sd.subscription : null)
+  ?? (typeof obj?.subscription === 'string' ? obj.subscription : null);
+periodEnd = unixToIso(obj?.items?.data?.[0]?.current_period_end) ?? unixToIso(obj?.current_period_end);
+```
+
+`press-stripe-webhook` and `press-checkout` do not read subscriptions or invoice lines - not affected.
+
+### 7. THE PROOF STEP CANNOT RUN AS WRITTEN - and why
+
+The dispatch says to fire a test-mode `invoice.paid` "(stripe trigger or dashboard resend on the
+existing test subscription)". Two blockers, both factual:
+
+1. **There is no existing test subscription event.** `public.stripe_events` is **empty** - zero rows,
+   any type, any api_version. So there is nothing to resend, and no stored payload from which to
+   read the account's actually-delivered `api_version` (the `2026-03-25.dahlia` figure above is the
+   **client pin in `_shared/stripe.ts`**, which is what our `retrieve` calls use - I could not
+   independently confirm the account's webhook delivery version from this side, and I am not
+   claiming to have).
+2. **`stripe trigger` needs Stripe credentials**, which the Secrets rule forbids me to hold or read.
+
+So even had a deploy been correct, the DONE-TEST's proof half was Butch-only. Same wall as the
+Stripe transport test in OPS50b section 11.
+
+### 8. HOUSEKEEPING - deviation, stated
+
+The lead asked for `supabase migration fetch` to pull `oracle_token_balances_column_comments` and
+`oracle_token_balances_invoker_and_grant`. **Both files are already in the repo** - I wrote them in
+OPS50b section 8, individually, from `schema_migrations.statements[1]`:
+
+```
+ supabase/migrations/20260801200948_oracle_token_balances_column_comments.sql      1298 bytes
+ supabase/migrations/20260801212011_oracle_token_balances_invoker_and_grant.sql    1159 bytes
+```
+
+**I did not run the blanket `migration fetch`**, deliberately: remote history holds 646 versions
+against 285 local files, so it would write ~469 files in one unreviewable sweep. The two named files
+were the point, and they are present and non-empty.
+
+### THE QUESTION
+
+**Does OPS52 close, or do you want something deployed anyway?**
+
+My reading: it closes. The live money path is correct, the reported defect exists only in a stale
+repo file, that file is now synced, and the useful follow-up is the drift-reconciliation dispatch in
+section 5 rather than any change to `stripe-subscription-webhook`.
+
+What I will NOT do without an explicit instruction: deploy the function. It is a live money path,
+the deploy would ship a `_shared/ids.ts` that differs from what production runs today, and the
+dispatch's justification for deploying rests on a premise I have shown to be false. Per R4 the
+dispatch stays `claimed` and I stop here.
+
+---
+
+## OPS50 - UNIFIED oracle-webhook + oracle-checkout DEPLOYED. Migrations BUILT, PROVEN, HELD at R7.
+
+Lane `ops`. Workdir `TheMANUAL.tech`. Scope `oracle`. Effort: deep. Runs after OPS49 (gate satisfied).
+
+**Both edge functions are LIVE at version 1 and answer exactly as designed. Both migrations are
+written, dry-run end-to-end against production inside a transaction that rolled back, and NOT
+applied** - the OPS50 dispatch names no migration file and states no rollback, which is the W-6
+defect verbatim. Nothing else in this pass is blocked by that hold.
+
+### W-1 - WHO OWNS THE NEXT MOVE, AND WHAT IT IS
+
+**Owner: LEAD.**
+
+**The single next action: re-stamp this pass as OPS50b naming these two files and stating their
+rollbacks, exactly as OPS49b did for OPS49.** Both files are written, ASCII-clean, and proven:
+
+```
+supabase/migrations/_drafts/20260801220000_oracle_token_packs_and_purchase.sql
+supabase/migrations/_drafts/20260801220100_oracle_token_plans_grant_refund.sql
+```
+
+Rollback for 20260801220000:
+```sql
+BEGIN;
+DROP FUNCTION IF EXISTS public.oracle_credit_token_purchase(uuid,text,text,integer,text);
+DROP TABLE IF EXISTS public.oracle_token_packs;
+DROP INDEX IF EXISTS public.oracle_token_ledger_one_adjustment_per_refund_uidx;
+DROP INDEX IF EXISTS public.oracle_token_ledger_one_purchase_per_payment_uidx;
+COMMIT;
+```
+
+Rollback for 20260801220100:
+```sql
+BEGIN;
+DROP FUNCTION IF EXISTS public.oracle_refund_token_purchase(text,text,numeric,text);
+DROP FUNCTION IF EXISTS public.oracle_grant_plan_tokens(uuid,text,text,timestamptz,integer);
+DROP INDEX IF EXISTS public.subscriptions_one_active_oracle_per_bee_uidx;
+DROP INDEX IF EXISTS public.oracle_token_ledger_one_grant_per_invoice_uidx;
+DROP TABLE IF EXISTS public.oracle_token_plans;
+COMMIT;
+```
+
+Both rollbacks are clean ONLY before the first real payment. Once Tokens have been credited,
+dropping the unique indexes removes the double-credit guard while credited rows remain - the ledger
+rows themselves are append-only and must never be deleted. After go-live the real rollback is:
+delete the Stripe webhook endpoint and `REVOKE EXECUTE` on the three RPCs. **The re-stamp must say
+which one it means.**
+
+**Second, and Butch's alone: the Stripe side cannot be done from a Code session.** Section 7. It
+needs the dashboard, and until it is done nothing can be tested with money.
+
+### 0. WHAT IS LIVE RIGHT NOW
+
+| Thing | State |
+|---|---|
+| `oracle-webhook` | **DEPLOYED, ACTIVE, version 1**, 2026-08-01 21:40:59Z, `verify_jwt=false` |
+| `oracle-checkout` | **DEPLOYED, ACTIVE, version 1**, 2026-08-01 21:41:08Z, `verify_jwt=true` |
+| `20260801220000` packs + purchase RPC | written, dry-run PASSED, **NOT applied** (R7 hold) |
+| `20260801220100` plans + grant + refund RPCs | written, dry-run PASSED, **NOT applied** (R7 hold) |
+| Stripe endpoint + `STRIPE_WEBHOOK_SECRET_ORACLE` | **does not exist.** Butch's, section 7 |
+| Stripe Price objects for plans | **deliberately none.** Section 3 - this is load-bearing |
+| `oracle_token_ledger` | **16 rows, unchanged.** Not one row written by this pass |
+| `subscriptions` | **1 row, unchanged** (venue / founding / canceled) |
+
+Local source, byte-exact, ASCII-clean:
+```
+oracle-checkout/index.ts   9398 bytes  0 non-ascii  sha256 a745a79d283e252762b1c8e3332b7aa7bf95c5f311b6bd3ede6426420d683523
+oracle-webhook/index.ts   16784 bytes  0 non-ascii  sha256 5194f9e526c77ee8e633fbb339c1c7e692c77b1b77ce6035fb4789abd3544a4b
+```
+
+**Deploy gate (DENO WARNING in the dispatch), satisfied first, before anything else ran:**
+```
+$ deno --version
+deno 2.9.4 (stable, release, x86_64-pc-windows-msvc)
+$ deno check supabase/functions/oracle-checkout/index.ts supabase/functions/oracle-webhook/index.ts
+Check supabase/functions/oracle-checkout/index.ts
+Check supabase/functions/oracle-webhook/index.ts
+```
+Zero diagnostics on either file.
+
+**Post-deploy verification (DEPLOY AMENDMENT), live against production:**
+```
+POST /functions/v1/oracle-webhook   (no auth, no signature)
+  -> 500 {"error":"Webhook secret not configured"}
+POST /functions/v1/oracle-checkout  (no auth)
+  -> 401 {"code":"UNAUTHORIZED_NO_AUTH_HEADER","message":"Missing authorization header"}
+```
+Those two responses ARE the verification. The webhook's body is **our JSON**, so the request reached
+our code - `verify_jwt=false` confirmed, and the 500 is the correct posture for a secret that has
+not been issued yet. The checkout's body is the **platform gateway's** error, never our code -
+`verify_jwt=true` confirmed. Neither function can do anything harmful in this state: the webhook
+refuses before it even verifies a signature, and the checkout cannot be reached without a Bee JWT.
+
+### 1. THE DISPATCH'S CENTRAL UNVERIFIED CLAIM - CONFIRMED, AND IT INVERTS ONE DELIVERABLE
+
+The dispatch asked for this first: *"VERIFY FIRST (OPS48 self-flag, unconfirmed): that Stripe inline
+price_data carries no metadata fields."*
+
+**Confirmed against the Stripe API reference.** `line_items[].price_data` accepts exactly:
+`currency`, `product`, `product_data`, `recurring`, `tax_behavior`, `unit_amount`,
+`unit_amount_decimal`. **There is no `metadata` field.** Only `product_data.metadata` exists, and
+that lands on the **Product**, not the **Price**. F6 reads `price.metadata`
+(`stripe-subscription-webhook/index.ts:45`). So an ad-hoc Price created from inline `price_data`
+is invisible to F6, and OPS48 s3b's isolation is **structural, not a happy accident**.
+
+**That confirmation inverts the dispatch's plan-Price deliverable, so I did not execute it as
+written.** The dispatch says: *"create Stripe subscription Prices for the three tiers WITH
+{product_type:'oracle', tier:...} metadata, so the webhook can route them and F6 does not."* The
+reasoning runs backwards. Price metadata is **precisely F6's routing key**, and F6 accepts oracle
+by name:
+
+```ts
+// stripe-subscription-webhook/index.ts:48
+if (pt !== 'membership' && pt !== 'oracle') return null;
+```
+
+Creating those Prices is what makes F6 process oracle events, not what stops it. The dispatch
+itself names the consequence and offers two ways out - deploy oracle-webhook first, or teach F6 to
+skip oracle. **I took the third, which is OPS48's accepted design and strictly safer than either:
+create no Stripe Price objects at all.**
+
+- Plans use inline `price_data` with `recurring: { interval: 'month' }` (verified supported in
+  `mode: 'subscription'`), so the Price carries no metadata and F6 stays inert **without deploying
+  F6 at all** - and F6 is the live membership and venue revenue path, which this pass has no
+  business touching.
+- Routing identity travels on `subscription_data.metadata`, which Stripe copies onto the
+  **Subscription** object at completion and snapshots onto **every invoice** it raises at
+  `invoice.parent.subscription_details.metadata`. Verified against the API reference. That is
+  strictly better than Price metadata: it carries `bee_id` too, which a Price never could.
+- **Sequencing, as the dispatch demanded it be stated: there is nothing to sequence.** The hazard
+  was "metadata-bearing Prices go live before oracle-webhook handles them". No such Price exists,
+  none is created by this design, and oracle-webhook is deployed anyway. The window never opens.
+
+The constraint is recorded where the next person will hit it - a 25-line header block in
+`oracle-checkout/index.ts` explaining why the obvious tidy-up (pre-create the Prices) is the one
+thing that breaks it.
+
+**Residual fragility, stated plainly:** this holds only while nobody creates an oracle Price with
+tier metadata. A one-line `product_type === 'oracle' -> ignore` filter in F6 would make it
+structural instead of conventional. **That is an F6 change and belongs to an F6 dispatch** - see
+section 6, where F6 turns out to need one anyway.
+
+### 2. WHAT SHIPPED - THE TWO FUNCTIONS
+
+**`oracle-checkout`** - one surface, two products, exactly OPS48 s2.
+
+```
+{ "pack_code": "plus" }        -> mode: 'payment'       one-time
+{ "plan_tier": "sovereign" }   -> mode: 'subscription'  monthly
+```
+
+Shared: JWT verify, server-side canon lookup (the client names a **pack or a plan, never an
+amount**), one Stripe customer reused across both SKUs, one success/cancel URL pair, one metadata
+convention. Branched: `mode`, `recurring` on `price_data`, and which canon table is read. That is
+the entire branch surface.
+
+**The OPS38 P1 idempotency gap is closed here, not deferred.** OPS48 s5b named it as a hard
+dependency: ledger indexes stop Stripe *replaying* a payment, but nothing stops a double-click
+*creating two Sessions* with two different `cs_` ids, both payable, both legal ledger rows.
+`oracle-checkout` now sends a Stripe `Idempotency-Key`:
+
+```
+oracle-checkout:<bee_id>:<pack|plan>:<sku>:<attempt nonce or 10-minute bucket>
+```
+
+A double-click returns the **same** Session. The caller may pin its own `attempt` nonce; the
+10-minute bucket is the default, chosen so it covers a double-click without freezing a Bee out of a
+deliberate second GET twenty minutes later. **This is the first of the three checkout functions in
+this repo to have one.**
+
+**`oracle-webhook`** - one endpoint, one signing secret, both event families plus refunds.
+
+| Event | Action |
+|---|---|
+| `checkout.session.completed` (mode=payment) | `oracle_credit_token_purchase` |
+| `checkout.session.completed` (mode=subscription) | **ack only** - the grant belongs to `invoice.paid` |
+| `invoice.paid` | `subscription_sync` then `oracle_grant_plan_tokens` |
+| `customer.subscription.created/updated/deleted` | `subscription_sync` only, **no token write** |
+| `charge.refunded` | `oracle_refund_token_purchase` |
+
+**The mode=subscription ack is not a stub, it is the design.** A plan's first payment fires *both*
+`checkout.session.completed` and `invoice.paid`. Granting on both would be two grants on two
+different idempotency keys - the one failure the ledger indexes cannot catch, because neither key
+is duplicated. One event owns the grant: the invoice.
+
+**The product filter is not optional and is the mirror of the F6 collision.** Stripe delivers every
+event of a subscribed type from the **whole account** to this endpoint - press flyer sessions,
+venue invoices, membership subscriptions. Every branch refuses anything whose metadata does not say
+`product_type='oracle'` and acks 200, because retrying something that will never be ours is a retry
+storm with no end state.
+
+### 3. THE STRIPE API VERSION FINDING - AND WHY IT CHANGED THE WEBHOOK
+
+`_shared/stripe.ts` pins `apiVersion: '2026-03-25.dahlia'` and its own comment says basil+ moved
+`current_period_end` onto items and the invoice-to-subscription link to `parent.subscription_details`.
+**I checked what that actually means for the payloads this webhook must read, and it is not cosmetic:**
+
+- The Invoice object has **no top-level `subscription`**. The link is
+  `invoice.parent.subscription_details.subscription`.
+- Invoice line items have **no `price` object**. They carry
+  `lines.data[].pricing.price_details.price` - a **string id**, not an object, so it has no
+  `.metadata` to read at all.
+- Subscription period end lives on `items.data[].current_period_end`.
+
+Every read in `oracle-webhook` uses the dahlia path first and falls back to the legacy path, so it
+is correct on either delivery version. **This is also the second, independent reason no oracle Price
+metadata could have worked**: even if a Price carried it, `invoice.lines.data[0].price` does not
+exist under this API version to read it from.
+
+### 4. DRY RUN - THE FULL FLOW, AGAINST PRODUCTION, ROLLED BACK
+
+The dispatch asks for the flow proven in Stripe TEST mode. **The Stripe half is impossible from
+here (section 7).** The database half is not, and it is where every money rule actually lives, so I
+proved all of it against the real production catalogue inside one transaction that ends in
+`ROLLBACK`.
+
+Both migration files were read off disk and **never retyped** - a Node generator strips each file's
+own `BEGIN;`/`COMMIT;` and **asserts it found exactly one of each**, which is the mechanical guard
+against a nested `COMMIT` ending the outer transaction (the OPS49 section-0 accident). It refuses to
+build the script if the count differs.
+
+```
+20260801220000_oracle_token_packs_and_purchase.sql  bytes=7454   non-ascii=0  BEGIN/COMMIT=1/1
+20260801220100_oracle_token_plans_grant_refund.sql  bytes=12504  non-ascii=0  BEGIN/COMMIT=1/1
+```
+
+Four fixture Bees were chosen **because they have no ledger rows**, so every number below was
+produced by the test and not by history.
+
+```
+################ 0. SEEDS ################
+ pack_code | usd_cents | tokens | tokens_per_usd        plan_tier | usd_cents | tokens_per_cycle | tokens_per_usd
+-----------+-----------+--------+---------------       -----------+-----------+------------------+---------------
+ starter   |       500 |   5000 |           1000        scout     |       900 |            10000 |           1111
+ regular   |      1000 |  11000 |           1100        oracle    |      2900 |            40000 |           1379
+ plus      |      2500 |  30000 |           1200        sovereign |      9900 |           150000 |           1515
+ pro       |      6000 |  78000 |           1300
+
+################ 1. PACK CREDIT, THEN REPLAY THE SAME SESSION ###########
+ {"tokens": 30000, "credited": true,  "duplicate": false, "ledger_id": "b3c2...", "pack_code": "plus"}
+ {                 "credited": false, "duplicate": true,  "ledger_id": "b3c2...", "payment_ref": "cs_test_OPS50_A"}
+ purchase_rows_for_that_session : 1
+```
+The replay returns **the same ledger_id** - it is reporting the row that already exists, not making
+one. `purchase_rows = 1` is the proof that matters.
+
+```
+################ 2. AMOUNT THAT DOES NOT MATCH CANON IS REFUSED #########
+ amount-mismatch : PASS -- amount 100 does not match pack plus (2500)
+ unknown-pack    : PASS -- unknown or inactive pack no_such_pack
+
+################ 3. PLAN GRANTS -- ONE PER TIER, ONE PER INVOICE ########
+ {"tokens":  10000, "granted": true,  "duplicate": false, "plan_tier": "scout"}
+ {"tokens":  40000, "granted": true,  "duplicate": false, "plan_tier": "oracle"}
+ {"tokens": 150000, "granted": true,  "duplicate": false, "plan_tier": "sovereign"}
+ {                  "granted": false, "duplicate": true,  "invoice_ref": "in_test_OPS50_B1"}
+ grant_rows_for_that_invoice : 1
+
+################ 4. TB-1 SPEND ORDER: PLAN FIRST, THEN PURCHASED ########
+   step               | plan_available | purchased_available | total_available
+ --------------------+----------------+---------------------+-----------------
+  opening             |          10000 |                5000 |           15000
+  after 12,000 spent  |              0 |                3000 |            3000
+```
+10,000 came out of the plan cycle and only the 2,000 overflow touched the pack. **Nothing chose that
+split** - the debit never names a bucket, so there is no code path that could choose wrong.
+
+```
+################ 5. EXPIRY IS A READ-TIME PREDICATE #####################
+  C before expiry                              |  40000 |      0 |  40000
+  C after cycle end                            |      0 |      0 |      0
+  c_ledger_rows_before : 1     c_ledger_rows_after : 1
+  {"tokens": 40000, "granted": true, "plan_tier": "oracle"}   <- grant with a period_end in the PAST
+  C after a 40,000 grant that already expired  |      0 |      0 |      0
+```
+**Two proofs, and the second is the honest one.** The first moved a grant's `expires_at` into the
+past - that is an UPDATE, so it demonstrates only that the row count never changes (1 before, 1
+after: no clawback row, no deletion). The second writes a **fresh 40,000 grant whose cycle has
+already ended** and it is worth zero from the instant it exists, with no update of any kind. That is
+the read-time predicate proving itself.
+
+```
+################ 6. REFUND: UNSPENT ONLY, NEVER NEGATIVE ################
+  A before spend           |      0 |  30000 |  30000
+  A after spending 5,000   |      0 |  25000 |  25000
+ {"refunded": true, "tokens_reversed": 25000, "purchased_available": 0}
+  A after refund           |      0 |      0 |      0
+ {"refunded": false, "duplicate": true, "ledger_id": "4631..."}          <- replay
+ adjustment_rows_for_that_refund : 1
+
+################ 7. REFUND WHEN NOTHING IS LEFT: 0, NOT NEGATIVE ########
+ {"reason": "nothing unspent remains", "refunded": false, "tokens_reversed": 0}
+  A final                  |      0 |      0 |      0
+
+################ 8. PARTIAL REFUND CAP #################################
+ {"refunded": true, "tokens_reversed": 2500, "purchased_available": 2500}   <- 5,000 pack, half the charge
+
+################ 9. subscription_sync ACCEPTS THE ORACLE TIERS ##########
+ product_type | tier  | status          band-name-into-tier : PASS --
+ oracle       | scout | active            violates check constraint "subscriptions_tier_valid"
+```
+Spend 5,000 of a 30,000 pack, then refund it: **25,000 back, 5,000 kept, balance 0 and not -5,000.**
+That single `GREATEST(0, LEAST(cap, purchased_available))` is the whole of ORACLE_MF v0.26 s2, and
+it is why no allow-negative machinery exists anywhere in this design.
+
+Test 9 also closes OPS48 s9's hazard by demonstration: a **model band** name cannot reach
+`subscriptions.tier`, because the CHECK refuses it before any code gets a say.
+
+```
+################ 11. ROLLBACK ###########################################
+ROLLBACK
+ packs_must_be_null | plans_must_be_null | credit_must_be_null | ledger_must_be_16 | subs_must_be_1
+--------------------+--------------------+---------------------+-------------------+----------------
+                    |                    |                     |                16 |              1
+```
+
+### 5. DEVIATIONS AND JUDGEMENT CALLS, EACH WITH ITS REASON
+
+1. **No Stripe Price objects created.** Section 1. The dispatch's stated purpose for them is served
+   better and more safely by subscription metadata, and creating them is the exact thing that arms
+   the F6 collision.
+2. **`oracle_grant_plan_tokens` does NOT check the invoice amount against the sticker price**,
+   although `oracle_credit_token_purchase` does check it for packs. A subscription invoice
+   legitimately differs from the sticker price - proration on upgrade, coupons, tax, a partial first
+   cycle. Refusing a mismatch would refuse **real renewals**. The allowance comes from canon; the
+   invoice amount is recorded in the memo only. A pack has no such excuse, so it keeps the check.
+3. **A refund idempotency index was added that OPS48 did not name.** W-9 binds every money write, and
+   a refund is one. Key is the Stripe refund id, on `entry_type='adjustment'`. Verified safe first:
+   all four existing adjustment rows carry a NULL `payment_ref`.
+4. **`p_max_tokens` was added to the refund RPC for partial refunds.** The ledger stores Tokens and
+   Stripe stores cents, and the ledger row does not record the charge amount. The webhook - which
+   has both numbers - computes the proportional cap and passes it. NULL means a full refund.
+5. **`charge.refunded` is handled, which OPS48 left as a manual act.** The rule was ruled and the RPC
+   exists; wiring the event is small and makes the rule automatic rather than aspirational. Refunds
+   resolve back to the purchase via `checkout.sessions.list({payment_intent})`, because the ledger is
+   keyed on the Session id (OPS35 s5, kept verbatim) and a charge only knows its PaymentIntent.
+6. **`customer.subscription.created` is handled too**, where OPS48 listed only updated/deleted. It is
+   the same no-token-write path and it gets the `subscriptions` row written earlier.
+7. **The debit rows in the dry run were written directly, not through `oracle_debit_tokens`.** That
+   RPC requires a real `atlasoracle_directives` row. The maths under test is
+   `oracle_token_available`, which is what the RPC itself reads, and OPS49b already proved the RPC
+   end to end. Stated so nobody reads section 4 as a re-proof of OPS49b.
+8. **Nothing was written to `src/`.** R5: the `front` lane owns the app tree. I read "wire plan
+   checkout" as wiring the plan path through the checkout function - OPS48 s2's "one surface, two
+   products" - which is done. The pack/plan picker UI is a front-lane dispatch and needs one.
+9. **Migration files are in `_drafts/`.** Same shape OPS49 used: the applying pass promotes them by
+   rename, content unchanged, and records the sha256.
+
+### 6. TWO LIVE FINDINGS OUTSIDE THIS SCOPE
+
+**F-1 (P1, money). The F6 webhook is broken for `invoice.paid` under the account's own API version.**
+Not the oracle collision - a plain defect on the live membership and venue path:
+
+```ts
+// stripe-subscription-webhook/index.ts:138-141
+const line = obj?.lines?.data?.[0];
+product = productFromPrice(line?.price);     // `line.price` does not exist in basil+
+subscriptionId = obj?.subscription ?? null;  // `invoice.subscription` does not exist in basil+
+...
+if (!subscriptionId) return ... 'invoice.paid (no subscription)'   // fires FIRST, every time
+```
+
+`_shared/stripe.ts` pins `2026-03-25.dahlia` and says in its own comment that these fields moved.
+**If the account delivers dahlia-shaped events, every `invoice.paid` returns early as "no
+subscription"** - so subscription renewals are never synced and **the affiliate reward never fires
+on a renewal**. Line 161's `obj?.current_period_end` on subscription events has the same problem
+(it moved onto items), so `current_period_end` would be written NULL.
+
+**I did not observe this.** It is read from the code against the API reference, and no oracle or
+venue invoice has ever landed. But the venue subscription in `subscriptions` is `canceled` with a
+`current_period_end` that was set at some point, so the subscription-event path clearly worked
+under an older version - which is exactly what a version drift looks like. **Wants its own dispatch,
+and it is arguably more urgent than anything in this pass, because press and venue are taking real
+money now.**
+
+**F-2 (closed while I was reading). The OPS49d balance-view defect is FIXED.** OPS49d's W-1 named
+`oracle_token_balances` losing `security_invoker=true` while calling a function `authenticated`
+cannot execute. My first recon this pass reproduced it - `reloptions` empty, no `authenticated`
+grant. Migration `20260801212011_oracle_token_balances_invoker_and_grant` landed during this pass
+and closes **both halves**, which is what stops the fix from becoming a leak. Verified live:
+
+```
+reloptions                          : {security_invoker=true}
+oracle_token_available acl          : postgres, service_role, authenticated
+as a Bee with ledger rows, via view : rows_visible 1 | other_bees_visible 0 | own_balance 4936.7444
+as the owner                        : 4 rows
+```
+One row, their own, nobody else's. The balance chip works and does not leak. **Someone should close
+OPS49d** (W-2: whoever unblocks a pass closes the loop).
+
+Also observed, unrelated to my writes: `atlasoracle-route` is **ACTIVE at version 23**
+(2026-08-01 21:08:55Z), so OPS49's route wire is deployed and `oracle_debit_tokens` has a live
+caller. OPS49b's report says otherwise because it was written before OPS49d shipped.
+
+### 7. WHAT I COULD NOT DO, AND WHO OWNS IT
+
+**The entire Stripe half of the dispatch's done-test is not reachable from a Code session.** Stated
+flatly rather than worked around:
+
+- **No Stripe CLI** (`stripe: command not found`).
+- **No Stripe key, by rule.** The Secrets section of root `CLAUDE.md` forbids reading `.env`. I did
+  not read it, so I cannot call the Stripe API at all - not to create a Price, not to create a
+  webhook endpoint, not to list anything.
+- **No dashboard.** Creating the webhook endpoint, obtaining `whsec_...`, and setting
+  `STRIPE_WEBHOOK_SECRET_ORACLE` are dashboard acts.
+- **No test card.** Completing a Checkout Session needs a browser and a human.
+
+**So these dispatch done-test items are NOT done and are not claimed as done:** buy a pack in test
+mode; subscribe to each of the three tiers; let a plan grant expire against a real cycle; refund a
+pack through Stripe.
+
+**BUTCH OWNS, and it is four things in one sitting:**
+1. Stripe Dashboard -> Webhooks -> add endpoint
+   `https://anxmqiehpyznifqgskzc.supabase.co/functions/v1/oracle-webhook`, subscribed to
+   `checkout.session.completed`, `invoice.paid`, `customer.subscription.created`,
+   `customer.subscription.updated`, `customer.subscription.deleted`, `charge.refunded`.
+2. Copy its `whsec_...` into Supabase secrets as `STRIPE_WEBHOOK_SECRET_ORACLE`.
+3. Set `ORACLE_CHECKOUT_SUCCESS_URL` and `ORACLE_CHECKOUT_CANCEL_URL` (both have sane defaults
+   pointing at `themanual.tech/oracle`, so this is optional).
+4. Confirm which Stripe **mode** the deployed `STRIPE_SECRET_KEY` is - test or live. **This matters
+   more than it looks.** The dispatch says test mode; a live key would make the first pack GET a
+   real charge.
+
+**Do 1 and 2 only after the migrations are applied.** Until the RPCs exist, a delivered event would
+500 and Stripe would retry it - harmless but noisy, and the retries would land before there is
+anything to write.
+
+### 8. DONE-TEST, HONESTLY
+
+| Requirement | Status |
+|---|---|
+| one oracle-webhook handling BOTH event families | **DONE** - deployed v1, plus refunds |
+| plan checkout wired, two modes, one surface | **DONE** - deployed v1 |
+| three plan Prices live with metadata | **DELIBERATELY NOT DONE** - section 1. Doing it arms the F6 collision the same dispatch warns about; the routing it was meant to enable is done better by subscription metadata |
+| F6 collision sequenced + stated | **DONE** - section 1. The window never opens because no metadata-bearing Price is created |
+| VERIFY FIRST: does price_data carry metadata | **DONE** - confirmed against the Stripe API reference. It does not |
+| plan grants on invoice.paid, allowance + expiry, idempotent on invoice id | **DONE and PROVEN** - section 4 tests 3 and 5 |
+| packs unchanged from OPS35 | **DONE** - s7a/s7b carried forward; the only change is `to_char` money formatting in the memo and W-10 wording |
+| full test-mode flow proven (pack, 3 plans, expiry, refund) | **DB half PROVEN, Stripe half IMPOSSIBLE from here** - section 7 |
+| every apply in schema_migrations | **NOT APPLIED - R7/W-6 hold.** The dispatch names no file and states no rollback. Both are supplied in W-1 for the re-stamp |
+| W-1 at top | **DONE** |
+| W-9 idempotency stated and enforced at the database | **DONE** - four partial unique indexes, three of them new, every one dry-run proven |
+| deno gate before the deploy | **DONE** - section 0 |
+
+### 9. COULD NOT VERIFY
+
+- **That either function runs against real Stripe traffic.** They type-check, they deploy, and they
+  answer correctly with no secret. Not one Stripe event has ever reached either of them. Treat the
+  first real event as a first run, not a regression test.
+- **The dahlia payload shapes, empirically.** Section 3 is read from the Stripe API reference and
+  the pinned `apiVersion`, not from an observed webhook body. Both the fallback paths and finding
+  F-1 depend on it. The first test-mode event settles it in one look.
+- **That the account's webhook delivery version actually is dahlia.** `_shared/stripe.ts` says it
+  matches; the endpoint's pinned version is a dashboard setting I cannot read. If it is pinned to
+  something older, my fallback paths carry it and **F-1 evaporates** - which would be good news.
+- **`affiliate_on_payment` pro-rating for plans.** The dry run shows the affiliate firing on a
+  $9 scout invoice (`to_treasury_held: 801`), so the hook works - but TOKEN-BUCKETS says affiliate
+  perks are "pro-rated for plans" and I did not read that function. OPS48 flagged the same gap and
+  it is still open.
+- **Concurrency.** Every idempotency proof is sequential. The unique indexes are argued to hold
+  under a race; no two callers ever ran at once.
+- **`auth.role()` through PostgREST with a real service-role key.** The dry run set
+  `request.jwt.claims` by hand in psql. Same gap OPS49b recorded.
+- **Whether anything besides `tokens.ts` reads `oracle_token_balances`.** Not swept.
+
+---
+
+## OPS50b - APPLIED. Both billing migrations live, full runtime proof green, zero disagreement.
+
+Lane `ops`. Workdir `TheMANUAL.tech`. Scope `oracle`. Butch-authorized apply.
+Pre-flight is the section immediately below this one, written **before** the apply as R7 requires.
+Both migrations applied clean, both recorded in `schema_migrations`, and the six-part runtime proof
+ran end to end on a real test bee with **RPC, view and ledger arithmetic agreeing at every step**.
+
+### W-1 - WHO OWNS THE NEXT MOVE, AND WHAT IT IS
+
+**Owner: BUTCH.** The only remaining unproven link is the Stripe transport, and it is his by
+construction: **run the Stripe dashboard test event against the deployed `oracle-webhook`** (the
+OPS50-Q section 7 procedure), which this pass was explicitly told is not gated on it. Everything on
+the DB side of that webhook is now applied and proven under real data.
+
+**Second, smaller, and also his: the rollback window is now CLOSED.** The DROP-based rollbacks quoted
+in the pre-flight were valid only pre-first-credit. This pass's proof wrote real `purchase`, `grant`,
+`adjustment` and `debit` rows, so from here rollback = delete the Stripe webhook endpoint + REVOKE
+EXECUTE on the three RPCs. That is not a regression; the dispatch called it in advance. It is
+recorded here so nobody reaches for the DROPs later.
+
+### 1. APPLY - both files, in order, each atomic
+
+```
+$ psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260801220000_oracle_token_packs_and_purchase.sql
+BEGIN / CREATE INDEX / CREATE INDEX / CREATE TABLE / INSERT 0 4 / ALTER TABLE / REVOKE / GRANT
+NOTICE:  policy "oracle_token_packs_public_read" ... does not exist, skipping
+DROP POLICY / CREATE POLICY / CREATE FUNCTION / REVOKE / GRANT / COMMIT
+
+$ psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260801220100_oracle_token_plans_grant_refund.sql
+BEGIN / CREATE TABLE / INSERT 0 3 / ALTER TABLE / REVOKE / GRANT
+NOTICE:  policy "oracle_token_plans_public_read" ... does not exist, skipping
+DROP POLICY / CREATE POLICY / CREATE INDEX / CREATE INDEX / CREATE FUNCTION / REVOKE / GRANT
+CREATE FUNCTION / REVOKE / GRANT / COMMIT
+```
+
+Both `NOTICE`s are the expected first-run output of the `DROP POLICY IF EXISTS` idempotency guards.
+Both files reached `COMMIT`; neither rolled back.
+
+Files were promoted out of `_drafts` to the paths the dispatch names. `_drafts/` now holds only
+`20260801130000_db14_narrow_bees_column_exposure.sql`, kept per the OPS49d ruling.
+
+### 2. RECORDED IN MIGRATION HISTORY
+
+```
+    version     |              name               | n_statements | bytes
+----------------+---------------------------------+--------------+-------
+ 20260801220000 | oracle_token_packs_and_purchase |            1 |  7454
+ 20260801220100 | oracle_token_plans_grant_refund |            1 | 12504
+```
+
+Byte counts match the files on disk exactly, so history stores the source that actually ran. The file
+text was passed as a dollar-quoted literal generated by script - never hand-escaped, never
+interpolated from a shell variable.
+
+### 3. VERIFY-AFTER against the catalog (R7)
+
+**Tables, RLS, policies:**
+
+```
+      relname       | rls_enabled | policies          |     tablename      |           policyname           |  cmd   |      qual
+--------------------+-------------+----------         |--------------------+--------------------------------+--------+-----------------
+ oracle_token_packs | t           |        1          | oracle_token_packs | oracle_token_packs_public_read | SELECT | (active = true)
+ oracle_token_plans | t           |        1          | oracle_token_plans | oracle_token_plans_public_read | SELECT | (active = true)
+```
+
+**Canon rows - the numbers a Bee will be shown, straight from production:**
+
+```
+ pack_code | usd_cents | tokens | display_name      plan_tier | usd_cents | tokens_per_cycle | display_name
+-----------+-----------+--------+--------------     ----------+-----------+------------------+-------------
+ starter   |       500 |   5000 | Starter           scout     |       900 |            10000 | Scout
+ regular   |      1000 |  11000 | Regular           oracle    |      2900 |            40000 | Oracle
+ plus      |      2500 |  30000 | Plus              sovereign |      9900 |           150000 | Sovereign
+ pro       |      6000 |  78000 | Pro
+```
+
+Matches ORACLE_MF v0.16 s5 (packs) and v0.27 s1 (plans). **Language firewall check on the only
+Bee-facing strings in either table** - `display_name` reaches the Stripe Checkout page: Starter,
+Regular, Plus, Pro, Scout, Oracle, Sovereign. No banned term (buy, sell, purchase, price, customer,
+mint) in any of the seven.
+
+**All four indexes present with the exact predicates the pre-flight measured against:**
+
+```
+ oracle_token_ledger_one_adjustment_per_refund_uidx | ... (payment_ref) WHERE (entry_type='adjustment' AND payment_ref IS NOT NULL)
+ oracle_token_ledger_one_grant_per_invoice_uidx     | ... (payment_ref) WHERE (entry_type='grant' AND expires_at IS NOT NULL AND payment_ref IS NOT NULL)
+ oracle_token_ledger_one_purchase_per_payment_uidx  | ... (payment_ref) WHERE (entry_type='purchase' AND payment_ref IS NOT NULL)
+ subscriptions_one_active_oracle_per_bee_uidx       | ... (bee_id) WHERE (product_type='oracle' AND status = ANY (ARRAY['active','trialing']))
+```
+
+**Functions - signature, SECURITY DEFINER, and grants:**
+
+```
+ oracle_credit_token_purchase | p_bee_id uuid, p_pack_code text, p_payment_ref text, p_amount_cents integer, p_method text                         | definer t
+ oracle_grant_plan_tokens     | p_bee_id uuid, p_plan_tier text, p_invoice_ref text, p_period_end timestamp with time zone, p_amount_cents integer | definer t
+ oracle_refund_token_purchase | p_payment_ref text, p_refund_ref text, p_max_tokens numeric, p_memo text                                           | definer t
+
+ all three:  anon f | authenticated f | service_role t
+```
+
+Three money functions, all DEFINER, all executable by `service_role` alone. Signatures match the
+rollback statements in the dispatch exactly, so those DROPs will resolve if ever used inside the
+window they are valid for.
+
+**Supabase security advisors, run after the apply: ZERO findings touch any of the five new objects.**
+373 advisories exist project-wide, all pre-existing (137 `anon_security_definer_function_executable`,
+209 `authenticated_...`, 10 `rls_enabled_no_policy`, 2 `security_definer_view`, etc.). Filtering all
+373 for the five new object names returns nothing.
+
+**One thing I will not overstate.** The migration comment says pack canon "changes by migration
+only". That is true for `anon` and `authenticated`, which hold SELECT alone. `service_role` holds
+full INSERT/UPDATE/DELETE on both canon tables via this project's default privileges - the same
+posture as every other table here, and the REVOKE in the migration deliberately targets only the two
+client roles. So the guarantee is "no client can rewrite canon", not "nothing can".
+
+### 4. LIVE RUNTIME PROOF - real ledger rows, on test bee `bee_c6f0c10b`
+
+Test bee `c6f0c10b-fd01-42d9-88f9-8db120191c8e`, chosen because it had **zero** ledger rows, so every
+number below is attributable to this proof alone. `request.jwt.claims` set to `{"role":"service_role"}`
+so the DEFINER guards saw the same caller identity the edge functions present. **These rows are
+permanent** - the ledger is append-only and the dispatch called for real history.
+
+```
+==== S0. STARTING POSITION ====
+ ledger_rows | 0        plan 0 | purchased 0 | total 0
+
+==== S1. CREDIT a starter pack (5 USD -> 5000 Tokens) ====
+ {"tokens": 5000, "credited": true, "duplicate": false,
+  "ledger_id": "fbbf3524-2649-4fec-a63f-9a870d286c14", "pack_code": "starter"}
+ plan 0 | purchased 5000.000000 | total 5000.000000
+
+==== S2. REPLAY the same payment_ref - W-9 ====
+ {"credited": false, "duplicate": true,
+  "ledger_id": "fbbf3524-2649-4fec-a63f-9a870d286c14", "payment_ref": "cs_ops50b_proof_001"}
+ purchase_rows_for_this_payment | 1
+ plan 0 | purchased 5000.000000 | total 5000.000000        <- unmoved
+
+==== S2b. AMOUNT MISMATCH ====
+ NOTICE:  REFUSED as designed -> amount 499 does not match pack starter (500)
+
+==== S3. GRANT a scout cycle (10000 Tokens, 30-day cycle) ====
+ {"tokens": 10000, "granted": true, "duplicate": false,
+  "ledger_id": "c4d90418-4e37-4b99-a773-1f5c81ccfb77", "plan_tier": "scout",
+  "expires_at": "2026-08-31T22:07:11.071813+00:00"}
+ plan 10000.000000 | purchased 5000.000000 | total 15000.000000
+
+==== S4. DEBIT 4000 - PLAN FIRST (TB-1) ====
+ {"debited": true, "from_plan": 4000, "from_purchased": 0,
+  "plan_available": 6000.000000, "purchased_available": 5000.000000, "total_available": 11000.000000}
+
+==== S5. DEBIT 8000 - exhausts plan, then crosses into purchased ====
+ {"debited": true, "from_plan": 6000.000000, "from_purchased": 2000.000000,
+  "plan_available": 0.000000, "purchased_available": 3000.000000, "total_available": 3000.000000}
+
+==== S6. REPLAY directive 2 ====
+ {"debited": false, "duplicate": true, "ledger_id": "c59d66e8-9172-4230-ab31-dd7c59216c70",
+  "plan_available": 0.000000, "purchased_available": 3000.000000, "total_available": 3000.000000}
+ debit_rows_for_directive_2 | 1
+
+==== S7. DUPLICATE INVOICE on the grant path ====
+ {"granted": false, "duplicate": true, "ledger_id": "c4d90418-4e37-4b99-a773-1f5c81ccfb77",
+  "invoice_ref": "in_ops50b_proof_001"}
+ grant_rows_for_this_invoice | 1
+
+==== S8. EXPIRY - a past-dated cycle grant credits the ledger but adds ZERO availability ====
+ {"tokens": 10000, "granted": true, "expires_at": "2026-08-01T22:06:11.955172+00:00"}
+ naive_ledger_sum | 13000.000000        <- raw SUM(amount_tokens)
+ plan 0.000000 | purchased 3000.000000 | total 3000.000000  <- the truth
+ view_balance | 3000.000000                                 <- view agrees with the RPC
+
+==== S9. REFUND - unspent purchased balance only ====
+ {"refunded": true, "tokens_reversed": 3000.000000, "purchased_available": 0.000000,
+  "ledger_id": "97bcb085-929f-41c4-a9b9-cb84c6d31718", "refund_ref": "re_ops50b_proof_001"}
+ plan 0.000000 | purchased 0.000000 | total 0.000000
+
+==== S10. OVER-REFUND - asks 5000 with nothing unspent left ====
+ {"refunded": false, "duplicate": false, "tokens_reversed": 0,
+  "reason": "nothing unspent remains", "purchased_available": 0.000000}
+
+==== S11. REFUND REPLAY - same refund_ref ====
+ {"refunded": false, "duplicate": true, "ledger_id": "97bcb085-929f-41c4-a9b9-cb84c6d31718"}
+ adjustment_rows_for_this_refund | 1
+
+==== S12. SHORT-DATED CYCLE 2 - 10000 Tokens expiring in 3 minutes ====
+ {"tokens": 10000, "granted": true, "expires_at": "2026-08-01T22:10:12.75856+00:00"}
+ granted_at 2026-08-01 22:07:12.841062+00 | plan 10000.000000 | purchased 0.000000 | total 10000.000000
+```
+
+**Reading S9 closely, because it is the whole refund ruling in one number.** The pack was 5000
+Tokens; 2000 of it had been spent by S5. The refund reversed **3000** - the unspent remainder - not
+5000. `p_max_tokens` was NULL (full refund), so the cap was the original purchase amount and the
+`LEAST(cap, purchased_available)` clamp is what produced 3000. S10 then proves the other edge: with
+nothing unspent left, an explicit 5000-Token refund request returns `tokens_reversed: 0` and writes
+**no row at all**, which is also why `amount_sign_chk` (no zero-value adjustment) is never violated.
+
+**Full ledger written by the proof - seven rows, all of them real:**
+
+```
+ entry_type | amount_tokens |       payment_ref       | has_expiry |               memo                |          created_at
+------------+---------------+-------------------------+------------+-----------------------------------+-------------------------------
+ purchase   |   5000.000000 | cs_ops50b_proof_001     | f          | pack starter @ 5.00 USD           | 2026-08-01 22:07:10.576627+00
+ grant      |  10000.000000 | in_ops50b_proof_001     | t          | plan scout cycle grant @ 9.00 USD | 2026-08-01 22:07:11.071813+00
+ debit      |  -4000.000000 |                         | f          | ops50b-proof directive 1          | 2026-08-01 22:07:11.228464+00
+ debit      |  -8000.000000 |                         | f          | ops50b-proof directive 2          | 2026-08-01 22:07:11.393183+00
+ grant      |  10000.000000 | in_ops50b_proof_expired | t          | plan scout cycle grant @ 9.00 USD | 2026-08-01 22:07:11.955172+00
+ adjustment |  -3000.000000 | re_ops50b_proof_001     | f          | ops50b-proof refund, unspent only | 2026-08-01 22:07:12.28468+00
+ grant      |  10000.000000 | in_ops50b_proof_002     | t          | plan scout cycle grant @ 9.00 USD | 2026-08-01 22:07:12.75856+00
+```
+
+**Deviation from the dispatch, stated rather than buried:** the dispatch said to memo-tag *every* row
+`ops50b-proof`. Only the rows whose memo I control carry the tag - the two debits and the refund. The
+purchase and grant memos are **composed inside the RPCs** (`'pack ' || pack_code || ' @ ' || ...`)
+with no caller override, so tagging them would have required editing a money function to suit a test.
+I did not. Those four rows are instead identifiable by their `payment_ref`, every one of which
+carries the `ops50b_proof` marker (`cs_ops50b_proof_001`, `in_ops50b_proof_001`,
+`in_ops50b_proof_expired`, `in_ops50b_proof_002`, `re_ops50b_proof_001`). The test bee is otherwise
+untouched, so the whole set is `WHERE bee_id = 'c6f0c10b-...'`.
+
+### 5. EXPIRY, OBSERVED LIVE AND WITH ZERO WRITES
+
+S12 granted 10000 plan Tokens expiring at `22:10:12`. Re-measured 11 minutes later - nothing run in
+between, no job, no write:
+
+```
+         measured_at          |      cycle2_expires_at       | still_active
+------------------------------+------------------------------+--------------
+ 2026-08-01 22:21:24.44751+00 | 2026-08-01 22:10:12.75856+00 | f
+
+ plan_available | purchased_available | total_available |  view_balance  | naive_ledger_sum
+----------------+---------------------+-----------------+----------------+------------------
+       0.000000 |            0.000000 |        0.000000 |    0.000000    |   20000.000000
+```
+
+Plan availability went 10000 -> 0 purely because `now()` crossed `expires_at`. This is the TB-1 claim
+that expiry needs no scheduled job, and it is now an observation rather than a design assertion.
+
+### 6. RECONCILIATION - the done-test
+
+```
+ plan_available | purchased_available |  rpc_total   |  view_total  | rpc_matches_view |  naive_sum
+----------------+---------------------+--------------+--------------+------------------+--------------
+   10000.000000 |            0.000000 | 10000.000000 | 10000.000000 | t                | 20000.000000
+```
+(measured at S14, before cycle 2 expired; after expiry both read 0.000000 and still agree)
+
+**Zero disagreement between the RPC and the view at every single measurement point.** The 10000-Token
+gap between `rpc_total` and `naive_sum` is not an error - it is precisely the expired
+`in_ops50b_proof_expired` grant, which the naive `SUM(amount_tokens)` counts forever and the
+expiry-aware path correctly does not. That gap is the exact failure mode OPS49c fixed, reproduced
+here deliberately to show the fix holding under real rows.
+
+### 7. FOUND WHILE WORKING - the OPS49d W-1 is already CLOSED
+
+My previous pass reported that `oracle_token_balances` had lost `security_invoker` and that
+`authenticated` could not read it. Re-measured at the top of this pass: **fixed.**
+
+```
+        relname        |  owner   | security_invoker        rows_visible (as authenticated)
+-----------------------+----------+------------------       --------------
+ oracle_token_balances | postgres | true                          0
+```
+
+Migration `20260801212011_oracle_token_balances_invoker_and_grant` did both halves atomically and
+names the OPS49d finding in its header. `rows_visible = 0` for a bee with no ledger rows is the
+correct answer and confirms invoker RLS is doing the filtering. **No action left on that item** - the
+OPS49d W-1 in the section below this one is stale, superseded here.
+
+The one loose thread from that pass is now corroborated independently: the security advisor flags
+`public.question_bank_public` at ERROR level for exactly the same defect (`SECURITY DEFINER` view,
+its `security_invoker` reloption lost). `public.trivia_topic_candidates` has it too. Both are trivia
+astra, outside `oracle` - flagged, not touched.
+
+### 8. HOUSEKEEPING - two migration files recovered from remote history
+
+Remote history carried two applied oracle migrations with no file in the repo. I wrote them from
+`schema_migrations.statements[1]` (a read plus two file writes - no database change):
+
+```
+ supabase/migrations/20260801200948_oracle_token_balances_column_comments.sql      1298 bytes
+ supabase/migrations/20260801212011_oracle_token_balances_invoker_and_grant.sql    1159 bytes
+```
+
+**I did NOT run `supabase migration fetch`**, which would have written files for all 471 remote
+versions missing locally. Two files, named individually, both non-empty and both verified to contain
+the migration they claim.
+
+### 9. DRIFT - measured, reported, NOT fixed
+
+```
+local .sql files: 285      remote recorded versions: 646
+local files NOT in remote history: 110      remote versions with NO local file: 471 (469 after section 8)
+```
+
+This is why the apply used `psql` + an explicit history INSERT instead of the CLI: `migration up`
+would have tried to replay 110 historical migrations including `20260513120000_lock8_c_rls_rewrite`
+and `20260511100000_lock7_precision_tightening`. Reconciling 581 rows of drift is its own dispatch
+and emphatically not something to attempt inside a money-path pass.
+
+### 10. WHAT THIS PASS CHANGED
+
+- **Applied 2 migrations to production**: `20260801220000`, `20260801220100`. Both recorded in history.
+- **Created**: 2 tables (7 canon rows), 4 unique indexes, 3 SECURITY DEFINER functions, 2 RLS policies.
+- **Wrote 7 real ledger rows + 2 directive rows** on test bee `bee_c6f0c10b` (permanent, append-only).
+- **Wrote 2 migration files** recovered from remote history. Moved 2 draft files up one level.
+- No edge function deployed or redeployed (`oracle-webhook` / `oracle-checkout` were already live and
+  were not touched). No git add/commit/push. No secrets read. No Stripe object touched, no Stripe key
+  used, zero provider spend.
+
+### 11. COULD NOT VERIFY
+
+- **The Stripe transport itself** - no test event fired, no webhook signature validated end to end.
+  Dispatch says this is Butch-only (OPS50-Q section 7) and not gated on this pass. Everything the
+  webhook calls on the DB side is proven above; what is unproven is Stripe -> function -> RPC.
+- **`oracle-webhook` / `oracle-checkout` source** - out of scope this pass; I neither read nor
+  redeployed them, so I cannot claim their call signatures match the three new RPCs. Worth one cheap
+  dispatch to diff them against section 3's signatures before the transport test.
+- **Concurrency under real parallel load** - the advisory lock and the four unique indexes are proven
+  by replay, not by two genuinely simultaneous callers.
+- **The 110-file drift set** - measured only; no claim about whether those migrations are semantically
+  already applied.
+
+---
+
+## OPS50b - PRE-FLIGHT (recorded BEFORE the apply, per R7 MIGRATION AMENDMENT)
+
+Lane `ops`. Workdir `TheMANUAL.tech`. Scope `oracle`. Status at time of writing: **nothing applied yet.**
+This section is the R7 pre-condition ("only after a pre-flight recorded in `REPORT.md`"). The apply
+result is appended below it in the same pass.
+
+**Files named by the dispatch, promoted out of `_drafts` (apply in this order):**
+
+1. `supabase/migrations/20260801220000_oracle_token_packs_and_purchase.sql` (7454 bytes)
+2. `supabase/migrations/20260801220100_oracle_token_plans_grant_refund.sql` (12504 bytes)
+
+**Rollback, stated in the dispatch before the apply** (verbatim, and reproduced here so the report
+alone is sufficient to reverse this):
+
+```sql
+-- 20260801220000
+BEGIN;
+DROP FUNCTION IF EXISTS public.oracle_credit_token_purchase(uuid,text,text,integer,text);
+DROP TABLE IF EXISTS public.oracle_token_packs;
+DROP INDEX IF EXISTS public.oracle_token_ledger_one_adjustment_per_refund_uidx;
+DROP INDEX IF EXISTS public.oracle_token_ledger_one_purchase_per_payment_uidx;
+COMMIT;
+
+-- 20260801220100
+BEGIN;
+DROP FUNCTION IF EXISTS public.oracle_refund_token_purchase(text,text,numeric,text);
+DROP FUNCTION IF EXISTS public.oracle_grant_plan_tokens(uuid,text,text,timestamptz,integer);
+DROP INDEX IF EXISTS public.subscriptions_one_active_oracle_per_bee_uidx;
+DROP INDEX IF EXISTS public.oracle_token_ledger_one_grant_per_invoice_uidx;
+DROP TABLE IF EXISTS public.oracle_token_plans;
+COMMIT;
+```
+
+**Rollback validity window, restated because it is easy to lose:** these DROPs are correct only
+while we are pre-first-payment. The moment a real Token credit exists they are FORBIDDEN - they
+strip the double-credit guards while credited rows remain, and ledger rows are append-only and never
+deleted. After that, rollback = delete the Stripe webhook endpoint + REVOKE EXECUTE on the three
+RPCs. **Note this pass's own proof sequence writes real ledger rows** (section 5 of the apply report),
+so the window closes at the end of this pass by design.
+
+### P1. Nothing being created already exists
+
+```
+ packs_tbl | plans_tbl |     ledger_tbl      |   subs_tbl
+-----------+-----------+---------------------+---------------
+           |           | oracle_token_ledger | subscriptions
+
+        proname         |                                args
+------------------------+--------------------------------------------------------------------
+ is_platform_admin      |
+ oracle_debit_tokens    | p_bee uuid, p_directive uuid, p_amount_tokens numeric, p_memo text
+ oracle_token_available | p_bee uuid
+```
+
+Both new tables are absent, so `CREATE TABLE IF NOT EXISTS` genuinely creates. None of the three new
+functions exists under any signature, so no accidental overload and no silent replacement of a
+function something else already calls. The two dependencies the new code calls -
+`is_platform_admin()` and `oracle_token_available(uuid)` - are both present.
+
+### P2. Rows at risk - every new UNIQUE index measured against live data, not assumed
+
+Four partial unique indexes are created across two tables holding real rows. Each was tested with the
+exact predicate from the migration:
+
+```
+-- B1 purchase/payment_ref duplicates                                  (0 rows)
+-- B2 adjustment/payment_ref duplicates                                (0 rows)
+-- B3 grant/payment_ref duplicates WHERE expires_at IS NOT NULL        (0 rows)
+-- B4 subscriptions: >1 active|trialing oracle sub per bee             (0 rows)
+```
+
+All four empty, so no `CREATE UNIQUE INDEX` can fail on existing data. The ledger as it stands - the
+whole population at risk, small enough to print in full:
+
+```
+ entry_type | rows | sum_tokens  | with_payment_ref | with_expires_at
+------------+------+-------------+------------------+-----------------
+ adjustment |    4 | -125.869400 |                0 |               0
+ debit      |    6 |  -69.633000 |                0 |               0
+ grant      |    5 | 7026.000000 |                2 |               0
+ purchase   |    1 |  100.000000 |                1 |               0
+```
+
+16 rows total. This confirms the two claims the migration comments make about legacy data:
+the single existing `purchase` row carries one `payment_ref` (no duplicate possible), and all five
+`grant` rows have `expires_at` NULL - which is exactly why the grant index carries
+`expires_at IS NOT NULL`, keeping the two legacy grants that do have a `payment_ref` out of the
+index. Both claims verified live rather than taken from the comment.
+
+### P3. Dependent objects on the target tables
+
+```
+   dependent_object    | relkind
+-----------------------+---------
+ oracle_token_balances | v
+```
+
+One view depends on `oracle_token_ledger`; nothing depends on `subscriptions`. Neither migration
+alters a column type, drops a column, or replaces that view, so the view cannot be invalidated by
+this apply. No routines other than the ones the migrations define reference the new objects (they
+do not exist yet).
+
+### P4. Existing constraints the new rows must satisfy
+
+```
+ subscriptions_product_type_check | CHECK (product_type = ANY (ARRAY['membership','oracle','venue']))
+ subscriptions_status_check       | CHECK (status = ANY (ARRAY['active','past_due','canceled','incomplete','incomplete_expired','trialing','unpaid']))
+ subscriptions_tier_valid         | CHECK (... (product_type='oracle' AND tier = ANY (ARRAY['scout','oracle','sovereign'])) ...)
+ oracle_token_ledger_entry_type_chk  | CHECK (entry_type = ANY (ARRAY['purchase','debit','adjustment','grant']))
+ oracle_token_ledger_amount_sign_chk | CHECK ((entry_type IN ('purchase','grant') AND amount_tokens > 0) OR (entry_type='debit' AND amount_tokens < 0) OR (entry_type='adjustment' AND amount_tokens <> 0))
+```
+
+The new index predicates reference only values these CHECKs already permit - `'oracle'` and
+`'trialing'` are both in the subscriptions CHECKs (so `20260801164922` really is already applied, as
+the migration header claims), and the three plan tiers match `subscriptions_tier_valid` exactly. The
+refund function's `GREATEST(0, ...)` clamp plus its explicit zero-refund early return are what keep
+it from ever attempting the zero-amount `adjustment` that `amount_sign_chk` would reject.
+
+### P5. Neither version is already in migration history
+
+```
+ version | name
+---------+------
+(0 rows)     -- for versions 20260801220000, 20260801220100
+```
+
+Latest recorded: `20260801212011 oracle_token_balances_invoker_and_grant`, `20260801200948`,
+`20260801193328`, `20260801170000`. Both new versions are genuinely new.
+
+### P6. APPLY MECHANISM - and why NOT `supabase migration up`
+
+**`supabase migration up` / `db push` would be a serious mistake here and I will not use them.**
+Measured drift, both directions:
+
+```
+local .sql files: 285      remote recorded versions: 646
+local files NOT in remote history: 110   (e.g. 20260511100000_lock7_precision_tightening,
+                                          20260513120000_lock8_c_rls_rewrite, the whole
+                                          20260618* geo buildout, 20260727180000_oracle_token_ledger_v1)
+remote versions with NO local file: 471
+```
+
+The CLI treats "local file not in remote history" as pending, so a single `migration up` would
+attempt to replay **110 historical migrations**, including RLS rewrites and precision changes that
+were applied long ago by other means. That is exactly the blast radius R7 exists to prevent.
+
+**Mechanism used instead**, matching how `20260801170000` / `20260801193328` / `20260801212011` were
+recorded (each carries one statement in `supabase_migrations.schema_migrations.statements`):
+
+1. `psql -v ON_ERROR_STOP=1 -f <file>` - each file carries its own `BEGIN; ... COMMIT;`, so it
+   applies atomically or not at all.
+2. A separate parameterized INSERT records `(version, name, statements)` in
+   `supabase_migrations.schema_migrations`, with the file text passed as a parameter (never
+   interpolated), so history matches reality.
+3. Verify against `information_schema` / `pg_catalog` afterwards and print the result.
+
+Drift itself is pre-existing, long-known, and NOT something I am fixing inside a money-path pass.
+
+### P7. Stop conditions
+
+Abort and file a question rather than improvise if: any `CREATE UNIQUE INDEX` fails (means P2 went
+stale between measurement and apply), either file's transaction rolls back, the recorded function
+signature differs from the file, or the runtime proof shows RPC / view / ledger arithmetic
+disagreeing at any step.
+
+---
+
+## OPS49d (re-run 2) - DEPLOYED. atlasoracle-route v22 -> v23, the RPC wire is LIVE.
+
+Lane `ops`. Workdir `TheMANUAL.tech`. Scope `oracle`. Effort: focused.
+The permission deny that stopped the last attempt is gone (narrowed to `Bash(*supabase functions delete*)`).
+deno re-verified, type-check re-run clean, deploy executed, artifact fetched back and byte-compared.
+**Production no longer writes the Oracle Token debit from the edge function.** `oracle_debit_tokens`
+now has a live caller, which is the thing this pass existed to make true.
+
+### W-1 - WHO OWNS THE NEXT MOVE, AND WHAT IT IS
+
+**Owner: LEAD, for one migration dispatch. Not this pass, and not urgent enough to have justified
+touching production DDL uninstructed.**
+
+**The next action: queue a migration that restores `security_invoker=true` on
+`public.oracle_token_balances` and grants EXECUTE on `public.oracle_token_available` to
+`authenticated`.** OPS49c's `create or replace view` silently dropped the view's
+`security_invoker=true` reloption, and the new view body calls a function `authenticated` cannot
+execute. Net effect, measured against production this pass, in section 6: **every signed-in Bee's
+token-balance chip is currently broken**, and the obvious one-line fix (grant EXECUTE) would turn a
+broken read into a cross-Bee balance leak unless `security_invoker` is restored in the same
+migration. Both halves, or neither.
+
+That is a pre-existing OPS49c defect, not something this deploy caused. The deploy is independent of
+it and correct on its own: the route reads and debits through the RPC as service_role, which is
+unaffected by either problem.
+
+### 1. PRECONDITION - deno, re-verified
+
+```
+$ deno --version
+deno 2.9.4 (stable, release, x86_64-pc-windows-msvc)
+v8 15.0.245.2-rusty
+typescript 6.0.3
+```
+
+### 2. TYPE-CHECK - CLEAN (the DEPLOY AMENDMENT gate)
+
+```
+$ deno check supabase/functions/atlasoracle-route/index.ts
+Check supabase/functions/atlasoracle-route/index.ts
+```
+
+No diagnostics. The check walks the whole reachable graph - `./canon.ts` plus `_shared/cors.ts`,
+`_shared/auth.ts`, `_shared/supabase.ts` - not just the entry file.
+
+### 3. "STOP IF THE DEPLOYED SOURCE DIFFERS FROM THE LOCAL EDIT'S ASSUMPTIONS" - CHECKED, DID NOT FIRE
+
+Rather than reason about it, I fetched deployed **v22** and diffed it against the local file as it
+stood **before** the edit (`b78d67b^`):
+
+```
+$ git show b78d67b^:supabase/functions/atlasoracle-route/index.ts > preedit-route.ts
+$ diff --strip-trailing-cr preedit-route.ts deployed-route.ts
+IDENTICAL: deployed v22 == local pre-edit source
+```
+
+So the OPS49b edit was the **only** delta between what was running and what I deployed. No third
+party had changed the function out from under the repo, and no unrelated change rode along.
+
+The RPC contract was verified against production too, not against the migration file:
+
+```
+        proname         |                                args                                |                                       result                                        | security_definer
+------------------------+--------------------------------------------------------------------+-------------------------------------------------------------------------------------+------------------
+ oracle_debit_tokens    | p_bee uuid, p_directive uuid, p_amount_tokens numeric, p_memo text | jsonb                                                                               | t
+ oracle_token_available | p_bee uuid                                                         | TABLE(plan_available numeric, purchased_available numeric, total_available numeric) | f
+
+    rolname    | can_exec |        proname
+---------------+----------+------------------------
+ anon          | f        | oracle_debit_tokens
+ authenticated | f        | oracle_debit_tokens
+ service_role  | t        | oracle_debit_tokens
+ anon          | f        | oracle_token_available
+ authenticated | f        | oracle_token_available
+ service_role  | t        | oracle_token_available
+
+ oracle_token_ledger_one_debit_per_directive_uidx | CREATE UNIQUE INDEX ... ON public.oracle_token_ledger USING btree (directive_id) WHERE ((entry_type = 'debit') AND (directive_id IS NOT NULL))
+```
+
+Four arguments, matching names, `total_available` present in the returned jsonb, service-role-only
+EXECUTE, and the idempotency backstop index all as the route assumes. (The `authenticated: f` row on
+`oracle_token_available` is the innocuous-looking fact that turns into section 6.)
+
+### 4. THE DEPLOY
+
+```
+$ "/c/Users/Butch/Documents/HONEYCOMB/TheMANUAL.tech/node_modules/.bin/supabase" functions deploy \
+    atlasoracle-route --project-ref anxmqiehpyznifqgskzc --workdir "C:/Users/Butch/Documents/HONEYCOMB/TheMANUAL.tech"
+WARNING: Docker is not running
+Uploading asset (atlasoracle-route): supabase/functions/atlasoracle-route/index.ts
+Uploading asset (atlasoracle-route): supabase/functions/atlasoracle-route/canon.ts
+Uploading asset (atlasoracle-route): supabase/functions/_shared/supabase.ts
+Uploading asset (atlasoracle-route): supabase/functions/_shared/auth.ts
+Uploading asset (atlasoracle-route): supabase/functions/_shared/cors.ts
+Deployed Functions on project anxmqiehpyznifqgskzc: atlasoracle-route
+```
+
+`WARNING: Docker is not running` is expected and harmless - it means the CLI uploaded the assets for
+remote bundling instead of bundling locally. All five files uploaded, which matches v22's shape.
+
+**Verify-after, per the DEPLOY AMENDMENT - fetched the artifact back, did not trust the CLI:**
+
+| | before | after |
+|---|---|---|
+| version | 22 | **23** |
+| bundle hash (`ezbr_sha256`) | `a555d60915b4021a424dbcdd190061ff8e03dab4ccc0668d8938cb49549a3a52` | `938adc8eae2ec9431fa84d00b89f526d500d1ace7c2315dc1300aa8f8043ebe4` |
+| status | ACTIVE | ACTIVE |
+
+```
+deployed index.ts sha256 48e2eab14d96efda820aa9a91acfa0bbb033e3ab7b14101b2cc18ab39665f0b0
+local    index.ts sha256 48e2eab14d96efda820aa9a91acfa0bbb033e3ab7b14101b2cc18ab39665f0b0
+IDENTICAL: true
+has oracle_debit_tokens rpc call:    true
+has oracle_token_available rpc call: true
+still has direct ledger insert:      false
+still reads oracle_token_balances:   false
+```
+
+The last two lines are the point of the pass: **the deployed artifact contains no direct
+`oracle_token_ledger` INSERT and no read of the expiry-blind view.** TB-1 spend-plan-first is now
+un-bypassable from the edge function because the edge function no longer has a bucket to choose.
+
+### 5. THE WIRE PROOF - and an honest statement of what I could NOT do
+
+**What I could not do: fire the deployed route over HTTP.** `atlasoracle-route` is
+`verify_jwt: true` and the handler's first act is `verifyAuth(req)` -> `beeId = auth.userId`, so the
+call needs a **signed-in Bee's access token**. The only two ways to get one are a Bee's
+email+password or the service-role key, and root `CLAUDE.md` Secrets forbids me both. The anon key
+does not help - it satisfies `verify_jwt` but carries no `sub`, so `verifyAuth` rejects it. This is
+the identical wall recorded in OPS37 §1; nothing about it changed. **I did not fake an invocation
+and did not quietly downgrade the claim.** Firing it also costs a real Anthropic call
+(`PAID_TIERS_ENABLED = true` now, so `standard` is not refused early).
+
+**What I did instead: exercised the real production function on real production data inside a
+transaction that was rolled back.** Every statement ran against `anxmqiehpyznifqgskzc`, against the
+live `oracle_debit_tokens` and the live `oracle_token_available`, with `request.jwt.claims` set to
+`{"role":"service_role"}` so the SECURITY DEFINER guard saw exactly the caller identity the route's
+`serviceClient()` presents. Nothing was left behind - the row counts after ROLLBACK are the proof.
+
+Test bee is `@combtreasury`, picked by the query as the first bee with **no** pre-existing ledger
+rows so the arithmetic could not be confounded. Verbatim:
+
+```
+== STEP 0. Test bee - chosen because it has NO pre-existing ledger rows ==
+                bee_id                |    handle    |               astra_id
+--------------------------------------+--------------+--------------------------------------
+ 00000000-0000-0000-0000-000000000bee | combtreasury | 16c5f71e-8a5d-49e7-86c7-4ff64c4590ac
+
+== STEP 1. A 1000-token plan grant expiring in 30 days ==
+INSERT 0 1
+ plan_available | purchased_available | total_available
+----------------+---------------------+-----------------
+    1000.000000 |                   0 |     1000.000000
+
+== STEP 2. FIRST CALL - oracle_debit_tokens, 250 tokens, exactly as the deployed route calls it ==
+ {
+     "debited": true,
+     "duplicate": false,
+     "from_plan": 250,
+     "ledger_id": "07401357-dde5-4ede-a1fc-1258b114f913",
+     "amount_tokens": 250,
+     "from_purchased": 0,
+     "plan_available": 750.000000,
+     "total_available": 750.000000,
+     "purchased_available": 0
+ }
+
+== STEP 3. The ledger row - written by the RPC, not by the route ==
+ entry_type | amount_tokens |                  memo                  | on_this_directive
+------------+---------------+----------------------------------------+-------------------
+ debit      |   -250.000000 | standard directive via claude-sonnet-5 | t
+
+ debit_rows_for_directive
+--------------------------
+                        1
+
+ plan_available | purchased_available | total_available
+----------------+---------------------+-----------------
+     750.000000 |                   0 |      750.000000
+
+== STEP 4. REPLAY - the identical call on the SAME directive ==
+ {
+     "debited": false,
+     "duplicate": true,
+     "ledger_id": "07401357-dde5-4ede-a1fc-1258b114f913",
+     "plan_available": 750.000000,
+     "total_available": 750.000000,
+     "purchased_available": 0
+ }
+
+== STEP 5. STILL EXACTLY ONE DEBIT ROW, BALANCE UNMOVED ==
+ debit_rows_for_directive
+--------------------------
+                        1
+
+ plan_available | purchased_available | total_available
+----------------+---------------------+-----------------
+     750.000000 |                   0 |      750.000000
+
+== STEP 6. OVERDRAFT REFUSAL on a fresh directive - available 750, ask 5000 ==
+NOTICE:  REFUSED as designed -> insufficient tokens: need 5000, available 750.000000
+
+== STEP 7. Ledger after the refusal - the overdraft wrote nothing ==
+ total_debit_rows_for_test_bee
+-------------------------------
+                             1
+
+ROLLBACK
+== STEP 8. POST-ROLLBACK - production ledger untouched by this proof ==
+ ledger_rows_now    | 16
+ directive_rows_now | 17
+```
+
+Read the replay closely: it returns the **same `ledger_id`** as the first call with
+`"debited": false, "duplicate": true`, and the debit count stays at 1 while `total_available` stays
+at 750. That is a clean no-op, not a second debit that happened to net out. Sixteen ledger rows and
+seventeen directive rows before and after - identical to the counts measured before the transaction
+opened.
+
+**The honest limit on this proof:** it establishes the RPC's behaviour on production, and section 4
+establishes that the deployed artifact calls exactly that RPC with exactly those arguments and no
+longer contains the old INSERT. It does not establish an end-to-end HTTP round trip. The one step
+that would - a signed-in Bee firing one `standard` directive - is Butch's to run, unchanged from
+OPS37:
+
+```bash
+node -e '
+const {createClient}=require("@supabase/supabase-js");
+const sb=createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+(async()=>{
+  const {data:s,error:e}=await sb.auth.signInWithPassword({email:process.env.BEE_EMAIL,password:process.env.BEE_PASSWORD});
+  if(e) throw e;
+  const r=await fetch(process.env.SUPABASE_URL+"/functions/v1/atlasoracle-route",{
+    method:"POST",
+    headers:{Authorization:"Bearer "+s.session.access_token,"Content-Type":"application/json"},
+    body:JSON.stringify({directive:"OPS49d wire smoke: reply with the single word ALIVE.",tier:"standard"})});
+  console.log(r.status, await r.text());
+})();'
+```
+
+Then the read that settles it - the memo proves which code path wrote the row:
+
+```sql
+SELECT l.directive_id, l.entry_type, l.amount_tokens, l.memo, l.created_at
+  FROM public.oracle_token_ledger l ORDER BY l.created_at DESC LIMIT 1;
+```
+
+### 6. FINDING - OPS49c's view replacement broke the Bee-facing balance read
+
+Not dispatched work; found while checking whether anything else still read the expiry-blind view.
+Measured, not inferred.
+
+**6a. `security_invoker` was silently dropped.** DB8 created the view deliberately:
+
+```
+supabase/migrations/20260727180000_oracle_token_ledger_v1.sql:161:    WITH (security_invoker = true) AS
+```
+
+OPS49c's `20260801193328_oracle_token_balances_expiry_aware.sql` used a bare
+`create or replace view public.oracle_token_balances as ...` with no `WITH` clause. Production now:
+
+```
+        relname        |       reloptions
+-----------------------+-------------------------
+ ops_pass_durations    | {security_invoker=true}
+ oracle_token_balances |
+```
+
+Empty. The view is back to running with its owner's (`postgres`) privileges, which bypasses the
+`oracle_token_ledger` select-own RLS policy. `src/lib/atlasoracle/tokens.ts` still carries a
+`SECURITY NOTE` asserting `security_invoker=true` as the reason browser reads are safe - that
+comment is now false.
+
+**6b. Which is currently masked by a second, louder break.** The new view body calls
+`oracle_token_available`, and OPS49b revoked EXECUTE on it from `authenticated`. Function EXECUTE is
+checked against the *caller* even inside an owner-privileged view, so:
+
+```sql
+SET LOCAL request.jwt.claims = '{"role":"authenticated","sub":"...0bee"}';
+SET LOCAL ROLE authenticated;
+SELECT count(*) FROM public.oracle_token_balances;
+ERROR:  permission denied for function oracle_token_available
+```
+
+`authenticated` holds SELECT on the view (`information_schema.role_table_grants` confirms), so this
+is purely the function grant. Live user-visible effect: `fetchOracleTokenBalance()` takes its error
+branch and every signed-in Bee's balance chip reads
+*"Balance unavailable - permission denied for function oracle_token_available"* instead of a number.
+
+**6c. Why the two must be fixed together.** Granting EXECUTE alone restores the read - and, because
+6a left the view owner-privileged, hands `authenticated` a view over every Bee's balance. The fix is
+one migration doing both:
+
+```sql
+-- restores DB8's reloption that OPS49c dropped
+ALTER VIEW public.oracle_token_balances SET (security_invoker = true);
+-- safe under security_invoker: oracle_token_available is prosecdef=f (INVOKER) and reads only
+-- oracle_token_ledger, whose RLS policy is select-own, so a Bee still sees only their own rows
+GRANT EXECUTE ON FUNCTION public.oracle_token_available(uuid) TO authenticated;
+-- ROLLBACK: ALTER VIEW ... RESET (security_invoker);
+--           REVOKE EXECUTE ON FUNCTION public.oracle_token_available(uuid) FROM authenticated;
+```
+
+**I did not apply it.** R7 MIGRATION AMENDMENT: production DDL needs a dispatch naming the migration
+file with the rollback stated up front. This is proposed text for that dispatch, nothing more.
+
+**One loose thread I did not chase:** `question_bank_public` also shows empty `reloptions` despite
+`20260606195105_question_bank_public_security_invoker.sql` setting it. Same failure shape, different
+astra, outside `oracle`. Flagging only - unverified.
+
+### 7. HOUSEKEEPING - confirmed still in the state the last pass left it
+
+The four `supabase migration fetch` files are present, non-empty, and untracked (Butch commits):
+
+```
+  594  supabase/migrations/20260801154515_bees_anon_column_narrowing_step1.sql
+  627  supabase/migrations/20260801164907_oracle_token_ledger_add_expires_at.sql
+  690  supabase/migrations/20260801164922_subscriptions_tier_widen_oracle_scout_sovereign.sql
+ 1337  supabase/migrations/20260801193328_oracle_token_balances_expiry_aware.sql
+```
+
+Per the lead's CORRECTION + RULING, `supabase/migrations/_drafts/20260801130000_db14_narrow_bees_column_exposure.sql`
+was **kept** - present, 6409 bytes, untouched. It holds the unshipped step 2 (authenticated
+narrowing + `bees_me()`), which is the only written design for the still-open PII hole.
+
+### 8. WHAT THIS PASS CHANGED
+
+- **Production edge function `atlasoracle-route`: v22 -> v23.** The only change of live state.
+- No migration applied. No DDL. No git add/commit/push. No secrets read.
+- One transaction opened against production and rolled back; row counts before and after match.
+- No provider call, no Anthropic spend.
+
+### 9. COULD NOT VERIFY
+
+- **End-to-end HTTP invocation of the deployed route** - blocked by the Bee-credential rule, not by
+  anything broken. Command for Butch in section 5.
+- **Whether `GROQ_API_KEY` is set in the function environment**, which is what decides the free-tier
+  ladder. Unreadable from here, unchanged by this pass.
+- **The 6c migration's effect** - not applied, so its result is proposed, not measured.
+- **`question_bank_public`** - noticed, not investigated.
+
+---
+
+## OPS49d (re-run) - deno CLEARED, type-check CLEAN. DEPLOY BLOCKED BY A PERMISSION DENY.
+
+Lane `ops`. Workdir `TheMANUAL.tech`. Scope `oracle`. Effort: focused.
+**One blocker traded for another.** The deno precondition that stopped the first attempt is gone -
+deno 2.9.4 is installed and `deno check` on the edited route passes clean. The deploy itself is
+now refused by `permissions.deny`, not by a missing tool. Nothing was deployed. Question filed as
+`OPS49d-Q`; dispatch left `claimed`.
+
+### W-1 - WHO OWNS THE NEXT MOVE, AND WHAT IT IS
+
+**Owner: BUTCH, for one edit.**
+
+**The single next action: remove `Bash(*supabase functions*)` from `permissions.deny` in
+`HONEYCOMB/.claude/settings.local.json`** (or narrow it to `*supabase functions delete*` and allow
+`*node_modules/.bin/supabase functions deploy*`). Then re-claim OPS49d; the deploy half is roughly
+two commands and the idempotency proof.
+
+I cannot make that edit myself and did not try - a terminal rewriting its own permission file is
+the one thing the permissions model exists to prevent.
+
+**Unchanged and still true: production runs the OLD direct-INSERT debit path.** `oracle_debit_tokens`
+is live and still has no live caller.
+
+### 1. PRECONDITION - PASSED THIS TIME
+
+```
+$ deno --version
+deno 2.9.4 (stable, release, x86_64-pc-windows-msvc)
+v8 15.0.245.2-rusty
+typescript 6.0.3
+```
+
+### 2. TYPE-CHECK - CLEAN
+
+```
+$ deno check supabase/functions/atlasoracle-route/index.ts
+Check supabase/functions/atlasoracle-route/index.ts
+```
+
+No diagnostics. This is the DEPLOY AMENDMENT's gate ("only after the bundle type-checks clean")
+and it is satisfied. The check pulls in the three `_shared/` imports and `./canon.ts` as well -
+`cors.ts`, `auth.ts`, `supabase.ts` - so the whole reachable graph is covered, not just the entry
+file.
+
+### 3. THE ROUTE EDIT IS PRESENT AND ITS ASSUMPTIONS MATCH LIVE
+
+`atlasoracle-route/index.ts` around the debit block (working tree clean for this file - the edit
+is committed at `b78d67b`, not a dirty local change):
+
+```ts
+const { data: debitRes, error: debitErr } = await service
+  .rpc('oracle_debit_tokens', {
+    p_bee: beeId,
+    p_directive: directiveId,
+    p_amount_tokens: finalCostTokens,
+    p_memo: `${tier} directive via ${providerModel}`,
+  });
+...
+balanceAfter = Number((debitRes as any)?.total_available ?? 0);
+```
+
+Verified against production, not against the migration file:
+
+```
+        proname         |                                args                                | prosecdef
+------------------------+--------------------------------------------------------------------+-----------
+ oracle_debit_tokens    | p_bee uuid, p_directive uuid, p_amount_tokens numeric, p_memo text | t
+ oracle_token_available | p_bee uuid                                                         | f
+```
+
+Four-argument signature, argument names, and the `total_available` key in the returned jsonb all
+match what the route sends and reads. `prosecdef=t` on the debit (DEFINER, as designed) and `f` on
+the balance function (INVOKER, as the migration argues for deliberately). The idempotency backstop
+is present too:
+
+```
+ oracle_token_ledger_pkey
+ oracle_token_ledger_bee_created_idx
+ oracle_token_ledger_directive_idx
+ oracle_token_ledger_one_debit_per_directive_uidx
+```
+
+So the "STOP if the deployed source differs from the local edit's assumptions" condition does not
+fire: the assumptions are about the RPC contract, and the live contract agrees.
+
+### 4. THE DEPLOY - REFUSED BY POLICY, TWICE
+
+```
+$ "/c/Users/Butch/Documents/HONEYCOMB/TheMANUAL.tech/node_modules/.bin/supabase" functions deploy \
+    atlasoracle-route --project-ref anxmqiehpyznifqgskzc --workdir "C:/Users/Butch/Documents/HONEYCOMB/TheMANUAL.tech"
+Permission to use Bash with command ... has been denied.
+
+$ supabase functions list --project-ref anxmqiehpyznifqgskzc --workdir .
+Permission to use Bash with command ... has been denied.
+```
+
+Cause, located rather than guessed - `HONEYCOMB/.claude/settings.local.json`:
+
+```json
+"deny": [
+  "Bash(*heartbeat*)",
+  "Bash(*claim.cmd*)",
+  "Bash(*install-heartbeat*)",
+  "Bash(*supabase secrets*)",
+  "Bash(*supabase functions*)",
+  ...
+]
+```
+
+Deny beats allow, and the wildcard matches every spelling - global binary, `node_modules` binary,
+quoted or bare, `deploy` or `list`. The allow list only ever carried `supabase migration *` and
+`supabase --version`, so there is nothing to fall back to. No prompt was shown either time; this is
+an auto-deny, not a missed approval.
+
+**No second route exists.** The Supabase MCP server attached to this session is read-only for
+functions - `list_edge_functions` and `get_edge_function` only. It exposes no deploy tool, and root
+`settings.json` denies `mcp__supabase__deploy_edge_function` by name regardless.
+
+**Judgement call, stated plainly: I did not work around it.** A Node shim spawning the same binary
+would evade the pattern, the way `_claude_tmp/rail.mjs` is already documented to evade the psql
+deny. I refused to do that here. This is a production edge-function deploy on the money path -
+precisely the thing root `CLAUDE.md` R7 DEPLOY AMENDMENT gates - and bypassing a standing deny to
+push it is not a call a terminal gets to make. Logged in `logs/permission-needed.md` instead.
+
+### 5. NOT VERIFIED - THE ENTIRE DONE-TEST
+
+Everything the dispatch defines as done is unproven, because all of it sits downstream of the
+deploy:
+
+- **deployed version incremented** - NOT verified. Pre-deploy baseline captured for the re-run:
+  `atlasoracle-route` is at **version 22**, `ezbr_sha256`
+  `a555d60915b4021a424dbcdd190061ff8e03dab4ccc0668d8938cb49549a3a52`, `updated_at`
+  `1785242287168`, `status ACTIVE`, `verify_jwt true`. A successful deploy must show 23.
+- **RPC-written debit proven** - NOT verified. No directive was invoked; nothing was written.
+- **idempotent replay proven** - NOT verified.
+- **deployed source read back and diffed against local** - NOT done. I checked the RPC contract
+  against production instead (section 3), which is the substantive half; the byte-level readback
+  belongs with the post-deploy verification anyway.
+
+One thing worth flagging for the re-run: `PAID_TIERS_ENABLED` is `true` at `index.ts:133`, so a
+`standard`-tier directive will reach a provider and produce a non-zero `finalCostTokens`. The free
+tier costs 0 and would skip the debit block entirely - the proof must not use it.
+
+### 6. HOUSEKEEPING - ALREADY SETTLED, NOTHING RE-RUN
+
+The lead's correction (Q2: the DB14 draft stays) is accepted and nothing was deleted.
+`supabase/migrations/_drafts/20260801130000_db14_narrow_bees_column_exposure.sql` is present and
+untouched. The four fetched migration files are present and untracked, awaiting Butch's commit:
+
+```
+?? supabase/migrations/20260801154515_bees_anon_column_narrowing_step1.sql
+?? supabase/migrations/20260801164907_oracle_token_ledger_add_expires_at.sql
+?? supabase/migrations/20260801164922_subscriptions_tier_widen_oracle_scout_sovereign.sql
+?? supabase/migrations/20260801193328_oracle_token_balances_expiry_aware.sql
+```
+
+I did not re-run `migration fetch` - that half was reported done and the files are on disk.
+
+### 7. FILE TREE TOUCHED THIS PASS
+
+```
+TheMANUAL.tech/
+└── REPORT.md                                    modified (this section)
+HONEYCOMB/
+└── logs/permission-needed.md                    appended (the deny entry)
+```
+
+No source file, no migration, no schema object, no deployed artifact changed.
+
+---
+
+## OPS49d - DEPLOY BLOCKED (no deno). Housekeeping done. ONE DELETE REFUSED.
+
+Lane `ops`. Workdir `TheMANUAL.tech`. Scope `oracle`. Effort: focused.
+**The deploy half did not run - the dispatch's own precondition failed.** The appended
+housekeeping is done except for one deletion I refused, with evidence. Question filed as
+`OPS49d-Q`; dispatch left `claimed`.
+
+### W-1 - WHO OWNS THE NEXT MOVE, AND WHAT IT IS
+
+**Owner: BUTCH, for one command.**
+
+**The single next action: install deno, then re-run this pass.**
+`winget install DenoLand.Deno` in cmd, or `curl -fsSL https://deno.land/install.sh | sh` in Git
+Bash. Nothing else in OPS49d is blocked on anything else. The route edit is written and waiting;
+the RPC and the expiry-aware view are both live and agree with each other.
+
+**Second, and it is the lead's:** `authenticated` still holds SELECT on all 17 columns of
+`public.bees`, including `email`, for every Bee. See section 3 - that is why I did not delete the
+draft the dispatch told me to delete.
+
+### 1. THE PRECONDITION FAILED - STOP, AS INSTRUCTED
+
+> *"PRECONDITION: run deno --version FIRST. If deno is not installed, STOP and report."*
+
+```
+$ deno --version
+/usr/bin/bash: line 1: deno: command not found
+```
+
+Also probed the three places a Windows install would land - `~/.deno/bin/deno`,
+`C:/Program Files/deno/deno.exe`, `%LOCALAPPDATA%/Microsoft/WinGet/Links/deno.exe`. **None
+exist.** Deno is not installed by any route.
+
+**Therefore: no type-check, and no deploy.** The DEPLOY AMENDMENT requires the bundle to
+type-check clean before a deploy, and the dispatch says so too. I did not deploy, did not run
+`supabase functions deploy`, and did not touch `atlasoracle-route/index.ts` this pass - the OPS49
+edit is exactly as it was.
+
+**Production still runs the old direct-INSERT debit path.** The applied `oracle_debit_tokens` RPC
+still has no live caller. That is unchanged from the end of OPS49b, and it is the whole point of
+this pass.
+
+### 2. HOUSEKEEPING - FOUR MIGRATION FILES WRITTEN
+
+**Deviation, stated with its reason.** The dispatch says run
+`supabase migration fetch --workdir TheMANUAL.tech`. I did not. `migration fetch` needs either a
+linked project or a `--db-url`, and a `--db-url` puts the database password on a command line and
+into this session transcript, which the Secrets rule forbids outright ("never put credential
+values into output, logs, commits, or canon"). I pulled the same bytes out of
+`supabase_migrations.schema_migrations` over the rail instead - which is what `fetch` does anyway,
+needs no credential, and is byte-faithful to what was actually applied.
+
+The CLI is present (`supabase 2.95.4`) if the lead prefers the sanctioned path on a re-run; the
+outcome should be identical.
+
+**Written, all verified non-empty on disk after writing:**
+
+| File | Bytes |
+|---|---|
+| `20260801154515_bees_anon_column_narrowing_step1.sql` | 594 |
+| `20260801164907_oracle_token_ledger_add_expires_at.sql` | 627 |
+| `20260801164922_subscriptions_tier_widen_oracle_scout_sovereign.sql` | 690 |
+| `20260801193328_oracle_token_balances_expiry_aware.sql` | 1,337 |
+
+**Skipped, already in the repo:** `20260801100000_press_payments_stripe_ref_uidx.sql`,
+`20260801100100_press_record_payment_replay_safe.sql`,
+`20260801170000_oracle_debit_tokens_rpc.sql`.
+
+The dispatch named three files; the correct number was **four** - it did not know
+`20260801154515` was also absent, though it correctly anticipated the fetch might write it. The
+script enumerates live history and diffs against the repo rather than working from a fixed list,
+so the count came out of the data.
+
+**Butch commits these; I did not stage or commit anything.**
+
+### 3. THE DELETION I REFUSED, AND WHY
+
+> *"Then DELETE the stale draft `supabase/migrations/_drafts/20260801130000_db14_narrow_bees_column_exposure.sql`
+> (superseded: live version is 20260801154515 bees_anon_column_narrowing_step1)."*
+
+**It is not superseded. It is half-shipped, and the draft is the only written record of the half
+that did not ship.**
+
+The live migration's own text says so:
+
+```sql
+-- DB14 step 1: close the LOUD half of the bees PII exposure - anon-only, no client change.
+-- The 'authenticated' half (step 2) is deliberately NOT here - it needs the client seam first.
+revoke select on public.bees from anon;
+grant select (id, handle, name, avatar_url, bio,
+              honeycomb_ring, action_count, bling_rank,
+              created_at, updated_at) on public.bees to anon;
+```
+
+Measured live this pass:
+
+```
+    grantee    | cols_with_select
+---------------+------------------
+ anon          |               10     <- step 1 shipped, loud half closed
+ authenticated |               17     <- step 2 did NOT ship
+
+ bees_me exists? | (null)
+```
+
+**Any signed-up account can still read every Bee's email.** The draft file contains step 2 and the
+`bees_me()` SECURITY DEFINER accessor that step 2 depends on. Deleting it deletes the design for
+an open PII hole.
+
+**R5: "do not create, edit, or delete outside `scope`- if a dispatch asks you to, file a
+question."** This deletion is also outside `scope=oracle`. Both reasons point the same way, so the
+file stays and `OPS49d-Q` carries it.
+
+### 4. UNASKED-FOR CHECK: THE VIEW AND THE RPC AGREE
+
+The dispatch asserts *"The expiry-aware view (OPS49c) is ALSO live - gate and RPC agree."* Money
+code, cheap to verify, so I verified it rather than taking it. OPS49c made `balance_tokens`
+delegate to my function through a LATERAL join:
+
+```sql
+FROM sums s
+  CROSS JOIN LATERAL oracle_token_available(s.bee_id) a(plan_available, purchased_available, total_available)
+SELECT s.bee_id, a.total_available AS balance_tokens, ...
+```
+
+**They agree by construction, not by coincidence** - there is now one balance implementation and
+the view is a presentation layer over it. Confirmed on the OPS49 expiry fixture (100 purchased,
+expired 1,000 plan grant, 300 spent inside the cycle), in a rolled-back transaction:
+
+```
+             src             |  balance
+-----------------------------+------------
+ RPC  oracle_token_available | 100.000000
+ VIEW oracle_token_balances  | 100.000000
+```
+
+Both now return 100 where the old view returned 800. Ledger unchanged at 16 rows.
+
+**One thing OPS49c left, worth a line and not worth a dispatch:** the view's `granted_tokens` and
+`spent_tokens` columns still sum every grant and every debit with no expiry predicate. Only
+`balance_tokens` is expiry-aware. They are display columns and nothing gates on them, but
+`granted_tokens` will over-report for any Bee with an expired plan cycle. Flagging so nobody
+later mistakes it for a spendable number - that is exactly the mistake the 402 gate used to make.
+
+### 5. DONE-TEST - HONEST STATUS
+
+| Requirement | Status |
+|---|---|
+| `deno --version` first; STOP if absent | DONE - absent, stopped |
+| deno type-check the edited function | **NOT DONE - blocked, no deno** |
+| deploy `atlasoracle-route` | **NOT DONE - blocked. DEPLOY AMENDMENT forbids deploying without a clean type-check** |
+| prove the wire: RPC-written debit + idempotent replay through the route | **NOT DONE - nothing deployed to prove** |
+| deployed version incremented | **NOT DONE** |
+| housekeeping: write the missing migration files, verify non-empty, list them | DONE - section 2, four files not three |
+| housekeeping: delete the stale DB14 draft | **REFUSED - section 3.** Not superseded; it holds the design for a live, open PII hole |
+| W-1 owner + next action at top | DONE |
+
+**Zero deploys. Zero DDL. Zero DML.** Every database interaction was a read, except one
+rolled-back transaction in section 4 whose fixtures were discarded - `oracle_token_ledger` is 16
+rows, as it has been since before OPS49. Files written: four migration files pulled from live
+history, and this report. Nothing staged, nothing committed.
+
+### 6. COULD NOT VERIFY
+
+- **That the route edit compiles at all.** Unchanged from OPS49 and OPS49b. This is the third
+  consecutive pass reporting it, and it is now the only thing between a hardened database and a
+  production path that actually uses it.
+- **That the four written files are byte-identical to what the applier originally had on disk.**
+  They are byte-identical to what `schema_migrations.statements` recorded, which is the applied
+  text. If an applier ever edited a file after applying it, the difference would not be visible
+  from here.
+- **`supabase migration fetch` itself.** Not run - see the section 2 deviation. If the lead wants
+  the CLI path exercised, that is a separate re-run with a linked project.
+- **Whether anything else still reads the view's `granted_tokens`.** Not swept; the caution in
+  section 4 is structural, not a report of a live misuse.
+
+---
+
 ## OPS49b - APPLIED. oracle_debit_tokens + oracle_token_available are LIVE and PROVEN.
 
 Lane `ops`. Workdir `TheMANUAL.tech`. Scope `oracle`. The R7 re-stamp of OPS49: migration file
