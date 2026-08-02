@@ -1,0 +1,46 @@
+// SAMPLE OUTPUT - DB18, 2026-08-02. NOT INSTALLED.
+//
+// This is byte-for-byte what scripts/_drafts/db18/gen-atom-type.mjs emits
+// once 20260802000000_db18_atoms_type_check.sql is applied. It is filed here
+// with a .sample suffix so it cannot be picked up by tsc; on promotion it
+// lands at src/types/atom-type.generated.ts with this header replaced by the
+// generated one below.
+//
+// ------------------------- generated content -------------------------
+
+// GENERATED FILE - DO NOT EDIT.
+//
+// Source of truth: the atoms_type_check CHECK constraint on public.atoms.
+// Regenerate with `npm run gen:atom-type`. Changing the vocabulary means
+// writing a migration; this file follows, it never leads.
+//
+// Mechanism: scripts/gen-atom-type.mjs (DB18, 2026-08-02).
+
+export type AtomType =
+  | 'admin1'
+  | 'admin2'
+  | 'city'
+  | 'concept'
+  | 'continent'
+  | 'country'
+  | 'event'
+  | 'neighborhood'
+  | 'region';
+
+/** Every legal atoms.type value, in the constraint's order. */
+export const ATOM_TYPES = [
+  'admin1',
+  'admin2',
+  'city',
+  'concept',
+  'continent',
+  'country',
+  'event',
+  'neighborhood',
+  'region',
+] as const satisfies readonly AtomType[];
+
+/** Runtime guard for values arriving from the DB as `unknown`/`string`. */
+export function isAtomType(v: unknown): v is AtomType {
+  return typeof v === 'string' && (ATOM_TYPES as readonly string[]).includes(v);
+}

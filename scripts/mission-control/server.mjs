@@ -69,18 +69,48 @@
 //   Focus is attempted ONLY in response to a deliberate button click, and the
 //   activator synthesises no input — no key or click injection anywhere.
 //
+// FRONT19 - THE REPORTS READER
+//   174 reports sit in ops_reports and there was no path from a filed report to
+//   a human reading one that did not go through asking a terminal to copy it
+//   into a file - for a document a terminal had already written. The work was
+//   done and stranded. This board now reads them.
+//
+//   Three things about it are load-bearing rather than stylistic:
+//     * PER-ROW fail-soft, not per-panel. The list is read one JSON object per
+//       line and each line is parsed alone (rail-json.mjs), so one unrenderable
+//       row degrades into a marked row and the other 173 still draw. OPS43's
+//       rule applied at the grain the data actually has.
+//     * EVERY SQL STRING IS ASSERTED PURE ASCII AT THE POINT OF SENDING.
+//       assertAscii() runs inside the two functions that shell out, so no query
+//       can reach psql unchecked. OPS43 lost the whole board to one 0x97 in a
+//       comment; report titles are full of em dashes, so this file must never
+//       be the thing that puts one on the wire. Rail CONTENT coming back is
+//       unrestricted and renders as-is.
+//     * STILL SELECT ONLY. Reading reports adds no write. The one thing this
+//       server now writes is a FILE - docs/<PASS>.md - and never a row.
+//
 // RUN:  node scripts/mission-control/server.mjs
 //       then open http://127.0.0.1:7317
+//
+// MC_FAULT_INJECT=reports  corrupts one line of the reports stream so the
+//   per-row degrade path can be seen in the real UI. Off unless set.
 
 import { createServer } from 'node:http';
 import { execFile, execFileSync } from 'node:child_process';
-import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, basename } from 'node:path';
+// `resolve` is aliased: the promise executors below bind their own `resolve`,
+// and a path helper shadowed inside them is a trap waiting for a later edit.
+import { dirname, join, basename, sep, resolve as resolvePath } from 'node:path';
+import { parseJsonLines, injectFault, BAD_ROW } from './rail-json.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = join(HERE, 'mission-control.config.json');
 const cfg = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
+
+// The repo root, two levels up from scripts/mission-control. Saved reports land
+// under it and nowhere else - see saveReport().
+const REPO_ROOT = resolvePath(HERE, '..', '..');
 
 // ── rail read ───────────────────────────────────────────────────────────────
 // One psql invocation, JSON out, so nothing depends on delimiter parsing.
@@ -116,16 +146,10 @@ SELECT json_build_object(
          WHERE status IN ('queued','claimed')
       ) d
   ), '[]'::json),
-  'reports', COALESCE((
-    SELECT json_agg(row_to_json(r) ORDER BY r.created_at DESC)
-      FROM (
-        SELECT pass, terminal, title, created_at,
-               EXTRACT(EPOCH FROM (now() - created_at))/60 AS age_min
-          FROM public.ops_reports
-         ORDER BY created_at DESC
-         LIMIT ${Number(cfg.reportHeadlines) || 12}
-      ) r
-  ), '[]'::json),
+  -- FRONT19 removed the 'reports' leg from this query. It fed a 12-row headline
+  -- strip that the REPORTS panel now supersedes with the whole table, its own
+  -- endpoint, per-row fail-soft and the bodies themselves. Two report lists on
+  -- one page would only raise the question of which one is complete.
   -- OPS33 build progress. Status is DERIVED from the rail wherever a step
   -- carries a pass; nobody ticks a box the rail already knows the answer to.
   'build_rollup', COALESCE((
@@ -157,16 +181,66 @@ SELECT json_build_object(
 // no longer take the other two down with it.
 const SECTION_SQL = {
   dispatches: "SELECT COALESCE(json_agg(row_to_json(d) ORDER BY d.status, d.priority, d.created_at), '[]'::json) FROM (SELECT * FROM public.ops_dispatches WHERE status IN ('queued','claimed')) d;",
-  reports:    "SELECT COALESCE(json_agg(row_to_json(r) ORDER BY r.created_at DESC), '[]'::json) FROM (SELECT pass, terminal, title, created_at FROM public.ops_reports ORDER BY created_at DESC LIMIT 12) r;",
   build_steps: "SELECT COALESCE(json_agg(row_to_json(s)), '[]'::json) FROM (SELECT * FROM public.ops_build_progress) s;",
 };
 
-function psqlJson(sql) {
+// FRONT19 - THE ASCII GATE, and it is a gate rather than a convention.
+//
+// OPS43: a single U+2014 inside a SQL comment blinded the entire board. The SQL
+// is handed to psql as a command-line ARGUMENT, Windows converts argv to the
+// child's codepage, and the em dash arrives as CP1252 0x97, which is not valid
+// UTF-8 - the server rejects the whole query. The fix at the time was to remove
+// the character. That fix does not survive the next edit.
+//
+// So the rule is now ENFORCED at the only two places a query can leave this
+// process. A non-ASCII byte in a query string throws here, loudly, naming the
+// offending character and its position, instead of coming back as an opaque
+// encoding error from Postgres. Nothing can send unchecked SQL, because nothing
+// else shells out to psql.
+//
+// This constrains what we SEND. It says nothing about what comes BACK: report
+// titles and bodies are full of em dashes and arrive over stdout, which has no
+// such problem, and they render untouched.
+const ASCII_OK = /^[\x09\x0A\x0D\x20-\x7E]*$/;
+
+function assertAscii(label, sql) {
+  if (ASCII_OK.test(sql)) return sql;
+  const i = [...sql].findIndex((c) => !ASCII_OK.test(c));
+  const ch = sql[i];
+  throw new Error(
+    `${label}: non-ASCII character U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')} `
+    + `at offset ${i} - it would reach psql as a codepage byte and poison the query (OPS43). `
+    + `Context: ${JSON.stringify(sql.slice(Math.max(0, i - 30), i + 30))}`,
+  );
+}
+
+const PSQL_ARGS = () => [
+  '-h', cfg.db.host, '-p', cfg.db.port, '-U', cfg.db.user, '-d', cfg.db.name,
+  '-w', '-t', '-A', '-v', 'ON_ERROR_STOP=1',
+];
+
+// Raw stdout, for reads that are parsed a line at a time (see rail-json.mjs).
+// maxBuffer is generous because one report body is 185KB and the list is 174 of
+// them without bodies; the body read is a single row.
+function psqlText(label, sql) {
+  assertAscii(label, sql);
   return new Promise((resolve, reject) => {
     execFile(
-      cfg.psql,
-      ['-h', cfg.db.host, '-p', cfg.db.port, '-U', cfg.db.user, '-d', cfg.db.name,
-       '-w', '-t', '-A', '-v', 'ON_ERROR_STOP=1', '-c', sql],
+      cfg.psql, [...PSQL_ARGS(), '-c', sql],
+      { maxBuffer: 1024 * 1024 * 32, windowsHide: true },
+      (err, stdout, stderr) => {
+        if (err) return reject(new Error((stderr || err.message).trim().split('\n')[0]));
+        resolve(stdout);
+      },
+    );
+  });
+}
+
+function psqlJson(sql) {
+  assertAscii('board query', sql);
+  return new Promise((resolve, reject) => {
+    execFile(
+      cfg.psql, [...PSQL_ARGS(), '-c', sql],
       { maxBuffer: 1024 * 1024 * 8, windowsHide: true },
       (err, stdout, stderr) => {
         if (err) return reject(new Error((stderr || err.message).trim().split('\n')[0]));
@@ -182,7 +256,7 @@ async function readBoard() {
     return await psqlJson(BOARD_SQL);           // fast path, unchanged shape
   } catch (whole) {
     // Degraded path. Each section stands or falls alone.
-    const board = { server_now: new Date().toISOString(), dispatches: [], reports: [], build_steps: [], build_rollup: [], build_total: null };
+    const board = { server_now: new Date().toISOString(), dispatches: [], build_steps: [], build_rollup: [], build_total: null };
     const failed = [{ section: 'combined', error: whole.message }];
     for (const [name, sql] of Object.entries(SECTION_SQL)) {
       try { board[name] = await psqlJson(sql); }
@@ -192,6 +266,93 @@ async function readBoard() {
     console.error(`[rail] degraded read :: ${failed.map((f) => f.section).join(', ')}`);
     return board;
   }
+}
+
+// ── reports (FRONT19) ───────────────────────────────────────────────────────
+// The list carries NO bodies. 174 rows averaging 15KB is 2.6MB, and the panel
+// needs a title to draw a row. Bodies are fetched one at a time, on open.
+//
+// row_to_json PER ROW, not one json_agg array, so rail-json.mjs can isolate a
+// bad row. `octet_length(body)` rides along because the size is the reader's
+// only warning that a click is about to open 185KB.
+const REPORTS_SQL = `
+SELECT row_to_json(r) FROM (
+  SELECT id, pass, terminal, title, created_at,
+         octet_length(body) AS bytes,
+         EXTRACT(EPOCH FROM (now() - created_at))/60 AS age_min
+    FROM public.ops_reports
+   ORDER BY created_at DESC
+) r;`;
+
+// Reports are addressed by id, never by pass. ops_reports holds 174 rows across
+// 169 distinct passes - a pass is NOT unique here (R3 says new pass, new row,
+// but a pass can be re-reported), so a pass lookup could open the wrong one.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// The id is validated against the pattern above BEFORE it is interpolated, so
+// the only characters that can reach the query are hex and hyphen. That is also
+// what keeps the statement ASCII, which assertAscii then proves rather than
+// assumes.
+const reportSql = (id) => `
+SELECT row_to_json(r) FROM (
+  SELECT id, pass, terminal, title, created_at, body,
+         octet_length(body) AS bytes
+    FROM public.ops_reports
+   WHERE id = '${id}'
+) r;`;
+
+const FAULTS = String(process.env.MC_FAULT_INJECT || '').split(',').map((s) => s.trim());
+
+async function readReports() {
+  const raw = await psqlText('reports list', REPORTS_SQL);
+  const { rows, bad } = parseJsonLines(injectFault(raw, FAULTS.includes('reports')));
+  if (bad) console.error(`[reports] ${bad} of ${rows.length} row(s) unparseable - degraded in place`);
+  return { rows, bad };
+}
+
+async function readReport(id) {
+  if (!UUID_RE.test(id)) throw new Error('not a report id');
+  const { rows } = parseJsonLines(await psqlText('report body', reportSql(id)));
+  const row = rows[0];
+  if (!row) throw new Error('no report with that id');
+  if (row[BAD_ROW]) throw new Error(`report body did not survive transport: ${row.error}`);
+  return row;
+}
+
+// A saved report goes to docs/<PASS>.md at the repo root and nowhere else.
+//
+// Two things make that safe rather than merely intended:
+//   * the pass is validated against a strict pattern, so no separator, no dot
+//     segment and no drive letter can enter the name;
+//   * the joined path is resolved and checked to still be inside docs/, which
+//     catches anything the pattern did not.
+// The body is re-read FROM THE RAIL by id - the browser never supplies it, so
+// the file cannot differ from the row it claims to be.
+const PASS_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
+const DOCS_DIR = join(REPO_ROOT, 'docs');
+
+async function saveReport(id) {
+  const row = await readReport(id);
+  const pass = String(row.pass || '').trim();
+  if (!PASS_RE.test(pass)) throw new Error(`pass "${pass}" is not a safe file name`);
+
+  mkdirSync(DOCS_DIR, { recursive: true });
+  let target = join(DOCS_DIR, `${pass}.md`);
+  // A pass is not unique. If a file for this pass already holds a DIFFERENT
+  // report, do not clobber it - disambiguate with the id and say which file was
+  // written. Silently overwriting one finished report with another is exactly
+  // the kind of quiet loss this whole pass exists to end.
+  let disambiguated = false;
+  if (existsSync(target) && readFileSync(target, 'utf8') !== row.body) {
+    target = join(DOCS_DIR, `${pass}-${String(row.id).slice(0, 8)}.md`);
+    disambiguated = true;
+  }
+  if (!resolvePath(target).startsWith(resolvePath(DOCS_DIR) + sep)) {
+    throw new Error('refusing to write outside docs/');
+  }
+  writeFileSync(target, row.body, 'utf8');
+  console.log(`[reports] saved ${pass} -> ${target} (${Buffer.byteLength(row.body, 'utf8')} bytes)`);
+  return { path: target, pass, bytes: Buffer.byteLength(row.body, 'utf8'), disambiguated };
 }
 
 // ── spawn ───────────────────────────────────────────────────────────────────
@@ -631,6 +792,43 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
  .wrap{padding:12px 14px}
  .err{color:var(--red);padding:12px 14px}
  .ok{color:var(--green)} .note{color:var(--dim);font-size:11px;padding:0 14px 12px}
+
+ /* FRONT19 reports reader */
+ .filters{display:flex;gap:8px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line)}
+ .filters input,.filters select{background:#0f131b;color:var(--fg);border:1px solid var(--line);
+   border-radius:5px;padding:5px 8px;font:inherit}
+ .filters input{width:120px}
+ .filters .count{color:var(--dim);font-size:11px;margin-left:auto}
+ .scroll{max-height:420px;overflow-y:auto}
+ tr.row{cursor:pointer} tr.row:hover td{background:#1b2130}
+ tr.badrow td{background:rgba(228,87,74,.10)}
+ .bytes{color:var(--dim);white-space:nowrap}
+ .big{color:var(--amber)}
+ /* Reading pane. Full width because a 40k register cannot be read in 256px, and
+    the largest report on the rail is 185,053 bytes. */
+ #pane{position:fixed;inset:0;background:rgba(6,8,11,.93);z-index:9;display:none;
+   padding:24px;overflow:hidden}
+ #pane.open{display:flex;flex-direction:column}
+ #paneHead{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;
+   background:var(--panel);border:1px solid var(--line);border-bottom:none;
+   border-radius:8px 8px 0 0;padding:12px 16px}
+ #paneBody{flex:1;overflow-y:auto;overflow-x:hidden;background:var(--panel);
+   border:1px solid var(--line);border-radius:0 0 8px 8px;padding:18px 22px;display:flex;gap:22px}
+ #toc{width:230px;flex-shrink:0;position:sticky;top:0;align-self:flex-start;
+   max-height:100%;overflow-y:auto}
+ #toc a{display:block;color:var(--dim);text-decoration:none;padding:2px 0;font-size:11px;
+   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+ #toc a:hover{color:var(--honey)} #toc a.h3{padding-left:12px;opacity:.8}
+ #doc{flex:1;min-width:0;max-width:1000px}
+ /* Prose wraps. Tables and fenced blocks do NOT - they scroll inside their own
+    box, because reflowing a fixed-width query result destroys the evidence. */
+ #doc .p{white-space:pre-wrap;overflow-wrap:break-word;margin:0 0 4px}
+ #doc .pre{white-space:pre;overflow-x:auto;background:#0f131b;border:1px solid var(--line);
+   border-radius:6px;padding:10px 12px;margin:8px 0}
+ #doc .tbl{white-space:pre;overflow-x:auto;margin:8px 0;color:var(--fg)}
+ #doc .h2{color:var(--honey);font-weight:600;margin:18px 0 6px;white-space:pre-wrap}
+ #doc .h3{color:var(--blue);font-weight:600;margin:14px 0 4px;white-space:pre-wrap}
+ .btn{width:auto;display:inline-block;margin:0}
 </style></head><body>
 <header>
   <h1>Mission Control</h1>
@@ -642,7 +840,15 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
     <section><h2>Rail — queued &amp; claimed</h2>
       <div class="note" style="padding:0 0 6px">pool order — a terminal sticky on a lane may pull differently</div>
       <div id="board" class="wrap">…</div></section>
-    <section style="margin-top:18px"><h2>Recent reports</h2><div id="reports" class="wrap">…</div></section>
+    <!-- FRONT19: the whole table, not a headline strip. Click a row to read it. -->
+    <section style="margin-top:18px"><h2>Reports</h2>
+      <div class="filters">
+        <input id="fPass" placeholder="pass" autocomplete="off">
+        <select id="fLane"><option value="">all lanes</option></select>
+        <button class="btn" id="fClear" style="width:auto">clear</button>
+        <span class="count" id="rCount"></span>
+      </div>
+      <div id="reports" class="scroll">…</div></section>
     <!-- OPS33: the whole HONEYCOMB build, phases and steps, at the bottom. -->
     <section style="margin-top:18px"><h2>Build progress — all HONEYCOMB</h2>
       <div id="build" class="wrap">…</div></section>
@@ -669,6 +875,18 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
     </section>
   </div>
 </main>
+<div id="pane">
+  <div id="paneHead">
+    <span class="pass" id="panePass"></span>
+    <span class="sub" id="paneMeta"></span>
+    <span class="title" id="paneTitle" style="flex-basis:100%"></span>
+    <button class="btn" id="paneCopy">copy</button>
+    <button class="btn" id="paneSave">save to docs/</button>
+    <button class="btn" id="paneClose">close (esc)</button>
+    <span class="meta" id="paneFlash"></span>
+  </div>
+  <div id="paneBody"><div id="toc"></div><div id="doc"></div></div>
+</div>
 <script>
 const fmtAge = m => m == null ? '' : m < 60 ? Math.round(m)+'m'
   : m < 1440 ? (m/60).toFixed(1)+'h' : (m/1440).toFixed(1)+'d';
@@ -707,7 +925,7 @@ async function tick() {
   } catch (e) {
     // Transport or total failure: every panel says so, none goes silently blank.
     const msg = 'rail read failed: ' + e.message;
-    ['board', 'reports', 'build'].forEach((id) => panelFail(id, msg));
+    ['board', 'build'].forEach((id) => panelFail(id, msg));
     document.getElementById('stamp').textContent = 'disconnected';
     return;
   }
@@ -716,10 +934,11 @@ async function tick() {
   const failed = b.failed || [];
   const bad = (name) => failed.find((f) => f.section === name);
 
-  // Each panel independently. One throwing renderer cannot stop the next two.
+  // Each panel independently. One throwing renderer cannot stop the other.
+  // The reports panel is NOT here: FRONT19 gave it its own endpoint and its own
+  // beat, so a board failure cannot blank it and vice versa.
   const panels = [
     ['board',   'dispatches', () => renderDispatches(b)],
-    ['reports', 'reports',    () => renderReports(b)],
     ['build',   'build_steps', () => renderBuildHtml(b)],
   ];
   for (const [id, section, fn] of panels) {
@@ -763,14 +982,187 @@ function renderDispatches(b) {
       }).join('') + '</table>';
 }
 
-function renderReports(b) {
-  const rs = b.reports || [];
-  if (rs.length === 0) return '<div class="note" style="padding:4px 0">no reports</div>';
-  return '<table>' + rs.map(r =>
-      '<tr><td class="pass">' + esc(r.pass) + '</td>'
-      + '<td class="sub">' + esc(r.terminal ?? '') + '</td>'
-      + '<td class="sub">' + fmtAge(r.age_min) + ' ago</td>'
-      + '<td class="title">' + esc(cleanTitle(r.title)) + '</td></tr>').join('') + '</table>';
+// ── FRONT19 reports reader ──────────────────────────────────────────────────
+// The list is its own fetch on its own beat. Reports move in hours; the rail
+// board moves in seconds, and re-reading 174 rows every 10s to watch a column
+// that rarely changes would be waste.
+const LANES = ['front', 'db', 'docs', 'ops', 'games', 'lead'];
+
+// ops_reports.terminal holds fourteen values from four vocabularies: lanes,
+// terminal ids (A, B, TL, TR), a role case-split as lead/LEAD, and heartbeat
+// rows prefixed HB:. Normalising on READ is deliberate - anything unrecognised
+// goes to a VISIBLE 'other' bucket rather than being dropped, because a filter
+// that silently hides a report is the same disease as a board that hides a
+// queue. Fixing the column itself is OPS54 R23 and is not this pass.
+function normLane(t) {
+  const v = String(t ?? '').replace(/^HB:/i, '').toLowerCase().trim();
+  if (!v) return 'other';
+  return LANES.includes(v) ? v : 'other';
+}
+
+let REPORTS = [];
+let REPORTS_BAD = 0;
+
+async function tickReports() {
+  try {
+    const j = await (await fetch('/api/reports')).json();
+    if (j.error) throw new Error(j.error);
+    REPORTS = j.rows || [];
+    REPORTS_BAD = j.bad || 0;
+    fillLaneFilter();
+    drawReports();
+  } catch (e) {
+    panelFail('reports', 'reports unavailable: ' + e.message);
+  }
+}
+
+function fillLaneFilter() {
+  const sel = document.getElementById('fLane');
+  const have = new Set(REPORTS.filter(r => !r.__bad).map(r => normLane(r.terminal)));
+  const want = ['', ...LANES.filter(l => have.has(l)), ...(have.has('other') ? ['other'] : [])];
+  if (sel.dataset.built === want.join('|')) return;
+  sel.dataset.built = want.join('|');
+  const keep = sel.value;
+  sel.innerHTML = want.map(v => '<option value="' + v + '">' + (v || 'all lanes') + '</option>').join('');
+  sel.value = want.includes(keep) ? keep : '';
+}
+
+function drawReports() {
+  const q = document.getElementById('fPass').value.trim().toUpperCase();
+  const lane = document.getElementById('fLane').value;
+  // A degraded row is NEVER filtered out. It has no pass and no lane to match
+  // on, and hiding it would turn "one row is broken" back into a silently
+  // shorter list - the exact thing per-row fail-soft exists to prevent.
+  const rows = REPORTS.filter(r => r.__bad
+    || ((!q || String(r.pass ?? '').toUpperCase().includes(q))
+        && (!lane || normLane(r.terminal) === lane)));
+
+  document.getElementById('rCount').textContent =
+    rows.length + ' of ' + REPORTS.length + ' reports'
+    + (REPORTS_BAD ? ' - ' + REPORTS_BAD + ' unreadable' : '');
+
+  if (REPORTS.length === 0) return panelOk('reports', '<div class="note" style="padding:10px 14px">no reports on the rail</div>');
+  if (rows.length === 0) return panelOk('reports', '<div class="note" style="padding:10px 14px">no report matches that filter</div>');
+
+  panelOk('reports', '<table><tr><th>pass</th><th>lane</th><th>filed</th><th>size</th><th>title</th></tr>'
+    + rows.map(r => {
+      if (r.__bad) {
+        return '<tr class="badrow"><td class="alert">unreadable</td>'
+          + '<td colspan="4" class="alert">this row did not survive transport ('
+          + esc(r.error) + ') - the rest of the list is intact'
+          + '<div class="sub">' + esc(r.raw) + '</div></td></tr>';
+      }
+      const kb = Math.round((r.bytes || 0) / 1024);
+      // data-id + one delegated listener, not an inline onclick: this whole page
+      // is a template literal in server.mjs, and nested quote escaping through
+      // that layer is how a working handler becomes a syntax error on the next
+      // edit. The id is a validated uuid, but it never enters executable text.
+      return '<tr class="row" data-id="' + esc(r.id) + '">'
+        + '<td class="pass">' + esc(r.pass) + '</td>'
+        + '<td><span class="lane">' + esc(normLane(r.terminal)) + '</span></td>'
+        + '<td class="sub">' + esc(String(r.created_at).slice(0, 16).replace('T', ' ')) + '</td>'
+        + '<td class="bytes ' + (kb >= 40 ? 'big' : 'sub') + '">' + (kb < 1 ? '<1' : kb) + 'k</td>'
+        + '<td class="title">' + esc(cleanTitle(r.title)) + '</td></tr>';
+    }).join('') + '</table>');
+}
+
+// ── rendering a body ────────────────────────────────────────────────────────
+// No markdown dependency: adding one is a plan-mode item under root CLAUDE.md
+// criterion 5, and this pass is not the place to spend that. What the bodies
+// actually need is narrower than markdown anyway - the two structures that
+// break under naive rendering are fenced blocks and wide tables, and both need
+// the SAME treatment: keep them monospace, do not reflow them, give each its
+// own horizontal scroll. Prose wraps; those do not.
+//
+// Blocks, not lines: consecutive prose lines join into one element, so a 185KB
+// body is a few hundred nodes rather than four thousand.
+function renderBody(text) {
+  // CRLF is normalised FIRST, and this is not defensive tidying - it is a
+  // measured bug. A trailing carriage return defeats the heading match, because
+  // the JS end anchor without the m flag will not step over one, so every '##'
+  // in such a report renders as prose and the mini-TOC comes back empty. Two of
+  // the 182 bodies on the rail carry CR today (counted, not assumed): a report
+  // is whatever a terminal wrote, and some terminals wrote Windows endings.
+  const lines = String(text).replace(/\\r\\n?/g, '\\n').split('\\n');
+  const out = [];
+  const toc = [];
+  let buf = [];
+  let mode = 'p';
+
+  const flush = () => {
+    if (!buf.length) return;
+    out.push('<div class="' + mode + '">' + esc(buf.join('\\n')) + '</div>');
+    buf = [];
+  };
+
+  let fenced = false;
+  for (const line of lines) {
+    if (/^\\s*\`\`\`/.test(line)) {
+      // The fence markers themselves are dropped; the box IS the fence.
+      if (fenced) { flush(); fenced = false; mode = 'p'; }
+      else { flush(); fenced = true; mode = 'pre'; }
+      continue;
+    }
+    if (fenced) { buf.push(line); continue; }
+
+    const isTable = /^\\s*\\|/.test(line);
+    const h = line.match(/^(#{2,3})\\s+(.*)$/);
+    if (h) {
+      flush(); mode = 'p';
+      const id = 'h' + toc.length;
+      const lvl = h[1].length;
+      toc.push({ id, lvl, text: h[2] });
+      out.push('<div class="h' + lvl + '" id="' + id + '">' + esc(h[2]) + '</div>');
+      continue;
+    }
+    const want = isTable ? 'tbl' : 'p';
+    if (want !== mode) { flush(); mode = want; }
+    buf.push(line);
+  }
+  flush();
+
+  // A mini-TOC derived from the headings, not from a convention a report writer
+  // has to remember. OPS54 has ~30 of them; scrolling 40k characters to find one
+  // section is the difference between readable and merely present.
+  const tocHtml = toc.length < 3 ? ''
+    : toc.map(t => '<a class="h' + t.lvl + '" data-t="' + t.id + '">'
+        + esc(t.text) + '</a>').join('');
+  return { doc: out.join(''), toc: tocHtml };
+}
+
+let OPEN_ID = null;
+let OPEN_BODY = '';
+
+async function openReport(id) {
+  const pane = document.getElementById('pane');
+  const doc = document.getElementById('doc');
+  pane.classList.add('open');
+  OPEN_ID = id; OPEN_BODY = '';
+  doc.innerHTML = '<div class="note">loading...</div>';
+  document.getElementById('toc').innerHTML = '';
+  document.getElementById('paneFlash').textContent = '';
+  try {
+    const j = await (await fetch('/api/report?id=' + encodeURIComponent(id))).json();
+    if (j.error) throw new Error(j.error);
+    OPEN_BODY = j.body || '';
+    document.getElementById('panePass').textContent = j.pass;
+    document.getElementById('paneMeta').textContent =
+      normLane(j.terminal) + ' - ' + String(j.created_at).slice(0, 16).replace('T', ' ')
+      + ' - ' + j.bytes.toLocaleString() + ' bytes';
+    document.getElementById('paneTitle').textContent = j.title || '';
+    const r = renderBody(OPEN_BODY);
+    doc.innerHTML = r.doc;
+    document.getElementById('toc').innerHTML = r.toc;
+    document.getElementById('paneBody').scrollTop = 0;
+  } catch (e) {
+    // The pane failing does not touch the list behind it.
+    doc.innerHTML = '<div class="err">could not read that report: ' + esc(e.message) + '</div>';
+  }
+}
+
+function closePane() {
+  document.getElementById('pane').classList.remove('open');
+  OPEN_ID = null; OPEN_BODY = '';
 }
 
 // ── OPS33 build panel ───────────────────────────────────────────────────────
@@ -868,6 +1260,66 @@ async function boot() {
     .map((x, i) => '<button onclick="spawn(' + i + ')">+ ' + esc(x.label) + '</button>').join('');
   tick(); setInterval(tick, 10000);
   tickBackups(); setInterval(tickBackups, 300000);
+
+  // FRONT19 wiring. Reports move in hours, so a 2-minute beat; filtering is
+  // client-side over the loaded set, so it is instant and issues no query.
+  document.getElementById('fPass').addEventListener('input', drawReports);
+  document.getElementById('fLane').addEventListener('change', drawReports);
+  document.getElementById('fClear').addEventListener('click', () => {
+    document.getElementById('fPass').value = '';
+    document.getElementById('fLane').value = '';
+    drawReports();
+  });
+  // Delegated, so redrawing the table never has to re-bind anything.
+  document.getElementById('reports').addEventListener('click', (e) => {
+    const tr = e.target.closest('tr.row');
+    if (tr) openReport(tr.dataset.id);
+  });
+  document.getElementById('toc').addEventListener('click', (e) => {
+    const a = e.target.closest('a[data-t]');
+    if (!a) return;
+    const h = document.getElementById(a.dataset.t);
+    if (h) h.scrollIntoView({ block: 'start' });
+  });
+  document.getElementById('paneClose').addEventListener('click', closePane);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePane(); });
+  document.getElementById('paneCopy').addEventListener('click', copyOpen);
+  document.getElementById('paneSave').addEventListener('click', saveOpen);
+  tickReports(); setInterval(tickReports, 120000);
+}
+
+async function copyOpen() {
+  const f = document.getElementById('paneFlash');
+  try {
+    await navigator.clipboard.writeText(OPEN_BODY);
+    f.textContent = 'copied ' + OPEN_BODY.length.toLocaleString() + ' characters';
+    f.className = 'meta ok';
+  } catch (e) {
+    f.textContent = 'copy failed: ' + e.message;
+    f.className = 'meta alert';
+  }
+}
+
+// The button reports the PATH, because the point of it is that the report can
+// then be opened in a real editor or dragged into a chat window. A "saved!"
+// with no path would leave the human hunting for the file.
+async function saveOpen() {
+  const f = document.getElementById('paneFlash');
+  f.textContent = 'saving...'; f.className = 'meta';
+  try {
+    const r = await fetch('/api/report/save', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: OPEN_ID }),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error);
+    f.textContent = 'saved -> ' + j.path
+      + (j.disambiguated ? ' (a different report already used that name)' : '');
+    f.className = 'meta ok';
+  } catch (e) {
+    f.textContent = 'save failed: ' + e.message;
+    f.className = 'meta alert';
+  }
 }
 // "opened" is only ever printed for a spawn the server actually CONFIRMED — a
 // launcher exit code is not evidence a window exists. Failures stay on screen
@@ -945,6 +1397,31 @@ const server = createServer(async (req, res) => {
         staleAlert: cfg.staleClaimAlertMinutes,
       });
     }
+    // FRONT19. Three endpoints, two of them SELECT and one that writes a FILE.
+    // None of them writes a row.
+    if (req.method === 'GET' && req.url === '/api/reports') {
+      const { rows, bad } = await readReports();
+      return json(res, 200, { rows, bad });
+    }
+    if (req.method === 'GET' && req.url.startsWith('/api/report?')) {
+      const id = new URL(req.url, 'http://127.0.0.1').searchParams.get('id') || '';
+      try { return json(res, 200, await readReport(id)); }
+      catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    if (req.method === 'POST' && req.url === '/api/report/save') {
+      let raw = '';
+      req.on('data', (c) => { raw += c; if (raw.length > 1024) req.destroy(); });
+      req.on('end', async () => {
+        try {
+          const { id } = JSON.parse(raw || '{}');
+          json(res, 200, { ok: true, ...await saveReport(String(id || '')) });
+        } catch (e) {
+          console.error(`[reports] save FAILED :: ${e.message}`);
+          json(res, 400, { ok: false, error: e.message });
+        }
+      });
+      return;
+    }
     if (req.method === 'POST' && req.url === '/api/spawn') {
       let raw = '';
       req.on('data', (c) => { raw += c; if (raw.length > 1024) req.destroy(); });
@@ -972,8 +1449,23 @@ const server = createServer(async (req, res) => {
 // moves the listen port; it cannot reach the bind address, which stays 127.0.0.1.
 const PORT = Number(process.env.MC_PORT) || cfg.port;
 
+// FRONT19 - the ASCII proof, run at STARTUP so a bad character is a refusal to
+// boot rather than a blank panel an hour later. assertAscii already guards the
+// wire; this walks every constant query plus a synthetic id-bearing one, so the
+// interpolated form is covered too, and it throws before the port is bound.
+const SQL_CONSTANTS = [
+  ['BOARD_SQL', BOARD_SQL],
+  ...Object.entries(SECTION_SQL).map(([k, v]) => [`SECTION_SQL.${k}`, v]),
+  ['REPORTS_SQL', REPORTS_SQL],
+  ['reportSql()', reportSql('00000000-0000-0000-0000-000000000000')],
+];
+for (const [label, sql] of SQL_CONSTANTS) assertAscii(label, sql);
+
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`Mission Control on http://127.0.0.1:${PORT}  (read-only rail, ${cfg.folders.length} spawn targets)`);
+  console.log(`  sql      : ${SQL_CONSTANTS.length} query constants verified pure ASCII (OPS43 gate)`);
+  console.log(`  reports  : save target ${DOCS_DIR}`
+    + (FAULTS.length && FAULTS[0] ? `   [FAULT INJECTION: ${FAULTS.join(',')}]` : ''));
   console.log(`  terminal : ${RESOLVED.terminal.path}   [${RESOLVED.terminal.how}]`);
   console.log(`  command  : ${RESOLVED.command
     ?? `'${cfg.terminal.command}' not found on this PATH — passing it bare, the terminal's shell must resolve it`}`);
