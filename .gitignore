@@ -57,3 +57,11 @@ _dberry_port/
 # FreedomBLiNGS port package — design handoff (tokens, surfaces.jsx, README).
 # Authoritative look/structure source for the staged surface port; not tracked.
 _fb_port/
+
+# Verification-run output (screenshots, report.json) from drift-reconciliation and
+# smoke runs. Root canon's SWEEP gate 2 forbids `verify-out/` paths by name, so while
+# this directory is untracked-but-not-ignored, any run that writes it blocks every
+# sweep of this repo until it is cleaned up by hand. OPS74-Q2 hit exactly that: a
+# concurrent reconcile session dropped 166 files here mid-manifest. Ignoring it makes
+# gate 1 satisfiable by construction. (ORACLE_MF v0.56 ruling c, applied OPS76.)
+verify-out/

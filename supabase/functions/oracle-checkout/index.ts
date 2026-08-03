@@ -143,6 +143,35 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ONE live plan per Bee, refused at the door (OPS67).
+    // subscriptions_one_active_per_product and
+    // subscriptions_one_active_oracle_per_bee_uidx both make a second live
+    // oracle subscription row unrepresentable, and Stripe Checkout always
+    // CREATES a subscription rather than modifying one. Without this guard a Bee
+    // can start a second plan, be charged for it monthly, and leave the webhook
+    // reconciling two Stripe subscriptions into one row that can only hold one.
+    // The pack lane above is deliberately NOT guarded -- top-ups are unlimited.
+    const { data: live, error: liveErr } = await sb.from('subscriptions')
+      .select('tier, status, current_period_end')
+      .eq('bee_id', beeId).eq('product_type', 'oracle')
+      .in('status', ['active', 'trialing'])
+      .maybeSingle();
+    if (liveErr) {
+      console.error('oracle-checkout live plan lookup failed', { message: liveErr.message });
+      return errorResponse('Lookup failed', 500);
+    }
+    if (live) {
+      // LANGUAGE FIREWALL: this reaches the Bee.
+      return jsonResponse({
+        error: 'You already have a plan running',
+        detail: `Your ${live.tier} plan is live. Stop it first and the change takes effect ` +
+          `from the next cycle -- you keep this cycle's Tokens either way. Tokens you GET ` +
+          `in a pack are separate and never expire.`,
+        current_tier: live.tier,
+        current_period_end: live.current_period_end,
+      }, 409);
+    }
+
     const { data: plan, error: plErr } = await sb.from('oracle_token_plans')
       .select('plan_tier, usd_cents, tokens_per_cycle, display_name')
       .eq('plan_tier', planTier).eq('active', true).maybeSingle();

@@ -70,6 +70,31 @@ const isOracle = (m: Meta) => m.product_type === 'oracle';
 const unixToIso = (s: unknown): string | null =>
   typeof s === 'number' && Number.isFinite(s) ? new Date(s * 1000).toISOString() : null;
 
+// subscriptions.status CHECK accepts exactly these. Stripe ALSO emits 'paused'
+// (pause_collection), which the CHECK refuses -- proven 23514 in
+// db/proofs/ops67_plan_lifecycle_battery.sql s7. Syncing it would make
+// subscription_sync throw on every delivery and every retry, i.e. a permanent
+// retry storm on an event that moves no Tokens. Unknown statuses are logged and
+// acked instead. DEBT: widening the CHECK to include 'paused' is a migration,
+// and migrations are gated -- see REPORT.md OPS67 F-3.
+const SUB_STATUS = new Set([
+  'active', 'past_due', 'canceled', 'incomplete', 'incomplete_expired', 'trialing', 'unpaid',
+]);
+
+// An invoice can carry several lines (proration on an upgrade, a credit line,
+// the subscription line). lines.data[0] is NOT reliably the subscription line,
+// and its period.end can be the PRORATION window rather than the cycle -- which
+// would become the expiry stamped on the Tokens. The cycle this invoice paid for
+// is the LATEST period end on the invoice.
+// deno-lint-ignore no-explicit-any
+const latestLinePeriodEnd = (o: any): string | null => {
+  const ends: number[] = (o?.lines?.data ?? [])
+    // deno-lint-ignore no-explicit-any
+    .map((l: any) => l?.period?.end)
+    .filter((e: unknown): e is number => typeof e === 'number' && Number.isFinite(e));
+  return ends.length ? unixToIso(Math.max(...ends)) : null;
+};
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
   if (!SECRET) return fail({ error: 'Webhook secret not configured' });
@@ -116,17 +141,23 @@ Deno.serve(async (req) => {
     customerId = typeof obj?.customer === 'string' ? obj.customer : null;
     amountCents = typeof obj?.amount_paid === 'number' ? obj.amount_paid : null;
     currency = obj?.currency ?? 'usd';
-    periodEnd = unixToIso(obj?.lines?.data?.[0]?.period?.end);
+    periodEnd = latestLinePeriodEnd(obj);
 
     if (!subscriptionId) return ok({ received: true, ignored: 'invoice.paid (no subscription)' });
 
     // Cold path: metadata snapshots only exist for invoices finalized after
-    // 2023-06-29, so fall back to reading the live subscription.
-    if (!isOracle(meta)) {
+    // 2023-06-29, so fall back to reading the live subscription. The same read
+    // supplies the period end when the invoice carried no usable line period --
+    // in basil+ that value lives on the subscription ITEM.
+    if (!isOracle(meta) || !periodEnd) {
       try {
         const sub = await stripe.subscriptions.retrieve(subscriptionId);
         // deno-lint-ignore no-explicit-any
-        meta = asMeta((sub as any)?.metadata);
+        const s = sub as any;
+        if (!isOracle(meta)) meta = asMeta(s?.metadata);
+        periodEnd = periodEnd
+          ?? unixToIso(s?.items?.data?.[0]?.current_period_end)
+          ?? unixToIso(s?.current_period_end);
       } catch (err) {
         console.error('oracle-webhook subscription retrieve failed', {
           subscription: subscriptionId, message: err instanceof Error ? err.message : String(err),
@@ -222,7 +253,46 @@ Deno.serve(async (req) => {
     if (event.type === 'invoice.paid') {
       const planTier = meta.plan_tier ?? meta.tier;
       if (!planTier) return ok({ received: true, skipped: 'no plan_tier' });
-      if (!periodEnd) throw new Error('invoice.paid carried no line period end');
+      if (!periodEnd) throw new Error('invoice.paid carried no period end');
+
+      // -------------------------------------------------------------------
+      // ORDER IS LOAD-BEARING (OPS67). GRANT FIRST, BOOKKEEPING SECOND.
+      //
+      // subscription_sync can fail PERMANENTLY: two partial unique indexes,
+      // subscriptions_one_active_per_product and
+      // subscriptions_one_active_oracle_per_bee_uidx, make a second live oracle
+      // subscription row unrepresentable -- and Stripe Checkout always CREATES a
+      // new subscription rather than modifying one, so an upgrade or a
+      // re-subscribe raises a second id by design. With the sync running first,
+      // that 23505 threw before the grant ever ran: a Bee paid and received
+      // nothing, on every retry, forever. Proven in
+      // db/proofs/ops67_plan_lifecycle_battery.sql s6 -- along with the fact
+      // that oracle_grant_plan_tokens has NO dependency on the subscriptions
+      // row, which is what makes this order safe.
+      //
+      // The grant is idempotent on the invoice id (W-9), so a Stripe retry that
+      // gets this far a second time settles as duplicate:true.
+      // -------------------------------------------------------------------
+      const { data, error } = await sb.rpc('oracle_grant_plan_tokens', {
+        p_bee_id: beeId, p_plan_tier: planTier, p_invoice_ref: invoiceId,
+        p_period_end: periodEnd, p_amount_cents: amountCents,
+      });
+      if (error) throw new Error(`oracle_grant_plan_tokens: ${error.message}`);
+
+      // Stripe just took money for THIS subscription, so any OTHER oracle
+      // subscription row still marked live for this Bee is stale by definition.
+      // Retiring it is what lets the sync below record an upgrade at all. Rows
+      // with a NULL stripe_subscription_id are left alone (neq skips NULLs).
+      const { error: staleErr } = await sb.from('subscriptions')
+        .update({ status: 'canceled', updated_at: new Date().toISOString() })
+        .eq('bee_id', beeId).eq('product_type', 'oracle')
+        .in('status', ['active', 'trialing'])
+        .neq('stripe_subscription_id', subscriptionId);
+      if (staleErr) {
+        console.error('oracle-webhook stale subscription retire failed', {
+          bee_id: beeId, subscription: subscriptionId, message: staleErr.message,
+        });
+      }
 
       const { error: syncErr } = await sb.rpc('subscription_sync', {
         p_bee_id: beeId, p_product_type: 'oracle', p_tier: planTier,
@@ -231,13 +301,18 @@ Deno.serve(async (req) => {
         p_invoice_amount_cents: amountCents,
         p_invoice_ref: invoiceId ? await invoiceRef(invoiceId) : null,
       });
-      if (syncErr) throw new Error(`subscription_sync: ${syncErr.message}`);
-
-      const { data, error } = await sb.rpc('oracle_grant_plan_tokens', {
-        p_bee_id: beeId, p_plan_tier: planTier, p_invoice_ref: invoiceId,
-        p_period_end: periodEnd, p_amount_cents: amountCents,
-      });
-      if (error) throw new Error(`oracle_grant_plan_tokens: ${error.message}`);
+      if (syncErr) {
+        // The Tokens ARE granted. A 500 here would have Stripe retry a failure
+        // that may be permanent, so settle at 200 and flag the row instead:
+        // status 'error' with processed_at still NULL is exactly what a
+        // reconciliation sweep looks for. Money first, bookkeeping visible.
+        console.error('oracle-webhook subscription_sync failed AFTER a successful grant', {
+          event_id: event.id, bee_id: beeId, subscription: subscriptionId,
+          message: syncErr.message,
+        });
+        await sb.from('stripe_events').update({ status: 'error' }).eq('event_id', event.id);
+        return ok({ received: true, result: data, subscription_sync_failed: syncErr.message });
+      }
       await markProcessed(sb, event.id, beeId);
       return ok({ received: true, result: data });
     }
@@ -246,6 +321,16 @@ Deno.serve(async (req) => {
     if (event.type.startsWith('customer.subscription.')) {
       const planTier = meta.plan_tier ?? meta.tier;
       if (!planTier) return ok({ received: true, skipped: 'no plan_tier' });
+      if (!SUB_STATUS.has(status)) {
+        // No Tokens ride on this branch, so refusing the sync costs nothing but
+        // a stale status column -- and it avoids an endless retry on a CHECK
+        // that will refuse this value on every delivery. The event row stays
+        // 'received' for reconciliation.
+        console.error('oracle-webhook unsupported Stripe subscription status', {
+          event_id: event.id, status, subscription: subscriptionId,
+        });
+        return ok({ received: true, skipped: `unsupported status ${status}` });
+      }
 
       // Cancel / lapse writes NOTHING to the ledger. The cycle's grant already
       // carries expires_at = period end and simply stops counting when it

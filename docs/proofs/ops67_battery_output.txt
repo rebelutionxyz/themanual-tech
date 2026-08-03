@@ -1,0 +1,377 @@
+Output format is aligned.
+Timing is off.
+BEGIN
+SET
+
+================= SECTION 0 -- PRECONDITIONS =================
+  acting_as   
+--------------
+ service_role
+(1 row)
+
+ honeypot_ledger_rows_before 
+-----------------------------
+                           0
+(1 row)
+
+ honeypot_subscriptions_before 
+-------------------------------
+                             0
+(1 row)
+
+
+================= SECTION 1 -- DOUBLE-FIRED invoice.paid =================
+-- Stripe delivers the same paid invoice twice under two event ids. The
+-- partial unique index oracle_token_ledger_one_grant_per_invoice_uidx is
+-- the guarantee; the RPC turns the violation into duplicate:true.
+                          fire_1                          
+----------------------------------------------------------
+ {                                                       +
+     "tokens": 40000,                                    +
+     "granted": true,                                    +
+     "duplicate": false,                                 +
+     "ledger_id": "35f9d70a-2212-45fa-a7db-60336f1bc1e8",+
+     "plan_tier": "oracle",                              +
+     "expires_at": "2026-09-02T09:47:30.781113+00:00"    +
+ }
+(1 row)
+
+                   fire_2_same_invoice                    
+----------------------------------------------------------
+ {                                                       +
+     "granted": false,                                   +
+     "duplicate": true,                                  +
+     "ledger_id": "35f9d70a-2212-45fa-a7db-60336f1bc1e8",+
+     "invoice_ref": "in_OPS67_A"                         +
+ }
+(1 row)
+
+ grant_rows_for_in_ops67_a | tokens_granted 
+---------------------------+----------------
+                         1 |   40000.000000
+(1 row)
+
+
+================= SECTION 2 -- RENEWAL = SECOND GRANT, OWN EXPIRY =================
+                     renewal_invoice                      
+----------------------------------------------------------
+ {                                                       +
+     "tokens": 40000,                                    +
+     "granted": true,                                    +
+     "duplicate": false,                                 +
+     "ledger_id": "9b73d779-79b1-4d63-a636-d411a56bea7f",+
+     "plan_tier": "oracle",                              +
+     "expires_at": "2026-10-02T09:47:30.781113+00:00"    +
+ }
+(1 row)
+
+ payment_ref | amount_tokens |          expires_at           
+-------------+---------------+-------------------------------
+ in_OPS67_A  |  40000.000000 | 2026-09-02 09:47:30.781113+00
+ in_OPS67_B  |  40000.000000 | 2026-10-02 09:47:30.781113+00
+(2 rows)
+
+
+================= SECTION 3 -- SPEND ORDER: PLAN BEFORE PURCHASED =================
+DELETE 2
+                 pack_5000_never_expires                  
+----------------------------------------------------------
+ {                                                       +
+     "tokens": 5000,                                     +
+     "credited": true,                                   +
+     "duplicate": false,                                 +
+     "ledger_id": "897b8194-2073-45ae-a341-5b4ffcf6afdd",+
+     "pack_code": "starter"                              +
+ }
+(1 row)
+
+                plan_grant_10000_expiring                 
+----------------------------------------------------------
+ {                                                       +
+     "tokens": 10000,                                    +
+     "granted": true,                                    +
+     "duplicate": false,                                 +
+     "ledger_id": "8dbf0622-9c96-4360-bd39-4fc8846f71e0",+
+     "plan_tier": "scout",                               +
+     "expires_at": "2026-09-01T09:47:30.781113+00:00"    +
+ }
+(1 row)
+
+UPDATE 1
+UPDATE 1
+-- expect plan 10000 / purchased 5000 / total 15000
+ plan_available | purchased_available | total_available 
+----------------+---------------------+-----------------
+   10000.000000 |         5000.000000 |    15000.000000
+(1 row)
+
+INSERT 0 3
+-- debit 8000: must come entirely from the EXPIRING plan grant
+                        debit_8000                        
+----------------------------------------------------------
+ {                                                       +
+     "debited": true,                                    +
+     "duplicate": false,                                 +
+     "from_plan": 8000,                                  +
+     "ledger_id": "5f05a9bc-08b0-45d9-9306-f1d395a121cf",+
+     "amount_tokens": 8000,                              +
+     "from_purchased": 0,                                +
+     "plan_available": 2000.000000,                      +
+     "total_available": 7000.000000,                     +
+     "purchased_available": 5000.000000                  +
+ }
+(1 row)
+
+-- debit 4000: 2000 left in the plan, so 2000 must SPILL into purchased
+                        debit_4000                        
+----------------------------------------------------------
+ {                                                       +
+     "debited": true,                                    +
+     "duplicate": false,                                 +
+     "from_plan": 2000.000000,                           +
+     "ledger_id": "016a91b3-4589-4c1d-80bf-7b39de93b6e2",+
+     "amount_tokens": 4000,                              +
+     "from_purchased": 2000.000000,                      +
+     "plan_available": 0.000000,                         +
+     "total_available": 3000.000000,                     +
+     "purchased_available": 3000.000000                  +
+ }
+(1 row)
+
+-- replay of the SAME directive must not debit twice
+                       debit_replay                       
+----------------------------------------------------------
+ {                                                       +
+     "debited": false,                                   +
+     "duplicate": true,                                  +
+     "ledger_id": "016a91b3-4589-4c1d-80bf-7b39de93b6e2",+
+     "plan_available": 0.000000,                         +
+     "total_available": 3000.000000,                     +
+     "purchased_available": 3000.000000                  +
+ }
+(1 row)
+
+ debit_rows 
+------------
+          2
+(1 row)
+
+
+================= SECTION 4 -- CANCEL: NO GRANT, NO CLAWBACK =================
+DELETE 4
+DELETE 0
+                        pack_again                        
+----------------------------------------------------------
+ {                                                       +
+     "tokens": 5000,                                     +
+     "credited": true,                                   +
+     "duplicate": false,                                 +
+     "ledger_id": "c44c7486-b74d-4ea7-8831-97ddfbb28a0a",+
+     "pack_code": "starter"                              +
+ }
+(1 row)
+
+                     plan_grant_again                     
+----------------------------------------------------------
+ {                                                       +
+     "tokens": 10000,                                    +
+     "granted": true,                                    +
+     "duplicate": false,                                 +
+     "ledger_id": "587ed4b3-bc34-483e-9463-a892ec64b89d",+
+     "plan_tier": "scout",                               +
+     "expires_at": "2026-09-01T09:47:30.781113+00:00"    +
+ }
+(1 row)
+
+UPDATE 2
+                          sub_active                           
+---------------------------------------------------------------
+ {                                                            +
+     "ok": true,                                              +
+     "tier": "scout",                                         +
+     "status": "active",                                      +
+     "affiliate": null,                                       +
+     "product_type": "oracle",                                +
+     "subscription_id": "ec7982df-5615-4abc-a1ba-51f630f06036"+
+ }
+(1 row)
+
+-- expect plan 10000 / purchased 5000 / total 15000 BEFORE cancel
+ plan_available | purchased_available | total_available 
+----------------+---------------------+-----------------
+   10000.000000 |         5000.000000 |    15000.000000
+(1 row)
+
+                         sub_canceled                          
+---------------------------------------------------------------
+ {                                                            +
+     "ok": true,                                              +
+     "tier": "scout",                                         +
+     "status": "canceled",                                    +
+     "affiliate": null,                                       +
+     "product_type": "oracle",                                +
+     "subscription_id": "ec7982df-5615-4abc-a1ba-51f630f06036"+
+ }
+(1 row)
+
+ ledger_rows_after_cancel 
+--------------------------
+                        2
+(1 row)
+
+-- expect UNCHANGED 10000 / 5000 / 15000 -- cancel writes nothing to the ledger
+ plan_available | purchased_available | total_available 
+----------------+---------------------+-----------------
+   10000.000000 |         5000.000000 |    15000.000000
+(1 row)
+
+-- now let the paid month actually end (FIXTURE: expiry moved into the past)
+UPDATE 1
+-- expect plan 0 / purchased 5000 / total 5000 -- plan tokens lapse, pack tokens do not
+ plan_available | purchased_available | total_available 
+----------------+---------------------+-----------------
+              0 |         5000.000000 |     5000.000000
+(1 row)
+
+
+================= SECTION 5 -- OVERLAPPING CYCLES (DEFECT PROBE) =================
+-- Reachable path: Bee cancels on day 5 and re-subscribes on day 25. The
+-- grant for the FIRST month is still live -- it expires at the end of the
+-- month that was paid for -- while the new cycle grant is already open, so
+-- the two attribution windows OVERLAP.
+DELETE 2
+                        pack_5000                         
+----------------------------------------------------------
+ {                                                       +
+     "tokens": 5000,                                     +
+     "credited": true,                                   +
+     "duplicate": false,                                 +
+     "ledger_id": "7f8fc4c4-9b26-4c0b-a9be-b8f251dfee9c",+
+     "pack_code": "starter"                              +
+ }
+(1 row)
+
+                         cycle_1                          
+----------------------------------------------------------
+ {                                                       +
+     "tokens": 10000,                                    +
+     "granted": true,                                    +
+     "duplicate": false,                                 +
+     "ledger_id": "ebca215b-2378-4a1d-8a23-0ea47ba89b35",+
+     "plan_tier": "scout",                               +
+     "expires_at": "2026-08-13T09:47:30.781113+00:00"    +
+ }
+(1 row)
+
+UPDATE 1
+                         cycle_2                          
+----------------------------------------------------------
+ {                                                       +
+     "tokens": 10000,                                    +
+     "granted": true,                                    +
+     "duplicate": false,                                 +
+     "ledger_id": "e7698ce3-57f3-4640-b2ea-b578131c558d",+
+     "plan_tier": "scout",                               +
+     "expires_at": "2026-08-28T09:47:30.781113+00:00"    +
+ }
+(1 row)
+
+UPDATE 1
+UPDATE 1
+-- TRUTH before any spend: plan 20000 / purchased 5000 / total 25000
+ plan_available | purchased_available | total_available 
+----------------+---------------------+-----------------
+   20000.000000 |         5000.000000 |    25000.000000
+(1 row)
+
+-- ONE debit of 12000. TRUTH after: plan 8000 / purchased 5000 / total 13000
+                       debit_12000                        
+----------------------------------------------------------
+ {                                                       +
+     "debited": true,                                    +
+     "duplicate": false,                                 +
+     "from_plan": 12000,                                 +
+     "ledger_id": "df1b4625-bba7-4bec-9e24-58a6d78814cd",+
+     "amount_tokens": 12000,                             +
+     "from_purchased": 0,                                +
+     "plan_available": 0.000000,                         +
+     "total_available": 1000.000000,                     +
+     "purchased_available": 1000.000000                  +
+ }
+(1 row)
+
+ plan_available | purchased_available | total_available 
+----------------+---------------------+-----------------
+       0.000000 |         1000.000000 |     1000.000000
+(1 row)
+
+ truth_total | measured_total | tokens_lost  
+-------------+----------------+--------------
+       13000 |    1000.000000 | 12000.000000
+(1 row)
+
+
+================= SECTION 6 -- TWO ACTIVE ORACLE SUBS COLLIDE =================
+-- subscriptions_one_active_oracle_per_bee_uidx is UNIQUE (bee_id) WHERE
+-- product_type=oracle AND status IN (active,trialing). Stripe Checkout
+-- always CREATES a subscription, so an upgrade / re-subscribe raises a
+-- second sub id. In oracle-webhook the grant call sits AFTER this sync.
+DELETE 1
+                           first_sub                           
+---------------------------------------------------------------
+ {                                                            +
+     "ok": true,                                              +
+     "tier": "scout",                                         +
+     "status": "active",                                      +
+     "affiliate": null,                                       +
+     "product_type": "oracle",                                +
+     "subscription_id": "d35067e0-3346-4b8d-84dd-94cf4aeced9b"+
+ }
+(1 row)
+
+psql:C:/Users/Butch/Documents/HONEYCOMB/TheMANUAL.tech/db/proofs/ops67_plan_lifecycle_battery.sql:208: NOTICE:  SECOND ACTIVE ORACLE SUB REFUSED -- 23505 / duplicate key value violates unique constraint "subscriptions_one_active_per_product"
+DO
+-- the grant that follows the failed sync in oracle-webhook: does the money
+-- write itself have any dependency on the subscription row? (it does not --
+-- proving the fix "grant first, then sync" is safe)
+             grant_without_a_subscription_row             
+----------------------------------------------------------
+ {                                                       +
+     "tokens": 150000,                                   +
+     "granted": true,                                    +
+     "duplicate": false,                                 +
+     "ledger_id": "0a7c6887-1296-4728-9b2d-b1fd4638f02b",+
+     "plan_tier": "sovereign",                           +
+     "expires_at": "2026-09-02T09:47:30.781113+00:00"    +
+ }
+(1 row)
+
+
+================= SECTION 7 -- STRIPE STATUS paused vs THE CHECK =================
+psql:C:/Users/Butch/Documents/HONEYCOMB/TheMANUAL.tech/db/proofs/ops67_plan_lifecycle_battery.sql:227: NOTICE:  status paused REFUSED -- 23514 / new row for relation "subscriptions" violates check constraint "subscriptions_status_check"
+DO
+
+================= SECTION 8 -- ROLLBACK =================
+ROLLBACK
+
+================= SECTION 9 -- NOTHING PERSISTED =================
+ honeypot_ledger_rows_after 
+----------------------------
+                          0
+(1 row)
+
+ honeypot_subscriptions_after 
+------------------------------
+                            0
+(1 row)
+
+ honeypot_directives_after 
+---------------------------
+                         0
+(1 row)
+
+ total_ledger_rows_platform_wide 
+---------------------------------
+                              23
+(1 row)
+

@@ -1,0 +1,67 @@
+{
+  "_comment": [
+    "Per-version verdict on whether a repo migration file with NO history row actually ran.",
+    "A ledger row is NEVER emitted from a guess: reconcile.mjs emits `mark-as-applied` SQL",
+    "only for versions listed here with verdict APPLIED, and quotes the evidence string.",
+    "OPS45's rule stands - writing fake history is worse than having none.",
+    "Probes recorded by DB22, 2026-08-03, all reads against production.",
+    "Re-probe before acting: an ABSENT object can become PRESENT and a verdict can rot."
+  ],
+  "probed_at": "2026-08-03",
+  "probed_by": "DB22",
+  "versions": {
+    "20260613161000": { "verdict": "APPLIED", "evidence": "pg_policies: astra_registry_select_anon PRESENT" },
+    "20260727140000": { "verdict": "APPLIED", "evidence": "information_schema.columns: atlasoracle_directives has no column matching cost|bling - the retire ran" },
+    "20260727180000": { "verdict": "APPLIED", "evidence": "to_regclass('public.oracle_token_ledger') non-null" },
+    "20260730230000": { "verdict": "APPLIED", "evidence": "ops_build_steps PRESENT plus all five views (ops_pass_durations, ops_effort_stats, ops_build_progress, ops_build_rollup, ops_build_honeycomb)" },
+    "20260730230100": { "verdict": "APPLIED", "evidence": "ops_build_steps holds 60 rows - data seed, so no ledger row is emitted (class A4)" },
+    "20260730230200": { "verdict": "APPLIED", "evidence": "all five ops views carry reloptions security_invoker=true" },
+    "20260731000000": { "verdict": "APPLIED", "evidence": "ops_dispatches.after_pass column PRESENT" },
+    "20260731020000": { "verdict": "APPLIED", "evidence": "pg_trigger: justice_dockets_repath_children_trg PRESENT" },
+    "20260731040000": { "verdict": "APPLIED", "evidence": "pg_policies: ops_dispatches_admin_read and ops_reports_admin_read both PRESENT" },
+    "20260802010000": { "verdict": "APPLIED", "evidence": "column_privileges: anon/authenticated SELECT on bee_keys excludes encrypted_secret_key and backup_kdf - the narrowing ran" },
+
+    "20260513120000": { "verdict": "NEVER-APPLIED", "evidence": "pillars carries only pillars_public_read; pillars_astra_isolation_select and pillars_service_role_write ABSENT; zero mentions anywhere in the 650-row applied corpus" },
+    "20260529120000": { "verdict": "NEVER-APPLIED", "evidence": "view bees_public and functions am_i_admin, my_bling_balance, list_bees_admin all ABSENT; zero mentions in the applied corpus" },
+    "20260530120000": { "verdict": "NEVER-APPLIED", "evidence": "source_pool_state, source_pool_events, increment_source_pool, get_source_pool_balance all ABSENT" },
+    "20260530130000": { "verdict": "NEVER-APPLIED", "evidence": "handle_reservations and handle_pricing_tiers ABSENT" },
+
+    "20260529130000": { "verdict": "UNPROVEN", "evidence": "MIXED - policy bees_public_read PRESENT but bees_self_select ABSENT. Cannot tell partial-apply from coincidence; needs adjudication before any ledger row" },
+    "20260602120000": { "verdict": "SUPERSEDED", "evidence": "duplicate slug: 20260602182706_competition_engine_v1.sql carries the same slug and IS in history. This file is a shadow, not a missing row" },
+    "20260602130000": { "verdict": "SUPERSEDED", "evidence": "duplicate slug: 20260602201522_economy_v3_cap_precision.sql carries the same slug and IS in history" },
+
+    "20260511120000": { "verdict": "NO-OP", "evidence": "verification queries only, no DDL and no DML - never belonged in migrations" },
+    "20260530110000": { "verdict": "NO-OP", "evidence": "balance reset, data only, no DDL" },
+
+    "20260618132000": { "verdict": "APPLIED", "evidence": "geo atom id sample 25/25 PRESENT" },
+    "20260618135000": { "verdict": "APPLIED", "evidence": "geo atom id sample 25/25 PRESENT" },
+    "20260618135001": { "verdict": "APPLIED", "evidence": "geo atom id sample 25/25 PRESENT" },
+    "20260618135002": { "verdict": "APPLIED", "evidence": "geo atom id sample 25/25 PRESENT" },
+    "20260618140000": { "verdict": "APPLIED", "evidence": "geo atom id sample 25/25 PRESENT" },
+    "20260618153000": { "verdict": "APPLIED", "evidence": "geo atom id sample 25/25 PRESENT" },
+    "20260618154000": { "verdict": "APPLIED", "evidence": "geo atom id sample 25/25 PRESENT" },
+    "20260618154100": { "verdict": "APPLIED", "evidence": "geo atom id sample 25/25 PRESENT" },
+    "20260618154200": { "verdict": "APPLIED", "evidence": "geo atom id sample 25/25 PRESENT" },
+
+    "20260618160000": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Europe 1of7" },
+    "20260618160100": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Europe 2of7" },
+    "20260618160200": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Europe 3of7" },
+    "20260618160300": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Europe 4of7" },
+    "20260618160400": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Europe 5of7" },
+    "20260618160500": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Europe 6of7" },
+    "20260618160600": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Europe 7of7" },
+    "20260618170000": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - North America 1of3" },
+    "20260618170100": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - North America 2of3" },
+    "20260618170200": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - North America 3of3" },
+    "20260618180000": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Asia 1of10" },
+    "20260618180100": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Asia 2of10" },
+    "20260618180200": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Asia 3of10" },
+    "20260618180300": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Asia 4of10" },
+    "20260618180400": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Asia 5of10" },
+    "20260618180500": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Asia 6of10" },
+    "20260618180600": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Asia 7of10" },
+    "20260618180700": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Asia 8of10" },
+    "20260618180800": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Asia 9of10" },
+    "20260618180900": { "verdict": "NEVER-APPLIED", "evidence": "geo atom id sample 0/25 PRESENT - Asia 10of10" }
+  }
+}
