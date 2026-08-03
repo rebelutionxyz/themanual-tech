@@ -15,6 +15,1012 @@ This file starts at **OPS74** (2026-08-03), the pass that performed rotation 001
 
 ---
 
+## DOCS22-Q - THE BROWSER TRANSPORT IS NOT CONNECTED. Option A's premise is false today, and the four walls are now proven permanent rather than a cooldown
+
+Lane `docs`. Workdir `TheMANUAL.tech`. Scope: empty (workdir bounds the pass). Effort: standard. ASCII only.
+**RESEARCH ONLY. Zero filings, zero purchases, zero domain actions, zero outreach. No bot challenge was
+bypassed or completed.** Every network call this pass made was a read. The only DB writes were the R2 claim
+and this `-Q` row.
+
+---
+
+### W-1 BLOCK - WHO OWNS THE NEXT MOVE
+
+| | |
+|---|---|
+| **Owner of the next move** | **BUTCH** |
+| **Single next action** | Connect the Chrome extension **and confirm it reports connected**, then re-dispatch. The extension is enabled on your side per the DOCS22 dispatch, but this session sees **zero connected browsers** - see section 1 for the exact readings |
+| **Why this is not DOCS21 repeating itself** | DOCS21 could not tell whether the register block was permanent or an IP cooldown, and could not tell whether the mirror was usable. **This pass answers both, by measurement** (sections 2 and 3). The register leg is still not runnable, but the option space is now smaller and better characterised |
+| **If the extension will not connect** | Option B from DOCS21-Q section 6 - a free USPTO ODP API key - is now the only remaining route to primary data, and section 2 confirms exactly which endpoint it unlocks. It is **US-only; the EM half of DOCS18-20 would be missing** |
+| **Blocked on** | Transport. Dispatch stays `claimed` per R4 |
+
+---
+
+### THE QUESTION, STATED ONCE
+
+**DOCS22 exists because DOCS21-Q's option A was chosen and the extension was connected on 2026-08-03. From
+inside this session the extension is not connected: `list_connected_browsers` returns an empty array and
+`tabs_context_mcp` returns "Browser extension is not connected." I did not attempt any workaround, because
+every workaround for a bot-challenge wall is bot-challenge evasion. How do you want to proceed?**
+
+I did not re-run any DOCS21 work. Sections 2-4 are new measurements that shrink the question.
+
+---
+
+### 1. THE BROWSER TRANSPORT - EXACT READINGS
+
+| Call | Result |
+|---|---|
+| `mcp__claude-in-chrome__tabs_context_mcp` (`createIfEmpty: true`) | `Browser extension is not connected. Please ensure the Claude browser extension is installed and running...` |
+| `mcp__claude-in-chrome__list_connected_browsers` | `[]` - **empty array, zero browsers paired to this account** |
+
+Two calls, not a retry loop. `list_connected_browsers` returning `[]` is the decisive one: it is an
+account-level list, so this is not a stale tab id or a tab-group problem. **No Chrome extension instance is
+paired.**
+
+**What this most likely is, and it is probably 30 seconds of your time:** the extension needs Chrome running,
+logged into claude.ai on the same account as Claude Code, and - per the extension's own error text - **a
+Chrome restart if this is the first install.** Connection is also per-account rather than per-session, so a
+browser connected in a different profile or a different Claude account will not show here.
+
+**One honest possibility I cannot rule out:** the extension may have been connected when you dispatched
+DOCS22 and dropped since. I can only see the present, and the present is `[]`.
+
+---
+
+### 2. THE FOUR WALLS ARE PERMANENT, NOT A COOLDOWN - **this closes DOCS21-Q section 7 item 8**
+
+DOCS21-Q flagged as unverified: *"Whether the TMview block is permanent or an IP-reputation cooldown...
+It may clear on its own. I did not test that beyond ~40 minutes."* DOCS21 ran ~06:30. This pass re-ran the
+same probes roughly a working day later, from the same egress, with no scripted volume in between.
+
+| Surface | DOCS21 (~06:30) | **DOCS22 (this pass)** | Verdict |
+|---|---|---|---|
+| `www.tmdn.org/tmview/api/search/results` (the DOCS18-20 harness, unchanged) | 200 `text/html`, Akamai challenge | **200 `text/html`, 14,231 bytes, `APM_DO_NOT_TOUCH` present** | **Unchanged. Not a cooldown** |
+| `tmsearch.uspto.gov` | AWS WAF challenge | **200 `text/html`, 110,406 bytes, `awswaf` present** | **Unchanged** |
+| `branddb.wipo.int` | ALTCHA proof-of-work | **200, 1,697 bytes, challenge markers present** | **Unchanged** |
+| `trademarks.justia.com` | 403 Cloudflare | **403, 5,776 bytes, Cloudflare interstitial** | **Unchanged** |
+
+**Four for four, identical, a day apart. The block is structural.** Waiting is not a strategy, and neither is
+retrying later. This is worth knowing precisely because it is the cheapest option nobody had ruled out.
+
+---
+
+### 3. TWO SURFACES ANSWERED CLEANLY, AND BOTH ARE DEAD ENDS - **new, DOCS21 did not establish this**
+
+Not everything is a challenge page. Two hosts answered honestly, and what they said is useful.
+
+**3a. There is no unauthenticated JSON API behind the new USPTO TM Search.** DOCS21 recorded `tmsearch.uspto.gov`
+as WAF-walled but did not probe for an API path. I did:
+
+```
+GET https://tmsearch.uspto.gov/api-v1-0-0/tmsearch?q=406local&rows=10
+->  404  application/xml  (no challenge)
+
+<?xml version="1.0" encoding="UTF-8"?>
+<Error><Code>NoSuchKey</Code><Message>The specified key does not exist.</Message>
+<Key>api-v1-0-0/tmsearch</Key><RequestId>A8BGK8D0X4C77DX0</RequestId>...</Error>
+```
+
+`NoSuchKey` is **S3's** error, not an application's. That hostname is a static bucket serving the search
+SPA; the real query path sits behind the WAF the SPA talks to. **There is no side door here** - stop looking
+for one, which is a small saving for the next pass.
+
+**3b. TSDR's API-key requirement, quoted verbatim** (the 401 body, `sn86722812`, one of the two leads):
+
+> "Beginning October 2, you'll need to register for an API key to download bulk data from our TSDR APIs.
+> Register for an API key at https://account.uspto.gov/api-manager/. Learn more about this new requirement
+> at https://developer.uspto.gov/api-catalog."
+
+Clean 401, no challenge, **specific and actionable.** This is option B's exact unlock, and it is the endpoint
+that would resolve both leads and the recitations. **Registering that account is something I am not
+permitted to do** - account creation is a prohibited action for me regardless of dispatch.
+
+---
+
+### 4. THE THIRD-PARTY MIRROR IS DEFINITIVELY UNUSABLE - **closes DOCS21-Q's open thread on it**
+
+DOCS21 recorded `trademarkelite.com` as *"reachable, no challenge - but I could not find a URL form that
+returns records."* I probed three forms:
+
+| URL form | Result |
+|---|---|
+| `/search/trademark?q=406local` | **404**, zero-length body |
+| `/trademark/trademark-detail/86722812` | **500**, zero-length body |
+| `/trademark/86722812` | **404**, zero-length body |
+
+No challenge, no content, no records. **Option C is dead on the merits, not merely "not recommended."**
+DOCS21 ranked it weakest on quality grounds; this pass shows there is nothing there to rank.
+
+---
+
+### 5. WHAT THE DISPATCH ASKED FOR AND DID NOT GET
+
+Stated plainly rather than approximated. **None of the register deliverables were produced, and none were
+guessed at:**
+
+1. **406LOCAL per-class verdict lines** for classes 41, 35, 9, 36 - **not produced.** No exact/contains
+   counts, no OPEN/CROWDED/BLOCKED verdicts, no numbered blockers.
+2. **THELEAGUE per-class verdict lines**, same classes - **not produced.**
+3. **The two leads - serial 86722812 and record 90706335** - **unresolved.** The TSDR call that would read
+   serial 86722812 returned the 401 quoted in 3b. Their characterisation is still exactly what DOCS21 said
+   it was: **leads from a web index, not registry-verified findings.**
+4. **Recitations quoted for decisive hits** - **not produced.** The recitations-unverified caveat from
+   DOCS18/19/20 **stands, and DOCS21's harder version stands too: for anything measured today, neither
+   recitations nor class numbers are verified.**
+5. **Updated head-to-head lines** - **not produced**, because "updated" means updated against register data.
+   The common-law halves from DOCS21-Q are unchanged and still stand on their own: **406local.com is a live
+   senior common-law user of the exact mark**, and **theleague.com is Match Group property since July 2022.**
+6. **THE SENTENCE per mark** - **not delivered.** A knockout sentence with no register leg would be an
+   opinion wearing a finding's clothes. **I will not write one.** This is the item most tempting to fake and
+   the one it would be most damaging to fake.
+7. **HONEYCOMB 41/36 refresh** (the optional "if nearly free" item) - **not done.** It was contingent on
+   being in the register, and I was never in the register.
+
+**Zero of seven register deliverables.** The dispatch's done-test cannot be met by this pass.
+
+---
+
+### 6. CARRIED FORWARD UNCHANGED, NOT RE-MEASURED
+
+Per the dispatch's "inherit DOCS21-Q sections, redo nothing," these stand as filed and I did **not** re-run
+them: code namespaces for all three marks (406LOCAL's zero-zero-zero namespace; `theleague` npm squatted),
+the common-law and domain-liveness table, the Montana 406-density answer (470+ registered business names),
+and the sub-brand-versus-standalone structure analysis. HONEYCOMB remains **ruled internal-only** per
+ORACLE_MF v0.58; this pass did not revisit that and was not asked to.
+
+---
+
+### 7. COULD NOT VERIFY
+
+1. **The entire register leg, for both marks, in every class.** Section 5 itemises it. Same gap as DOCS21,
+   for the same reason, now with the cooldown hypothesis eliminated.
+2. **Whether the Chrome extension was ever connected today.** I can see only the present state, which is
+   `[]`. Whether it connected and dropped, or never connected, is not something this session can determine.
+3. **Whether a connected extension would actually defeat the walls.** This is worth stating because the
+   whole option-A plan rests on it and **nobody has tested it.** The reasoning is sound - challenge JS runs
+   in a real browser session - but Akamai, AWS WAF, ALTCHA and Cloudflare all fingerprint automation, and an
+   extension-driven tab may still be classified as one. **Option A is untested, not proven.**
+4. **Anything about the two leads beyond what DOCS21 said.** Serial 86722812 and record 90706335 remain
+   uncharacterised. I did not read them; I read a 401 where they live.
+5. **I did not re-check domain liveness** for `406local.com`, `theleague.com` or any other domain in
+   DOCS21's table. The dispatch said redo nothing, so a day-old liveness reading is carried, not confirmed.
+6. **TTAB and opposition history** for any party - Match Group, Hound Technology, HCOMB Venture. No TTAB
+   surface was reachable in DOCS18-21 and none was probed here. Not asserted either way.
+
+---
+
+### 8. STANDING LIMIT - carried verbatim as the dispatch requires
+
+**PRELIMINARY KNOCKOUT ONLY, NOT LEGAL ADVICE - a real clearance wants trademark counsel.**
+
+This report tabulates transport availability. It does **not** tabulate what is on the public registers, does
+not perform a likelihood-of-confusion analysis, does not weigh the DuPont factors, does not assess
+descriptiveness or dilution, and does not opine on registrability or freedom to operate in any jurisdiction.
+Those are the questions a trademark attorney is for.
+
+No filing, purchase, domain action, or outreach was made or is authorized by this report. **No bot challenge
+was bypassed or completed at any point in this pass.**
+
+**Dispatch DOCS22 remains `claimed`, per R4.**
+
+---
+## DB26 - **FREEZE LIFTED.** F-1 IS FIXED IN PRODUCTION: 12,000 destroyed Tokens come back, `tokens_lost` reads 0.000000 against the LIVE structure, one click
+
+**FREEZE LIFTED.** `reconcile.mjs measure` exits **0** - `RECONCILED on/after baseline`, before the
+apply and again after it.
+
+Lane `db`. Workdir `TheMANUAL.tech`. Scope: empty. Effort: standard. ASCII only.
+**BUTCH CLICK COUNT: EXACTLY 1** - the `apply_migration` ask-gate, as expected.
+
+### THE HEADLINE
+
+OPS67 measured a Bee holding 20,000 plan Tokens and a 5,000 pack, spending 12,000 once, and left
+holding **1,000** against a truth of 13,000. Against the live production structure, after the apply:
+
+```
+-- THE HEADLINE ROW. tokens_lost must be exactly 0.
+ truth_total | measured_total | tokens_lost
+-------------+----------------+-------------
+       13000 |   13000.000000 |    0.000000
+```
+
+### 1. STEP 0 - THE PREMISE, CONFIRMED BY READING THE CODE
+
+`scripts/migration-reconcile/reconcile.mjs` line 105:
+
+```js
+for (const f of readdirSync(MIG)) {
+  if (!f.endsWith('.sql')) continue;
+```
+
+`readdirSync` **without** `{recursive: true}`, and a directory entry never ends in `.sql`. The
+reconciler is blind to subdirectories **by construction, not by configuration** - which is why
+`_drafts/` has always been invisible to its file count. **No tooling edit was needed**, so none was
+made. The property is now written into the archive README so nobody makes that loop recursive without
+reading why they should not.
+
+### 2. STEP 1 + 2 - ARCHIVED IN PLACE, BYTES UNTOUCHED
+
+```
+=== md5 BEFORE ===
+f224c13419ea96da24d7921deafa5b1a  supabase/migrations/20260616_geo_us_cities_geonames_pop_coords.sql
+=== md5 AFTER ===
+f224c13419ea96da24d7921deafa5b1a  supabase/migrations/_archive/20260616_geo_us_cities_geonames_pop_coords.sql
+```
+
+Identical. Both ends of the rename sit inside `supabase/migrations/`, so the amended gate 2c is
+satisfied. `supabase/migrations/_archive/README.md` carries the full citation: ran unrecorded, 2,983
+US city atoms with `source=geonames.org` + `population_basis=municipal` + lat/lng against 91
+accounted for by any recorded row, evidence DB25-Q section 4, archived because the filename carries
+no stampable version and minting one is fake history, **never replay**.
+
+### 3. STEP 3 - THE CRITERION, MET
+
+```
+repo .sql           291  (291 versioned, 0 unparseable)
+
+  407 history rows with no repo file   (0 on/after baseline)
+   39 repo files with no history row   (0 on/after baseline)
+   34 version-matched pairs, file != applied   (0 on/after baseline)
+    0 repo files with an unparseable version
+
+RECONCILED on/after baseline - freeze-lift criterion MET
+MEASURE EXIT=0
+```
+
+### 4. LEG 2 - THE APPLY. ONE CLICK
+
+`apply_migration(name: f1_explicit_token_attribution)` -> `{"success":true}`. **One prompt, one
+click.** The file was promoted out of `_drafts/` first, per DB23's mechanics, md5
+`4f04e7256f2892b88e8fcd190c201517` unchanged by the move.
+
+**AND THE RE-STAMP FIRED, EXACTLY AS DB22 PREDICTED.** The management API stamped its own apply-time
+version rather than honouring the filename:
+
+```
+version|name
+20260803143034|f1_explicit_token_attribution      <- stamped
+```
+
+The repo file was named `20260803120000`. Left alone, this apply would have manufactured **one fresh
+orphan and one fresh repo-only file** - re-opening the drift the whole chain existed to close, in the
+very act of closing it. The file was renamed to `20260803143034_f1_explicit_token_attribution.sql`
+(class A1a, both ends inside `supabase/migrations/`, gate-2c exempt) and **`measure` was re-run: still
+exit 0**. This is the single most important operational note in the pass: *every* future
+`apply_migration` needs that rename in the same breath, or the freeze re-arms itself.
+
+### 5. VERIFY BY STRUCTURE (v0.24 C-2) - THREE CHECKS, QUOTED
+
+```
+=== CHECK 1: to_regclass('public.oracle_token_consumption') ===
+regclass|not_null
+oracle_token_consumption|t
+
+=== CHECK 2: subscriptions_status_check contains 'paused' ===
+CHECK ((status = ANY (ARRAY['active'::text, 'past_due'::text, 'canceled'::text, 'incomplete'::text,
+'incomplete_expired'::text, 'trialing'::text, 'unpaid'::text, 'paused'::text])))
+contains_paused|t
+
+=== CHECK 3: oracle_token_balances answers healthy ===
+rows_returned|null_balances
+5|0
+```
+
+Plus the security posture of the new table, checked because DB23 argued for it explicitly:
+
+```
+rls_enabled|policy_count
+t|0
+```
+
+RLS on, zero permissive policies - deny-all by construction, with the SECURITY DEFINER routines as
+the only writers.
+
+**The backfill, in production:**
+
+```
+consumption_rows|distinct_debits|tokens_attributed
+9|8|12069.633000
+```
+
+9 attribution rows across all 8 existing debits, totalling 12,069.633 Tokens - which is exactly the
+sum of every debit in the ledger. Conservation holds: every Token ever spent is now attributed to a
+named source.
+
+### 6. THE BATTERY, AGAINST LIVE STRUCTURE
+
+Run with DB23's section 1 (`\i` the migration in-transaction) replaced by a note, since the migration
+is now applied for real - every assertion below therefore ran against the production structure, with
+fixture writes still wrapped in `BEGIN ... ROLLBACK`. Exit 0, **zero ERROR lines**.
+
+**s2 - what the backfill moved for real Bees:**
+
+```
+                bee_id                | before_total | after_total |  delta   | after_purchased
+--------------------------------------+--------------+-------------+----------+-----------------
+ 0e6e5b41-...                         |     0.000000 |    0.000000 | 0.000000 |        0.000000
+ 2b66f641-...                         |  1000.000000 | 1000.000000 | 0.000000 |     1000.000000
+ 88739ef8-...                         |  4936.744400 | 4936.744400 | 0.000000 |     4936.744400
+ ab696a36-...                         |   993.753200 |  993.753200 | 0.000000 |      993.753200
+ c6f0c10b-...                         |     0.000000 |    0.000000 | 0.000000 |        0.000000
+
+ bees_with_negative_purchased_after_backfill = 0
+```
+
+All five deltas zero. The backfill ran during the apply, so this run re-derives against an already-
+migrated baseline - which makes the zeros a **proof of idempotency** (the `NOT EXISTS` guard holds)
+rather than a proof that nothing moved. No real Bee's balance changed at any point.
+
+**s3 - the simple case, byte-identical to OPS67:**
+
+```
+-- expect plan 10000 / purchased 5000 / total 15000
+   10000.000000 |         5000.000000 |    15000.000000
+-- debit 8000
+     "from_plan": 8000,  "from_purchased": 0,
+     "plan_available": 2000.000000, "purchased_available": 5000.000000
+-- debit 4000: 2000 left in the plan, so 2000 must SPILL into purchased
+     "from_plan": 2000.000000, "from_purchased": 2000.000000,
+     "plan_available": 0, "purchased_available": 3000.000000
+```
+
+Identical to OPS67's s3. And now the attribution behind the spill is a readable record, which OPS67
+could not show:
+
+```
+     source     | amount_tokens
+----------------+---------------
+ (durable pool) |   2000.000000
+ in_DB23_C      |   2000.000000
+ in_DB23_C      |          8000
+```
+
+**s5 - the overlap case, the whole point:**
+
+```
+-- debit 6000 -- expect from_plan 6000, entirely against grant 1
+     "from_plan": 6000, "plan_available": 14000.000000, "total_available": 19000.000000
+-- debit 6000 again -- 4000 finishes grant 1, 2000 opens grant 2
+     "from_plan": 6000.000000, "plan_available": 8000.000000, "total_available": 13000.000000
+
+-- per-grant consumption: grant 1 exhausted first (soonest expiry), then grant 2
+  source   |          expires_at           |   consumed
+-----------+-------------------------------+--------------
+ in_DB23_G | 2026-08-11 14:35:59.024968+00 | 10000.000000
+ in_DB23_H | 2026-08-30 14:35:59.024968+00 |  2000.000000
+
+-- expect plan 8000 / purchased 5000 / total 13000
+    8000.000000 |         5000.000000 |    13000.000000
+
+ truth_total | measured_total | tokens_lost
+       13000 |   13000.000000 |    0.000000
+```
+
+FIFO by soonest expiry, the durable pack never touched, `tokens_lost` **0.000000**.
+
+**s9 - nothing persisted:** honeypot ledger rows 0, subscriptions 0, directives 0, platform-wide
+ledger still **23** rows. The fixture writes rolled back cleanly.
+
+**TWO ASSERTIONS IN s9 NOW READ "WRONG", AND THEY ARE RIGHT TO.** The battery was authored pre-apply,
+so its last two labels assert that the in-transaction migration was undone by the rollback:
+
+```
+ consumption_table_must_be_null
+ oracle_token_consumption                  <- NOT null
+
+ status_check_must_be_narrow_again
+ CHECK ((status = ANY (ARRAY[... 'unpaid'::text, 'paused'::text])))   <- still wide
+```
+
+Both are inverted by the apply and **must** now read this way: the table is permanent and the CHECK
+is permanently wide. Reporting them rather than quietly calling the battery all-green - the labels
+are stale, not the results, and the next pass to run this battery should re-word those two lines.
+
+### 7. ROLLBACKS, BOTH RESTATED
+
+- **DB23's migration:** `supabase/migrations/_drafts/20260803120100_f1_explicit_token_attribution_rollback.sql`
+  - restores both function bodies verbatim from the 2026-08-03 `pg_get_functiondef()` captures, drops
+  `oracle_token_consumption`, narrows the CHECK back. **ROLLING BACK REINSTATES F-1** - the
+  12,000-Token defect returns. Nobody runs it casually. Note its step 4 fails loudly if any
+  subscription row sits at `paused`, which is correct.
+- **This pass's archive move:** `git mv supabase/migrations/_archive/20260616_geo_us_cities_geonames_pop_coords.sql supabase/migrations/`
+  and delete the README. Nothing is committed, so `git reset && git checkout -- supabase/migrations/`
+  reverses every rename this chain made.
+- **DB25's C2 backfill** and **DB24's 9 ledger rows** - both still valid, unchanged.
+
+### 8. FILE TREE
+
+```
+TheMANUAL.tech/
+├── supabase/migrations/
+│   ├── _archive/
+│   │   ├── README.md                                          NEW  why, with citations
+│   │   └── 20260616_geo_us_cities_geonames_pop_coords.sql     MOVED  bytes identical
+│   └── 20260803143034_f1_explicit_token_attribution.sql       PROMOTED from _drafts, then
+│                                                              RENAMED to the stamped version
+└── REPORT.md                                                  this section
+```
+
+`git status` shows **50 `R` entries, every one with both ends inside `supabase/migrations/`** -
+sweepable under the amended gate 2c, verified by the same check DB25 used.
+
+### 9. DONE-TEST
+
+| Clause | Result |
+|---|---|
+| reconciler blindness confirmed or taught, diff shown | **PASS** - confirmed by reading line 105; no edit needed, so no diff to show |
+| file archived bytes-identical (md5 before and after) | **PASS** - `f224c13419ea96da24d7921deafa5b1a` both sides |
+| README present with the citation | **PASS** |
+| measure EXIT 0 | **PASS** - and again after the apply |
+| freeze recorded LIFTED, first line | **PASS** |
+| exactly one click | **PASS - 1** |
+| three structural checks quoted | **PASS** - section 5 |
+| battery halves green against live | **PASS** - s3 byte-identical, s5 `tokens_lost` 0.000000, with the two stale s9 labels disclosed |
+| both rollbacks restated | **PASS** - section 7 |
+
+### 10. COULD NOT VERIFY
+
+- **The rollback migration has never been executed.** It is written and its bodies were captured from
+  production, but running it would reinstate F-1, so it stays unproven by design.
+- **No live Stripe event has exercised the new `paused` CHECK.** The constraint accepts the value;
+  whether `subscription_sync` behaves correctly on a real `customer.subscription.updated` carrying
+  `paused` is still unobserved, and the Oracle webhook cannot receive anything until
+  `STRIPE_WEBHOOK_SECRET_ORACLE` is set (OPS71 N-1, still open).
+- **The 34 pre-baseline drifted pairs and 407 pre-baseline orphans** are untouched and non-blocking.
+  DB25 flagged that two of two blocking "drifted" pairs turned out to be ledger-text artifacts; the
+  pre-baseline set deserves the same suspicion before anyone acts on the "files that lie" headline.
+- **The 24 never-applied migration files** remain DB22's open escalation - finish or archive.
+- **Nothing in this chain is committed.** 50 renames, the archive move, the promoted migration and
+  four report sections are all uncommitted working-tree state. A sweep is needed and the amended gate
+  now permits it.
+
+---
+
+## DB25-Q - 5 BLOCKERS TO 1. Both rulings executed, all three directions clean - and the last file turns out to have RUN, which the dispatch's two instructions cannot both accommodate
+
+Lane `db`. Workdir `TheMANUAL.tech`. Scope: empty + the root-canon scope extension ruling 2 granted.
+Effort: deep. ASCII only. **Filed as `DB25-Q` per R4; the dispatch is left `claimed`.**
+**BUTCH CLICK COUNT THIS PASS: ZERO.** Leg 2 never fired. `apply_migration` was never called.
+
+**FREEZE STATUS: NOT LIFTED.** `measure` exits **1** with **1** blocking discrepancy, down from 5.
+
+### W-1 BLOCK - WHO OWNS THE NEXT MOVE
+
+| | |
+|---|---|
+| **Owner** | **The LEAD** - one ruling, on one file. Not a click |
+| **The residue** | `supabase/migrations/20260616_geo_us_cities_geonames_pop_coords.sql` - the third unparseable filename |
+| **What I found that changes the question** | The ruling said: content matches one candidate -> rename; matches neither -> **"it joins the never-applied escalation class untouched."** It matches neither. **But it is not never-applied - it RAN.** 2,983 US city atoms in production carry this file's exact metadata signature; the nearest recorded candidate accounts for 91. Evidence in section 4 |
+| **Why that stalls the pass** | "Escalate untouched" and "EXPECT EXIT 0" cannot both hold. The unparseable bucket is **date-blind and unconditional** - DB22 section 5 property 3: *"A file with no 14-digit version cannot be compared to a baseline... It blocks whenever it exists."* Leaving the file untouched guarantees exit 1 |
+| **The three ways out** | **(a)** treat it as **class B2a** - it ran, proven by probe, no history row - and mark-as-applied. Blocked on one sub-question: B2a stamps the repo file's own version and this file has none, so a version must be **chosen**, which is the one thing DB22's emitter refuses to do. **(b)** **archive-with-reason** - move it out of `supabase/migrations/` (DB22's own A4/B2b disposition shape). Clears the bucket honestly without inventing a version; the SQL survives in the repo. **(c)** widen the criterion to exempt pre-baseline unparseable files. I recommend **(b)** |
+| **Blocked on** | The lead. Nothing needs Butch at a keyboard |
+
+### 1. INHERITED STATE - VERIFIED
+
+`measure` at claim time: exit 1, **5** blocking, history rows **659**, and DB24's adopted file
+`20260802160501_oracle_model_rates_one_active_per_model.sql` present. Matches DB24-Q exactly.
+Nothing redone.
+
+### 2. RULING 1 - CLASS C2 BACKFILL, COMMITTED
+
+**Rollback emitted FIRST**, from values captured before any write, and the generator refuses to run
+unless the prior value it is about to encode still matches what production holds (md5
+`5809dbc571eb9722eebe93c4a47a6ed0`, 207 bytes). Prior state:
+
+| version | prior `statements` |
+|---|---|
+| `20260802170000` | **NULL** |
+| `20260801100100` | one element, the 207-byte prose pointer |
+
+**Dry run first, same discipline as DB24's B2a rows:**
+
+```
+BEGIN
+UPDATE 1
+UPDATE 1
+=== inside txn, before rollback: md5 of each backfilled element ===
+ 20260801100100 | 2c430b211602fe1284e19a5d0112ac2f |         3158
+ 20260802170000 | 4a7b110058bb3815d72a86f191a7224f |        10152
+ROLLBACK
+=== after rollback: must be NULL and the 207-byte prose again ===
+ 20260801100100 | 5809dbc571eb9722eebe93c4a47a6ed0 |         207
+ 20260802170000 | (null)                           |           0
+```
+
+**Then committed, and verified byte-faithful against the repo files:**
+
+```
+20260801100100 md5=2c430b211602fe1284e19a5d0112ac2f bytes=3158
+20260802170000 md5=4a7b110058bb3815d72a86f191a7224f bytes=10152
+```
+
+Both md5s are the md5 of the repo file on disk. **This is truth-restoration, not fake history**, and
+the evidence is DB24-Q section 2's production probes, cited as the ruling requires: `status_manual`
+exists and `status` does not; `ops_build_progress` carries `{security_invoker=true}`; the `done`
+branch sits at offset 834 ahead of the `blocked` branch at 893; `press_record_payment` carries
+`ON CONFLICT` and `press_payments_stripe_ref_uidx` exists. Production matches both files
+object-for-object.
+
+**WATCH-ITEM for the assert suite, recorded not fixed, as instructed:** the mechanism that wrote a
+history row with a **NULL `statements` array** is still unexplained. `20260802170000` was the only
+one of 650; it is now backfilled, so the evidence of the bug is gone from the data. Proposed assert
+row: **every new `supabase_migrations.schema_migrations` row must carry a non-empty `statements`
+array** - it would have caught this at write time instead of two months later.
+
+### 3. RULING 2 - GATE 2c AMENDED, THEN 48 RENAMES EXECUTED
+
+**The canon diff** (root `CLAUDE.md`, SWEEP gate 2, that line only):
+
+```diff
+-   (report-of-record archive, exempt by name); **no deletion (`D`) and no rename
+-   (`R`)**, which always escalate; every path inside the workspace.
++   (report-of-record archive, exempt by name); **no deletion (`D`) and no rename (`R`), EXCEPT
++   renames whose OLD AND NEW paths both sit under `supabase/migrations/`** — migration-filename
++   normalization is a sanctioned reconciliation class (DB22 class A1a: the management API stamps
++   its own apply-time version, so the repo filename has to be moved to the version that actually
++   ran). **A rename with either end outside that directory still escalates**, and every deletion
++   still escalates without exception; every path inside the workspace.
+```
+
+**Then the renames: 46 class-A1a plus the 2 obvious unparseable mappings = 48**, all via `git mv`.
+
+```
+23_v9_0_security.sql            -> 20260506191712_v9_0_security.sql
+24_v9_0_security_tightening.sql -> 20260506192517_v9_0_security_tightening.sql
+```
+
+Both are exact name matches against applied rows, which is why they were the "obvious" two.
+
+**R entries visible and sweepable, verified against the amended gate:**
+
+```
+=== rename entries ===
+48
+=== any rename with an end OUTSIDE supabase/migrations/ ? ===
+none - every rename stays inside supabase/migrations/
+=== non-rename entries ===
+ M REPORT.md
+?? supabase/migrations/20260802160501_oracle_model_rates_one_active_per_model.sql
+```
+
+### 4. THE THIRD FILE - RESOLVED BY CONTENT, AND THE ANSWER IS NOT THE ONE THE RULING EXPECTED
+
+Comparison against **both** same-day candidates, normalized the reconciler's way (comments stripped,
+whitespace collapsed, lower-cased):
+
+| | value-tuples | normalized chars | exact match | longest common prefix |
+|---|---|---|---|---|
+| **repo file** | **~3,368** | 176,290 | - | - |
+| `20260616135818` `geo_us_major_cities_municipal_pop_coords` | ~91 | 5,095 | **no** | 1,691 chars (33% of applied) |
+| `20260616140949` `geo_nonus_major_cities_municipal_pop_coords` | ~193 | 10,119 | **no** | 7 chars |
+
+`140949` is non-US data (Johannesburg, Cape Town) - unrelated. `135818` shares the same generator and
+the same opening cities but is a **37x smaller dataset**. **Matches neither.**
+
+**A first attempt at this comparison was contaminated and I re-ran it.** The in-file `\pset format
+unaligned` echoes its own confirmation line into the captured output, which prepended
+`output format is unaligned.` to both candidate texts. Re-run with `-P format=unaligned` on the
+command line instead. The numbers above are from the clean run.
+
+**But "matches neither" is not "never applied".** The file's operation is an `UPDATE atoms` stamping
+`source=geonames.org`, `population_basis=municipal`, plus `lat`/`lng`. Production:
+
+```
+us_cities_with_geonames_pop = 2983
+with_latlng                 = 2983
+total_us_city_atoms         = 15310
+```
+
+**2,983 atoms carry this file's exact signature.** The only recorded row that writes that signature
+for US cities is `135818`, with 91 tuples. 2,892 atoms are unaccounted for by anything in the
+history. A ~3,368-tuple statement ran, and this file is the only artifact of that size in the
+repo - the shortfall from 3,368 to 2,983 is exactly what its `WHERE` clause predicts, since a tuple
+with no matching atom updates nothing.
+
+**So it is the same disease as the C2 pairs, one degree worse:** production matches the file, and the
+ledger has not a wrong row but **no row at all** - while the filename is unorderable, so the
+reconciler cannot even place it in a direction.
+
+### 5. THE MEASURE - EXIT 1, RESIDUE OF ONE
+
+```
+baseline            20260801000000
+history rows        659
+repo .sql           292  (291 versioned, 1 unparseable)
+version-matched     238  (204 faithful, 34 drifted)
+re-stamped applies  14  (one orphan + one repo-only file each, same migration)
+
+  407 history rows with no repo file   (0 on/after baseline)
+   39 repo files with no history row   (0 on/after baseline)
+   34 version-matched pairs, file != applied   (0 on/after baseline)
+    1 repo files with an unparseable version   (all blocking - no version to date)
+
+NOT RECONCILED - 1 discrepancies on/after baseline
+```
+
+**All three dated directions are now at zero on/after baseline** - direction A, direction B, and the
+drifted pairs. The re-stamped-applies count fell 60 -> 14 as the renames collapsed those pairs. The
+sole residue is the unparseable bucket, which is date-blind and blocks unconditionally.
+
+Per the dispatch - *"If not zero, -Q with the residue and STOP"* - I stopped.
+
+### 6. LEG 2 - NOT FIRED
+
+Its gate is `measure` exit 0. Not met. Zero clicks, no apply, no promotion out of `_drafts/`.
+
+**R7 compliance is not the blocker this time** - this dispatch names both files inline, which closes
+the gap DB24-Q raised:
+- apply: `supabase/migrations/_drafts/20260803120000_f1_explicit_token_attribution.sql`
+- **ROLLBACK: `supabase/migrations/_drafts/20260803120100_f1_explicit_token_attribution_rollback.sql`** -
+  restores both function bodies verbatim from the `pg_get_functiondef()` captures of 2026-08-03,
+  drops the attribution table, narrows the CHECK back. **Rolling it back REINSTATES F-1.**
+
+The re-queued dispatch can carry these two lines unchanged and fire the moment the residue clears.
+
+### 7. ROLLBACKS FOR EVERYTHING THIS PASS COMMITTED
+
+**The C2 backfill** - `scratchpad/db25-c2-rollback.sql`, restoring the exact captured prior values:
+
+```sql
+BEGIN;
+UPDATE supabase_migrations.schema_migrations SET statements = NULL
+ WHERE version = '20260802170000';
+UPDATE supabase_migrations.schema_migrations
+   SET statements = ARRAY[$C2PRIOR$see supabase/migrations/20260801100100_press_record_payment_replay_safe.sql -- CREATE OR REPLACE FUNCTION public.press_record_payment(...) adding the draft-A ON CONFLICT arbiter and the idempotent return key$C2PRIOR$]
+ WHERE version = '20260801100100';
+COMMIT;
+```
+
+**The 48 renames** - `git mv` staged them, so `git reset && git checkout -- supabase/migrations/`
+restores every filename. Nothing is committed, so this costs nothing.
+**The canon edit** - revert the one gate-2c hunk in root `CLAUDE.md`.
+**DB24's ledger rows** - `verify-out/ledger-rollback.sql`, unchanged and still valid.
+
+### 8. DONE-TEST - SCORED HONESTLY
+
+| Clause | Result |
+|---|---|
+| C2 backfills committed with dry-run transcripts and probe citations | **PASS** - section 2 |
+| gate 2c diff quoted | **PASS** - section 3 |
+| renames executed with R entries visible and sweepable | **PASS** - 48, all inside the exempted directory |
+| geo file resolved by content or escalated | **PASS on the comparison, and it produced a third answer** - matches neither, but it ran. Section 4 |
+| measure EXIT 0, freeze recorded LIFTED | **FAILED** - exit 1, one residue. Freeze **NOT LIFTED** |
+| exactly one click reported | **ZERO** - leg 2 gated off |
+| three structural checks quoted | **NOT REACHED** |
+| battery halves green against live | **NOT REACHED** |
+| both rollbacks named | **PASS** - section 7 for this pass's, section 6 for DB23's |
+
+### 9. COULD NOT VERIFY
+
+- **That the geo file is the exact statement that produced those 2,983 atoms.** The signature match
+  and the tuple arithmetic are strong and the shortfall behaves as its `WHERE` clause predicts, but
+  no history row records it, so this is inference from production state - not a recorded fact.
+- **Which of the 3,368 tuples failed to match an atom.** I counted; I did not diff the 385.
+- **The other 34 drifted pairs**, all pre-baseline and now all non-blocking. If two of two blocking
+  ones turned out to be ledger-text artifacts rather than file drift, the pre-baseline set deserves
+  the same suspicion before anyone acts on the "34 files that lie" headline.
+- **That the 48 renamed files still replay in order.** The filenames now carry apply-time versions,
+  which is the point, but no replay was attempted.
+- **Whether any tooling outside this repo references the old filenames** - the two `v9_0_security`
+  files in particular had human-readable names for two months.
+
+---
+
+## DB24-Q - FREEZE NOT LIFTED. 7 blockers down to 5, and the last 5 have no route DB22 sanctioned - two of them because the migrations DID run and the LEDGER TEXT is what is wrong
+
+Lane `db`. Workdir `TheMANUAL.tech`. Scope: empty. Effort: deep. ASCII only.
+**Filed as `DB24-Q` per R4; the dispatch is left `claimed`.** **BUTCH CLICK COUNT THIS PASS: ZERO.**
+Leg 2 never fired. `apply_migration` was never called. No DDL, no migration applied, no deploy.
+
+**FREEZE STATUS: NOT LIFTED.** `reconcile.mjs measure` exits **1** with **5** blocking discrepancies,
+down from 7.
+
+### W-1 BLOCK - WHO OWNS THE NEXT MOVE
+
+| | |
+|---|---|
+| **Owner** | **The LEAD** - two rulings, neither of them Butch's and neither a click |
+| **Ruling 1 - the ledger-text class** | Two blockers are class-C "drifted" pairs. **I proved both migrations actually ran, in full.** What differs is the `statements` text in the history row: one is **empty**, one holds a **prose pointer instead of SQL**. That is a fourth failure mode DB22 did not name, and there is no sanctioned repair for it. The obvious fix - backfill `statements` from the repo file - is the same DML class as the B2a rows executed this pass, but **DB22 defined no such route and I will not invent one on the money path** |
+| **Ruling 2 - renames vs. the sweep** | DB22's sanctioned route for 46 class-A1a files and for the unparseable filenames is `git mv`. **Root canon's SWEEP gate 2c refuses any `R` entry outright.** Executing DB22's rename repairs produces a tree that no sweep can commit. DB22 predates that gate wording. **These two canon rules are incompatible and one of them has to move** |
+| **What is DONE** | 7 -> 5. Direction A and direction B are both at **0 on/after baseline**. The 9 B2a ledger rows are committed and DB22's #1 could-not-verify item is now verified |
+| **Blocked on** | The lead. Nothing needs Butch at a keyboard |
+
+### 1. LEG 1 - WHAT EXECUTED, AND ITS ROUTE PER REPAIR CLASS
+
+| repair | class | route taken | committed? |
+|---|---|---|---|
+| 9 mark-as-applied history rows | **B2a** | `psql` DML into `supabase_migrations.schema_migrations` - the pure ledger-bookkeeping route the dispatch prefers | **YES** |
+| 1 orphan adopted into the repo | **A2** | file copy from `verify-out/adopt/` into `supabase/migrations/` | file on disk, uncommitted |
+| 46 A1a renames | A1a | **NOT RUN** - see ruling 2 | no |
+| 3 unparseable renames | - | **NOT RUN** - see ruling 2 and section 3 | no |
+| 2 drifted pairs | C | **NOT RUN** - see ruling 1 | no |
+
+**The ledger repair was dry-run before it was committed.** DB22 recorded *"that the emitted
+`ledger-repair.sql` executes cleanly"* as its first could-not-verify item, and said first execution
+should be inside a transaction with the rollback open. It was. A copy with **only the trailing
+statement-level `COMMIT;` swapped for `ROLLBACK;`** ran first - the file's other `BEGIN`/`COMMIT`
+lines all sit inside `$MIGSTMT$` dollar quotes and are inert text, which was checked rather than
+assumed, because a nested `COMMIT` inside a supposedly rolled-back batch is the OPS49-Q trap.
+
+```
+BEGIN
+INSERT 0 1   (x9)
+=== inside the transaction, before rollback ===
+ rows_in_txn = 9
+ROLLBACK
+=== after ROLLBACK, must be identical to rows_before ===
+ rows_after_rollback = 0
+```
+
+Then the real run, unmodified file:
+
+```
+BEGIN
+INSERT 0 1   (x9)
+COMMIT
+```
+
+Verified after - all 9 present, history rows 650 -> 659:
+
+```
+20260613161000|astra_registry_anon_select
+20260727140000|atlasoracle_retire_cost_bling
+20260727180000|oracle_token_ledger_v1
+20260730230000|ops_build_steps_v1
+20260730230200|ops_build_steps_security_invoker
+20260731000000|ops_rail_best_practice_v1
+20260731020000|justice_repath_trigger_restore_safe
+20260731040000|ops_rail_admin_read_v1
+20260802010000|db21_bee_keys_secret_column_narrowing
+```
+
+**Before / after discrepancy counts:**
+
+```
+BEFORE                                          AFTER
+  410 history rows, no repo file  (1 blocking)    409  (0 blocking)
+   48 repo files, no history row  (1 blocking)     39  (0 blocking)
+   34 version-matched, file != applied (2)         34  (2 blocking)
+    3 unparseable version          (3 blocking)     3  (3 blocking)
+NOT RECONCILED - 7                              NOT RECONCILED - 5
+exit 1                                          exit 1
+```
+
+### 2. RULING 1 - THE TWO DRIFTED PAIRS BOTH RAN. THE LEDGER TEXT IS THE DEFECT
+
+DB22 classified these as "the file is not what ran" and flagged them as the worst class, because
+*"an orphan announces itself; a version-matched file that lies reads as reconciled."* **I probed
+production for the objects each one claims, and the conclusion inverts: the files are faithful and
+the ledger rows are the unreliable half.**
+
+**`20260802170000_ops_build_steps_status_manual_rename`** - the zero-statement row DB22 found was
+the only one of 650 and could not explain. Every object the file specifies is live:
+
+| the file says | production says |
+|---|---|
+| rename `ops_build_steps.status` -> `status_manual` | only `status_manual` exists; `status` is gone |
+| view keeps `security_invoker` | `reloptions = {security_invoker=true}` |
+| move the `done` branch ABOVE the `-Q` branch | `done` branch at offset **834**, `blocked` branch at **893** - done first, as specified |
+
+It ran, completely, including the security-critical `security_invoker` restatement. Its history row
+simply carries **no statements at all**, so the reconciler had nothing to compare and reported
+"REPO-SUPERSET". **That is a classification artifact of an empty array, not drift.**
+
+**`20260801100100_press_record_payment_replay_safe`** - money path (press payments). Its
+`statements[1]` is **not SQL**:
+
+```
+see supabase/migrations/20260801100100_press_record_payment_replay_safe.sql -- CREATE OR REPLACE
+FUNCTION public.press_record_payment(...) adding the draft-A ON CONFLICT arbiter and the idempotent
+return key
+```
+
+A prose pointer to the file, recorded where the executed SQL belongs. The substance is live:
+`press_record_payment` carries `ON CONFLICT` (offset 642) and the paired
+`press_payments_stripe_ref_uidx` index exists. So it ran too.
+
+**Why I stopped instead of fixing it.** The repair is obvious - backfill `statements` from the repo
+file, identical DML class to the B2a rows I did execute. But DB22 sanctioned B2a for *"applied
+through a path that wrote no history row, proven by probe"*; these have a history row whose contents
+are wrong, which is a different thing, and DB22's emitter deliberately **refuses to guess** - it
+emits a row only for a version with recorded probe evidence. Writing ledger text for a money-path
+migration on my own authority is exactly the "fake history" move OPS45 called worse than none. **The
+dispatch's own stop condition - "a route DB22 did not sanction, -Q and STOP" - is this.**
+
+### 3. THE 3 UNPARSEABLE FILENAMES - TWO ARE OBVIOUS, ONE IS NOT
+
+| repo file | maps to | verdict |
+|---|---|---|
+| `23_v9_0_security.sql` | `20260506191712 v9_0_security` | **obvious** - exact name match |
+| `24_v9_0_security_tightening.sql` | `20260506192517 v9_0_security_tightening` | **obvious** - exact name match |
+| `20260616_geo_us_cities_geonames_pop_coords.sql` | `20260616135818 geo_us_major_cities_municipal_pop_coords` **or** `20260616140949 geo_nonus_major_cities_municipal_pop_coords` | **NOT obvious** - two same-day candidates, and the file's name (`us_cities_geonames`) matches neither (`us_major_cities_municipal`) |
+
+DB22 said *"two map to applied rows and the rename is obvious"* without naming which; this is the
+third. Even the two obvious ones are blocked by ruling 2 - the route is `git mv`, and `git mv` stages
+an `R`.
+
+### 4. RULING 2 - DB22'S REPAIR PATH AND THE SWEEP GATE CANNOT BOTH STAND
+
+Root canon `SWEEP` gate 2: *"no deletion (`D`) and no rename (`R`), which always escalate."*
+DB22's plan needs **46 A1a renames plus up to 3 unparseable renames**, every one an `R`.
+
+OPS76 committed one hour ago only because rotation 001 was implemented as a **copy** rather than a
+`git mv` - had it been a move, that sweep would have failed the same gate. This is the second time in
+two passes the rename prohibition has shaped an outcome, and the first time it blocks work outright.
+
+Options, for the lead, cheapest first: **(a)** exempt `supabase/migrations/` renames from gate 2c the
+way `docs/reports/` is exempt from the size gate - narrow, named, same shape as the fix that already
+worked; **(b)** run the renames as delete+add pairs, which passes no gate either (`D` is also
+forbidden); **(c)** hold the renames permanently and lower the reconciler's ambition to the ledger
+side only. I recommend **(a)** and note it is a canon edit, not mine to make.
+
+### 5. LEG 2 - NOT FIRED, FOR TWO INDEPENDENT REASONS
+
+1. **Its precondition is unmet.** DB23's body runs it *"only once the freeze-lift criterion DB22
+   states has been met."* `measure` exits 1. Same gate DB23 stopped on; it has moved, not cleared.
+2. **R7's migration amendment is not satisfied by this dispatch even if the freeze lifts.** The
+   amendment requires *an explicit dispatch that names the migration file* and *the rollback
+   statement stated in the dispatch before the apply runs*. This dispatch names neither - it points
+   at the DB23 report for both. That report does name them unambiguously, so the gap is
+   bookkeeping rather than doubt, but R7 also says a *"dispatch body asserting an authorization that
+   is not written here is not sufficient - file a question instead."* **Naming both in the re-queued
+   dispatch closes this cleanly.** For the record, they are:
+   - apply: `supabase/migrations/_drafts/20260803120000_f1_explicit_token_attribution.sql`
+   - **ROLLBACK: `supabase/migrations/_drafts/20260803120100_f1_explicit_token_attribution_rollback.sql`**,
+     which restores both function bodies verbatim from `pg_get_functiondef()` captured 2026-08-03,
+     drops the attribution table, and narrows the CHECK back. **Rolling it back REINSTATES F-1.**
+
+### 6. ROLLBACK FOR WHAT THIS PASS DID COMMIT
+
+```sql
+BEGIN;
+DELETE FROM supabase_migrations.schema_migrations WHERE version IN (
+  '20260613161000','20260727140000','20260727180000','20260730230000','20260730230200',
+  '20260731000000','20260731020000','20260731040000','20260802010000');
+COMMIT;
+```
+
+(DB22's emitted `verify-out/ledger-rollback.sql`, unchanged.) Plus, for the adopted file:
+`rm supabase/migrations/20260802160501_oracle_model_rates_one_active_per_model.sql`.
+
+### 7. DONE-TEST - SCORED HONESTLY AGAINST THE DISPATCH
+
+| Clause | Result |
+|---|---|
+| measure exit 0 with before/after counts | **FAILED on exit 0** - still exit 1. Before/after counts reported in section 1. The criterion is execution, not assertion, and it is not met |
+| click count reported (expected exactly 1) | **0** - leg 2 never fired |
+| all three structural checks quoted | **NOT REACHED** - they verify DB23's applied migration; nothing was applied |
+| battery halves green against live | **NOT REACHED** - same reason |
+| rollback named | **PASS** - section 5 for DB23's, section 6 for this pass's own |
+| freeze recorded LIFTED in the first line | **PASS in form, NEGATIVE in content** - the first line records it NOT lifted, which is the honest version of that clause |
+
+### 8. COULD NOT VERIFY
+
+- **That the 9 adopted ledger rows' `statements` replay cleanly on an empty database.** They are
+  byte-faithful to the repo files; "runs again" is a different claim. DB22's caveat, unchanged.
+- **The exact ON CONFLICT arbiter in `press_record_payment`.** I confirmed `ON CONFLICT` is present
+  and the paired unique index exists; I did not diff the live function body against the repo file
+  line by line.
+- **Whether `20260802170000`'s history row was always empty** or was emptied later. I established it
+  is empty now and that the migration ran; the mechanism that wrote an empty array is unexplained -
+  and it matters, because if the apply path can write a row with no statements, it can do it again.
+- **The other 32 drifted pairs** (all pre-baseline, non-blocking). If the two blocking ones are both
+  ledger-text artifacts rather than real drift, some of the other 32 probably are too, and DB22's
+  "34 files that lie" headline may overstate the problem. Not measured.
+- **The 24 never-applied files** remain untouched and undecided - DB22's escalation, not this pass's.
+
+---
+
+## DOCS21-Q - THREE-MARK KNOCKOUT: QUESTION FILED. The register harness died between DOCS20 and DOCS21
+
+Lane `docs`. Workdir `TheMANUAL.tech`. Scope: empty. Effort: standard. ASCII only.
+**RESEARCH ONLY.** Zero filings, purchases, domain actions, outreach. Every network call was a read;
+the only DB writes were the R2 claim and the `DOCS21-Q` report row. Dispatch stays `claimed` per R4.
+
+**Full report body is the `DOCS21-Q` row in `public.ops_reports`.** This section is the repo-side
+summary of record.
+
+### 1. THE QUESTION
+
+The TMview harness that produced DOCS18, DOCS19 and DOCS20 (`POST www.tmdn.org/tmview/api/search/results`,
+offices US + EM) **stopped working between DOCS20 (~05:18 today) and this pass (~06:30)**. It now returns
+HTTP 200 `text/html` carrying an Akamai bot-manager challenge instead of JSON. Every substitute probed is
+behind bot-detection or an API key. **Bypassing bot-detection is forbidden by standing rules**, so the
+per-class verdict lines with numbered blockers cannot be produced. **Butch picks the transport.**
+
+### 2. TRANSPORT PROBES - ALL WALLS, MEASURED
+
+| Source | Result | Wall |
+|---|---|---|
+| `www.tmdn.org/tmview/api/search/results` (DOCS18-20 harness, unchanged) | 200 `text/html`, `<APM_DO_NOT_TOUCH>` | Akamai bot manager |
+| Same + landing-GET cookie warm-up (4 cookies) + origin/referer/XHR headers | identical challenge | Akamai bot manager |
+| Same, retried twice over ~40 min | identical | persistent, not transient |
+| `tmsearch.uspto.gov` | loads `edge.sdk.awswaf.com/.../challenge.js` | AWS WAF |
+| `tsdrapi.uspto.gov` | **401** - API key required "beginning October 2" | key required |
+| `branddb.wipo.int` + `/api/search` | 200, ALTCHA proof-of-work page | PoW bot-detection |
+| `trademarks.justia.com` | 403 from this IP **and** 403 via WebFetch | Cloudflare |
+| `uspto.report`, `trademarkia.com` | 403 | Cloudflare |
+| `developer.uspto.gov/ds-api/...` | ODP HTML shell; key required | key required |
+| `assignment-api.uspto.gov` | `fetch failed` | unreachable |
+| `euipo.europa.eu/eSearch/api/...` | "It works! Apache httpd" | not a public API |
+| `trademarkelite.com` | reachable, no challenge; no record-returning URL found | mirror, unusable as found |
+| Chrome extension (drive TMview in a real browser) | **"Browser extension is not connected."** | see option A |
+
+### 3. WHAT IS FINISHED - 4 OF 7 DONE-TEST ITEMS
+
+**Code namespaces (GitHub + npm search APIs, both reachable):**
+
+| Mark | GH users/orgs | GH repos | npm | Read |
+|---|---|---|---|---|
+| **406LOCAL** | **0** | **0** | **0** | completely empty namespace |
+| **THELEAGUE** | 42 | 81 | 2 | `theleague`, `theleagueof`, `theleagueapp`, `theLeague-AI` orgs; npm `theleague@0.0.1` is a squatted "Holding page for League of Agents" |
+| **HONEYCOMB** | 406 | 2,596 | 386 | `honeycombio`, `Honeycomb-Protocol` orgs; whole `@honeycombio/*` npm scope; `honeycomb-mcp` |
+
+**Domain liveness (HTTP GET only - "no live site" is NOT evidence of availability; no WHOIS run):**
+
+| Domain | Status | What is there |
+|---|---|---|
+| `406local.com` | **LIVE** | "406 Local - If it's happening in Montana, it's here." Montana news/events aggregator on the exact mark. No owner published. |
+| `406local.net` | LIVE but empty | default WordPress, "Hello world!" dated 2026-02-06 |
+| `theleague.com` | **LIVE** | **Match Group's dating app** - founded 2014, acquired July 2022 |
+| `league.com` | LIVE | League Inc, healthcare agentic platform (nearest bare-word neighbour, in software) |
+| `honeycomb.io` | **LIVE** | Hound Technology, Inc. - observability platform |
+| `honeycomb.ai` | **LIVE** | "Honeycomb AI - Menu intelligence for restaurant chains" (**new** - DOCS20 did not surface this) |
+| `honeycomb.com` / `.app` | for sale | domaineasy.com / Spaceship.com listings |
+| `theleague.app`, `theleague.io`, `honeycomb.tech` | parked | 114-byte empty responses |
+
+**Montana 406-branding, answered:** 406 is Montana's *statewide* area code (not region-divided), which is
+why it reads as identity rather than prefix. State records show **470+ Montana businesses with "406" in
+the registered name**. So the field is **dense on the `406` element, thin on the exact string `406LOCAL`** -
+one live .com holding the mark and tagline, one empty .net squat, zero code.
+
+**Sub-brand vs standalone:** 406LOCAL is the one that genuinely wants a parent (geographic sub-brand under
+a national umbrella is the classic shape, and it has the cleanest surface here). THELEAGUE **cannot** be a
+sub-brand - a definite-article common noun leaves no room for a parent, and "Rebelution presents: THE
+LEAGUE" resolves to a description of a competition format, not a brand. HONEYCOMB **is already the parent**,
+which is the problem: demoting it inverts the canon hierarchy, promoting it walks into a developer-tools
+company registered in both offices in classes 9 and 42. **Structurally coherent answer: internal-only.**
+
+### 4. CARRIED, NOT RE-MEASURED
+
+DOCS20 section 4 swept `honeycomb` in **classes 9 + 42** on the working harness ~1 hr before it died: 95
+contains-hits, **19 live exact marks**, incl. **Hound Technology US Reg. 6228227 (cl. 9/38/42) and EM
+016177859 (cl. 9/38/42)**, Honeycomb Biotechnologies US Reg. 7225504 (9/42), GB Gas Holdings EM 018627509,
+and **HCOMB Venture Inc. US 99862922/99862927 pending in cl. 9 + 41**. **Prior-pass data, attributed, not
+confirmed today.** It is the only registry material in this pass.
+
+### 5. DONE-TEST, HONESTLY SCORED
+
+| Item | Result |
+|---|---|
+| Three marks swept with counts | **FAIL** - register unreachable; namespace + domain counts done |
+| Per-class verdict lines, blockers named and numbered | **FAIL** - needs the register |
+| Common-law characterized per mark, incl. Montana 406 branding | **PASS** |
+| Code namespaces counted | **PASS** |
+| Sub-brand-vs-standalone paragraph | **PASS** |
+| Not-legal-advice line | **PASS** |
+| Report filed | **PASS** - as `DOCS21-Q` |
+
+### 6. COULD NOT VERIFY
+
+Entire register leg, all three marks. **HONEYCOMB classes 41 and 36 never swept by any pass.** Two
+THELEAGUE leads (Trademarkia serial **86722812**, uspto.report **90706335**) surfaced by web index only -
+host pages Cloudflare-blocked, **not registry-verified, leads not findings**. Recitations unreadable, and
+in this pass **class numbers are unverified too** - DOCS20's honest line was "classes verified, wordings
+not"; DOCS21 cannot claim even that. Operator of `406local.com` unknown (no name/copyright published), so
+its priority date is unknown. Domain availability unknown for all - liveness only. No TTAB surface
+reachable for Match Group, Hound Technology, or HCOMB Venture. Whether the TMview block is permanent or an
+IP-reputation cooldown is untested beyond ~40 min (DOCS18-20 ran ~45 scripted queries that morning).
+
+### 7. STANDING LIMIT
+
+**PRELIMINARY KNOCKOUT ONLY, NOT LEGAL ADVICE - a real clearance wants trademark counsel.**
+
+No filing, purchase, domain action, or outreach was made or is authorized by this report.
+
+---
+
 ## OPS76 - THE SWEEP FIRED. Inherited state verified piece by piece, `verify-out/` ignored, 13 paths committed - and the ruling's premise was already half-stale when it was written
 
 Lane `ops`. Workdir `TheMANUAL.tech`. Scope: empty. Effort: light. ASCII only.
