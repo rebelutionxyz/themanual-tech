@@ -93,7 +93,7 @@ const MARK: Record<string, string> = {
 // the brand, and alphabetical order buried it under 37 games+ops rows. Both are
 // fixed here: real display names, and the astra under active build sorts first.
 const ASTRA_LABEL: Record<string, string> = {
-  oracle: 'AtlasORACLE', games: 'Games', ops: 'Ops',
+  oracle: 'here24', games: 'Games', ops: 'Ops',
 };
 
 // Lower sorts earlier. Anything unlisted lands after these, alphabetically.

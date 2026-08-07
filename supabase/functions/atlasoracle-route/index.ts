@@ -244,12 +244,18 @@ interface OpenAIResponse {
 // Normalized result of one provider attempt. `failureKind` is null on success
 // and otherwise carries the sanitized reason already used by markFailed, so a
 // failed rung of the ladder reads identically to the old inline failure path.
+// `cached` is the SUM of both cache buckets and is kept for the existing
+// cached_tokens column and every reader of it. `cacheWrite` / `cacheRead` are
+// the DB27 split: they are priced at different tariffs (OPS64 3c) and must
+// never be re-summed before pricing.
 interface ProviderAttempt {
   ok:          boolean;
   responseText: string;
   input:       number;
   output:      number;
   cached:      number;
+  cacheWrite:  number;
+  cacheRead:   number;
   latencyMs:   number;
   failureKind: string | null;
 }
@@ -278,6 +284,7 @@ interface ModelRate {
   input_tokens_per_m:  number;
   output_tokens_per_m: number;
   cached_input_per_m:  number | null;
+  cache_write_per_m:   number | null;
 }
 
 // Cost in Oracle Tokens.
@@ -297,18 +304,34 @@ interface ModelRate {
 // If a model has no cached rate configured, cached tokens fall back to the full
 // input rate — over-charging the Bee slightly is the safe direction for a
 // missing rate, and it is visible rather than silent.
+//
+// ⚠ THE CACHE BUCKETS ARE TWO TARIFFS, NOT ONE (DB27, executing OPS64 3c).
+// Anthropic prices cache READ at 0.1x base input and cache CREATION at 1.25x —
+// a 12.5x spread. Until 2026-08-03 this function took one summed `cachedTokens`
+// and priced the whole thing at the read rate, under-charging every cache-write
+// leg by 12.5x: 32.43 Oracle Tokens per cold call on opus, 23.36 on sonnet,
+// against directives charged 58.4 and 6.2 respectively. It was a margin leak,
+// never a Bee overcharge, and it was unauditable because only the sum was
+// stored. The two legs are now priced separately and MUST NOT be re-summed.
+//
+// cache_write_per_m falls back to input_tokens_per_m — NOT to the cached rate —
+// when unconfigured. Same principle as above: over-charge on a missing rate,
+// visibly, rather than silently reinstating the bug this fix exists to remove.
 function calculateCostTokens(
   rate: ModelRate,
   inputTokens: number,
   outputTokens: number,
-  cachedTokens: number,
+  cacheReadTokens: number,
+  cacheWriteTokens: number,
 ): number {
-  const cachedRate = rate.cached_input_per_m ?? rate.input_tokens_per_m;
+  const cacheReadRate  = rate.cached_input_per_m ?? rate.input_tokens_per_m;
+  const cacheWriteRate = rate.cache_write_per_m  ?? rate.input_tokens_per_m;
 
   const cost =
-      (inputTokens  / 1_000_000) * rate.input_tokens_per_m
-    + (cachedTokens / 1_000_000) * cachedRate
-    + (outputTokens / 1_000_000) * rate.output_tokens_per_m;
+      (inputTokens      / 1_000_000) * rate.input_tokens_per_m
+    + (cacheReadTokens  / 1_000_000) * cacheReadRate
+    + (cacheWriteTokens / 1_000_000) * cacheWriteRate
+    + (outputTokens     / 1_000_000) * rate.output_tokens_per_m;
 
   // Six decimals matches oracle_token_ledger.amount_tokens numeric(20,6).
   return Math.round(cost * 1_000_000) / 1_000_000;
@@ -351,7 +374,7 @@ async function callAnthropic(
 
   const startedAt = Date.now();
   const empty = (kind: string): ProviderAttempt => ({
-    ok: false, responseText: '', input: 0, output: 0, cached: 0,
+    ok: false, responseText: '', input: 0, output: 0, cached: 0, cacheWrite: 0, cacheRead: 0,
     latencyMs: Date.now() - startedAt, failureKind: kind,
   });
 
@@ -393,8 +416,12 @@ async function callAnthropic(
   const usage = payload.usage ?? {};
   const input  = usage.input_tokens  ?? 0;
   const output = usage.output_tokens ?? 0;
-  const cached = (usage.cache_creation_input_tokens ?? 0)
-               + (usage.cache_read_input_tokens ?? 0);
+  // DB27: kept SEPARATE, because they are priced 12.5x apart. `cached` is still
+  // the sum for the cached_tokens column and its existing readers, but pricing
+  // now takes the two legs individually — see calculateCostTokens.
+  const cacheWrite = usage.cache_creation_input_tokens ?? 0;
+  const cacheRead  = usage.cache_read_input_tokens ?? 0;
+  const cached = cacheWrite + cacheRead;
 
   const responseText = (payload.content ?? [])
     .filter((b) => b.type === 'text' && typeof b.text === 'string')
@@ -403,7 +430,7 @@ async function callAnthropic(
 
   return {
     ok: responseText.length > 0,
-    responseText, input, output, cached, latencyMs,
+    responseText, input, output, cached, cacheWrite, cacheRead, latencyMs,
     failureKind: responseText.length > 0 ? null : 'provider_empty_content',
   };
 }
@@ -429,7 +456,7 @@ async function callOpenAICompatible(
 
   const startedAt = Date.now();
   const empty = (kind: string): ProviderAttempt => ({
-    ok: false, responseText: '', input: 0, output: 0, cached: 0,
+    ok: false, responseText: '', input: 0, output: 0, cached: 0, cacheWrite: 0, cacheRead: 0,
     latencyMs: Date.now() - startedAt, failureKind: kind,
   });
 
@@ -474,9 +501,13 @@ async function callOpenAICompatible(
 
   const responseText = payload.choices?.[0]?.message?.content ?? '';
 
+  // DB27: the OpenAI wire has NO cache-creation concept — `cached_tokens` is a
+  // read count only. Reporting the whole thing as a read is therefore accurate,
+  // not a default, and it prices at the cheaper leg exactly as it did before.
   return {
     ok: responseText.length > 0,
-    responseText, input, output, cached, latencyMs,
+    responseText, input, output, cached,
+    cacheWrite: 0, cacheRead: cached, latencyMs,
     failureKind: responseText.length > 0 ? null : 'provider_empty_content',
   };
 }
@@ -642,7 +673,7 @@ Deno.serve(async (req) => {
   if (tier !== 'free') {
     const { data: rateRow, error: rateErr } = await service
       .from('oracle_model_rates')
-      .select('input_tokens_per_m, output_tokens_per_m, cached_input_per_m')
+      .select('input_tokens_per_m, output_tokens_per_m, cached_input_per_m, cache_write_per_m')
       .eq('model_name', providerModelForRate)
       .eq('active', true)
       .order('effective_from', { ascending: false })
@@ -661,6 +692,12 @@ Deno.serve(async (req) => {
       output_tokens_per_m: Number(rateRow.output_tokens_per_m),
       cached_input_per_m:  rateRow.cached_input_per_m === null
         ? null : Number(rateRow.cached_input_per_m),
+      // DB27. Absent (pre-F-2 rate row, or a model never re-rated) falls back to
+      // the full input rate inside calculateCostTokens — over-charge visibly
+      // rather than silently restoring the 12.5x under-charge.
+      cache_write_per_m:   rateRow.cache_write_per_m === null
+        || rateRow.cache_write_per_m === undefined
+        ? null : Number(rateRow.cache_write_per_m),
     };
   }
 
@@ -669,7 +706,11 @@ Deno.serve(async (req) => {
   const estimatedOutputTokens = estimateOutputTokens(tier, estimatedInputTokens);
   const estimatedCostTokens = rate === null
     ? 0
-    : calculateCostTokens(rate, estimatedInputTokens, estimatedOutputTokens, 0);
+    // Both cache legs are quoted at ZERO, so the whole canon prefix is priced at
+    // full input rate in the estimate. That over-states the quote, which under
+    // charge-the-lesser is conservative in the Bee's favour (OPS64 3c closing
+    // note). Deliberate — do not "fix" it by pricing the cache legs here.
+    : calculateCostTokens(rate, estimatedInputTokens, estimatedOutputTokens, 0, 0);
 
   // ─── Frontier cost-preview gate (now reachable — see the constant). ───
   if (
@@ -843,12 +884,14 @@ Deno.serve(async (req) => {
     return errorResponse('Provider returned an error', 502);
   }
 
-  const inputTokens  = attempt.input;
-  const outputTokens = attempt.output;
-  const cachedTokens = attempt.cached;
+  const inputTokens      = attempt.input;
+  const outputTokens     = attempt.output;
+  const cachedTokens     = attempt.cached;
+  const cacheWriteTokens = attempt.cacheWrite;
+  const cacheReadTokens  = attempt.cacheRead;
   const responseText = attempt.responseText;
   const spendTelemetry: FailureTelemetry = {
-    providerModel, inputTokens, outputTokens, cachedTokens,
+    providerModel, inputTokens, outputTokens, cachedTokens, cacheWriteTokens,
   };
   if (ladderTrail.length > 0) {
     console.log('atlasoracle-route served via fallback', {
@@ -865,7 +908,8 @@ Deno.serve(async (req) => {
   // the fact that cached input is now priced at its own cheaper rate.
   const actualCostTokens = rate === null
     ? 0
-    : calculateCostTokens(rate, inputTokens, outputTokens, cachedTokens);
+    : calculateCostTokens(
+        rate, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens);
   const finalCostTokens = Math.min(estimatedCostTokens, actualCostTokens);
   if (
     estimatedCostTokens > 0
@@ -944,6 +988,10 @@ Deno.serve(async (req) => {
       input_tokens: inputTokens,
       output_tokens: outputTokens,
       cached_tokens: cachedTokens,
+      // DB27: the auditable half of the F-2 fix. cached_tokens stays the SUM so
+      // existing readers are untouched; this column makes the split recoverable
+      // from here on. NULL on every pre-2026-08-03 row means unknown, not zero.
+      cache_write_tokens: cacheWriteTokens,
       status: 'success',
       success: true,
       completed_at: new Date().toISOString(),
@@ -1000,10 +1048,11 @@ Deno.serve(async (req) => {
 // them, so a null column keeps meaning "never got that far" rather than
 // "unknown".
 interface FailureTelemetry {
-  providerModel?: string;
-  inputTokens?:   number;
-  outputTokens?:  number;
-  cachedTokens?:  number;
+  providerModel?:    string;
+  inputTokens?:      number;
+  outputTokens?:     number;
+  cachedTokens?:     number;
+  cacheWriteTokens?: number;
 }
 
 async function markFailed(
@@ -1036,6 +1085,12 @@ async function markFailed(
   }
   if (telemetry?.cachedTokens !== undefined) {
     patch.cached_tokens = telemetry.cachedTokens;
+  }
+  // DB27: a failed directive still consumed a cache write the provider billed
+  // us for. Recording it here is what keeps the margin picture honest on the
+  // paths where the Bee is deliberately NOT charged.
+  if (telemetry?.cacheWriteTokens !== undefined) {
+    patch.cache_write_tokens = telemetry.cacheWriteTokens;
   }
 
   const { error } = await service

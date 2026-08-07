@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import { SidebarPromotedSlot } from '@/components/promotions/SidebarPromotedSlot';
+import { ConstellationRail } from '@/components/shell/ConstellationRail';
 import { useAstra } from '@/lib/astras/AstraContext';
 import { useManualStore } from '@/stores/useManualStore';
 import { REALM_COLORS, SILVER } from '@/lib/constants';
@@ -29,8 +30,10 @@ function RealmStrip() {
 
 export function PlatformLayout() {
   // Right PlatformRail retired platform-wide (dispatch A2) — surface-switching
-  // is the toolbar's Astras popup. The promoted slot survives as a content-area
-  // element on the right; it returns null when empty, so no column is reserved.
+  // was the toolbar's Astras popup. FRONT21 restores a right column, but NOT
+  // that rail: this is the §15.1 rotating CONSTELLATION rail (the full derived
+  // Astra set, accent rotating per page change), which the retired rail never
+  // was. The promoted slot keeps its own column and still hides when empty.
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Left: realm-accent strip (closed sidebar per §15.1) */}
@@ -43,6 +46,12 @@ export function PlatformLayout() {
 
       {/* Right: promoted slot (independent of the retired rail; hides when empty) */}
       <SidebarPromotedSlot className="m-2 hidden w-64 flex-shrink-0 self-start lg:block" />
+
+      {/* Right: the rotating constellation (§15.1). lg+ — the same breakpoint
+          the promoted slot uses, so a laptop shows the constellation rather
+          than hiding the spine's second sidebar. Below lg it collapses and
+          /constellation is the full-page equivalent. */}
+      <ConstellationRail className="hidden w-52 flex-shrink-0 lg:flex" />
     </div>
   );
 }

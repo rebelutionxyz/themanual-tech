@@ -1,6 +1,6 @@
 // HQ §8 — Astra Status (INFRA STATUS SLIDER)
 //
-// Panel A: 38-Astra catalog from astra-registry-canonical-v1.md, grouped by
+// Panel A: the Astra catalog from astra-registry-canonical-v1.md, grouped by
 //   category, with runtime cross-reference against ASTRA_REGISTRY for live
 //   status. Filterable by free-text search across slug/wordmark/host.
 // Panel B: infrastructure layer status cards (hardcoded "operational" for
@@ -54,7 +54,7 @@ const INFRA_LAYERS: InfraLayer[] = [
   },
   {
     name: 'Anthropic API',
-    identifier: 'AtlasORACLE provider · Sonnet 4.6 / Opus 4.7 / Haiku 4.5',
+    identifier: 'here24 provider · Sonnet 4.6 / Opus 4.7 / Haiku 4.5',
     status: 'operational',
     last_verified: '2026-05-27',
     note: 'Monthly cap usage tracking pending FE instrumentation.',
@@ -93,7 +93,10 @@ export function AstraStatus() {
       <header className="mb-4">
         <h2 className="font-display text-2xl font-semibold text-text-silver-bright">Astra Status</h2>
         <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }}>
-          INFRA STATUS SLIDER · 38 Astras across 7 categories · 3 constellation hubs
+          {/* Derived, not hard-coded — the catalog grew 38 → 40 in FRONT21 and
+              will grow again as Astras are confirmed. */}
+          INFRA STATUS SLIDER · {ASTRA_CATALOG.length} Astras across 7 categories ·{' '}
+          {CONSTELLATION_HUBS.length} constellation hubs
         </p>
       </header>
 

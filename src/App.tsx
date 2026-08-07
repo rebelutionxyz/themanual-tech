@@ -16,7 +16,12 @@ import { useUserRole } from '@/lib/useUserRole';
 import { useBranding } from '@/stores/useBranding';
 import { lazy, Suspense, useEffect } from 'react';
 import { type Location, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { ASTRA_STUB_ENTRIES } from '@/lib/astra-catalog';
 const AdvertisePage = lazy(() => import('@/pages/AdvertisePage').then((m) => ({ default: m.AdvertisePage })));
+// FRONT21 — the constellation shell. Every Astra has a route in themanual.tech
+// (ORACLE_MF v1.24); the ones with no ported code render an honest stub.
+const AstraStubPage = lazy(() => import('@/pages/AstraStubPage').then((m) => ({ default: m.AstraStubPage })));
+const ConstellationPage = lazy(() => import('@/pages/ConstellationPage').then((m) => ({ default: m.ConstellationPage })));
 const BlingsPage = lazy(() => import('@/pages/BlingsPage').then((m) => ({ default: m.BlingsPage })));
 const BookmarksPage = lazy(() => import('@/pages/BookmarksPage').then((m) => ({ default: m.BookmarksPage })));
 const BusinessPage = lazy(() => import('@/pages/BusinessPage').then((m) => ({ default: m.BusinessPage })));
@@ -403,6 +408,34 @@ function AppContent() {
               catch-all SurfacePage swallows it. Not to be confused with
               /dingleberry/oracle, which is the DingleBERRY copilot demo. */}
             <Route path="/oracle" element={<OraclePage />} />
+            {/* h24 / here24 — the SAME Astra as /oracle (ORACLE_MF v1.22:
+              "here24 = AtlasOracle rebranded — the engine, not the successor
+              universe"), so it renders the same console rather than a second
+              one. FRONT21 choice, recorded: /h24 is CANONICAL — it is the form
+              the owner used when the Astra was named ("we created h24") and it
+              is what the header badge points at. /here24 answers as an alias
+              and /oracle stays live as the legacy path; all three are the same
+              room. The domains here24.tech / h24.tech stay registered and DARK
+              (v1.21 / v1.24) — this route is the only way in. */}
+            <Route path="/h24" element={<OraclePage />} />
+            <Route path="/here24" element={<Navigate to="/h24" replace />} />
+
+            {/* The constellation index — the full derived Astra set. */}
+            <Route path="/constellation" element={<ConstellationPage />} />
+
+            {/* One route per Astra that has no ported code yet. Generated from
+              the catalog so the router can never drift from the list, and
+              registered BEFORE /:slug so an Astra slug reaches its stub instead
+              of SurfacePage's silent redirect to /manual. Astras whose `mount`
+              is 'page' or 'surface' are excluded by ASTRA_STUB_ENTRIES — a real
+              surface always wins over a stub. */}
+            {ASTRA_STUB_ENTRIES.map((entry) => (
+              <Route
+                key={entry.slug}
+                path={entry.route}
+                element={<AstraStubPage entry={entry} />}
+              />
+            ))}
             {/* Mission Control board. Gates on bees.is_admin like /hq, but the
               real enforcement is RLS on the ops_ tables — the gate is courtesy.
               MUST stay ahead of /:slug or SurfacePage swallows it. */}

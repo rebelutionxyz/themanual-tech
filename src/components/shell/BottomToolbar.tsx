@@ -25,9 +25,9 @@ interface Launcher {
 const LAUNCHERS: Launcher[] = [
   {
     id: 'oracle',
-    label: 'AtlasOracle',
+    label: 'here24',
     icon: Sparkles,
-    title: 'AtlasOracle',
+    title: 'here24',
     lines: ['The platform AI runtime — ask, summarize, and route across Astras.'],
   },
   {

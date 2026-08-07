@@ -53,6 +53,12 @@ export function SiteHeader() {
           </span>
         </Link>
 
+        {/* h24 SPINE BADGE — already here. UtilityChrome (right cluster) mounts
+            AtlasOracleWalletBadge, which IS the v1.23 spine element: the small
+            AI badge in the header that opens the wallet. FRONT21 deliberately
+            does NOT add a second badge to this header; the gap it fills is the
+            white community shell (LensRow) and MiniWaves, which had no AI
+            element in their headers at all. */}
         <div className="flex-1" />
 
         {/* Right: utility chrome (search · notif · msg · cart · BLiNG! · profile · [mobile surfaces]) */}

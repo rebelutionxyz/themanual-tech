@@ -108,9 +108,9 @@ export function OraclePage() {
             <Sparkles size={30} className="text-honey" />
           </div>
           <div>
-            <h1 className="font-display text-2xl font-semibold text-text">AtlasOracle</h1>
+            <h1 className="font-display text-2xl font-semibold text-text">here24</h1>
             <p className="mt-1 text-text-silver" style={{ fontSize: '13px' }}>
-              Send a directive. AtlasOracle routes it to a provider against this platform's canon
+              Send a directive. here24 routes it to a provider against this platform's canon
               and hands the answer straight back to you — the directive and the response are never
               stored.
             </p>

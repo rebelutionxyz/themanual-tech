@@ -117,8 +117,8 @@ export function AtlasOracleWalletBadge({
   const balanceLabel = tokens.balance === null ? '—' : formatTokens(tokens.balance);
   const badgeTitle =
     tokens.status === 'live'
-      ? `AtlasOracle · ${balanceLabel} Oracle Tokens`
-      : `AtlasOracle · ${tokens.reason}`;
+      ? `here24 · ${balanceLabel} Oracle Tokens`
+      : `here24 · ${tokens.reason}`;
 
   return (
     <>
@@ -126,7 +126,7 @@ export function AtlasOracleWalletBadge({
         type="button"
         onClick={() => setOpen(true)}
         title={badgeTitle}
-        aria-label="Open AtlasOracle"
+        aria-label="Open here24"
         className={cn(
           'flex items-center gap-2 rounded-full border bg-bg-elevated px-2.5 py-1 transition-colors',
           badgeState === 'idle' && 'border-honey/40 hover:border-honey/70',
@@ -153,12 +153,12 @@ export function AtlasOracleWalletBadge({
           <button
             type="button"
             onClick={close}
-            aria-label="Close AtlasOracle"
+            aria-label="Close here24"
             className="fixed inset-0 z-40 cursor-default bg-black/60"
           />
           <dialog
             open
-            aria-label="AtlasOracle directive"
+            aria-label="here24 directive"
             className={cn(
               'fixed inset-x-0 bottom-0 z-50 m-0 flex w-full flex-col gap-4 border border-border-bright bg-bg-elevated p-5 text-text',
               'rounded-t-2xl sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl',
@@ -168,7 +168,7 @@ export function AtlasOracleWalletBadge({
               <div className="flex items-center gap-2">
                 <span className="font-mono font-semibold text-honey">A⊕O</span>
                 <span className="text-text-silver" style={{ fontSize: '12.5px' }}>
-                  AtlasOracle · {astraSlug}
+                  here24 · {astraSlug}
                   {novaSlug ? ` / ${novaSlug}` : ''}
                 </span>
               </div>

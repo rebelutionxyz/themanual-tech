@@ -1,5 +1,6 @@
 import { Popup, TimePresetPanel } from '@/components/layout/lensPanels';
 import { BlingPopup, readableInk } from '@/components/shell/BottomToolbar';
+import { H24Badge } from '@/components/shell/H24Badge';
 import { LocationPanel, PLACES_ROOT } from '@/components/shell/LocationPanel';
 import { ModalLink } from '@/components/shell/ModalLink';
 import { RealmTreeContent } from '@/components/shell/RealmTreeSlider';
@@ -162,6 +163,11 @@ export function LensRow({ accent }: { accent: string }) {
         <HoneyDrop size={16} style={{ color: ink }} />
         <span className="hidden md:inline">BLiNG!</span>
       </button>
+
+      {/* h24 spine badge — the same element the black shell's SiteHeader
+          carries, flipping ink with the rest of this accent bar. ORACLE_MF
+          v1.23: the AI is in the header of EVERY Astra, never a nav entry. */}
+      <H24Badge ink={ink} onDark={onDark} />
 
       {/* ml-auto on the first control floats the lens group (and the trailing
           Cart) to the RIGHT edge of the row. Degrades to 0 when the row

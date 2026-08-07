@@ -1,3 +1,4 @@
+import { H24Badge } from '@/components/shell/H24Badge';
 import { useEffect } from 'react';
 
 const WAVES_COLOR = '#0EA5E9'; // ocean/sky blue — matches Mini Waves V76 --ocean
@@ -25,11 +26,16 @@ export function WavesPage() {
 
   return (
     <div
-      className="h-full w-full overflow-hidden"
+      className="relative h-full w-full overflow-hidden"
       style={{
         background: 'rgba(14, 165, 233, 0.06)',
       }}
     >
+      {/* h24 spine badge (FRONT21). MiniWaves is chrome-free and its surface is
+          a static HTML build inside the iframe, so the badge rides ON TOP as a
+          React overlay rather than being injected into that file — the spine
+          rule holds for every Astra, including the ones we only wrap. */}
+      <H24Badge className="absolute right-3 top-3 z-10 rounded-md bg-black/50 backdrop-blur-sm" />
       <iframe
         src="/mini-waves-v92.html"
         title="MiniWaves"
