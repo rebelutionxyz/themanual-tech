@@ -110,6 +110,7 @@ export const SURFACE_FRIENDLY: Record<string, string> = {
   rule: 'Events',
   give: 'Give',
   comms: 'COMMs',
+  security: 'Security',
 };
 
 /** Astra dropdown entries. */

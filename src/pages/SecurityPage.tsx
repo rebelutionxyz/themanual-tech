@@ -441,23 +441,29 @@ export function SecurityPage() {
   const fmtWhen = (d: Date) => d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div className="mx-auto max-w-[760px] px-4 pt-5 pb-24 text-text"
-      style={{ '--sec': '#58a6ff', '--sec-deep': '#1f6feb', '--warn': '#f59e0b' } as CSSProperties}>
+    // Full-bleed dark center column. Security keeps its console skin inside the
+    // white community shell (owner ruling 2026-08-08) — the dark owns the whole
+    // content column so the boundary reads as intentional, with no white gaps
+    // inside it and no dark bleed past it onto the shell chrome. --clear is
+    // pinned here rather than left to each call site's var() fallback.
+    <div className="min-h-full w-full bg-[var(--bg)] text-text"
+      style={{ '--sec': '#58a6ff', '--sec-deep': '#1f6feb', '--warn': '#f59e0b', '--clear': '#16a34a' } as CSSProperties}>
+    <div className="mx-auto max-w-[760px] px-4 pt-5 pb-24">
       {DEMO_MODE && (
         <div className="mb-5 flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-[13px] leading-relaxed"
           style={{ background: 'color-mix(in srgb, var(--warn) 8%, var(--panel))', borderColor: 'color-mix(in srgb, var(--warn) 45%, var(--border))', color: 'var(--text-silver)' }}>
           <span className="mt-px flex-none rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold tracking-[0.08em]"
             style={{ background: 'var(--warn)', color: '#07080a' }}>DEMO DATA</span>
-          <span><b className="text-text-silver-bright">Agent surfaces show sample findings</b> until the DingleBERRY agent is
+          <span><b className="text-text-silver-bright">Agent surfaces show sample findings</b> until the security agent is
             connected to this device. Local surfaces (Privacy, System integrity) and the file check below are live, and run on your machine.</span>
         </div>
       )}
 
       <div className="mb-1.5 font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
-        <b style={{ color: '#dc2626' }}>DINGLEBERRY</b> · SECURITY COMMAND · DEVICE
+        <b style={{ color: '#dc2626' }}>SECURITY</b> · DEVICE
       </div>
       <h1 className="m-0 text-[28px] font-bold tracking-tight">Security</h1>
-      <p className="mb-6 mt-1 text-sm text-text-dim">The HoneyComb's immune system, pointed at your device. Six surfaces, one posture.</p>
+      <p className="mb-6 mt-1 text-sm text-text-dim">The immune system, pointed at your device. Six surfaces, one posture.</p>
 
       {/* hex posture flower */}
       <div className="mb-2 flex justify-center">
@@ -587,7 +593,7 @@ export function SecurityPage() {
             <p className="mb-3 mt-0 text-[12.5px] leading-relaxed text-text-dim">
               Drop files here — or pick below — and they are checked <b className="font-semibold text-text-silver-bright">on your machine, nothing uploaded</b>:
               disguised executables, double extensions, hidden direction-override characters, macro carriers, and headers that don't match the name.
-              Indicators, not verdicts — full signature scanning arrives with the DingleBERRY agent.
+              Indicators, not verdicts — full signature scanning arrives with the security agent.
             </p>
             <div className="flex flex-wrap gap-2">
               <button onClick={() => fcFilesRef.current?.click()} disabled={scanning}
@@ -697,6 +703,7 @@ export function SecurityPage() {
         <span><Dot color="var(--clear, #16a34a)" />DEFINITIONS · {DEFINITIONS_STAMP}</span>
         <span>LAST SCAN · {lastScan ? fmtWhen(lastScan).toUpperCase() : 'NEVER'}</span>
       </div>
+    </div>
     </div>
   );
 }

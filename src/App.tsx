@@ -306,6 +306,13 @@ function AppContent() {
             <Route path="/pulse/watch/:broadcastId" element={<WatchPage />} />
             <Route path="/pulse/c/:handle" element={<ChannelPage />} />
 
+            {/* Security — the device immune system. Owner ruling 2026-08-08:
+              this belongs in the COMMUNITY shell, not the platform one, so the
+              sidebar/toolbar never unmount when a Bee steps into it. The page
+              content stays dark by design — it reads as its own console inside
+              the white shell. Backed by the dingleberry_device_v1 rail. */}
+            <Route path="/security" element={<SecurityPage />} />
+
             {/* BAZAAR — marketplace. Mounts in the same community shell; flat
               children. (new / orders land in later slices.) */}
             <Route path="/bazaar" element={<BazaarBrowse />} />
@@ -368,13 +375,6 @@ function AppContent() {
               <Route path="oracle" element={<AtlasOraclePage />} />
               <Route path="justice" element={<JusticeHandoffPage />} />
             </Route>
-
-            {/* User-facing device security (DingleBERRY · Security). The Bee-side
-              scan page — six surfaces, one posture — backed by the
-              dingleberry_device_v1 rail (scans/findings RPCs). Registered before
-              /:slug so it wins over the generic SurfacePage. Reached from the
-              Astra dropdown (sidebarNav ASTRA_SWITCHER → 'Security'). */}
-            <Route path="/security" element={<SecurityPage />} />
 
             {/* FreedomBLiNGS — The Sovereign Ledger (Currency). Staged port; Slice 1
               ships the LIVE Balance surface. Registered before /:slug so the

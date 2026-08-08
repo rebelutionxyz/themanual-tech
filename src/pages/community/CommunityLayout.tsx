@@ -36,7 +36,7 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
-type Surface = 'intel' | 'unite' | 'rule' | 'give' | 'pulse' | 'bazaar' | 'comms';
+type Surface = 'intel' | 'unite' | 'rule' | 'give' | 'pulse' | 'bazaar' | 'comms' | 'security';
 
 const ACCENT: Record<Surface, string> = {
   intel: '#1D9BF0',
@@ -49,6 +49,8 @@ const ACCENT: Record<Surface, string> = {
   bazaar: BAZAAR_ACCENT,
   // COMMS lilac — canonical color from the surface registry.
   comms: SURFACE_BY_SLUG.get('comms')?.color ?? '#9B7FC8',
+  // Security steel blue — matches astraColor('security') in sidebarNav.
+  security: '#58A6FF',
 };
 
 const VIEW_ROUTE_MAP: Record<string, IntelView> = {
@@ -77,6 +79,7 @@ function surfaceFromPath(pathname: string): Surface {
   if (pathname.startsWith('/pulse')) return 'pulse';
   if (pathname.startsWith('/bazaar')) return 'bazaar';
   if (pathname.startsWith('/comms')) return 'comms';
+  if (pathname.startsWith('/security')) return 'security';
   return 'intel';
 }
 
@@ -249,6 +252,12 @@ export function CommunityLayout() {
       if (location.pathname !== '/comms') navigate('/comms');
       return;
     }
+    if (surface === 'security') {
+      // Security is self-contained — surfaces / threats / quarantine / history
+      // are tabs on the center page, so the only own item is Overview.
+      if (location.pathname !== '/security') navigate('/security');
+      return;
+    }
     if (surface === 'bazaar') {
       // BAZAAR sidebar items are route links; this guards the give-fallthrough.
       return;
@@ -277,7 +286,7 @@ export function CommunityLayout() {
         ? uniteView
         : surface === 'rule'
           ? ruleView
-          : surface === 'pulse' || surface === 'comms'
+          : surface === 'pulse' || surface === 'comms' || surface === 'security'
             ? 'home'
             : surface === 'bazaar'
               ? bazaarItem
@@ -391,6 +400,11 @@ function buildItems(surface: Surface, c: Counts): SidebarItem[] {
     // COMMS — conversation list + thread live on the center page, so the
     // sidebar is just Conversations + the shared utility tail.
     return [{ id: 'home', label: 'Conversations', icon: MessageCircle }, ...tailItems(c)];
+  }
+  if (surface === 'security') {
+    // Security — the scan surfaces, threats, quarantine and history are tabs on
+    // the center page, so the sidebar is just Overview + the shared tail.
+    return [{ id: 'home', label: 'Overview', icon: Shield }, ...tailItems(c)];
   }
   if (surface === 'bazaar') {
     // BAZAAR — route-link items (Browse / OFFER / Orders) + the shared tail.
