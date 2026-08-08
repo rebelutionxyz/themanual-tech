@@ -133,16 +133,22 @@ export const ASTRA_SWITCHER: AstraSwitchItem[] = [
   { label: 'INTEL', slug: 'intel', to: '/intel', icon: MessagesSquare },
   { label: 'COMMs', slug: 'comms', to: '/comms', icon: MessageCircle },
   { label: 'BAZAAR', slug: 'bazaar', to: '/bazaar', icon: Store },
-  // Security (DingleBERRY · device rail) — navigates OUT of the community
-  // shell to the platform-chrome scan page, same pattern as JUSTICE above.
-  // Named 'Security' per Butch 2026-08-08 (matches astra_registry default_name).
-  { label: 'Security', slug: 'security', to: '/security', icon: ShieldAlert },
+  // Security (DingleBERRY · device rail) — a community surface like the rest
+  // (FRONT23 moved it in; FRONT27 added '/security' to COMMUNITY_PREFIXES so
+  // the platform chrome is actually suppressed). NOT the JUSTICE pattern.
+  // Label is the Astra NAME in caps like its siblings (FRONT27); the page H1
+  // stays sentence case, and astra_registry.default_name is unchanged.
+  { label: 'SECURITY', slug: 'security', to: '/security', icon: ShieldAlert },
 ];
 
 /** Resolve an Astra/surface color on white. Astra layer (≠ realm color). */
 export function astraColor(slug: string): string {
   if (slug === 'intel') return '#1D9BF0';
-  if (slug === 'security') return '#58A6FF'; // Security steel blue (device rail)
+  // Security SLATE (FRONT27). #58A6FF was indistinguishable from INTEL's
+  // #1D9BF0; every other community accent is taken and crimson belongs to
+  // PULSE. Slate collides with nothing and reads as security. Keep in sync
+  // with CommunityLayout's ACCENT.security and the surfaces.ts SurfaceDef.
+  if (slug === 'security') return '#475569';
   if (slug === 'justice') return '#1E40AF'; // Justice ASTRA navy (distinct from INTEL sky)
   return SURFACE_BY_SLUG.get(slug)?.color ?? NEUTRAL_INK;
 }

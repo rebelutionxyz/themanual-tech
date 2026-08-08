@@ -253,7 +253,9 @@ export const SURFACES: SurfaceDef[] = [
     purpose:
       'Watches the platform: infra health, transaction integrity, source verification, shill and abuse detection, dispatch authority, and threat interception.',
     icon: ShieldAlert,
-    color: '#DC2626',
+    // Slate (FRONT27). Was #DC2626, which is PULSE's crimson — the catalog now
+    // agrees with astraColor('security') and CommunityLayout's ACCENT.security.
+    color: '#475569',
     group: 'Safety',
     tier: 2,
   },

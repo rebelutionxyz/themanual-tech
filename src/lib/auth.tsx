@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { isPwnedPassword, PWNED_PASSWORD_MESSAGE } from './security/pwnedPassword';
 
 export interface Bee {
   id: string;
@@ -89,6 +90,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     handle,
   ) => {
     if (!supabase) return { error: new Error('Supabase not configured') };
+
+    // FRONT25: leaked-password gate. Runs BEFORE the password reaches Supabase,
+    // and fails open, so a breach-list outage never blocks a signup.
+    const { pwned } = await isPwnedPassword(password);
+    if (pwned) return { error: new Error(PWNED_PASSWORD_MESSAGE) };
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,

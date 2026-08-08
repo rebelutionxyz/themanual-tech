@@ -49,8 +49,9 @@ const ACCENT: Record<Surface, string> = {
   bazaar: BAZAAR_ACCENT,
   // COMMS lilac — canonical color from the surface registry.
   comms: SURFACE_BY_SLUG.get('comms')?.color ?? '#9B7FC8',
-  // Security steel blue — matches astraColor('security') in sidebarNav.
-  security: '#58A6FF',
+  // Security SLATE — matches astraColor('security') in sidebarNav. #58A6FF read
+  // as the same bar as INTEL's #1D9BF0 (FRONT27).
+  security: '#475569',
 };
 
 const VIEW_ROUTE_MAP: Record<string, IntelView> = {

@@ -132,6 +132,7 @@ const COMMUNITY_PREFIXES = [
   '/pulse',
   '/bazaar',
   '/comms',
+  '/security',
   // Sidebar utility-tail surfaces — same white shell, no skin switch.
   '/bookmarks',
   '/notifications',

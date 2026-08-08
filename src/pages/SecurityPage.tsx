@@ -32,6 +32,14 @@
  * that rail is live; a security page must never present fabricated threats as real.
  */
 
+import {
+  type LookupOutcome,
+  MAX_HASH_BYTES,
+  lookupHashes,
+  malwareDetail,
+  malwareTitle,
+  sha256File,
+} from '@/lib/security/malwareHash';
 import { useMemo, useRef, useState } from 'react';
 import type { CSSProperties, InputHTMLAttributes } from 'react';
 
@@ -64,7 +72,24 @@ export interface Finding {
 }
 interface HistoryRow { at: Date; mode: ScanMode; items: number; found: number; bad: number; }
 interface FindingAction { label: string; danger?: boolean; confirmingNow?: boolean; onClick: () => void; }
-type FcStatus = { phase: 'run'; text: string } | { phase: 'done'; checked: number; flagged: number; capped: boolean } | null;
+type FcStatus =
+  | { phase: 'run'; text: string }
+  | {
+      phase: 'done';
+      checked: number;
+      /** Structural indicators — the heuristics, not the database. */
+      flagged: number;
+      capped: boolean;
+      /** Files that produced a fingerprint and were actually looked up. */
+      hashed: number;
+      /** Confirmed known-malware matches. */
+      matched: number;
+      /** Files past MAX_HASH_BYTES — reported, never silently skipped. */
+      oversize: number;
+      /** The lookup could not reach a conclusion. NOT a no-match. */
+      degraded: boolean;
+    }
+  | null;
 
 /* ── catalog ─────────────────────────────────────────────────────────── */
 const SURFACES: SurfaceDef[] = [
@@ -319,6 +344,11 @@ export function SecurityPage() {
   const allowedRef = useRef<Set<string>>(new Set());
   const [fcStatus, setFcStatus] = useState<FcStatus>(null);
   const [fcDrag, setFcDrag] = useState(false);
+  // Folder picking is detected BEHAVIOURALLY, never by property sniffing:
+  // `'webkitdirectory' in input` returns true on Android Chrome even where
+  // selecting a folder is impossible, so the property is a liar. The honest
+  // signal is a change event that yields zero files. null = not yet tried.
+  const [folderWorks, setFolderWorks] = useState<boolean | null>(null);
   const fcFilesRef = useRef<HTMLInputElement | null>(null);
   const fcFolderRef = useRef<HTMLInputElement | null>(null);
 
@@ -390,18 +420,70 @@ export function SecurityPage() {
 
   async function runFileCheck(fileList: FileList) {
     if (scanning) return;
+    // Read length up front: the input is cleared on change, and this function
+    // awaits, so `fileList.length` is not safe to read later.
+    const total = fileList.length;
     const files = Array.from(fileList).slice(0, FC_LIMIT);
     if (!files.length) return;
     let working = findings.filter((f) => !f.local); // re-checks replace, not stack
     let flagged = 0;
+
+    // ---- 1. structural checks, then a fingerprint, file by file ----------
+    // Both signals matter, so the hash is taken IN ADDITION to the heuristics,
+    // never instead of them.
+    const hashes: (string | null)[] = new Array(files.length);
+    let oversize = 0;
     for (let i = 0; i < files.length; i++) {
       if (i % 25 === 0) { setFcStatus({ phase: 'run', text: `Checking ${i + 1} / ${files.length} — ${files[i].name}` }); await sleep(0); }
       const found = await fcCheckFile(files[i]);
       for (const f of found) { working = [...working, { ...f, id: uid++ }]; flagged++; }
+
+      const h = await sha256File(files[i]);
+      hashes[i] = h;
+      if (!h && files[i].size > MAX_HASH_BYTES) oversize++;
     }
+
+    // ---- 2. one batched lookup for every fingerprint ---------------------
+    const present = hashes.filter((h): h is string => h !== null);
+    let outcome: LookupOutcome = { byHash: new Map(), degraded: false };
+    if (present.length) {
+      setFcStatus({ phase: 'run', text: `Checking ${present.length} fingerprint${present.length === 1 ? '' : 's'} against the malware database…` });
+      await sleep(0);
+      outcome = await lookupHashes(present);
+    }
+
+    // ---- 3. a 'malicious' verdict is a REAL critical finding -------------
+    // local:true earns the LOCAL CHECK tag; sample stays false so it can never
+    // pick up the SAMPLE badge. noact:true keeps it Dismiss-only — a browser
+    // cannot delete or quarantine a file, and offering to would be a lie.
+    let matched = 0;
+    for (let i = 0; i < files.length; i++) {
+      const h = hashes[i];
+      if (!h) continue;
+      const v = outcome.byHash.get(h);
+      if (!v || v.verdict !== 'malicious') continue;
+      matched++;
+      working = [...working, {
+        id: uid++, surface: 'malware', sev: 'critical',
+        title: malwareTitle(v), detail: malwareDetail(files[i].name, v),
+        path: files[i].webkitRelativePath || files[i].name,
+        sample: false, local: true, noact: true,
+      }];
+    }
+
     setFindings(working);
-    setSurfaceStatus((p) => (flagged || p.malware !== 'idle') ? { ...p, malware: levelFor('malware', working) } : p);
-    setFcStatus({ phase: 'done', checked: files.length, flagged, capped: fileList.length > FC_LIMIT });
+    setSurfaceStatus((p) => {
+      const next = levelFor('malware', working);
+      // A degraded lookup must NEVER paint this surface CLEAR. That green is
+      // the false clean this whole pass exists to prevent — if the database
+      // could not be reached, the honest answer is the status quo, not "clear".
+      if (outcome.degraded && next === 'clear') return p;
+      return (flagged || matched || p.malware !== 'idle') ? { ...p, malware: next } : p;
+    });
+    setFcStatus({
+      phase: 'done', checked: files.length, flagged, capped: total > FC_LIMIT,
+      hashed: present.length, matched, oversize, degraded: outcome.degraded,
+    });
   }
 
   function afterAction(surfaceId: SurfaceId, nextFindings: Finding[]) {
@@ -590,32 +672,79 @@ export function SecurityPage() {
             onDrop={(e) => { e.preventDefault(); setFcDrag(false); if (e.dataTransfer?.files?.length) runFileCheck(e.dataTransfer.files); }}
             className="rounded-2xl border-[1.5px] border-dashed p-4 transition-colors"
             style={{ background: fcDrag ? 'color-mix(in srgb, var(--sec) 7%, var(--panel))' : 'var(--panel)', borderColor: fcDrag ? 'var(--sec)' : 'var(--border-bright)' }}>
-            <p className="mb-3 mt-0 text-[12.5px] leading-relaxed text-text-dim">
-              Drop files here — or pick below — and they are checked <b className="font-semibold text-text-silver-bright">on your machine, nothing uploaded</b>:
+            <p className="mb-2 mt-0 text-[12.5px] leading-relaxed text-text-dim">
+              Drop files here — or pick below. Each file is examined <b className="font-semibold text-text-silver-bright">in this browser</b> for
               disguised executables, double extensions, hidden direction-override characters, macro carriers, and headers that don't match the name.
-              Indicators, not verdicts — full signature scanning arrives with the security agent.
+              Each file is then fingerprinted and checked against a known-malware database.
+            </p>
+            <p className="mb-2 mt-0 text-[12.5px] leading-relaxed text-text-dim">
+              <b className="font-semibold text-text-silver-bright">Only a mathematical fingerprint (SHA-256) of each file is sent — never the file, its name, or its contents.</b>{' '}
+              A fingerprint is one-way: it cannot be turned back into the file it came from.
+            </p>
+            <p className="mb-3 mt-0 text-[12.5px] leading-relaxed text-text-dim">
+              Downloaded an app install file? Check it here before you open it. This page can only check files you hand it —
+              it cannot see installed apps, other apps' storage, or watch this device in the background.
             </p>
             <div className="flex flex-wrap gap-2">
               <button onClick={() => fcFilesRef.current?.click()} disabled={scanning}
                 className="rounded-lg border px-3 py-1.5 text-[12.5px] font-semibold disabled:opacity-45"
                 style={{ background: 'var(--panel-2)', borderColor: 'var(--border-bright)', color: 'var(--text-silver)' }}>Pick files</button>
-              <button onClick={() => fcFolderRef.current?.click()} disabled={scanning}
-                className="rounded-lg border px-3 py-1.5 text-[12.5px] font-semibold disabled:opacity-45"
-                style={{ background: 'var(--panel-2)', borderColor: 'var(--border-bright)', color: 'var(--text-silver)' }}>Pick a folder</button>
+              {folderWorks !== false && (
+                <button onClick={() => fcFolderRef.current?.click()} disabled={scanning}
+                  className="rounded-lg border px-3 py-1.5 text-[12.5px] font-semibold disabled:opacity-45"
+                  style={{ background: 'var(--panel-2)', borderColor: 'var(--border-bright)', color: 'var(--text-silver)' }}>Pick a folder</button>
+              )}
             </div>
+            {folderWorks === false && (
+              <p className="mb-0 mt-2 text-[12px] leading-relaxed text-text-dim">
+                Your browser can't select a whole folder — pick files instead.
+              </p>
+            )}
             {fcStatus && (
               <div className="mt-3 font-mono text-[11.5px] tracking-[0.03em]" style={{ color: 'var(--text-dim)' }} aria-live="polite">
                 {fcStatus.phase === 'run' ? fcStatus.text : (
-                  <>Checked <b style={{ color: 'var(--text-silver)' }}>{fcStatus.checked}</b> file{fcStatus.checked === 1 ? '' : 's'} ·{' '}
-                    {fcStatus.flagged
-                      ? <b style={{ color: 'var(--warn)' }}>{fcStatus.flagged} risk indicator{fcStatus.flagged === 1 ? '' : 's'} — see the Threats tab</b>
-                      : <b style={{ color: 'var(--clear, #16a34a)' }}>no risk indicators</b>}
-                    {' '}· nothing left this device{fcStatus.capped ? ` · capped at ${FC_LIMIT}` : ''}</>
+                  <>
+                    <div>
+                      Checked <b style={{ color: 'var(--text-silver)' }}>{fcStatus.checked}</b> file{fcStatus.checked === 1 ? '' : 's'} ·{' '}
+                      {fcStatus.flagged
+                        ? <b style={{ color: 'var(--warn)' }}>{fcStatus.flagged} risk indicator{fcStatus.flagged === 1 ? '' : 's'} — see the Threats tab</b>
+                        : <span>no structural risk indicators</span>}
+                      {fcStatus.capped ? ` · capped at ${FC_LIMIT}` : ''}
+                      {fcStatus.oversize ? ` · ${fcStatus.oversize} too large to fingerprint in the browser` : ''}
+                    </div>
+                    {/* The database line is deliberately SEPARATE and never green.
+                        "No known-malware match" is not "clean" and must not look
+                        like a pass; a degraded lookup must not look like either. */}
+                    <div className="mt-1">
+                      {fcStatus.matched > 0 && (
+                        <b style={{ color: '#dc2626' }}>
+                          {fcStatus.matched} known-malware match{fcStatus.matched === 1 ? '' : 'es'} — see the Threats tab
+                        </b>
+                      )}
+                      {fcStatus.degraded ? (
+                        <b className={fcStatus.matched > 0 ? 'ml-2' : ''} style={{ color: 'var(--warn)' }}>
+                          Could not reach the malware database — structural checks only.
+                        </b>
+                      ) : fcStatus.matched === 0 && fcStatus.hashed > 0 ? (
+                        <span>
+                          No known-malware match for {fcStatus.hashed} fingerprint{fcStatus.hashed === 1 ? '' : 's'}.
+                        </span>
+                      ) : null}
+                    </div>
+                  </>
                 )}
               </div>
             )}
             <input ref={fcFilesRef} type="file" multiple hidden onChange={(e) => { if (e.target.files) runFileCheck(e.target.files); e.target.value = ''; }} />
-            <input ref={fcFolderRef} type="file" {...DIR_PICK_PROPS} hidden onChange={(e) => { if (e.target.files) runFileCheck(e.target.files); e.target.value = ''; }} />
+            {/* A change event carrying ZERO files is the Android tell: the picker
+                opened and could not return a folder. Cancelling fires `cancel`,
+                not `change`, so this does not misfire on a user backing out. */}
+            <input ref={fcFolderRef} type="file" {...DIR_PICK_PROPS} hidden onChange={(e) => {
+              const list = e.target.files;
+              if (list && list.length > 0) { setFolderWorks(true); runFileCheck(list); }
+              else { setFolderWorks(false); }
+              e.target.value = '';
+            }} />
           </div>
 
           <div className="mb-2.5 mt-6 font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>Real-time shields</div>

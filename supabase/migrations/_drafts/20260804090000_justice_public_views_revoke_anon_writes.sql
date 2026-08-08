@@ -1,3 +1,5 @@
+-- SUPERSEDED AND NEVER APPLIED -- moved to _drafts/ by DB34 (2026-08-08). This file was authored but is absent from supabase_migrations.schema_migrations; its work was delivered instead by 20260808193736 (DB31: the seven justice_*_public views + the atoms view, revoking from anon AND authenticated, not anon only) and 20260808195846 (DB34: the two views this file correctly named that DB31's pattern missed). Kept for history, not for replay -- do not apply.
+--
 -- DB28 -- JUSTICE HARDENING: remove anon write grants from the nine justice
 -- views, and finish DB11's atoms half.
 --
