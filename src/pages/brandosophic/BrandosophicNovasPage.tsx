@@ -107,7 +107,7 @@ export function BrandosophicNovasPage() {
       <div className="mx-auto max-w-2xl px-4 py-10">
         <div className="rounded-2xl border-2 border-zinc-900 p-8 text-center">
           <div className="text-[10px] font-bold tracking-[0.3em] text-zinc-400">
-            THE HONEYCOMB · NOVA REGISTRY
+            NOVA REGISTRY
           </div>
           <h1 className="mt-3 text-2xl font-extrabold text-zinc-900">Birth Certificate</h1>
           <p className="mt-4 text-lg font-bold text-zinc-900">{displayName}</p>

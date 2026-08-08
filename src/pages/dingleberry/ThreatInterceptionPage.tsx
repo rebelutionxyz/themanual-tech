@@ -349,7 +349,7 @@ export function ThreatInterceptionPage() {
                 </div>
                 <div className="mb-3 text-text-silver" style={{ fontSize: 13, lineHeight: 1.4 }}>
                   <b>{x.affected.toLocaleString()} members</b> were hit by the same payload from the same source.
-                  DingleBERRY found it — it opens a <b>class-action Docket</b> carried by AtlasADVOCATE. Affected members
+                  Security found it — it opens a <b>class-action Docket</b> carried by AtlasADVOCATE. Affected members
                   are pointed to the Docket and each opts in. It enters at the first rung:
                 </div>
                 <div className="mb-3 rounded-md border border-border bg-bg-elevated" style={{ padding: '12px 10px' }}>
@@ -359,7 +359,7 @@ export function ThreatInterceptionPage() {
                   Open class-action Docket
                 </ActionButton>
                 <div className="mt-2 text-center font-mono text-text-muted" style={{ fontSize: 10.5 }}>
-                  DingleBERRY = detector + on-ramp · AtlasADVOCATE = the venue
+                  Security = detector + on-ramp · AtlasADVOCATE = the venue
                 </div>
                 <div className="mt-2">
                   <ActionCaption />

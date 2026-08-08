@@ -24,7 +24,7 @@ const SUMMARY: Record<Posture, string> = {
   critical:
     'The spine is down and we are in Go Dark. I have the mesh serving from cache and relaying P2P, quarantined 14 misbehaving nodes, and I am queuing every ledger write for clean reconcile.',
   degraded:
-    'The HoneyComb is vigilant — 3 flags open, nothing on fire. I auto-resolved 37 overnight. Three need your call; here is the one I would take first.',
+    'The platform is vigilant — 3 flags open, nothing on fire. I auto-resolved 37 overnight. Three need your call; here is the one I would take first.',
   secure:
     'All six surfaces are nominal. I am watching, and I auto-cleared 37 low-risk items overnight. Nothing needs you right now.',
 };
@@ -154,8 +154,8 @@ export function AtlasOraclePage() {
               Atlas Oracle
             </h1>
             <div className="text-text-silver" style={{ fontSize: 14, maxWidth: 540 }}>
-              HoneyComb’s security copilot — explains every finding in plain language, ships the fix it can, and automates
-              the rest across the whole HoneyComb.
+              The platform’s security copilot — explains every finding in plain language, ships the fix it can, and automates
+              the rest across the whole platform.
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -286,7 +286,7 @@ export function AtlasOraclePage() {
               </div>
             ))}
             <div className="mt-[2px] text-text-muted" style={{ fontSize: 11.5, lineHeight: 1.4 }}>
-              Every fix Atlas ships is logged, reversible, and attributable — the audit trail the HoneyComb runs on.
+              Every fix Atlas ships is logged, reversible, and attributable — the audit trail the platform runs on.
             </div>
           </DbCard>
         </div>

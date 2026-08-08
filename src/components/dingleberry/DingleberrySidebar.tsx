@@ -78,7 +78,7 @@ export function DingleberrySidebar() {
           setPinned((p) => !p);
           setHovered(false);
         }}
-        aria-label={pinned ? 'Collapse DingleBERRY menu' : 'Expand DingleBERRY menu'}
+        aria-label={pinned ? 'Collapse Security menu' : 'Expand Security menu'}
         className={cn(
           'flex h-11 flex-shrink-0 items-center border-b border-border text-text-silver hover:bg-bg hover:text-text',
           expanded ? 'justify-between px-3' : 'justify-center',
@@ -89,7 +89,7 @@ export function DingleberrySidebar() {
             className="font-serif font-bold tracking-wide"
             style={{ fontSize: '15px', color: DINGLEBERRY_COLOR }}
           >
-            DingleBERRY
+            Security
           </span>
         )}
         {expanded ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}

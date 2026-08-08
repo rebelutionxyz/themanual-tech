@@ -28,7 +28,7 @@ export const miniwavesAstra: AstraConfig = {
   slug: 'miniwaves',
   hosts: ['miniwaves.app', 'www.miniwaves.app'],
   wordmark: 'MiniWaves',
-  siteTitle: 'MiniWaves · HONEYCOMB Motion Flow',
+  siteTitle: 'MiniWaves · Motion Flow',
   tagline: 'Orchestrate your life by motion, Vessel to Dribble.',
   primarySurface: 'waves',
   constellation: 'honeycomb',

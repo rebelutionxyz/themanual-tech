@@ -38,7 +38,7 @@ export function NucleusPage() {
               The Nucleus is restricted to the Five Keyholders.
             </p>
             <p className="mt-2 text-xs" style={{ color: TEXT_MUTED }}>
-              See HONEYCOMB §31 — Three Switches & Five Keyholders.
+              See canon §31 — Three Switches & Five Keyholders.
             </p>
           </div>
         }

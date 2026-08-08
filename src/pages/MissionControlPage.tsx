@@ -288,7 +288,7 @@ export default function MissionControlPage() {
         </p>
       ) : (
         <>
-          <ProgressBar done={totals.done} total={totals.total} pct={totals.pct} label="HONEYCOMB" />
+          <ProgressBar done={totals.done} total={totals.total} pct={totals.pct} label="PLATFORM" />
           {byAstra.map(([astra, rows]) => {
             const d = rows.filter((r) => r.derived_status === 'done').length;
             return (

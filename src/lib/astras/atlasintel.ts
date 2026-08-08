@@ -12,7 +12,7 @@ export const atlasintelAstra: AstraConfig = {
   wordmark: 'AtlasINTEL',
   // siteTitle fix: previously inheriting "The Manual" from index.html static title.
   // Canonical value per manual-spine-api-v1.md §2.1.
-  siteTitle: 'AtlasINTEL · HONEYCOMB Forum',
+  siteTitle: 'AtlasINTEL · Forum',
   tagline: 'Sovereign intelligence for free people.',
   primarySurface: 'intel',
   constellation: 'atlasnation',

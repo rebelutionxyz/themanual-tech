@@ -12,7 +12,7 @@ export const atlasunitedAstra: AstraConfig = {
   // Conservative value — dispatch didn't list canonical for atlasunited;
   // matches the dispatch fallback pattern `${brand} · HONEYCOMB`. Refine when
   // OG HUMAN locks the Rule-of-Law surface copy.
-  siteTitle: 'AtlasUNITED · HONEYCOMB',
+  siteTitle: 'AtlasUNITED',
   tagline: 'Rule of law, by the people.',
   primarySurface: 'rule',
   constellation: 'atlasnation',

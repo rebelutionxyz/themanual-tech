@@ -29,7 +29,7 @@ import { useDingleberry } from './DingleberryLayout';
 /* DingleBERRY seal — red identity hex (was navy + gold) */
 function DBHex({ size = 36 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 120 120" role="img" aria-label="DingleBERRY">
+    <svg width={size} height={size} viewBox="0 0 120 120" role="img" aria-label="Security">
       <circle cx="60" cy="60" r="50" fill="#14171C" stroke={DINGLEBERRY_COLOR} strokeWidth="3" />
       <path d="M60 30 L84 44 L84 72 L60 86 L36 72 L36 44 Z" fill="none" stroke={DINGLEBERRY_COLOR} strokeWidth="3" strokeLinejoin="round" />
       <circle cx="60" cy="58" r="7" fill="none" stroke={DINGLEBERRY_COLOR} strokeWidth="3" />
@@ -84,7 +84,7 @@ function RecordPreview() {
           </div>
           <div className="mt-[5px] text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
             A maintained dependency was hijacked to inject a crypto-miner into every site that pulled the update.
-            DingleBERRY detected and blocked it; this Docket opens to seek accountability.
+            Security detected and blocked it; this Docket opens to seek accountability.
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-text-muted" style={{ fontSize: 11 }}>
             <span>
@@ -135,7 +135,7 @@ export function JusticeHandoffPage() {
             <div className="flex flex-col items-center gap-1">
               <DBHex size={36} />
               <span className="font-mono uppercase text-text-muted" style={{ fontSize: 8, letterSpacing: '0.06em' }}>
-                DingleBERRY
+                Security
               </span>
             </div>
             <ChevronRight size={20} className="text-text-muted" />
@@ -154,10 +154,10 @@ export function JusticeHandoffPage() {
           <div className="min-w-[260px] flex-1">
             <Eyebrow>Detector → venue · the handoff</Eyebrow>
             <h1 className="font-serif font-bold text-text" style={{ fontSize: 28, lineHeight: 1.05, margin: '3px 0 4px' }}>
-              DingleBERRY found it. AtlasADVOCATE is where you act.
+              Security found it. AtlasADVOCATE is where you act.
             </h1>
             <div className="text-text-silver" style={{ fontSize: 14.5, maxWidth: 580 }}>
-              1,204 members were hit by the same payload from the same source. DingleBERRY packages the evidence and{' '}
+              1,204 members were hit by the same payload from the same source. Security packages the evidence and{' '}
               <b>opens a class-action Docket</b> — affected members are pointed to it and <b>each opts in</b> (nobody is
               enrolled). <b>AtlasADVOCATE</b> — the legal Astra — carries it forward; the docket record is auto-filed in
               the Justice realm.
@@ -170,7 +170,7 @@ export function JusticeHandoffPage() {
         {/* left — what DingleBERRY hands over */}
         <div className="min-w-0">
           <div className="mb-3 flex items-center gap-[10px]">
-            <Eyebrow>What DingleBERRY hands over</Eyebrow>
+            <Eyebrow>What Security hands over</Eyebrow>
             <span className="h-px flex-1 bg-border" />
           </div>
           <DbCard className="mb-4 p-5">
@@ -213,7 +213,7 @@ export function JusticeHandoffPage() {
           >
             <Shield size={16} style={{ color: DATA_BLUE, flex: 'none', marginTop: 1 }} />
             <div className="text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
-              <b>DingleBERRY is the detector and the on-ramp — not the court.</b> It packages findings and surfaces the
+              <b>Security is the detector and the on-ramp — not the court.</b> It packages findings and surfaces the
               affected class, then opens a <b>class-action Docket</b>. Affected members are pointed to it and{' '}
               <b>each opts in</b> — nobody is enrolled. The case is carried forward in <b>AtlasADVOCATE</b>, the legal
               Astra (justice system + attorney marketplace); the docket record is auto-filed in the Justice realm — a

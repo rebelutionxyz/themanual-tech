@@ -90,7 +90,7 @@ export function CharterPage() {
       <div className="charter-body">
         <div className="preamble">
           <p>
-            We, the members of the HoneyComb, hold this ledger in common — that value belongs to
+            We, the members of this platform, hold this ledger in common — that value belongs to
             those who create it, that the record be honest, and that no one stand above the rules
             all can read. This Charter binds the economy of FreedomBLiNGs, and binds it equally to
             all.
@@ -127,7 +127,7 @@ export function CharterPage() {
         <div className="seal-mark">
           <i />
         </div>
-        <div className="seal-title">Sealed by the HoneyComb</div>
+        <div className="seal-title">Sealed by the members</div>
         <div className="seal-sub">
           Append-only and member-owned. This Charter stands above every steward and every Astra
           alike.

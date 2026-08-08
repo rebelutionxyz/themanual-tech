@@ -11,7 +11,7 @@ export const brandosophicAstra: AstraConfig = {
   hosts: ['brandosophic.com', 'www.brandosophic.com'],
   wordmark: 'BRANDoSOPHIC',
   wordmarkShort: 'BRAND',
-  siteTitle: 'BRANDoSOPHIC · HONEYCOMB Brand Studio',
+  siteTitle: 'BRANDoSOPHIC · Brand Studio',
   tagline: 'Make it yours.',
   primarySurface: 'brand',
   constellation: 'honeycomb',

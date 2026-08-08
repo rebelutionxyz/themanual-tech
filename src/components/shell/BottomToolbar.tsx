@@ -36,7 +36,7 @@ const LAUNCHERS: Launcher[] = [
     id: 'tasks',
     label: 'Tasks',
     icon: Waves,
-    title: 'Mini Waves',
+    title: 'Tasks',
     lines: ['Your task waves — lightweight coordination across the constellation.'],
   },
   {
@@ -44,7 +44,7 @@ const LAUNCHERS: Launcher[] = [
     label: 'Workshop',
     icon: Hammer,
     title: 'Workshop',
-    lines: ['The creation surface.', 'Build Skins, HoneyComb templates, and apps.'],
+    lines: ['The creation surface.', 'Build Skins, templates, and apps.'],
   },
 ];
 
@@ -218,7 +218,7 @@ function TasksPopup({ onClose }: { onClose: () => void }) {
       // biome-ignore lint/a11y/useSemanticElements: native <dialog> needs imperative showModal(); this overlay is mounted declaratively
       role="dialog"
       aria-modal="true"
-      aria-label="Tasks — MiniWaves"
+      aria-label="Tasks"
     >
       <div
         className="relative m-auto h-[92dvh] w-full max-w-6xl overflow-hidden rounded-2xl shadow-2xl"
@@ -235,7 +235,7 @@ function TasksPopup({ onClose }: { onClose: () => void }) {
         </button>
         <iframe
           src="/mini-waves-v92.html"
-          title="MiniWaves"
+          title="Tasks"
           className="h-full w-full border-0"
           style={{ display: 'block', background: '#030508' }}
           sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"

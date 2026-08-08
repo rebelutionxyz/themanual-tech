@@ -56,7 +56,7 @@ export function ConstellationRail({ className }: { className?: string }) {
           style={{ fontSize: '10px' }}
           data-size="meta"
         >
-          The HoneyComb
+          The constellation
         </span>
         <span
           className="mt-0.5 block font-display font-semibold tracking-wide"

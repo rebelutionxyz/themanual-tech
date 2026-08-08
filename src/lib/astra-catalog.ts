@@ -135,7 +135,7 @@ export const ASTRA_CATALOG: AstraCatalogEntry[] = [
   { slug: 'theranking',    wordmark: 'TheRanking',      category: 'connection', hosts: ['TheRanking.app'],                                       status: 'deferred',                                description: 'Hot-or-Not 2.0 (Bee-vetted lists).', route: '/theranking', mount: 'stub', accent: '#D4AF37' },
 
   // ─── Do (4) ─────────────────────────────────────────────────────────
-  { slug: 'miniwaves',     wordmark: 'MiniWaves',       category: 'do', hosts: ['MiniWAVES.app'],                                                status: 'live',                                    description: 'Mode of Operations — task manager (live).', route: '/miniwaves', aliases: ['/waves'], mount: 'page', accent: '#0EA5E9' },
+  { slug: 'miniwaves',     wordmark: 'Tasks',           category: 'do', hosts: ['MiniWAVES.app'],                                                status: 'live',                                    description: 'Mode of Operations — task manager (live).', route: '/miniwaves', aliases: ['/waves'], mount: 'page', accent: '#0EA5E9' },
   { slug: 'production',    wordmark: 'Production',      category: 'do', hosts: [],                                                               status: 'deferred',                                description: 'Long-form production pipeline.', route: '/production', mount: 'surface', accent: '#8A94A0' },
   { slug: 'brandosophic',  wordmark: 'BRANDoSOPHIC',    category: 'do', hosts: ['BRANDoSOPHIC.com', 'rebelution.site'],                          status: 'scaffolded',                              description: 'Brand-design + identity surface.', route: '/brand', mount: 'page', accent: '#6E1423' },
   { slug: 'safetycheck',   wordmark: 'Safety Check',    category: 'do', hosts: ['Takefiveforsafety.com', 'Safetymeeting.tech', 'Safetymeeting.ai'], status: 'deferred',                            description: 'Partner co-brand safety meetings.', route: '/safetycheck', mount: 'stub', accent: '#6FCF8F' },
@@ -150,7 +150,7 @@ export const ASTRA_CATALOG: AstraCatalogEntry[] = [
   { slug: 'justice',       wordmark: 'atlasJUSTICE',    category: 'governance', hosts: ['atlasJUSTICE.org'],                                     status: 'scaffolded',                              description: 'Case record + accountability spine (justice_* tables live).', route: '/justice', mount: 'stub', accent: '#B23A48', derived: true },
 
   // ─── Security (1) ───────────────────────────────────────────────────
-  { slug: 'dingleberry',   wordmark: 'DingleBERRY',     category: 'security', hosts: ['DingleBERRY.tech', 'beeSECURE.dev', 'beeSafe.dev', 'DiEphone.app', 'SoSphone.app', 'MAYDAYphone.app', 'Minutemen.app'], status: 'post-Swarm', description: 'Consolidated surveillance + safety tools.', route: '/dingleberry', mount: 'page', accent: '#DC2626' },
+  { slug: 'dingleberry',   wordmark: 'Security',          category: 'security', hosts: ['DingleBERRY.tech', 'beeSECURE.dev', 'beeSafe.dev', 'DiEphone.app', 'SoSphone.app', 'MAYDAYphone.app', 'Minutemen.app'], status: 'post-Swarm', description: 'Consolidated surveillance + safety tools.', route: '/dingleberry', mount: 'page', accent: '#DC2626' },
 ];
 
 // ─── Constellation hubs (NOT Astras) ─────────────────────────────────

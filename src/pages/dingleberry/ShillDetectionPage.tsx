@@ -184,7 +184,7 @@ export function ShillDetectionPage() {
               Shill &amp; abuse detection
             </h1>
             <div className="text-text-silver" style={{ fontSize: 14.5, maxWidth: 540 }}>
-              Coordinated inauthentic behavior, caught across the whole HoneyComb — not one Astra at a time.
+              Coordinated inauthentic behavior, caught across the whole platform — not one Astra at a time.
             </div>
           </div>
           <div className="flex flex-wrap gap-[10px]">
@@ -334,7 +334,7 @@ export function ShillDetectionPage() {
                   </span>
                 </div>
                 <div className="mb-[11px] text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
-                  Coordinated abuse aimed at accountability isn’t just moderation — it’s evidence. DingleBERRY packages the
+                  Coordinated abuse aimed at accountability isn’t just moderation — it’s evidence. Security packages the
                   ring, its signals and its timeline into a <b>class-action Docket</b> carried by AtlasADVOCATE; affected
                   members are pointed to it and each opts in.
                 </div>

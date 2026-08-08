@@ -67,7 +67,7 @@ function getHeader(p: Posture): HeaderDef {
   if (p === 'secure')
     return {
       tone: 'secure',
-      word: 'The HoneyComb is secure.',
+      word: 'The platform is secure.',
       sub: 'All six surfaces nominal. Member mesh healthy. Astra is watching.',
       stats: [
         ['Transactions secured · 24h', '1.28M', 'secure'],
@@ -171,7 +171,7 @@ function PostureBanner({ posture }: { posture: Posture }) {
               style={{ width: 13, height: 13, borderRadius: 99, background: k.c }}
             />
             <StatusPill tone={h.tone} pulse={posture === 'critical'} />
-            <Eyebrow>Security Astra · dingleberry</Eyebrow>
+            <Eyebrow>Security Astra</Eyebrow>
           </div>
           <h1
             className="font-serif font-bold text-text"

@@ -87,7 +87,7 @@ export const SURFACES: SurfaceDef[] = [
     name: 'FreedomBLiNGs',
     function: 'The Freedom Ledger',
     description:
-      'The economic heart of the HoneyComb — where your BLiNG! lives, is FREEd, and moves.',
+      'The economic heart of the platform — where your BLiNG! lives, is FREEd, and moves.',
     purpose:
       'See your balance, read your ledger in the open, and trace any BLiNG! to its origin. Member-owned, capped, transparent — never bought or sold.',
     icon: Droplet,
@@ -247,11 +247,11 @@ export const SURFACES: SurfaceDef[] = [
   // ═══ SAFETY ═══
   {
     slug: 'dingleberry',
-    name: 'DingleBERRY',
+    name: 'Security',
     function: 'Security Command',
-    description: "The HoneyComb's immune system. Posture at a glance across six security surfaces.",
+    description: 'The immune system. Posture at a glance across six security surfaces.',
     purpose:
-      'DingleBERRY watches the platform: infra health, transaction integrity, source verification, shill/abuse detection, dispatch authority, and threat interception. Funded by @combtreasury.defense.',
+      'Watches the platform: infra health, transaction integrity, source verification, shill and abuse detection, dispatch authority, and threat interception.',
     icon: ShieldAlert,
     color: '#DC2626',
     group: 'Safety',
@@ -297,7 +297,7 @@ export const SURFACES: SurfaceDef[] = [
     slug: 'waves',
     name: 'WAVES',
     function: 'Motion Flow',
-    description: 'Mini Waves. One Vessel at a time. Full 10-level hierarchy of motion.',
+    description: 'Tasks. One Vessel at a time. Full 10-level hierarchy of motion.',
     purpose:
       'Orchestrate your life by motion. Vessels, Oceans, Waves, Tides, Flows — tasks tagged by what they feel like, not where they live.',
     icon: Waves,

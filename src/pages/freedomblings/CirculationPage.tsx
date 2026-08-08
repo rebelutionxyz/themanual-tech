@@ -39,7 +39,7 @@ export function CirculationPage() {
           <h1>Circulation</h1>
           <div className="sub">
             BLiNG! is meant to flow, not sit. Idle BLiNG! gently melts back to the well — so the
-            HoneyComb stays alive and value keeps reaching the people doing the work. Here's exactly how,
+            platform stays alive and value keeps reaching the people doing the work. Here's exactly how,
             in the open.
           </div>
         </div>
@@ -57,8 +57,7 @@ export function CirculationPage() {
           <div className="mh-sub">
             {c.isOG ? (
               <>
-                Your melt rate — the <b>Founder rate</b>, a loyalty edge for being early to the
-                HoneyComb.
+                Your melt rate — the <b>Founder rate</b>, a loyalty edge for being early.
               </>
             ) : (
               <>
@@ -72,7 +71,7 @@ export function CirculationPage() {
           <span className="fn-mark" />
           <p>
             A bank quietly skims a few percent off idle savings — and <b>keeps it</b>. Here the melt
-            returns to the HoneyComb and is <b>FREE'd again</b> to people doing the work.
+            returns to the platform and is <b>FREE'd again</b> to people doing the work.
           </p>
         </div>
       </div>
@@ -92,7 +91,7 @@ export function CirculationPage() {
             paying your way out of circulation.
           </p>
           <div className="og-line">
-            <BMark /> OG Founders rest at <b>{c.ogRate}%</b> — for being early to the HoneyComb, not for
+            <BMark /> OG Founders rest at <b>{c.ogRate}%</b> — for being early, not for
             holding more.
           </div>
         </div>
@@ -131,7 +130,7 @@ export function CirculationPage() {
 
       <div className="ledger-foot">
         <span className="seal" />
-        The melt is not a fee and never leaves the HoneyComb. A flat 3% for every Bee (OG Founders 2.5%),
+        The melt is not a fee and never leaves the platform. A flat 3% for every Bee (OG Founders 2.5%),
         Patchboard-tunable.
       </div>
     </main>

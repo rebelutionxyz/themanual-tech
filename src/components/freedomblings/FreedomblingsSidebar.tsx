@@ -101,7 +101,7 @@ export function FreedomblingsSidebar({ onLaunch }: { onLaunch?: () => void }) {
       <button
         type="button"
         className="side-brand sb-launch"
-        title="The HoneyComb constellation"
+        title="The constellation"
         onClick={onLaunch}
       >
         <Mark size={24} />

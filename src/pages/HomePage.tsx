@@ -76,7 +76,7 @@ export function HomePage() {
             style={{ fontSize: '11px' }}
             data-size="meta"
           >
-            19 Surfaces · One HoneyComb
+            19 Surfaces · One platform
           </div>
           <div className="flex flex-wrap justify-center gap-1.5">
             {[

@@ -60,7 +60,7 @@ const TIERS: Tier[] = [
     perks: [
       'Everything in Manuka',
       'Deepest curation & faucet reach',
-      'Founding voice in the HoneyComb',
+      'Founding voice on the platform',
     ],
   },
 ];
@@ -70,10 +70,10 @@ export function GradationsPage() {
     <main className="app-main">
       <div className="commons-top">
         <div>
-          <div className="eyebrow">Membership in the HoneyComb</div>
+          <div className="eyebrow">Membership</div>
           <h1>Honey Gradations</h1>
           <div className="sub">
-            Choose how deeply you tend the HoneyComb. Membership unlocks reach and tools.
+            Choose how deeply you tend the platform. Membership unlocks reach and tools.
           </div>
         </div>
         <div className="commons-tags">

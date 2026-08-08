@@ -237,7 +237,7 @@ export const THREATS_ThreatInterception = [
     affected: 3,
     sample: ['b2', 'd4', '8a'],
     plain:
-      'A no-interaction spyware implant that reads messages, location and the mic. DingleBERRY caught its outbound beacon and isolated the device before exfiltration completed.',
+      'A no-interaction spyware implant that reads messages, location and the mic. Security caught its outbound beacon and isolated the device before exfiltration completed.',
     fix: 'Force-revoke the implant’s tokens, rebuild the device from a clean image, rotate the member’s credentials.',
     justice: true,
   },
@@ -282,7 +282,7 @@ export const THREATS_ThreatInterception = [
     affected: 0,
     sample: [],
     plain:
-      'A borrowed-compute job tried to break its sandbox to join a botnet. Contained instantly — results are charitable and never touch platform ops, so no HoneyComb impact.',
+      'A borrowed-compute job tried to break its sandbox to join a botnet. Contained instantly — results are charitable and never touch platform ops, so no platform impact.',
     fix: 'Kill the job, flag the submitting node, tighten the seccomp profile.',
     justice: false,
   },
@@ -297,7 +297,7 @@ export const THREATS_ThreatInterception = [
     affected: 18,
     sample: ['9f', 'a0'],
     plain:
-      'A pixel-perfect clone of the BLiNG! login harvesting credentials. DingleBERRY flagged the domain and triggered takedown.',
+      'A pixel-perfect clone of the BLiNG! login harvesting credentials. Security flagged the domain and triggered takedown.',
     fix: 'Blocklist the domain mesh-wide, warn the 18 members who clicked, force a credential reset.',
     justice: true,
   },
@@ -324,7 +324,7 @@ export const RINGS_ShillDetection = [
       ['Shared funding path', 0.7],
     ],
     oracle:
-      'A manufactured downline — 22 fake Bees funnelling affiliate weight to one upline. DingleBERRY froze the chain BEFORE affiliate_distribute could free a pool from the Well, so no fraudulent BLiNG! was FREE’d. There’s no standing gate; this freeze is the affiliate-integrity mechanism.',
+      'A manufactured downline — 22 fake Bees funnelling affiliate weight to one upline. Security froze the chain BEFORE affiliate_distribute could free a pool from the Well, so no fraudulent BLiNG! was FREE’d. There’s no standing gate; this freeze is the affiliate-integrity mechanism.',
   },
   {
     id: 'SHILL-0042',

@@ -10,7 +10,7 @@ export const atlasnationAstra: AstraConfig = {
   slug: 'atlasnation',
   hosts: ['atlasnation.com', 'www.atlasnation.com'],
   wordmark: 'AtlasNATION',
-  siteTitle: 'AtlasNATION · HONEYCOMB',
+  siteTitle: 'AtlasNATION',
   tagline: 'Organize around shared purpose.',
   primarySurface: 'unite',
   constellation: 'atlasnation',

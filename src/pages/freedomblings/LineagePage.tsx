@@ -34,7 +34,7 @@ export function LineagePage() {
   if (lin.status === 'loading') {
     return (
       <main className="app-main">
-        <div className="eyebrow">Growing the HoneyComb is productive action</div>
+        <div className="eyebrow">Growing the platform is productive action</div>
         <div className="feed-empty" style={{ marginTop: 16 }}>
           <span className="live-dot" /> Opening your lineage…
         </div>
@@ -45,7 +45,7 @@ export function LineagePage() {
   if (lin.status === 'signed-out') {
     return (
       <main className="app-main">
-        <div className="eyebrow">Growing the HoneyComb is productive action</div>
+        <div className="eyebrow">Growing the platform is productive action</div>
         <div className="state-card">
           <h2>Sign in to see your lineage</h2>
           <p>
@@ -63,7 +63,7 @@ export function LineagePage() {
   if (lin.status === 'unavailable') {
     return (
       <main className="app-main">
-        <div className="eyebrow">Growing the HoneyComb is productive action</div>
+        <div className="eyebrow">Growing the platform is productive action</div>
         <div className="state-card">
           <h2>Lineage unavailable</h2>
           <p>
@@ -83,7 +83,7 @@ export function LineagePage() {
     <main className="app-main">
       <div className="commons-top">
         <div>
-          <div className="eyebrow">Growing the HoneyComb is productive action</div>
+          <div className="eyebrow">Growing the platform is productive action</div>
           <h1>Your lineage</h1>
           <div className="sub">
             When you welcome people and they thrive, value is FREE'd up your lineage on a Fibonacci

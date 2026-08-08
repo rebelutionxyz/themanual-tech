@@ -248,7 +248,7 @@ function SystemHealthSnapshotAction() {
   };
 
   const textBlock = snapshot
-    ? `=== HONEYCOMB System Health Snapshot ===
+    ? `=== System Health Snapshot ===
 Generated: ${snapshot.generated_at}
 
 Bees total:          ${snapshot.bees_total}

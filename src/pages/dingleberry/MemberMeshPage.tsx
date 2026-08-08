@@ -161,7 +161,7 @@ export function MemberMeshPage() {
               Member mesh
             </h1>
             <div className="text-text-silver" style={{ fontSize: 14.5, maxWidth: 560 }}>
-              The muscle earns no trust. DingleBERRY scores every borrowed node, runs proof-of-storage, and{' '}
+              The muscle earns no trust. Security scores every borrowed node, runs proof-of-storage, and{' '}
               <b>quarantines + self-heals</b> the moment one misbehaves.
             </div>
           </div>

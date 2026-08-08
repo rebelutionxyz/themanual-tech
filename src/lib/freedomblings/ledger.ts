@@ -594,7 +594,7 @@ export function useProvenance(tx: ProvTx): ProvState {
     const isIssuance = FREED_TYPES.has(tx.type);
     const amtFmt = fmtMicros(absMicros(tx.amount));
     const when = fullWhen(tx.created_at);
-    const who = tx.counterparty || (isIssuance ? 'The HoneyComb · the well' : '');
+    const who = tx.counterparty || (isIssuance ? 'The platform · the well' : '');
     const desc = tx.memo || meta.label;
 
     // the "now" node — always present: what rests in the Bee's own ledger today.

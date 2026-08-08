@@ -180,7 +180,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
                 style={{ fontSize: '11px' }}
                 data-size="meta"
               >
-                Type to search the {SCOPE_LABELS[scope].toLowerCase()} across HoneyComb
+                Type to search the {SCOPE_LABELS[scope].toLowerCase()}
               </p>
               <p
                 className="mt-2 font-mono text-text-dim"

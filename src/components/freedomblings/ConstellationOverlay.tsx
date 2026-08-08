@@ -22,13 +22,13 @@ const ASTRAS: Astra[] = [
   { name: 'FreedomBLiNGs', role: 'BLiNG! · The Freedom Ledger', status: 'here' },
   { name: 'TheMANUAL', role: 'The knowledge spine', status: 'live', to: '/manual' },
   {
-    name: 'DingleBERRY',
+    name: 'Security',
     role: 'Security console · operators only',
     status: 'live',
     to: '/dingleberry',
   },
   { name: 'FreedomNETWORK', role: 'The Live News Network', status: 'soon' },
-  { name: 'MiniWaves', role: 'Mini Waves · your tasks', status: 'soon' },
+  { name: 'Tasks', role: 'Your tasks', status: 'soon' },
   { name: 'BLiNGster', role: 'The games arena', status: 'soon' },
   { name: 'TheWORKSHOP', role: 'Clone-mode workshop', status: 'soon' },
 ];
@@ -78,16 +78,16 @@ export function ConstellationOverlay({ onClose }: { onClose: () => void }) {
 
   return (
     // biome-ignore lint/a11y/useSemanticElements: a surface-scoped positioned overlay, not a top-layer <dialog> (no showModal); role="dialog" is the correct semantics here
-    <div className="constel" role="dialog" aria-label="The HoneyComb constellation">
+    <div className="constel" role="dialog" aria-label="The constellation">
       <button type="button" className="constel-backdrop" aria-label="Close" onClick={onClose} />
       <div className="constel-panel card">
         <div className="constel-head">
           <div>
             <div className="eyebrow">Your constellation</div>
-            <h2>The HoneyComb</h2>
+            <h2>The constellation</h2>
             <p className="constel-sub">
               The Astras that share one honest, member-owned BLiNG! ledger. Step across — your
-              balance follows you across the HoneyComb.
+              balance follows you everywhere.
             </p>
           </div>
           <button type="button" className="constel-x" onClick={onClose} aria-label="Close">
@@ -101,7 +101,7 @@ export function ConstellationOverlay({ onClose }: { onClose: () => void }) {
         </div>
         <div className="constel-foot">
           <span className="seal" />
-          Your balance follows you across the HoneyComb — one honest, member-owned ledger.
+          Your balance follows you everywhere — one honest, member-owned ledger.
         </div>
       </div>
     </div>

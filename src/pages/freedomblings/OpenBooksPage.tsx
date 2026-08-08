@@ -197,7 +197,7 @@ export function OpenBooksPage() {
 
       <div className="card ob-feed">
         <div className="ob-feed-head">
-          <h3>Just FREE'd across the HoneyComb</h3>
+          <h3>Just FREE'd across the platform</h3>
           <span className="ob-feed-live">
             <span className="live-dot" />
             Live

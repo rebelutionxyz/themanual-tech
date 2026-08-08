@@ -9,7 +9,7 @@ const AstraContext = createContext<AstraConfig | null | undefined>(undefined);
 
 // Foundation site title — used ONLY when no astra resolves (themanual.tech
 // itself, localhost). Per manual-spine-api-v1.md §2.1 canonical values list.
-const FOUNDATION_SITE_TITLE = 'The Manual · HONEYCOMB Knowledge Spine';
+const FOUNDATION_SITE_TITLE = 'The Manual';
 
 function setMetaProperty(property: string, content: string): void {
   let el = document.head.querySelector<HTMLMetaElement>(
@@ -51,7 +51,7 @@ export function AstraProvider({ children }: { children: ReactNode }) {
     if (astra?.siteTitle) {
       title = astra.siteTitle;
     } else if (astra) {
-      title = `${astra.wordmark} · HONEYCOMB`;
+      title = astra.wordmark;
     } else {
       title = FOUNDATION_SITE_TITLE;
     }

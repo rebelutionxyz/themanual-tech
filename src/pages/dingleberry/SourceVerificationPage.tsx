@@ -352,7 +352,7 @@ export function SourceVerificationPage() {
                 <div className="text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.35 }}>
                   {broken ? (
                     <span>
-                      <b>Credibility withheld.</b> {sel.flag || 'No chain to verify against'} — DingleBERRY will not let
+                      <b>Credibility withheld.</b> {sel.flag || 'No chain to verify against'} — Security will not let
                       unverified claims earn standing.
                     </span>
                   ) : (

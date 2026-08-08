@@ -155,7 +155,7 @@ function GateDenied() {
         Operator access required
       </h1>
       <p className="mt-2 text-text-silver" style={{ fontSize: 14, lineHeight: 1.5 }}>
-        DingleBERRY is the platform’s security console. Sign in with an operator (admin) Bee to view
+        This is the platform’s security console. Sign in with an operator (admin) Bee to view
         it.
       </p>
       <div

@@ -67,7 +67,7 @@ export function ConstellationPage() {
           style={{ fontSize: '11px' }}
           data-size="meta"
         >
-          The HoneyComb
+          The constellation
         </div>
         <h1 className="mt-1 font-display text-4xl font-semibold tracking-wide text-text-silver-bright md:text-5xl">
           The constellation

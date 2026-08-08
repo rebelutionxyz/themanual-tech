@@ -34,7 +34,7 @@ const SECTIONS: BizSection[] = [
   {
     icon: Megaphone,
     title: 'Promotions console',
-    copy: 'Run contextual promotions through atlasADs: compose creative, pick slots, set your window. Review-before-live keeps the HoneyComb clean.',
+    copy: 'Run contextual promotions through atlasADs: compose creative, pick slots, set your window. Review-before-live keeps the platform clean.',
     to: '/promotion',
     linkLabel: 'Open Advertise',
   },
@@ -96,7 +96,7 @@ export function BusinessPage() {
           <Briefcase size={13} /> Business
         </div>
         <h1 className="mx-auto mb-3 max-w-2xl font-display text-4xl font-semibold leading-tight text-zinc-900">
-          The fastest way to grow on HoneyComb
+          The fastest way to grow
         </h1>
         <p className="mx-auto mb-6 max-w-xl text-[14.5px] leading-relaxed text-zinc-500">
           A suite of tools for organizations: <strong className="text-zinc-900">grow your reach</strong>,{' '}
