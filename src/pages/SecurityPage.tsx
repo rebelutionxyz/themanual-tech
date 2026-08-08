@@ -33,6 +33,19 @@
  */
 
 import {
+  type FsDirHandle,
+  type FsFileEntry,
+  QUARANTINE_DIR,
+  type WalkSkip,
+  folderPickerAvailable,
+  pickDirectory,
+  purgeQuarantined,
+  quarantineFile,
+  removeFile,
+  restoreFile,
+  walkDirectory,
+} from '@/lib/security/folderScan';
+import {
   type LookupOutcome,
   MAX_HASH_BYTES,
   lookupHashes,
@@ -69,7 +82,12 @@ export interface Finding {
   local?: boolean;
   noact?: boolean;
   qAt?: Date;
+  /** Set only for findings from a readwrite folder scan — the handle that makes
+   *  Remove and Quarantine real. Absent means the action is not offered. */
+  fsEntry?: FsFileEntry;
 }
+/** Outcome of a real filesystem action, shown on the finding it belongs to. */
+interface ActNote { ok: boolean; text: string; }
 interface HistoryRow { at: Date; mode: ScanMode; items: number; found: number; bad: number; }
 interface FindingAction { label: string; danger?: boolean; confirmingNow?: boolean; onClick: () => void; }
 type FcStatus =
@@ -88,6 +106,12 @@ type FcStatus =
       oversize: number;
       /** The lookup could not reach a conclusion. NOT a no-match. */
       degraded: boolean;
+      /** Files the walk could not read at all. A scan that hides these lies. */
+      skipped: number;
+      /** True when the Bee pressed Stop — the numbers are a partial scan. */
+      stopped: boolean;
+      /** Name of the scanned folder, when this was a folder scan. */
+      folder?: string;
     }
   | null;
 
@@ -189,6 +213,15 @@ const FC_SCRIPT = new Set(['bat', 'cmd', 'vbs', 'vbe', 'jse', 'wsf', 'ps1']);
 const FC_MACRO  = new Set(['docm', 'xlsm', 'pptm', 'dotm', 'xltm', 'ppsm']);
 const FC_DOUBLE = /\.(pdf|docx?|xlsx?|pptx?|jpe?g|png|gif|txt|csv|mp3|mp4|zip)\.([a-z0-9]{2,4})$/i;
 const FC_LIMIT  = 2000;
+/** Folder scans stream, so the ceiling is far higher than the hand-pick path.
+ *  It still exists, and hitting it is REPORTED — never a silent truncation. */
+const FOLDER_LIMIT = 50000;
+/** Fingerprints resolved per request; mirrors the rail's own batch size. */
+const HASH_BATCH = 100;
+
+/** One file entering the scan. `entry` is present only for a readwrite folder
+ *  scan, and its presence is what makes Remove and Quarantine real. */
+interface ScanItem { file: File; relPath: string; entry?: FsFileEntry; }
 
 const fcExt = (name: string) => { const m = /\.([a-z0-9]{1,5})$/i.exec(name); return m ? m[1].toLowerCase() : ''; };
 async function fcHeader(file: File): Promise<Uint8Array | null> {
@@ -202,9 +235,10 @@ function fcHeaderKind(b: Uint8Array | null): '' | 'MZ' | 'ELF' | 'PDF' | 'ZIP' {
   if (b[0] === 0x50 && b[1] === 0x4b) return 'ZIP';                                   // PK — also docx/xlsx/pptx/jar/apk
   return '';
 }
-async function fcCheckFile(file: File): Promise<Finding[]> {
+async function fcCheckFile(file: File, relPath?: string): Promise<Finding[]> {
   const out: Omit<Finding, 'surface'>[] = []; const name = file.name; const ext = fcExt(name);
-  const rel = file.webkitRelativePath || name;
+  // A folder walk has no webkitRelativePath, so the caller supplies the path.
+  const rel = relPath || file.webkitRelativePath || name;
   if (/[\u202A-\u202E\u2066-\u2069]/.test(name)) {
     out.push({ sev: 'high', title: 'Filename hides its real extension',
       detail: `"${name.replace(/[\u202A-\u202E\u2066-\u2069]/g, '\u2400')}" contains invisible text-direction characters — the trick that makes "annexe.exe" read as "annexe.txt". Treat as hostile until verified.` });
@@ -239,6 +273,8 @@ async function fcCheckFile(file: File): Promise<Finding[]> {
     out.push({ sev: 'medium', title: `.${ext} with a non-matching header`,
       detail: 'Files of this type are ZIP containers; this one is not. The name may be a disguise.' });
   }
+  // `noact` is decided by the CALLER: a hand-picked file has no handle and so
+  // stays Dismiss-only, while a readwrite folder scan can act for real.
   return out.map((f) => ({ ...f, surface: 'malware', path: rel, sample: false, local: true, noact: true }));
 }
 
@@ -351,6 +387,20 @@ export function SecurityPage() {
   const [folderWorks, setFolderWorks] = useState<boolean | null>(null);
   const fcFilesRef = useRef<HTMLInputElement | null>(null);
   const fcFolderRef = useRef<HTMLInputElement | null>(null);
+  // ---- FRONT29: real folder access ------------------------------------
+  // `fsAvailable` starts as the capability check and is demoted to false the
+  // first time the picker fails for anything other than a user cancel, so the
+  // control disappears instead of failing twice.
+  const [fsAvailable, setFsAvailable] = useState<boolean>(() => folderPickerAvailable());
+  const [fsRoot, setFsRoot] = useState<FsDirHandle | null>(null);
+  const [fsWritable, setFsWritable] = useState(false);
+  const [skips, setSkips] = useState<WalkSkip[]>([]);
+  const [showSkips, setShowSkips] = useState(false);
+  const [actNotes, setActNotes] = useState<Record<number, ActNote>>({});
+  const [acting, setActing] = useState<number | null>(null);
+  // Skips are collected in a ref because the walk fills them while React is
+  // mid-render; the state copy is published once the scan settles.
+  const skipRef = useRef<WalkSkip[]>([]);
 
   const posture = useMemo(() => {
     if (scanning) return 'scanning';
@@ -418,58 +468,89 @@ export function SecurityPage() {
     setReadout({ line: `Scan complete · ${working.length} finding${working.length === 1 ? '' : 's'}`, item: '', items });
   }
 
-  async function runFileCheck(fileList: FileList) {
-    if (scanning) return;
-    // Read length up front: the input is cleared on change, and this function
-    // awaits, so `fileList.length` is not safe to read later.
-    const total = fileList.length;
-    const files = Array.from(fileList).slice(0, FC_LIMIT);
-    if (!files.length) return;
+  /**
+   * The one scan pipeline, fed by either entry point.
+   *
+   * STREAMING is the point: a real folder holds tens of thousands of files, so
+   * items arrive one at a time and fingerprints are resolved in batches of
+   * HASH_BATCH rather than accumulating the whole tree first. Stop is checked
+   * every item, so it takes effect mid-walk instead of at the end.
+   */
+  async function runScanStream(
+    source: AsyncIterable<ScanItem>,
+    meta: { folder?: string; cap: number },
+  ) {
+    stopRef.current = false;
+    setScanning(true);
+    setActNotes({});
     let working = findings.filter((f) => !f.local); // re-checks replace, not stack
+    setFindings(working);
+
+    let seen = 0;
+    let checked = 0;
     let flagged = 0;
-
-    // ---- 1. structural checks, then a fingerprint, file by file ----------
-    // Both signals matter, so the hash is taken IN ADDITION to the heuristics,
-    // never instead of them.
-    const hashes: (string | null)[] = new Array(files.length);
+    let hashed = 0;
     let oversize = 0;
-    for (let i = 0; i < files.length; i++) {
-      if (i % 25 === 0) { setFcStatus({ phase: 'run', text: `Checking ${i + 1} / ${files.length} — ${files[i].name}` }); await sleep(0); }
-      const found = await fcCheckFile(files[i]);
-      for (const f of found) { working = [...working, { ...f, id: uid++ }]; flagged++; }
-
-      const h = await sha256File(files[i]);
-      hashes[i] = h;
-      if (!h && files[i].size > MAX_HASH_BYTES) oversize++;
-    }
-
-    // ---- 2. one batched lookup for every fingerprint ---------------------
-    const present = hashes.filter((h): h is string => h !== null);
-    let outcome: LookupOutcome = { byHash: new Map(), degraded: false };
-    if (present.length) {
-      setFcStatus({ phase: 'run', text: `Checking ${present.length} fingerprint${present.length === 1 ? '' : 's'} against the malware database…` });
-      await sleep(0);
-      outcome = await lookupHashes(present);
-    }
-
-    // ---- 3. a 'malicious' verdict is a REAL critical finding -------------
-    // local:true earns the LOCAL CHECK tag; sample stays false so it can never
-    // pick up the SAMPLE badge. noact:true keeps it Dismiss-only — a browser
-    // cannot delete or quarantine a file, and offering to would be a lie.
     let matched = 0;
-    for (let i = 0; i < files.length; i++) {
-      const h = hashes[i];
-      if (!h) continue;
-      const v = outcome.byHash.get(h);
-      if (!v || v.verdict !== 'malicious') continue;
-      matched++;
-      working = [...working, {
-        id: uid++, surface: 'malware', sev: 'critical',
-        title: malwareTitle(v), detail: malwareDetail(files[i].name, v),
-        path: files[i].webkitRelativePath || files[i].name,
-        sample: false, local: true, noact: true,
-      }];
+    let degraded = false;
+    let capped = false;
+    let batch: { item: ScanItem; hash: string }[] = [];
+
+    // Resolve one batch of fingerprints and turn every 'malicious' verdict into
+    // a real critical finding. A folder-scan item carries its handle, which is
+    // what makes Remove and Quarantine act on disk rather than on a list.
+    const flush = async () => {
+      if (!batch.length) return;
+      setFcStatus({
+        phase: 'run',
+        text: `Checking ${batch.length} fingerprint${batch.length === 1 ? '' : 's'} against the malware database…`,
+      });
+      await sleep(0);
+      const outcome: LookupOutcome = await lookupHashes(batch.map((b) => b.hash));
+      if (outcome.degraded) degraded = true;
+      for (const b of batch) {
+        const v = outcome.byHash.get(b.hash);
+        if (!v || v.verdict !== 'malicious') continue;
+        matched++;
+        working = [...working, {
+          id: uid++, surface: 'malware', sev: 'critical',
+          title: malwareTitle(v), detail: malwareDetail(b.item.file.name, v),
+          path: b.item.relPath, sample: false, local: true,
+          noact: !b.item.entry, fsEntry: b.item.entry,
+        }];
+      }
+      setFindings(working);
+      batch = [];
+    };
+
+    for await (const item of source) {
+      if (stopRef.current) break;
+      if (checked >= meta.cap) { capped = true; break; }
+      seen++;
+      if (seen === 1 || seen % 20 === 0) {
+        setFcStatus({ phase: 'run', text: `Checked ${checked} of ${seen} seen — ${item.relPath}` });
+        await sleep(0);
+      }
+
+      // Structural checks AND a fingerprint. Both signals matter, so the hash
+      // is taken in addition to the heuristics, never instead of them.
+      const found = await fcCheckFile(item.file, item.relPath);
+      for (const f of found) {
+        working = [...working, { ...f, id: uid++, noact: !item.entry, fsEntry: item.entry }];
+        flagged++;
+      }
+      checked++;
+
+      const h = await sha256File(item.file);
+      if (h) {
+        hashed++;
+        batch.push({ item, hash: h });
+        if (batch.length >= HASH_BATCH) await flush();
+      } else if (item.file.size > MAX_HASH_BYTES) {
+        oversize++;
+      }
     }
+    await flush();
 
     setFindings(working);
     setSurfaceStatus((p) => {
@@ -477,28 +558,114 @@ export function SecurityPage() {
       // A degraded lookup must NEVER paint this surface CLEAR. That green is
       // the false clean this whole pass exists to prevent — if the database
       // could not be reached, the honest answer is the status quo, not "clear".
-      if (outcome.degraded && next === 'clear') return p;
+      if (degraded && next === 'clear') return p;
       return (flagged || matched || p.malware !== 'idle') ? { ...p, malware: next } : p;
     });
     setFcStatus({
-      phase: 'done', checked: files.length, flagged, capped: total > FC_LIMIT,
-      hashed: present.length, matched, oversize, degraded: outcome.degraded,
+      phase: 'done', checked, flagged, capped,
+      hashed, matched, oversize, degraded,
+      skipped: skipRef.current.length, stopped: stopRef.current, folder: meta.folder,
     });
+    setScanning(false);
+    stopRef.current = false;
+  }
+
+  /** File-pick / drag-drop path. No handles, so actions stay Dismiss-only. */
+  async function runFileCheck(fileList: FileList) {
+    if (scanning) return;
+    // Read length up front: the input is cleared on change, and this function
+    // awaits, so `fileList.length` is not safe to read later.
+    const files = Array.from(fileList);
+    if (!files.length) return;
+    skipRef.current = [];
+    setSkips([]);
+    async function* stream(): AsyncGenerator<ScanItem> {
+      for (const file of files) {
+        yield { file, relPath: file.webkitRelativePath || file.name };
+      }
+    }
+    await runScanStream(stream(), { cap: FC_LIMIT });
+  }
+
+  /**
+   * Folder path (Chromium desktop). Walks the granted directory, streaming.
+   * Everything the walk cannot read is COUNTED and listed — a scan that
+   * silently skips files reports a smaller, prettier, wrong number.
+   */
+  async function runFolderScan() {
+    if (scanning) return;
+    let picked: Awaited<ReturnType<typeof pickDirectory>>;
+    try {
+      picked = await pickDirectory();
+    } catch {
+      // The picker exists but this environment refuses it — demote to the
+      // file-input fallback rather than leaving a control that cannot work.
+      setFsAvailable(false);
+      return;
+    }
+    if (!picked) return; // Bee cancelled; capability is fine.
+
+    setFsRoot(picked.root);
+    setFsWritable(picked.writable);
+    skipRef.current = [];
+    setSkips([]);
+    setShowSkips(false);
+
+    const source = walkDirectory(
+      picked.root,
+      () => stopRef.current,
+      (s) => { skipRef.current = [...skipRef.current, s]; },
+    );
+    async function* stream(): AsyncGenerator<ScanItem> {
+      for await (const e of source) {
+        // Only a writable grant gets handles: an action offered on a read-only
+        // folder would fail, and a button that fails is worse than none.
+        yield { file: e.file, relPath: e.relPath, entry: picked?.writable ? e : undefined };
+      }
+    }
+    await runScanStream(stream(), { folder: picked.root.name, cap: FOLDER_LIMIT });
+    setSkips(skipRef.current);
   }
 
   function afterAction(surfaceId: SurfaceId, nextFindings: Finding[]) {
     setSurfaceStatus((p) => (p[surfaceId] === 'idle' ? p : { ...p, [surfaceId]: levelFor(surfaceId, nextFindings) }));
   }
-  function actQuarantine(f: Finding) {
-    securityApi.actOnFinding(f.id!, 'quarantine');
+  const note = (id: number, ok: boolean, text: string) =>
+    setActNotes((n) => ({ ...n, [id]: { ok, text } }));
+
+  /**
+   * Quarantine — real, and honestly bounded.
+   *
+   * A browser has no sandbox to put a file in, so this does the containment it
+   * CAN do: move the file into <folder>/Quarantine/ and append .quarantined so
+   * it cannot be launched by double-click. The UI says exactly that. The file
+   * is moved, never copied-and-left, and the original is deleted only after the
+   * copy is verified — so a failure loses nothing.
+   */
+  async function actQuarantine(f: Finding) {
+    if (!f.fsEntry || !fsRoot) return;
+    setActing(f.id!);
+    const res = await quarantineFile(f.fsEntry, fsRoot);
+    setActing(null);
+    if (!res.ok) { note(f.id!, false, res.error ?? 'Quarantine failed.'); return; }
     const next = findings.filter((x) => x.id !== f.id);
-    setFindings(next); setQuarantine((q) => [{ ...f, qAt: new Date() }, ...q]); afterAction(f.surface, next);
+    setFindings(next);
+    setQuarantine((q) => [{ ...f, qAt: new Date() }, ...q]);
+    afterAction(f.surface, next);
   }
-  function actRemove(f: Finding) {
+
+  /** Remove — deletes from disk, then proves it is gone before saying so. */
+  async function actRemove(f: Finding) {
     if (confirming !== f.id) { setConfirming(f.id!); setTimeout(() => setConfirming((c) => (c === f.id ? null : c)), 3500); return; }
-    securityApi.actOnFinding(f.id!, 'remove');
+    setConfirming(null);
+    if (!f.fsEntry) return;
+    setActing(f.id!);
+    const res = await removeFile(f.fsEntry);
+    setActing(null);
+    if (!res.ok) { note(f.id!, false, res.error ?? 'Remove failed.'); return; }
     const next = findings.filter((x) => x.id !== f.id);
-    setFindings(next); setConfirming(null); afterAction(f.surface, next);
+    setFindings(next);
+    afterAction(f.surface, next);
   }
   function actAllow(f: Finding) {
     securityApi.actOnFinding(f.id!, 'allow');
@@ -506,16 +673,29 @@ export function SecurityPage() {
     const next = findings.filter((x) => x.id !== f.id);
     setFindings(next); afterAction(f.surface, next);
   }
-  function actRestore(f: Finding) {
-    securityApi.actOnFinding(f.id!, 'restore');
+  /** Restore — moves the file back out of Quarantine to where it came from. */
+  async function actRestore(f: Finding) {
+    if (!f.fsEntry || !fsRoot) return;
+    setActing(f.id!);
+    const res = await restoreFile(f.fsEntry, fsRoot);
+    setActing(null);
+    if (!res.ok) { note(f.id!, false, res.error ?? 'Restore failed.'); return; }
     setQuarantine((q) => q.filter((x) => x.id !== f.id));
     const next = [f, ...findings];
     setFindings(next); afterAction(f.surface, next);
+    if (res.error) note(f.id!, false, res.error); // restored, with a caveat
   }
-  function actPurge(f: Finding) {
+
+  /** Delete forever — removes the quarantined copy from disk. */
+  async function actPurge(f: Finding) {
     if (confirming !== f.id) { setConfirming(f.id!); setTimeout(() => setConfirming((c) => (c === f.id ? null : c)), 3500); return; }
-    securityApi.actOnFinding(f.id!, 'purge');
-    setQuarantine((q) => q.filter((x) => x.id !== f.id)); setConfirming(null);
+    setConfirming(null);
+    if (!f.fsEntry || !fsRoot) return;
+    setActing(f.id!);
+    const res = await purgeQuarantined(f.fsEntry, fsRoot);
+    setActing(null);
+    if (!res.ok) { note(f.id!, false, res.error ?? 'Delete failed.'); return; }
+    setQuarantine((q) => q.filter((x) => x.id !== f.id));
   }
 
   const sortedFindings = useMemo(() => [...findings].sort((a, b) => SEV_ORDER[a.sev] - SEV_ORDER[b.sev]), [findings]);
@@ -689,12 +869,36 @@ export function SecurityPage() {
               <button onClick={() => fcFilesRef.current?.click()} disabled={scanning}
                 className="rounded-lg border px-3 py-1.5 text-[12.5px] font-semibold disabled:opacity-45"
                 style={{ background: 'var(--panel-2)', borderColor: 'var(--border-bright)', color: 'var(--text-silver)' }}>Pick files</button>
-              {folderWorks !== false && (
+              {/* Real folder scan — Chromium desktop only. Hidden entirely where
+                  the picker is absent or has already failed, so no dead control
+                  is ever shown and the Bee is never asked what platform this is. */}
+              {fsAvailable && (
+                <button type="button" onClick={() => { void runFolderScan(); }} disabled={scanning}
+                  className="rounded-lg border px-3 py-1.5 text-[12.5px] font-semibold disabled:opacity-45"
+                  style={{ background: 'var(--sec-deep)', borderColor: 'var(--sec-deep)', color: '#fff' }}>Scan a folder</button>
+              )}
+              {!fsAvailable && folderWorks !== false && (
                 <button onClick={() => fcFolderRef.current?.click()} disabled={scanning}
                   className="rounded-lg border px-3 py-1.5 text-[12.5px] font-semibold disabled:opacity-45"
                   style={{ background: 'var(--panel-2)', borderColor: 'var(--border-bright)', color: 'var(--text-silver)' }}>Pick a folder</button>
               )}
+              {scanning && (
+                <button type="button" onClick={() => { stopRef.current = true; }}
+                  className="rounded-lg border px-3 py-1.5 text-[12.5px] font-semibold"
+                  style={{ background: 'var(--panel-2)', borderColor: 'color-mix(in srgb, #dc2626 60%, var(--border-bright))', color: '#dc2626' }}>Stop</button>
+              )}
             </div>
+            {fsAvailable && (
+              <p className="mb-0 mt-2 text-[12px] leading-relaxed text-text-dim">
+                A folder scan reads every file inside the folder you choose. Grant write access and
+                findings inside it can be removed or quarantined for real.
+              </p>
+            )}
+            {fsRoot && !fsWritable && (
+              <p className="mb-0 mt-2 text-[12px] leading-relaxed" style={{ color: 'var(--warn)' }}>
+                Opened read-only — Remove and Quarantine are not available for this folder.
+              </p>
+            )}
             {folderWorks === false && (
               <p className="mb-0 mt-2 text-[12px] leading-relaxed text-text-dim">
                 Your browser can't select a whole folder — pick files instead.
@@ -705,13 +909,38 @@ export function SecurityPage() {
                 {fcStatus.phase === 'run' ? fcStatus.text : (
                   <>
                     <div>
-                      Checked <b style={{ color: 'var(--text-silver)' }}>{fcStatus.checked}</b> file{fcStatus.checked === 1 ? '' : 's'} ·{' '}
+                      {fcStatus.stopped ? <b style={{ color: 'var(--warn)' }}>Stopped early — partial scan. </b> : null}
+                      Checked <b style={{ color: 'var(--text-silver)' }}>{fcStatus.checked}</b> file{fcStatus.checked === 1 ? '' : 's'}
+                      {fcStatus.folder ? <> in <b style={{ color: 'var(--text-silver)' }}>{fcStatus.folder}</b></> : null}
+                      {fcStatus.skipped > 0 ? <>, skipped <b style={{ color: 'var(--warn)' }}>{fcStatus.skipped}</b></> : null} ·{' '}
                       {fcStatus.flagged
                         ? <b style={{ color: 'var(--warn)' }}>{fcStatus.flagged} risk indicator{fcStatus.flagged === 1 ? '' : 's'} — see the Threats tab</b>
                         : <span>no structural risk indicators</span>}
-                      {fcStatus.capped ? ` · capped at ${FC_LIMIT}` : ''}
+                      {fcStatus.capped ? ` · stopped at the ${fcStatus.folder ? FOLDER_LIMIT : FC_LIMIT}-file ceiling` : ''}
                       {fcStatus.oversize ? ` · ${fcStatus.oversize} too large to fingerprint in the browser` : ''}
                     </div>
+                    {/* The skipped list is openable, not buried. A scan that
+                        hides what it could not read reports a prettier, wrong
+                        number and invites false confidence. */}
+                    {skips.length > 0 && (
+                      <div className="mt-1">
+                        <button type="button" onClick={() => setShowSkips((v) => !v)}
+                          className="underline decoration-dotted underline-offset-2"
+                          style={{ color: 'var(--warn)' }}>
+                          {showSkips ? 'Hide' : 'Show'} the {skips.length} skipped file{skips.length === 1 ? '' : 's'}
+                        </button>
+                        {showSkips && (
+                          <div className="mt-1 max-h-40 overflow-y-auto rounded-lg border px-2 py-1.5"
+                            style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
+                            {skips.map((s) => (
+                              <div key={`${s.reason}:${s.path}`} className="truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                                {s.path} — {s.reason === 'permission' ? 'permission denied' : 'unreadable'}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {/* The database line is deliberately SEPARATE and never green.
                         "No known-malware match" is not "clean" and must not look
                         like a pass; a degraded lookup must not look like either. */}
@@ -730,6 +959,13 @@ export function SecurityPage() {
                           No known-malware match for {fcStatus.hashed} fingerprint{fcStatus.hashed === 1 ? '' : 's'}.
                         </span>
                       ) : null}
+                    </div>
+                    {/* The line that keeps a finished scan from reading as a
+                        clean bill of health. It is the last thing shown, and it
+                        is deliberately unavoidable. */}
+                    <div className="mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                      This says what was checked, not that this device is clean — it can only
+                      see the files you handed it.
                     </div>
                   </>
                 )}
@@ -779,12 +1015,16 @@ export function SecurityPage() {
               No open findings. {lastScan ? 'Your last scan came back clear or everything has been handled.' : 'Run a scan to check this device.'}
             </div>
           ) : sortedFindings.map((f) => (
+            /* Real actions require a real handle. Without one the card offers
+               Dismiss only — the old build showed Quarantine and Remove on
+               every finding and neither touched the disk. */
             <FindingCard key={f.id} f={f} confirming={confirming === f.id}
-              actions={f.noact ? [
+              busy={acting === f.id} note={actNotes[f.id!]}
+              actions={!f.fsEntry ? [
                 { label: 'Dismiss', onClick: () => actAllow(f) },
               ] : [
-                { label: 'Quarantine', onClick: () => actQuarantine(f) },
-                { label: confirming === f.id ? 'Confirm remove' : 'Remove', danger: true, confirmingNow: confirming === f.id, onClick: () => actRemove(f) },
+                { label: 'Quarantine', onClick: () => { void actQuarantine(f); } },
+                { label: confirming === f.id ? 'Confirm remove' : 'Remove', danger: true, confirmingNow: confirming === f.id, onClick: () => { void actRemove(f); } },
                 { label: 'Allow', onClick: () => actAllow(f) },
               ]} />
           ))}
@@ -796,13 +1036,15 @@ export function SecurityPage() {
         <section>
           {quarantine.length === 0 ? (
             <div className="rounded-2xl border border-dashed px-4 py-7 text-center text-[13.5px] text-text-dim" style={{ borderColor: 'var(--border)' }}>
-              Quarantine is empty. Items you quarantine are held here, disabled, until you restore or delete them.
+              Quarantine is empty. Files you quarantine are moved into a <b>{QUARANTINE_DIR}</b> folder
+              inside the folder you scanned and renamed so they cannot be opened by double-click.
             </div>
           ) : quarantine.map((f) => (
             <FindingCard key={f.id} f={f} confirming={confirming === f.id}
+              busy={acting === f.id} note={actNotes[f.id!]}
               actions={[
-                { label: 'Restore', onClick: () => actRestore(f) },
-                { label: confirming === f.id ? 'Confirm delete' : 'Delete forever', danger: true, confirmingNow: confirming === f.id, onClick: () => actPurge(f) },
+                { label: 'Restore', onClick: () => { void actRestore(f); } },
+                { label: confirming === f.id ? 'Confirm delete' : 'Delete forever', danger: true, confirmingNow: confirming === f.id, onClick: () => { void actPurge(f); } },
               ]} />
           ))}
         </section>
@@ -841,7 +1083,15 @@ function Dot({ color }: { color: string }) {
   return <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-[1px]" style={{ background: color }} />;
 }
 
-function FindingCard({ f, actions }: { f: Finding; actions: FindingAction[]; confirming?: boolean }) {
+function FindingCard({ f, actions, busy, note }: {
+  f: Finding;
+  actions: FindingAction[];
+  confirming?: boolean;
+  /** An action is in flight against the disk — buttons lock so it cannot double-fire. */
+  busy?: boolean;
+  /** The outcome of the last action on this finding, shown verbatim. */
+  note?: ActNote;
+}) {
   const sev = SEV_STYLE[f.sev];
   const sname = (SURFACES.find((s) => s.id === f.surface) || {}).name || f.surface;
   return (
@@ -859,17 +1109,29 @@ function FindingCard({ f, actions }: { f: Finding; actions: FindingAction[]; con
         <div className="mb-2.5 inline-block max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-lg border px-2 py-1 font-mono text-[11px] text-text-silver"
           style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>{f.path}</div>
       )}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {actions.map((a) => (
-          <button key={a.label} onClick={a.onClick}
-            className="rounded-lg border px-3 py-1.5 text-[12.5px] font-semibold"
+          <button key={a.label} onClick={a.onClick} disabled={busy}
+            className="rounded-lg border px-3 py-1.5 text-[12.5px] font-semibold disabled:opacity-45"
             style={a.confirmingNow
               ? { background: '#dc2626', borderColor: '#dc2626', color: '#fff' }
               : { background: 'var(--panel-2)', borderColor: a.danger ? 'color-mix(in srgb, #dc2626 45%, var(--border-bright))' : 'var(--border-bright)', color: a.danger ? '#dc2626' : 'var(--text-silver)' }}>
             {a.label}
           </button>
         ))}
+        {busy && <span className="font-mono text-[11px]" style={{ color: 'var(--text-muted)' }}>working…</span>}
       </div>
+      {/* A failed disk action is reported here, in plain language. Success is
+          silent because the card disappears — a failure must never be. */}
+      {note && (
+        <div className="mt-2 rounded-lg border px-2 py-1.5 text-[12px] leading-relaxed"
+          style={note.ok
+            ? { background: 'var(--bg-elevated)', borderColor: 'var(--border)', color: 'var(--text-silver)' }
+            : { background: 'color-mix(in srgb, #dc2626 10%, var(--panel-2))', borderColor: 'color-mix(in srgb, #dc2626 45%, var(--border))', color: '#f87171' }}
+          role={note.ok ? undefined : 'alert'}>
+          {note.text}
+        </div>
+      )}
     </div>
   );
 }

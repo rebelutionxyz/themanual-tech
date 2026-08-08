@@ -58,6 +58,7 @@ const InfraHealthPage = lazy(() => import('@/pages/dingleberry/InfraHealthPage')
 const JusticeHandoffPage = lazy(() => import('@/pages/dingleberry/JusticeHandoffPage').then((m) => ({ default: m.JusticeHandoffPage })));
 const KarmaCreditPage = lazy(() => import('@/pages/dingleberry/KarmaCreditPage').then((m) => ({ default: m.KarmaCreditPage })));
 const MemberMeshPage = lazy(() => import('@/pages/dingleberry/MemberMeshPage').then((m) => ({ default: m.MemberMeshPage })));
+const PostureBoardPage = lazy(() => import('@/pages/dingleberry/PostureBoardPage').then((m) => ({ default: m.PostureBoardPage })));
 const ShillDetectionPage = lazy(() => import('@/pages/dingleberry/ShillDetectionPage').then((m) => ({ default: m.ShillDetectionPage })));
 const SourceVerificationPage = lazy(() => import('@/pages/dingleberry/SourceVerificationPage').then((m) => ({ default: m.SourceVerificationPage })));
 const ThreatInterceptionPage = lazy(() => import('@/pages/dingleberry/ThreatInterceptionPage').then((m) => ({ default: m.ThreatInterceptionPage })));
@@ -364,6 +365,8 @@ function AppContent() {
               explicit tree wins over the generic SurfacePage, exactly like /intel. */}
             <Route path="/dingleberry" element={<DingleberryLayout />}>
               <Route index element={<CommandCenterPage />} />
+              {/* FRONT28 — DB32's platform posture scan, database-only. */}
+              <Route path="posture" element={<PostureBoardPage />} />
               <Route path="infra" element={<InfraHealthPage />} />
               <Route path="txn" element={<TransactionSecurityPage />} />
               <Route path="source" element={<SourceVerificationPage />} />

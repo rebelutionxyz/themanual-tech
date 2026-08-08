@@ -25,6 +25,10 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { key: 'overview', icon: 'radar', label: 'Command center', count: '', to: '/dingleberry' },
+  // FRONT28. Count is deliberately blank: the neighbours carry static mock
+  // numbers, and this surface is real — a fake count beside real data is worse
+  // than none, and a live one would put a query in shared chrome.
+  { key: 'posture', icon: 'shield', label: 'Database posture', count: '', to: '/dingleberry/posture' },
   { key: 'infra', icon: 'server', label: 'Infra health', count: '142', to: '/dingleberry/infra' },
   { key: 'txn', icon: 'lock', label: 'Transactions', count: '1.2M', to: '/dingleberry/txn' },
   { key: 'source', icon: 'fingerprint', label: 'Source verification', count: '2.1k', to: '/dingleberry/source' },

@@ -36,6 +36,9 @@ type Gate = 'checking' | 'allowed' | 'denied';
    future live surface by adding its route here (value = the header caption). */
 const LIVE_ROUTES: Record<string, string> = {
   '/dingleberry/txn': 'S02 posture derives from live ledger state',
+  // FRONT28 — real posture-scan rows. A "SAMPLE DATA" chip above real findings
+  // is the exact blur this surface must not have.
+  '/dingleberry/posture': 'Database posture · live scan results',
 };
 
 export function DingleberryLayout() {
