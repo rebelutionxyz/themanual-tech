@@ -1,14 +1,14 @@
 import { BlingPopupContent } from '@/components/freedomblings/BlingPopupContent';
 import type { ShellIcon } from '@/components/shell/sidebarNav';
 import { cn } from '@/lib/utils';
-import { Hammer, ShieldAlert, Sparkles, Waves, X } from 'lucide-react';
+import { Hammer, Sparkles, Waves, X } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 // 'bling' retired from the launcher row 2026-07-18 — the BLiNG! trigger (and
 // the identity chip) moved UP to the top toolbar (LensRow); BlingPopup below
 // is exported for it.
-type LauncherId = 'oracle' | 'workshop' | 'security' | 'tasks';
+type LauncherId = 'oracle' | 'workshop' | 'tasks';
 
 interface Launcher {
   id: LauncherId;
@@ -22,6 +22,8 @@ interface Launcher {
 
 // Bottom utility launchers. Each opens an OVERLAY popup (no navigation) —
 // mirrors the top lens toolbar in height + right-of-sidebar span.
+// 'security' moved OFF this row 2026-08-08 — Security is now an Astra-dropdown
+// destination (sidebarNav ASTRA_SWITCHER → /security), not a popup.
 const LAUNCHERS: Launcher[] = [
   {
     id: 'oracle',
@@ -29,13 +31,6 @@ const LAUNCHERS: Launcher[] = [
     icon: Sparkles,
     title: 'here24',
     lines: ['The platform AI runtime — ask, summarize, and route across Astras.'],
-  },
-  {
-    id: 'security',
-    label: 'Security',
-    icon: ShieldAlert,
-    title: 'DingleBERRY',
-    lines: ['Security + monitoring — threat interception, source verification, infra health.'],
   },
   {
     id: 'tasks',

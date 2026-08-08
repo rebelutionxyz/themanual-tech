@@ -40,6 +40,7 @@ const PremiumPage = lazy(() => import('@/pages/PremiumPage').then((m) => ({ defa
 const ProfilePage = lazy(() => import('@/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
 const RealmFeedPage = lazy(() => import('@/pages/RealmFeedPage').then((m) => ({ default: m.RealmFeedPage })));
 const StudioPage = lazy(() => import('@/pages/StudioPage').then((m) => ({ default: m.StudioPage })));
+const SecurityPage = lazy(() => import('@/pages/SecurityPage').then((m) => ({ default: m.SecurityPage })));
 const SurfacePage = lazy(() => import('@/pages/SurfacePage').then((m) => ({ default: m.SurfacePage })));
 const WavesPage = lazy(() => import('@/pages/WavesPage').then((m) => ({ default: m.WavesPage })));
 const BazaarBrowse = lazy(() => import('@/pages/bazaar/BazaarBrowse').then((m) => ({ default: m.BazaarBrowse })));
@@ -367,6 +368,13 @@ function AppContent() {
               <Route path="oracle" element={<AtlasOraclePage />} />
               <Route path="justice" element={<JusticeHandoffPage />} />
             </Route>
+
+            {/* User-facing device security (DingleBERRY · Security). The Bee-side
+              scan page — six surfaces, one posture — backed by the
+              dingleberry_device_v1 rail (scans/findings RPCs). Registered before
+              /:slug so it wins over the generic SurfacePage. Reached from the
+              Astra dropdown (sidebarNav ASTRA_SWITCHER → 'Security'). */}
+            <Route path="/security" element={<SecurityPage />} />
 
             {/* FreedomBLiNGS — The Sovereign Ledger (Currency). Staged port; Slice 1
               ships the LIVE Balance surface. Registered before /:slug so the

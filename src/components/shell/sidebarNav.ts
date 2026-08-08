@@ -14,6 +14,7 @@ import {
   Radio,
   Scale,
   Settings,
+  ShieldAlert,
   Store,
   Users,
 } from 'lucide-react';
@@ -131,11 +132,16 @@ export const ASTRA_SWITCHER: AstraSwitchItem[] = [
   { label: 'INTEL', slug: 'intel', to: '/intel', icon: MessagesSquare },
   { label: 'COMMs', slug: 'comms', to: '/comms', icon: MessageCircle },
   { label: 'BAZAAR', slug: 'bazaar', to: '/bazaar', icon: Store },
+  // Security (DingleBERRY · device rail) — navigates OUT of the community
+  // shell to the platform-chrome scan page, same pattern as JUSTICE above.
+  // Named 'Security' per Butch 2026-08-08 (matches astra_registry default_name).
+  { label: 'Security', slug: 'security', to: '/security', icon: ShieldAlert },
 ];
 
 /** Resolve an Astra/surface color on white. Astra layer (≠ realm color). */
 export function astraColor(slug: string): string {
   if (slug === 'intel') return '#1D9BF0';
+  if (slug === 'security') return '#58A6FF'; // Security steel blue (device rail)
   if (slug === 'justice') return '#1E40AF'; // Justice ASTRA navy (distinct from INTEL sky)
   return SURFACE_BY_SLUG.get(slug)?.color ?? NEUTRAL_INK;
 }
