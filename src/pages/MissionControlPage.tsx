@@ -61,9 +61,54 @@ interface Dispatch {
   claimed_at: string | null;
 }
 
+// FRONT34: stale-claim detection, built by DB41. A claimed row and a dead lock
+// look identical on this board -- both render as "claimed Nh ago" -- and that is
+// exactly what cost a session on 2026-08-08, when DB39 sat claimed by an ended
+// window and blocked SWEEP1's board-quiet gate.
+//
+// public.ops_stale_claims returns ONLY rows already past the threshold (120 min,
+// p99 of 168 clean passes), so presence in this set IS the verdict -- there is no
+// client-side threshold logic here, deliberately. `suggested_action` is the
+// view's own triage sentence and is rendered verbatim rather than re-derived.
+//
+// ACCESS: the view is `security_invoker=true` (verified in pg_class.reloptions),
+// so it evaluates the underlying ops_dispatches RLS as the CALLER. A non-admin
+// reads zero rows through it -- it does not widen what the admin gate already
+// allows. Nothing was loosened to render this.
+interface StaleClaim {
+  pass: string;
+  claimed_at: string | null;
+  heartbeat_at: string | null;
+  minutes_silent: number;
+  threshold_minutes: number;
+  report_exists: boolean;
+  question_filed: boolean;
+  suggested_action: string;
+}
+
 const DISPATCH_MARK: Record<string, string> = {
   claimed: '▶', queued: '☐', done: '✓',
 };
+
+// Minutes since the last sign of life, recomputed from the `now` clock rather
+// than read off the view. `minutes_silent` is a server snapshot taken at fetch
+// time; printing it raw would freeze on a board left open, which is the same rot
+// the elapsedSince clock exists to prevent. The view still decides WHETHER a row
+// is stale -- this only keeps the number honest between reads.
+function minutesSilent(s: StaleClaim, now: number): number {
+  const iso = s.heartbeat_at ?? s.claimed_at;
+  if (!iso) return Math.round(s.minutes_silent);
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return Math.round(s.minutes_silent);
+  return Math.max(0, Math.floor((now - t) / 60000));
+}
+
+function silentLabel(mins: number): string {
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ${mins % 60}m`;
+  return `${Math.floor(hrs / 24)}d ${hrs % 24}h`;
+}
 
 // How many finished passes to show under the live queue. The queue is often
 // empty (everything done) and a panel that renders nothing at all reads as
@@ -141,6 +186,12 @@ export default function MissionControlPage() {
   const [queue, setQueue] = useState<Dispatch[] | null>(null);
   const [recentDone, setRecentDone] = useState<Dispatch[] | null>(null);
   const [queueError, setQueueError] = useState<string | null>(null);
+  // FRONT34: kept in its own state with its own error, so a failed stale read
+  // degrades to "the queue without stale markers" rather than blanking the queue.
+  // Silently showing no markers would be the worst outcome -- it reads as "no
+  // stale claims", which is the exact false-clear this pass exists to prevent.
+  const [stale, setStale] = useState<StaleClaim[] | null>(null);
+  const [staleError, setStaleError] = useState<string | null>(null);
   // OPS53: a clock, not a data refresh. "claimed 12m ago" rendered once at mount
   // would quietly rot into a lie on a page left open; this re-renders the elapsed
   // strings every minute and issues no queries.
@@ -222,6 +273,22 @@ export default function MissionControlPage() {
         .limit(RECENT_DONE);
       if (cancelled) return;
       setRecentDone(done.error ? [] : ((done.data ?? []) as Dispatch[]));
+
+      // FRONT34. A third read rather than a join: the view already does the
+      // threshold arithmetic and the triage, and PostgREST cannot join a view to
+      // a table anyway. Rows are matched to the queue by `pass`, which is UNIQUE
+      // (ops_dispatches_pass_uidx) -- the same guarantee after_pass relies on.
+      const staleRows = await supabase
+        .from('ops_stale_claims')
+        .select('pass, claimed_at, heartbeat_at, minutes_silent, threshold_minutes, report_exists, question_filed, suggested_action')
+        .order('minutes_silent', { ascending: false });
+      if (cancelled) return;
+      if (staleRows.error) {
+        setStaleError(staleRows.error.message);
+        setStale([]);
+      } else {
+        setStale((staleRows.data ?? []) as StaleClaim[]);
+      }
     })();
     return () => { cancelled = true; };
   }, [isAdmin]);
@@ -252,8 +319,8 @@ export default function MissionControlPage() {
   }
 
   if (!bee) {
-    return <Gate title="Mission Control needs a Bee sign-in"
-                 body="This board reads the internal ops rail. Sign in with an admin Bee to view it." />;
+    return <Gate title="Mission Control needs a sign-in"
+                 body="This board reads the internal ops rail. Sign in with an admin username to view it." />;
   }
   if (!isAdmin) {
     return <Gate title="Mission Control is admin-only"
@@ -277,7 +344,8 @@ export default function MissionControlPage() {
         </div>
       )}
 
-      <DispatchQueue queue={queue} recentDone={recentDone} error={queueError} now={now} />
+      <DispatchQueue queue={queue} recentDone={recentDone} error={queueError}
+                     stale={stale} staleError={staleError} now={now} />
 
 
       {steps === null ? (
@@ -330,25 +398,60 @@ export default function MissionControlPage() {
 
 // OPS51 — the panel Butch asked for twice. Read-only, admin-gated by the same
 // database policy as the board.
-function DispatchQueue({ queue, recentDone, error, now }: {
+function DispatchQueue({ queue, recentDone, error, stale, staleError, now }: {
   queue: Dispatch[] | null;
   recentDone: Dispatch[] | null;
   error: string | null;
+  stale: StaleClaim[] | null;
+  staleError: string | null;
   now: number;
 }) {
   const claimed = (queue ?? []).filter((d) => d.status === 'claimed').length;
   const queued = (queue ?? []).filter((d) => d.status === 'queued').length;
 
+  // Keyed by pass, which is UNIQUE on ops_dispatches.
+  const staleByPass = useMemo(() => {
+    const m = new Map<string, StaleClaim>();
+    for (const s of stale ?? []) m.set(s.pass, s);
+    return m;
+  }, [stale]);
+
+  // Only count stale rows that are actually ON this board. The view is scoped to
+  // claimed rows already, but counting its length directly would let a row the
+  // queue read missed inflate the parenthetical past the claimed count.
+  const staleCount = (queue ?? []).filter(
+    (d) => d.status === 'claimed' && staleByPass.has(d.pass),
+  ).length;
+
   return (
     <section className="mb-7">
       <div className="flex items-baseline justify-between text-text-dim" style={{ fontSize: '11.5px' }}>
         <span className="font-display uppercase tracking-wide">Dispatch queue</span>
-        <span>{queue === null ? 'reading…' : `${claimed} claimed · ${queued} queued`}</span>
+        <span>
+          {queue === null ? 'reading…' : (
+            <>
+              {claimed} claimed
+              {staleCount > 0 && (
+                <span className="font-semibold text-amber-300"> ({staleCount} stale)</span>
+              )}
+              {` · ${queued} queued`}
+            </>
+          )}
+        </span>
       </div>
 
       {error && (
         <div className="mt-2 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-amber-200" style={{ fontSize: '12px' }}>
           Queue read failed: {error}
+        </div>
+      )}
+
+      {/* Say it out loud. An absent marker is indistinguishable from "nothing is
+          stale", and this panel exists precisely because that false clear is
+          expensive. */}
+      {staleError && (
+        <div className="mt-2 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-amber-200" style={{ fontSize: '12px' }}>
+          Stale-claim check failed: {staleError} — claims below are UNCHECKED for staleness.
         </div>
       )}
 
@@ -364,7 +467,9 @@ function DispatchQueue({ queue, recentDone, error, now }: {
                 </td>
               </tr>
             )}
-            {queue.map((d) => <DispatchRow key={d.id} d={d} now={now} />)}
+            {queue.map((d) => (
+              <DispatchRow key={d.id} d={d} now={now} stale={staleByPass.get(d.pass) ?? null} />
+            ))}
             {(recentDone?.length ?? 0) > 0 && (
               <tr className="border-t border-border/60">
                 <td />
@@ -381,22 +486,40 @@ function DispatchQueue({ queue, recentDone, error, now }: {
   );
 }
 
-function DispatchRow({ d, now, dim = false }: { d: Dispatch; now: number; dim?: boolean }) {
+function DispatchRow({ d, now, stale = null, dim = false }: {
+  d: Dispatch;
+  now: number;
+  stale?: StaleClaim | null;
+  dim?: boolean;
+}) {
   const live = d.status === 'claimed';
   // Elapsed is shown ONLY while claimed — on a finished pass it would be the age
   // of a closed row, which means nothing.
   const elapsed = live ? elapsedSince(d.claimed_at, now) : null;
+  // A row can only be stale while claimed. Guarding here as well as at the call
+  // site means a future caller cannot accidentally flag a finished pass.
+  const isStale = live && stale !== null;
+  const silent = isStale ? minutesSilent(stale, now) : 0;
+
   return (
-    <tr className="border-t border-border/60">
-      <td className="w-8 py-1.5 align-top text-center text-text-silver">
-        <span className={live ? 'inline-block animate-pulse-slow' : undefined}>
-          {DISPATCH_MARK[d.status] ?? '·'}
+    <tr className={`border-t border-border/60 ${isStale ? 'bg-amber-500/[0.07]' : ''}`}>
+      <td className={`w-8 py-1.5 align-top text-center ${isStale ? 'text-amber-300' : 'text-text-silver'}`}>
+        {/* The pulse says "alive". A dead lock must not pulse — that animation is
+            the single strongest signal on the row and it would be lying. */}
+        <span className={live && !isStale ? 'inline-block animate-pulse-slow' : undefined}>
+          {isStale ? '⚠' : DISPATCH_MARK[d.status] ?? '·'}
         </span>
       </td>
       <td className={`py-1.5 ${dim ? 'text-text-dim' : 'text-text-silver-bright'}`}>
         <span className="font-display">{d.pass}</span>
         {d.lane && <span className="text-text-dim"> · {d.lane}</span>}
         {' '}{shortTitle(d.title)}
+        {isStale && (
+          <span className="ml-1.5 inline-block whitespace-nowrap rounded border border-amber-400/60 bg-amber-500/15 px-1.5 align-[1px] font-display font-semibold uppercase tracking-wide text-amber-300"
+                style={{ fontSize: '10px' }}>
+            Stale · silent {silentLabel(silent)}
+          </span>
+        )}
         <div className="text-text-dim" style={{ fontSize: '11px' }}>
           {d.status}
           {d.priority != null && ` · p${d.priority}`}
@@ -405,6 +528,15 @@ function DispatchRow({ d, now, dim = false }: { d: Dispatch; now: number; dim?: 
           {' · '}{shortWhen(d.created_at)}
           {elapsed && <span className="text-text-silver"> · {elapsed}</span>}
         </div>
+        {isStale && (
+          // The view's own triage sentence, verbatim. It already distinguishes
+          // "a -Q is filed, answer it" from "R3 half-ran, just close it" from
+          // "release candidate" — re-deriving any of that here would be a second
+          // source of truth for the same judgement.
+          <div className="mt-0.5 text-amber-300/90" style={{ fontSize: '11px' }}>
+            past {stale.threshold_minutes}m threshold · {stale.suggested_action}
+          </div>
+        )}
       </td>
     </tr>
   );
