@@ -120,7 +120,28 @@ function loadRepo() {
 const squash = s => String(s).toLowerCase().replace(/\s+/g, '');
 const decomment = s => squash(String(s).replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, ''));
 
-function relate(applied, file) {
+// ...and transaction control is the third (DB42, 2026-08-09). Whether a migration's
+// BEGIN;/COMMIT; wrapper reaches schema_migrations depends on how it was submitted:
+// a body passed to apply_migration WITH the wrapper stores it verbatim (20260809002940),
+// one passed without it does not (20260808202736 and five others). Both ran under a
+// transaction either way -- the API supplies one. DB42 diffed all six statement by
+// statement and the ONLY file statements absent from the applied text were BEGIN; and
+// COMMIT;. No schema statement was ever missing from production.
+//
+// So this strips them before comparing, rather than "fixing" the six files by deleting
+// their wrappers. Deleting them would be the wrong repair: a migration file is also a
+// replayable artifact, and one without BEGIN/COMMIT replays under psql in autocommit --
+// which is precisely the DB37 breach mode (HARNESS_SAFETY v1.0 rules 2 and 3). The
+// bookkeeping tool bends; the safety property does not.
+//
+// LINE-ANCHORED and END IS DELIBERATELY ABSENT. plpgsql blocks contain a bare BEGIN
+// (no semicolon, so it cannot match) and a terminating END; on its own line (which
+// WOULD match, and stripping it would blind the comparison to real body changes).
+const detx = s => String(s).replace(
+  /^[ \t]*(begin|commit|rollback|start[ \t]+transaction)[ \t]*;[ \t]*$/gim, '');
+
+function relate(appliedRaw, fileRaw) {
+  const applied = detx(appliedRaw), file = detx(fileRaw);
   const a = squash(applied), b = squash(file);
   if (a === b) return 'IDENTICAL';
   const a2 = decomment(applied), b2 = decomment(file);
