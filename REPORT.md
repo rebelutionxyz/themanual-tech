@@ -144,3 +144,10 @@ committed before the push by necessity, since the dispatch requires exactly one 
   tidied nothing in their code, per the dispatch.
 - **No lint run.** The dispatch requires `npm run build`, which passed. The repo carries 23
   pre-existing lint errors (measured in FRONT32) that this sweep did not touch.
+
+## DB45 - elections_v1c saved under its stamped version (repo files only, no DDL)
+
+Stamp `20260809171412` (the version `apply_migration` wrote, not a provisional name) -
+`supabase/migrations/20260809171412_elections_v1c_public_positions.sql` (3,522 bytes) and
+`supabase/migrations/_drafts/20260809171412_elections_v1c_public_positions_rollback.sql`
+(471 bytes); reconcile MEASURE EXIT=0, the pair version-matched and faithful.
