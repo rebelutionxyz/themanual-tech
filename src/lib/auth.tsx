@@ -12,6 +12,21 @@ export interface Bee {
   createdAt: string;
 }
 
+/**
+ * FRONT32: the one message every failed sign-in shows. Wrong username, wrong
+ * email, unknown account and wrong password are indistinguishable here on
+ * purpose -- the DB39 endpoint already returns byte-identical 401s for all four,
+ * and re-deriving a more specific message client-side would hand back the
+ * enumeration oracle the endpoint was built to close.
+ */
+const SIGN_IN_ERROR = 'Invalid username, email, or password.';
+
+/** Shape of a 200 from the auth-login edge function. No email field, by design. */
+interface AuthLoginSession {
+  access_token?: string;
+  refresh_token?: string;
+}
+
 interface AuthContextValue {
   user: User | null;
   session: Session | null;
@@ -23,9 +38,43 @@ interface AuthContextValue {
     password: string,
     handle: string,
   ) => Promise<{ error: Error | null }>;
-  signInWithPassword: (email: string, password: string) => Promise<{ error: Error | null }>;
+  /**
+   * FRONT32: `identifier` is a USERNAME or an email -- the caller does not
+   * decide which, and neither does this client. The auth-login edge function
+   * resolves a username to an address server-side with the service role; the
+   * address never reaches the browser.
+   */
+  signIn: (identifier: string, password: string) => Promise<{ error: Error | null }>;
   signInWithMagicLink: (email: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+}
+
+/**
+ * Reads the JSON body off a non-2xx functions.invoke error, the same way
+ * atlasoracle/client.ts does: supabase-js hands back a FunctionsHttpError with
+ * the raw Response on `.context`, and without unwrapping it every failure
+ * collapses into "Edge Function returned a non-2xx status code".
+ *
+ * Only 429 is allowed to say something specific. That is a rate-limit state,
+ * not a credential verdict -- auth-login counts an attempt whether or not the
+ * identifier resolves, so surfacing it tells an attacker nothing about whether
+ * the account exists, and hiding it would leave a locked-out member staring at
+ * "wrong password" while retrying correct credentials.
+ */
+async function signInErrorMessage(err: unknown): Promise<string> {
+  const ctx = (err as { context?: unknown } | null)?.context;
+  const res = ctx instanceof Response ? ctx : null;
+  if (!res || res.status !== 429) return SIGN_IN_ERROR;
+
+  let retry: unknown;
+  try {
+    retry = ((await res.clone().json()) as Record<string, unknown>).retry_after_seconds;
+  } catch {
+    // Non-JSON body -- fall through to the un-timed wording.
+  }
+  return typeof retry === 'number' && retry > 0
+    ? `Too many sign-in attempts. Try again in ${retry} seconds.`
+    : 'Too many sign-in attempts. Try again shortly.';
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -118,13 +167,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
-  const signInWithPassword: AuthContextValue['signInWithPassword'] = async (
-    email,
-    password,
-  ) => {
+  const signIn: AuthContextValue['signIn'] = async (identifier, password) => {
     if (!supabase) return { error: new Error('Supabase not configured') };
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
+    const sb = supabase;
+
+    // DB39's auth-login, NOT supabase.auth.signInWithPassword. The direct call
+    // can only take an email, which is exactly the half of the handle system
+    // that was missing.
+    const { data, error } = await sb.functions.invoke<AuthLoginSession>('auth-login', {
+      body: { identifier, password },
+    });
+
+    if (error) return { error: new Error(await signInErrorMessage(error)) };
+    if (!data?.access_token || !data?.refresh_token) return { error: new Error(SIGN_IN_ERROR) };
+
+    // The endpoint authenticates; it does not persist. setSession is what hands
+    // the tokens to the browser client, writes them to storage, and fires
+    // onAuthStateChange -> loadBeeProfile.
+    const { error: sessionError } = await sb.auth.setSession({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+    });
+    if (sessionError) return { error: new Error(SIGN_IN_ERROR) };
+
+    return { error: null };
   };
 
   const signInWithMagicLink: AuthContextValue['signInWithMagicLink'] = async (email) => {
@@ -150,7 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         configured: isSupabaseConfigured(),
         signUpWithPassword,
-        signInWithPassword,
+        signIn,
         signInWithMagicLink,
         signOut,
       }}

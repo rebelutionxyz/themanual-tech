@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock } from 'lucide-react';
+import { AtSign, Lock } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { ManualLogo } from '@/components/ui/ManualLogo';
 import { cn } from '@/lib/utils';
@@ -9,12 +9,19 @@ import { cn } from '@/lib/utils';
  * Sign-in ONLY (landing gate 2026-07-10): no sign-up, no magic link, no
  * anonymous-browsing link. The platform is pre-open — accounts are created
  * out-of-band (Supabase dashboard) until launch.
+ *
+ * FRONT32: one field takes a USERNAME or an email. The form does not decide
+ * which -- it hands the raw string to `signIn`, which routes it through the
+ * auth-login edge function where a username is resolved to an address
+ * server-side. Note the input is deliberately `type="text"`, not
+ * `type="email"`: browser email validation would reject every username before
+ * the form ever submitted.
  */
 export function LoginPage() {
   const navigate = useNavigate();
-  const { signInWithPassword, configured, bee } = useAuth();
+  const { signIn, configured, bee } = useAuth();
 
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +37,7 @@ export function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const { error } = await signInWithPassword(email, password);
+      const { error } = await signIn(identifier, password);
       if (error) setError(error.message);
       else navigate('/');
     } catch (e) {
@@ -62,13 +69,13 @@ export function LoginPage() {
 
       <form onSubmit={onSubmit} className="space-y-4">
         <Field
-          label="Email"
-          icon={<Mail size={14} />}
-          type="email"
-          value={email}
-          onChange={setEmail}
-          placeholder="you@domain"
-          autoComplete="email"
+          label="Username or email"
+          icon={<AtSign size={14} />}
+          type="text"
+          value={identifier}
+          onChange={setIdentifier}
+          placeholder="yourname or you@domain"
+          autoComplete="username"
           required
         />
 
@@ -148,6 +155,13 @@ function Field({
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           autoComplete={autoComplete}
+          // FRONT32: a mobile keyboard that auto-capitalizes or autocorrects
+          // turns "butch" into "Butch" before it is ever submitted. The edge
+          // function lowercases, so case is survivable -- autocorrect rewriting
+          // the word is not.
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           required={required}
           className={cn(
             'w-full rounded-md border border-border bg-bg py-2 pr-3 text-sm text-text',

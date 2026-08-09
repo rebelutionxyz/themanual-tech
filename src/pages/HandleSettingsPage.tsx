@@ -230,6 +230,12 @@ export function HandleSettingsPage() {
           <p className="mt-2 font-display text-2xl font-semibold text-zinc-900">
             @{bee.handle}
           </p>
+          {/* FRONT32: this handle is now a credential, not only a display name.
+              Saying so here is the difference between a member knowing they can
+              sign in with it and never discovering the feature. */}
+          <p className="mt-1.5 text-zinc-500" style={{ fontSize: '11.5px' }}>
+            This is your username &mdash; sign in with it or with your email.
+          </p>
         </div>
         <div className="rounded-lg border border-zinc-200 bg-white p-5">
           <p className="font-mono text-zinc-500" style={{ fontSize: '11px' }} data-size="meta">
