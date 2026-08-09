@@ -1,9 +1,10 @@
-import { Outlet } from 'react-router-dom';
 import { SidebarPromotedSlot } from '@/components/promotions/SidebarPromotedSlot';
 import { ConstellationRail } from '@/components/shell/ConstellationRail';
 import { useAstra } from '@/lib/astras/AstraContext';
-import { useManualStore } from '@/stores/useManualStore';
 import { REALM_COLORS, SILVER } from '@/lib/constants';
+import { useIsAdmin } from '@/lib/useIsAdmin';
+import { useManualStore } from '@/stores/useManualStore';
+import { Outlet } from 'react-router-dom';
 
 /**
  * Left realm-accent strip per MMF §15.1 (closed sidebar = realm accent).
@@ -34,6 +35,21 @@ export function PlatformLayout() {
   // that rail: this is the §15.1 rotating CONSTELLATION rail (the full derived
   // Astra set, accent rotating per page change), which the retired rail never
   // was. The promoted slot keeps its own column and still hides when empty.
+  //
+  // FRONT31 (owner ruling 2026-08-08): THE CONSTELLATION IS AN ADMIN TOOL. The
+  // rail listed all 40 Astras with their build states — including everything
+  // unbuilt — to signed-out visitors on every platform surface. Admins only now.
+  //
+  // Note the gate is on RENDER, not on CSS: a non-admin never mounts the rail,
+  // so ConstellationRail's rotation effect never runs and the catalog never
+  // reaches the DOM. `loading` renders nothing too — otherwise the rail would
+  // flash for everyone on first paint, before the is_admin lookup settles.
+  //
+  // No layout compensation is needed. The rail is a flex sibling with a fixed
+  // w-52; the <main> beside it is flex-1, so when the rail is absent main takes
+  // the width back at every breakpoint. There is no placeholder to leave a gap.
+  const { isAdmin, loading: adminLoading } = useIsAdmin();
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Left: realm-accent strip (closed sidebar per §15.1) */}
@@ -50,8 +66,10 @@ export function PlatformLayout() {
       {/* Right: the rotating constellation (§15.1). lg+ — the same breakpoint
           the promoted slot uses, so a laptop shows the constellation rather
           than hiding the spine's second sidebar. Below lg it collapses and
-          /constellation is the full-page equivalent. */}
-      <ConstellationRail className="hidden w-52 flex-shrink-0 lg:flex" />
+          /constellation is the full-page equivalent (also admin-gated). */}
+      {!adminLoading && isAdmin && (
+        <ConstellationRail className="hidden w-52 flex-shrink-0 lg:flex" />
+      )}
     </div>
   );
 }

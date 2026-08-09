@@ -11,6 +11,8 @@ import {
   effectiveStatus,
   groupByCategory,
 } from '@/lib/astra-catalog';
+import { useIsAdmin } from '@/lib/useIsAdmin';
+import { ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const MOUNT_LABEL: Record<AstraCatalogEntry['mount'], string> = {
@@ -55,9 +57,49 @@ function AstraCard({ entry }: { entry: AstraCatalogEntry }) {
   );
 }
 
+/* FRONT31 — the not-authorised state. Deliberately the same shape and the same
+   behaviour /hq gives a non-admin: a plain in-place panel, NOT a redirect. No
+   teaser, no partial list, no "sign in to see" — per the owner ruling a
+   non-admin sees nothing of the catalogue at all. Markup mirrors
+   HQControlRoom's local Gate; that component is not exported, and exporting it
+   would mean editing a working admin gate from a presentation pass. */
+function Gate({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center px-4">
+      <div className="max-w-lg rounded-lg border border-border bg-bg-elevated p-8 text-center">
+        <ShieldAlert size={28} className="mx-auto mb-4 text-text-silver/60" aria-hidden />
+        <h1 className="font-display text-xl font-semibold text-text-silver-bright">{title}</h1>
+        <p className="mt-3 text-text-dim" style={{ fontSize: '13px' }}>
+          {body}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function ConstellationPage() {
+  const { isAdmin, loading: adminLoading } = useIsAdmin();
   const groups = groupByCategory();
   const total = groups.reduce((n, g) => n + g.entries.length, 0);
+
+  // Hold the surface until access resolves — no flash of the catalogue, which
+  // is the entire thing this pass exists to stop.
+  if (adminLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="h-8 w-8 animate-pulse-slow rounded-full border-2 border-text-silver/30 border-t-text-silver" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <Gate
+        title="The constellation is an admin tool"
+        body="This page lists the platform's Astra catalogue and its build states. Access is restricted to admin accounts."
+      />
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto">

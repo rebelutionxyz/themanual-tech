@@ -101,7 +101,7 @@ export function HQControlRoom() {
     );
   }
 
-  if (!bee) return <Gate title="HQ requires Bee authentication" body="Sign in with an admin Bee to access the HQ Control Room." />;
+  if (!bee) return <Gate title="HQ requires sign-in" body="Sign in with an admin username to access the HQ Control Room." />;
   if (!adminCheck.isAdmin) return <Gate title="HQ Control Room is OG HUMAN only" body="Per og-human-v1 authority canon — Director and Treasury Council roles are deferred until post-Swarm. v1 admin access is restricted to bees.is_admin = true (currently a single OG HUMAN Bee)." />;
 
   return <HQShell bee={bee} />;
