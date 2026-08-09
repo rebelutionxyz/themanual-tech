@@ -10,9 +10,11 @@
  * failure that is not an explicit user cancel demotes the capability so the
  * caller can fall back to <input type=file> without ever showing a dead control.
  *
- * PERMISSION. A directory granted read-only can be scanned but NOT written. The
- * caller must gate every destructive control on `writable` — a Remove button
- * that is going to fail is worse than no button.
+ * PERMISSION IS TWO-STAGE (FRONT33, owner ruling). pickDirectory asks for READ
+ * only, so a scan costs the member nothing but a read grant. Write is requested
+ * later by ensureWritable(), inside the click that actually changes something.
+ * Callers must therefore NOT gate the action buttons on a stored writable flag —
+ * the action asks for itself, and a refusal leaves the finding intact.
  *
  * The DOM lib does not ship these types in every TS version we build against,
  * so the shapes below are declared structurally rather than imported.
@@ -61,7 +63,8 @@ export interface WalkSkip {
 
 export interface PickedFolder {
   root: FsDirHandle;
-  /** True only when readwrite was actually granted. Gate destructive UI on this. */
+  /** Whether write was ALREADY held at pick time (a handle re-granted this
+   *  session). Informational only — never gate UI on it; call ensureWritable(). */
   writable: boolean;
 }
 
@@ -78,9 +81,16 @@ export function folderPickerAvailable(): boolean {
 }
 
 /**
- * Prompt for a directory. Resolves null when the Bee cancels, and throws
- * UNSUPPORTED when the picker exists but the environment refuses it (some
- * embedded webviews) so the caller can demote to the file-input fallback.
+ * Prompt for a directory, READ-ONLY. Resolves null when the Bee cancels, and
+ * throws UNSUPPORTED when the picker exists but the environment refuses it
+ * (some embedded webviews) so the caller can demote to the file-input fallback.
+ *
+ * FRONT33, owner ruling: scan first, ask for write only when there is something
+ * to remove. Requesting 'readwrite' here raised Chrome's "Allow this site to
+ * edit files?" before a single file had been read -- the biggest permission at
+ * the moment of least trust, in exchange for nothing yet. Worse on this page
+ * than any other: a security product that trains people to click Allow on an
+ * edit-files prompt is teaching the exact reflex attackers rely on.
  */
 export async function pickDirectory(): Promise<PickedFolder | null> {
   const show = (window as PickerWindow).showDirectoryPicker;
@@ -88,7 +98,7 @@ export async function pickDirectory(): Promise<PickedFolder | null> {
 
   let root: FsDirHandle;
   try {
-    root = await show({ mode: 'readwrite' });
+    root = await show({ mode: 'read' });
   } catch (err) {
     // AbortError is the Bee closing the dialog — an ordinary outcome, not a
     // capability failure, so it must NOT demote the button.
@@ -97,18 +107,43 @@ export async function pickDirectory(): Promise<PickedFolder | null> {
     throw new Error('UNSUPPORTED');
   }
 
-  // Asking for readwrite does not guarantee getting it.
+  // Whether write is ALREADY held (a handle re-granted within the session may
+  // be). Never requested here — only queried, so this stays prompt-free.
   let writable = false;
   try {
-    const state = (await root.queryPermission?.({ mode: 'readwrite' })) ?? 'prompt';
-    writable =
-      state === 'granted'
-        ? true
-        : (await root.requestPermission?.({ mode: 'readwrite' })) === 'granted';
+    writable = (await root.queryPermission?.({ mode: 'readwrite' })) === 'granted';
   } catch {
     writable = false;
   }
   return { root, writable };
+}
+
+/** What an upgrade attempt did, so the caller can speak plainly about it. */
+export type WriteGrant = 'granted' | 'denied' | 'unavailable';
+
+/**
+ * Upgrade a read handle to readwrite, ON DEMAND.
+ *
+ * MUST be called synchronously inside a user gesture (a click handler) — the
+ * File System Access API rejects a permission request without transient
+ * activation. queryPermission runs first so an already-granted handle never
+ * re-prompts: a second Remove in the same session is silent.
+ *
+ * A 'denied' answer is an ordinary outcome, not an error. The caller keeps the
+ * finding and tells the Bee where the file is.
+ */
+export async function ensureWritable(root: FsDirHandle): Promise<WriteGrant> {
+  try {
+    if ((await root.queryPermission?.({ mode: 'readwrite' })) === 'granted') return 'granted';
+    if (!root.requestPermission) return 'unavailable';
+    return (await root.requestPermission({ mode: 'readwrite' })) === 'granted'
+      ? 'granted'
+      : 'denied';
+  } catch {
+    // A throw here is the browser refusing the request outright (no transient
+    // activation, or an environment that does not implement it).
+    return 'unavailable';
+  }
 }
 
 /* ── walk ─────────────────────────────────────────────────────────────── */

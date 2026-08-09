@@ -1,35 +1,41 @@
 /**
- * SecurityPage — DingleBERRY device security (user-facing) · themanual.tech/security
+ * SecurityPage — browser security, user-facing · themanual.tech/security
  * ---------------------------------------------------------------------------------
- * Drop-in for The Manual's Vite + React + Tailwind app. Uses the app's existing
- * CSS variables (--panel, --border, …) for the dark base, plus Security's own
- * palette defined on the page root: --sec #58a6ff (steel blue · trust/authority),
- * --sec-deep #1f6feb (actions), --warn #f59e0b (amber caution), #dc2626 crimson
- * (critical), #16a34a forest green (protected). Honey stays with Blings — it is
- * not used on this page.
+ * FRONT30, owner ruling 2026-08-08: "If they can go to the website - no app
+ * needed to get the value of security, that is good enough for me for now."
+ * The website IS the product. There is no agent on the near roadmap.
  *
- * ROUTE WIRING (matches your existing lazy pattern):
- *   const SecurityPage = lazy(() => import('./pages/SecurityPage')
- *     .then(e => ({ default: e.SecurityPage })));
- *   <Route path="/security" element={<SecurityPage />} />
+ * THE RULE THIS FILE EXISTS TO KEEP: **nothing on this page is invented.**
+ * Every finding rendered here came from a check this browser actually ran. The
+ * old build shipped SAMPLE_FINDINGS behind a DEMO DATA banner, which was right
+ * while an agent was weeks away and became scareware once it wasn't — a
+ * security page showing fabricated threats indefinitely is scareware however
+ * well it is labelled. The sample data, the fake scan item names, the fake item
+ * counts and the inert "shield" toggles are all gone. If you are adding to this
+ * file: a finding must trace to a real check, or it does not get rendered.
  *
- * NAV CHANGE (bottom toolbar → Astra dropdown):
- *   1. Remove the Security item from the bottom-toolbar config array.
- *   2. Ensure the Astra dropdown source includes { slug:'security'|'dingleberry',
- *      label:'Security', route:'/security' }. The astra_registry row already
- *      exists (slug 'dingleberry', default_name 'Security'); if the dropdown is
- *      registry-driven, flipping its status from 'off_grid' to 'active' surfaces it.
+ * THE FIVE THINGS A BROWSER CAN HONESTLY DO, and the one it cannot:
+ *   FILES     structural checks + SHA-256 corpus lookup (hand-picked or folder)
+ *   LINKS     paste a link, check it against a known-bad feed
+ *   PASSWORDS is this password in a known breach (HIBP k-anonymity, local hash)
+ *   PRIVACY   granted permissions, tracking opt-out signals
+ *   SYSTEM    browser patch level, secure context
+ *   DEEP SCAN NOT POSSIBLE IN A BROWSER. Rendered dimmed and inert, with one
+ *             plain sentence saying why. A truthful placeholder, not a teaser:
+ *             no findings, no fake counts, not clickable, and it never drags
+ *             the posture reading.
  *
- * BACKEND (Supabase) — LIVE. Migration dingleberry_device_v1 is applied:
- * tables dingleberry_devices/scans/findings/events (RLS: bee reads own) and
- * RPCs dingleberry_scan_start / dingleberry_finding_act (authenticated) +
- * dingleberry_scan_report (service_role — the agent rail). See
- * dingleberry-device-schema.sql for the exact applied SQL.
- * DEMO_MODE=true until the agent exists. In demo mode every agent-surface
- * finding is tagged SAMPLE in the UI; local surfaces run real in-browser checks.
- * A web page cannot scan a device's filesystem — real detection comes from the
- * DingleBERRY agent reporting through the backend. Keep the SAMPLE tags until
- * that rail is live; a security page must never present fabricated threats as real.
+ * WORDING: 'unknown' is "no known-malware match" / "not on the known-bad list",
+ * never clean, never safe, never a green tick. A finished check reports WHAT WAS
+ * CHECKED — never that the device is clean.
+ *
+ * THE AGENT BACKEND STAYS. dingleberry_scan_report and the scans/findings
+ * tables are untouched by this pass; if an agent ever exists the rail is waiting
+ * for it. This was a UI truthfulness pass, not a teardown.
+ *
+ * Palette: the app's CSS variables plus --sec #58a6ff (steel blue), --sec-deep
+ * #1f6feb (actions), --warn #f59e0b (caution), #dc2626 crimson (critical),
+ * #16a34a forest green. Honey stays with BLiNG! and is not used here.
  */
 
 import {
@@ -38,6 +44,7 @@ import {
   QUARANTINE_DIR,
   type WalkSkip,
   folderPickerAvailable,
+  ensureWritable,
   pickDirectory,
   purgeQuarantined,
   quarantineFile,
@@ -53,24 +60,33 @@ import {
   malwareTitle,
   sha256File,
 } from '@/lib/security/malwareHash';
+import { PWNED_PASSWORD_MESSAGE, isPwnedPassword } from '@/lib/security/pwnedPassword';
+import {
+  type UrlVerdict,
+  coerceUrl,
+  lookupUrls,
+  urlFindingDetail,
+  urlFindingTitle,
+} from '@/lib/security/urlCheck';
 import { useMemo, useRef, useState } from 'react';
 import type { CSSProperties, InputHTMLAttributes } from 'react';
 
 // Nonstandard-but-universal folder-pick attribute; typed once for reuse.
 const DIR_PICK_PROPS = { webkitdirectory: '' } as unknown as InputHTMLAttributes<HTMLInputElement>;
-// import { supabase } from '@/lib/supabase'; // real path — note: SupabaseClient | null (env-guarded)
-
-const DEMO_MODE = true;
 
 /* ── types ───────────────────────────────────────────────────────────── */
-type SurfaceId = 'malware' | 'spyware' | 'pups' | 'network' | 'privacy' | 'system';
+/** `deep` is the honest placeholder; it never carries findings. */
+type SurfaceId = 'files' | 'links' | 'passwords' | 'privacy' | 'system' | 'deep';
 type Severity = 'critical' | 'high' | 'medium' | 'low';
-type Level = 'idle' | 'scanning' | 'clear' | 'warn' | 'risk';
-type ScanMode = 'quick' | 'deep' | 'custom';
+/**
+ * `ok` means "this check ran and turned up nothing" — NOT "clean". `na` is the
+ * deep-scan cell: permanently unavailable in a browser, and excluded from the
+ * posture calculation entirely so it can never drag the reading.
+ */
+type Level = 'idle' | 'scanning' | 'ok' | 'warn' | 'risk' | 'na';
 type Tab = 'surfaces' | 'threats' | 'quarantine' | 'history';
 
-interface SurfaceDef { id: SurfaceId; name: string; glyph: string; desc: string; src: 'agent' | 'local'; }
-interface ShieldDef { id: string; name: string; desc: string; agent: boolean; }
+interface SurfaceDef { id: SurfaceId; name: string; glyph: string; desc: string; }
 export interface Finding {
   id?: number;
   surface: SurfaceId;
@@ -78,7 +94,11 @@ export interface Finding {
   title: string;
   detail: string;
   path?: string;
-  sample?: boolean;
+  /* There is deliberately NO `sample` flag on this type any more. The old build
+     carried one, plus a SAMPLE badge to render it, and that pair is what made
+     fabricated findings expressible in the first place. Removing the field makes
+     the invariant structural: there is no way to mark a finding as invented,
+     because there is no way to have one. */
   local?: boolean;
   noact?: boolean;
   qAt?: Date;
@@ -88,7 +108,8 @@ export interface Finding {
 }
 /** Outcome of a real filesystem action, shown on the finding it belongs to. */
 interface ActNote { ok: boolean; text: string; }
-interface HistoryRow { at: Date; mode: ScanMode; items: number; found: number; bad: number; }
+/** One real check that actually ran. `items` is a true count, never invented. */
+interface HistoryRow { at: Date; kind: 'files' | 'folder' | 'link' | 'password' | 'browser'; items: number; found: number; bad: number; }
 interface FindingAction { label: string; danger?: boolean; confirmingNow?: boolean; onClick: () => void; }
 type FcStatus =
   | { phase: 'run'; text: string }
@@ -116,44 +137,33 @@ type FcStatus =
   | null;
 
 /* ── catalog ─────────────────────────────────────────────────────────── */
+/**
+ * Five things this browser can genuinely do, and one it cannot. Every entry
+ * except `deep` is backed by code in this file that really runs.
+ */
 const SURFACES: SurfaceDef[] = [
-  { id: 'malware', name: 'Malware',               glyph: '⬡', desc: 'Viruses, trojans, ransomware, worms.',          src: 'agent' },
-  { id: 'spyware', name: 'Spyware & stalkerware', glyph: '◉', desc: 'Keyloggers, screen grabbers, tracking apps.',   src: 'agent' },
-  { id: 'pups',    name: 'Adware & PUPs',         glyph: '▤', desc: 'Unwanted programs, hijacked browser settings.', src: 'agent' },
-  { id: 'network', name: 'Network',               glyph: '⌁', desc: 'Wi-Fi posture, open ports, DNS integrity.',     src: 'agent' },
-  { id: 'privacy', name: 'Privacy',               glyph: '◍', desc: 'Site permissions, tracking signals, exposure.', src: 'local' },
-  { id: 'system',  name: 'System integrity',      glyph: '⬢', desc: 'OS and browser patch level, secure context.',   src: 'local' },
+  { id: 'files',     name: 'Files',     glyph: '⬡', desc: 'Check files you hand over: disguised executables, bad headers, and a known-malware fingerprint lookup.' },
+  { id: 'links',     name: 'Links',     glyph: '⌁', desc: 'Paste a suspicious link and check it against a feed of addresses seen distributing malware.' },
+  { id: 'passwords', name: 'Passwords', glyph: '◍', desc: 'Check whether a password already appears in a known data breach. It never leaves this device.' },
+  { id: 'privacy',   name: 'Privacy',   glyph: '◉', desc: 'What this site has been granted, and whether a tracking opt-out signal is switched on.' },
+  { id: 'system',    name: 'System',    glyph: '⬢', desc: 'Browser patch level and whether this page is running in a secure context.' },
+  { id: 'deep',      name: 'Deep scan', glyph: '▤', desc: 'Ambient malware, stalkerware and network monitoring need software installed on the device. That software does not exist yet, so this cannot run here.' },
 ];
 
-const SHIELDS: ShieldDef[] = [
-  { id: 'web',     name: 'Web shield',        desc: 'Blocks known-bad domains and phishing pages.',  agent: true },
-  { id: 'ransom',  name: 'Ransomware shield', desc: 'Guards protected folders against encryption.',  agent: true },
-  { id: 'stalker', name: 'Stalkerware watch', desc: 'Alerts on covert tracking and mic/camera use.', agent: true },
-  { id: 'netg',    name: 'Network guard',     desc: 'Watches for rogue devices and DNS tampering.',  agent: true },
-];
-
-const SAMPLE_FINDINGS: Finding[] = [
-  { surface: 'malware', sev: 'critical', title: 'Trojan.Agent.GenKD', path: '~/Downloads/invoice_2026-07.pdf.exe',
-    detail: 'Executable disguised as a PDF. Matches a known dropper signature; quarantine before opening anything from this folder.' },
-  { surface: 'spyware', sev: 'high', title: 'Stalkerware.TrackView', path: '/apps/system_helper_svc',
-    detail: 'Background service reporting location and screen state to a third-party endpoint every 4 minutes.' },
-  { surface: 'pups', sev: 'medium', title: 'PUP.SearchHijack.Bree', path: 'browser extension · "Coupon Companion"',
-    detail: 'Extension rewrote the default search engine and injects sponsored results.' },
-  { surface: 'network', sev: 'medium', title: 'Open port 3389 (RDP)', path: 'this device · inbound',
-    detail: 'Remote Desktop is reachable from the local network. Close it if you do not use remote access.' },
-];
-
-const DEMO_ITEMS: Record<SurfaceId, string[]> = {
-  malware: ['/bin/launchd', '~/Library/Caches/com.app.store', '~/Downloads/invoice_2026-07.pdf.exe', '/usr/lib/dyld', '~/Documents/tax_2025.xlsx'],
-  spyware: ['/apps/system_helper_svc', 'com.track.view.daemon', '/private/var/log/keys.db', 'accessibility services registry'],
-  pups: ['extension: Coupon Companion', 'extension: Dark Reader', 'default search settings', 'startup items'],
-  network: ['port sweep 1-1024', 'port 3389/tcp', 'router 192.168.1.1', 'DNS resolver check'],
-  privacy: ['site permission grants', 'tracking opt-out signals', 'cookie posture'],
-  system: ['browser build', 'secure context', 'platform report'],
-};
+/** The one surface that can never run in a browser. Excluded from posture. */
+const UNAVAILABLE: SurfaceId = 'deep';
 
 const SEV_ORDER: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
-const DEFINITIONS_STAMP = '2026.08.08';
+/** Stamp for the BROWSER FLOOR table below — not a virus-definition database. */
+const FLOORS_STAMP = '2026.08.08';
+
+const HISTORY_LABEL: Record<HistoryRow['kind'], string> = {
+  files: 'File check', folder: 'Folder scan', link: 'Link check',
+  password: 'Password check', browser: 'Browser check',
+};
+const HISTORY_UNIT: Record<HistoryRow['kind'], string> = {
+  files: 'file', folder: 'file', link: 'link', password: 'password', browser: 'check',
+};
 
 /* ── real local checks (run in this browser) ─────────────────────────── */
 function parseUA() {
@@ -167,8 +177,16 @@ function parseUA() {
   else if ((v = pick(/Version\/(\d+).+Safari/)) != null){ name = 'Safari'; major = v; }
   return { name, major };
 }
-// Floors current as of the DEFINITIONS_STAMP above — bump alongside it.
+// Floors current as of FLOORS_STAMP above — bump alongside it.
 const BROWSER_FLOOR: Record<string, number> = { Chrome: 132, Edge: 132, Firefox: 133, Safari: 18, Opera: 117 };
+
+/**
+ * How many browser facts the two self-checks actually examine: browser build,
+ * secure context, three permission grants, and the tracking opt-out signal.
+ * This is a REAL count reported in History — the old build put a random number
+ * there to make the scan look substantial.
+ */
+const BROWSER_CHECK_COUNT = 6;
 
 async function runSystemChecks(): Promise<Finding[]> {
   const out: Finding[] = [];
@@ -275,45 +293,14 @@ async function fcCheckFile(file: File, relPath?: string): Promise<Finding[]> {
   }
   // `noact` is decided by the CALLER: a hand-picked file has no handle and so
   // stays Dismiss-only, while a readwrite folder scan can act for real.
-  return out.map((f) => ({ ...f, surface: 'malware', path: rel, sample: false, local: true, noact: true }));
+  return out.map((f) => ({ ...f, surface: 'files', path: rel, local: true, noact: true }));
 }
 
-/* ── backend adapter (single seam for going live) ────────────────────── */
-// Params the DEMO_MODE branch never reads carry a leading underscore so
-// tsconfig's noUnusedParameters stays satisfied. When the LIVE lines below are
-// uncommented, drop the underscore — the commented code already names them bare.
-const securityApi = {
-  /** Start a scan. Live mode: creates the scan row (RPC is applied + granted to authenticated). */
-  async startScan(mode: ScanMode, surfaceIds: SurfaceId[]) {
-    if (DEMO_MODE) return { scanId: `demo-${Date.now()}`, mode, surfaceIds };
-    // LIVE (uncomment the supabase import first; client is env-guarded → assert):
-    // const { data, error } = await supabase!.rpc('dingleberry_scan_start',
-    //   { p_mode: mode, p_surfaces: surfaceIds, p_device_label: 'This browser' });
-    // if (error) throw error;
-    // return { scanId: data as string, mode, surfaceIds };
-    throw new Error('Live scan rail not wired yet');
-  },
-  /** Resolve one agent surface. Live mode: read agent-reported findings (RLS: bee reads own). */
-  async resolveAgentSurface(_scanId: string, surfaceId: SurfaceId): Promise<Finding[]> {
-    if (DEMO_MODE) {
-      return SAMPLE_FINDINGS.filter((f) => f.surface === surfaceId).map((f) => ({ ...f, sample: true }));
-    }
-    // LIVE: const { data } = await supabase!
-    //   .from('dingleberry_findings').select('*')
-    //   .eq('scan_id', scanId).eq('surface', surfaceId).eq('status', 'detected');
-    // return (data ?? []).map((r) => ({ surface: r.surface, sev: r.severity,
-    //   title: r.title, detail: r.detail, path: r.item_ref ?? undefined, sample: false }));
-    return [];
-  },
-  /** Record an action on a finding. Live mode: SECDEF RPC (applied); the agent executes for real. */
-  async actOnFinding(_findingId: number | string, _action: 'quarantine' | 'remove' | 'allow' | 'restore' | 'purge') {
-    if (DEMO_MODE) return true;
-    // LIVE: const { error } = await supabase!.rpc('dingleberry_finding_act',
-    //   { p_finding_id: findingId, p_action: action });
-    // if (error) throw error;
-    return true;
-  },
-};
+/* The DEMO_MODE backend adapter that used to live here is DELETED. Its only
+   live behaviour was returning SAMPLE_FINDINGS; the rest was commented-out
+   scaffolding for an agent rail that has no near-term agent. The SERVER side of
+   that rail (dingleberry_scan_report, the scans/findings tables) is deliberately
+   untouched and still waiting — see the file header. */
 
 /* ── hex geometry ────────────────────────────────────────────────────── */
 const HIVE = 340, C = HIVE / 2, R_PETAL = 47, R_CENTER = 54;
@@ -333,22 +320,31 @@ const PETALS = SURFACES.map((s, i) => {
 
 const CELL_STROKE: Record<Level, string> = {
   idle: 'var(--border)', scanning: 'var(--sec)',
-  clear: 'color-mix(in srgb, var(--clear, #16a34a) 55%, var(--border))',
+  ok: 'color-mix(in srgb, var(--clear, #16a34a) 55%, var(--border))',
   warn: 'color-mix(in srgb, var(--warn) 60%, var(--border))',
   risk: 'color-mix(in srgb, #dc2626 65%, var(--border))',
+  na: 'var(--border)',
 };
 const CELL_FILL: Record<Level, string> = {
   idle: 'var(--panel-2)', scanning: 'color-mix(in srgb, var(--sec) 9%, var(--panel-2))',
-  clear: 'color-mix(in srgb, var(--clear, #16a34a) 7%, var(--panel-2))',
+  ok: 'color-mix(in srgb, var(--clear, #16a34a) 7%, var(--panel-2))',
   warn: 'color-mix(in srgb, var(--warn) 8%, var(--panel-2))',
   risk: 'color-mix(in srgb, #dc2626 10%, var(--panel-2))',
+  na: 'var(--bg)',
 };
+/**
+ * The centre word. `ok` deliberately reads CHECKED, never PROTECTED — this page
+ * can report what it looked at and nothing more. Claiming a device is protected
+ * on the strength of five browser-side checks would be the same lie as a false
+ * "clean", just louder.
+ */
 const POSTURE: Record<Level, { word: string; sub: string; color: string }> = {
-  idle:     { word: 'UNKNOWN',   sub: 'run a scan',        color: 'var(--text-dim)' },
-  scanning: { word: 'SCANNING',  sub: '',                  color: 'var(--sec)' },
-  clear:    { word: 'PROTECTED', sub: 'no active threats', color: 'var(--clear, #16a34a)' },
-  warn:     { word: 'ATTENTION', sub: 'review findings',   color: 'var(--warn)' },
-  risk:     { word: 'AT RISK',   sub: 'act on threats',    color: '#dc2626' },
+  idle:     { word: 'UNKNOWN',  sub: 'nothing checked yet',  color: 'var(--text-dim)' },
+  scanning: { word: 'CHECKING', sub: '',                     color: 'var(--sec)' },
+  ok:       { word: 'CHECKED',  sub: 'nothing found so far', color: 'var(--clear, #16a34a)' },
+  warn:     { word: 'ATTENTION', sub: 'review findings',     color: 'var(--warn)' },
+  risk:     { word: 'AT RISK',  sub: 'act on findings',      color: '#dc2626' },
+  na:       { word: 'UNKNOWN',  sub: 'nothing checked yet',  color: 'var(--text-dim)' },
 };
 const SEV_STYLE: Record<Severity, { color: string; bg: string }> = {
   critical: { color: '#dc2626', bg: 'color-mix(in srgb, #dc2626 18%, var(--panel-2))' },
@@ -363,19 +359,36 @@ let uid = 1;
 /* ── component ───────────────────────────────────────────────────────── */
 export function SecurityPage() {
   const [surfaceStatus, setSurfaceStatus] = useState<Record<SurfaceId, Level>>(
-    () => Object.fromEntries(SURFACES.map((s) => [s.id, 'idle'])) as Record<SurfaceId, Level>,
+    () =>
+      Object.fromEntries(
+        // The deep-scan cell starts — and stays — `na`. It is never scanned,
+        // never has findings, and is excluded from the posture reading.
+        SURFACES.map((s) => [s.id, s.id === UNAVAILABLE ? 'na' : 'idle']),
+      ) as Record<SurfaceId, Level>,
   );
   const [findings, setFindings] = useState<Finding[]>([]);
   const [quarantine, setQuarantine] = useState<Finding[]>([]);
   const [history, setHistory] = useState<HistoryRow[]>([]);
-  const [shields, setShields] = useState<Record<string, boolean>>(() => Object.fromEntries(SHIELDS.map((s) => [s.id, false])));
   const [scanning, setScanning] = useState(false);
-  const [readout, setReadout] = useState({ line: 'No scan yet on this device.', item: '', items: 0 });
   const [lastScan, setLastScan] = useState<Date | null>(null);
   const [tab, setTab] = useState<Tab>('surfaces');
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [picked, setPicked] = useState<Set<SurfaceId>>(() => new Set(SURFACES.map((s) => s.id)));
   const [confirming, setConfirming] = useState<number | null>(null); // finding id awaiting destructive confirm
+  // ---- LINKS ----------------------------------------------------------
+  const [urlInput, setUrlInput] = useState('');
+  const [urlBusy, setUrlBusy] = useState(false);
+  const [urlResult, setUrlResult] = useState<
+    | { kind: 'invalid' }
+    | { kind: 'malicious'; v: UrlVerdict }
+    | { kind: 'unknown'; url: string }
+    | { kind: 'degraded' }
+    | null
+  >(null);
+  // ---- PASSWORDS ------------------------------------------------------
+  const [pwInput, setPwInput] = useState('');
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwResult, setPwResult] = useState<
+    { kind: 'pwned'; count: number } | { kind: 'unlisted' } | null
+  >(null);
   const stopRef = useRef(false);
   const allowedRef = useRef<Set<string>>(new Set());
   const [fcStatus, setFcStatus] = useState<FcStatus>(null);
@@ -393,7 +406,9 @@ export function SecurityPage() {
   // control disappears instead of failing twice.
   const [fsAvailable, setFsAvailable] = useState<boolean>(() => folderPickerAvailable());
   const [fsRoot, setFsRoot] = useState<FsDirHandle | null>(null);
-  const [fsWritable, setFsWritable] = useState(false);
+  // FRONT33: no `fsWritable` state any more. Write is not held after a scan and
+  // is not meant to be; whether it is currently granted is asked at the moment
+  // of the action via ensureWritable(), which is the only moment it matters.
   const [skips, setSkips] = useState<WalkSkip[]>([]);
   const [showSkips, setShowSkips] = useState(false);
   const [actNotes, setActNotes] = useState<Record<number, ActNote>>({});
@@ -402,70 +417,167 @@ export function SecurityPage() {
   // mid-render; the state copy is published once the scan settles.
   const skipRef = useRef<WalkSkip[]>([]);
 
-  const posture = useMemo(() => {
+  /**
+   * Posture derives from REAL checks only.
+   *
+   * The `deep` cell is filtered out before anything is decided, so a permanently
+   * unavailable surface can never drag the reading to a false ATTENTION — and
+   * equally can never be counted as a pass. Nothing checked yet means UNKNOWN,
+   * not "protected".
+   */
+  const posture = useMemo<Level>(() => {
     if (scanning) return 'scanning';
-    const st = Object.values(surfaceStatus);
+    const st = SURFACES.filter((s) => s.id !== UNAVAILABLE).map((s) => surfaceStatus[s.id]);
     if (st.includes('risk')) return 'risk';
     if (st.includes('warn')) return 'warn';
-    if (st.includes('clear')) return 'clear';
+    if (st.includes('ok')) return 'ok';
     return 'idle';
   }, [surfaceStatus, scanning]);
 
   const levelFor = (id: SurfaceId, list: Finding[]): Level => {
     const f = list.filter((x) => x.surface === id);
     if (f.some((x) => x.sev === 'critical' || x.sev === 'high')) return 'risk';
-    if (f.some((x) => x.sev === 'medium')) return 'warn';
-    return 'clear';
+    // ANY finding means the cell must not read "nothing found". The old ladder
+    // let a `low` fall through to the all-clear state, so a surface could report
+    // NOTHING FOUND while a finding of its own sat in the Threats tab. `ok` is
+    // reserved for a check that ran and genuinely produced nothing.
+    if (f.length > 0) return 'warn';
+    return 'ok';
   };
 
-  async function runScan(mode: ScanMode, ids: SurfaceId[]) {
-    if (scanning) return;
-    const targets = SURFACES.filter((s) => ids.includes(s.id));
-    if (!targets.length) return;
-    stopRef.current = false;
-    setScanning(true);
-    setPickerOpen(false);
-    let working = findings.filter((f) => !ids.includes(f.surface));
-    setFindings(working);
-    setSurfaceStatus((p) => ({ ...p, ...Object.fromEntries(targets.map((s) => [s.id, 'scanning'])) }));
-
-    const { scanId } = await securityApi.startScan(mode, ids);
-    const perSurfaceMs = mode === 'deep' ? 2600 : 1400;
-    let items = 0;
-    let aborted = false;
-
-    for (const s of targets) {
-      if (stopRef.current) { aborted = true; break; }
-      const pool = DEMO_ITEMS[s.id] || ['…'];
-      const steps = mode === 'deep' ? pool.length : Math.min(pool.length, 3);
-      for (let i = 0; i < steps; i++) {
-        if (stopRef.current) { aborted = true; break; }
-        items += Math.floor(180 + Math.random() * 420);
-        setReadout({ line: `Scanning ${s.name}`, item: pool[i % pool.length], items });
-        await sleep(perSurfaceMs / steps);
-      }
-      if (aborted) break;
-
-      let found = s.src === 'local'
-        ? (s.id === 'system' ? await runSystemChecks() : await runPrivacyChecks()).map((f) => ({ ...f, sample: false }))
-        : await securityApi.resolveAgentSurface(scanId, s.id);
-      found = found.filter((f) => !allowedRef.current.has(f.title)).map((f) => ({ ...f, id: uid++ }));
-      working = [...working, ...found];
-      setFindings(working);
-      setSurfaceStatus((p) => ({ ...p, [s.id]: levelFor(s.id, working) }));
-    }
-
-    setScanning(false);
-    if (aborted) {
-      setSurfaceStatus((p) => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, v === 'scanning' ? 'idle' : v])) as Record<SurfaceId, Level>);
-      setReadout({ line: 'Scan stopped.', item: '', items });
-      return;
-    }
+  /** Record a real check in History. Only ever called after something ran. */
+  const recordRun = (kind: HistoryRow['kind'], items: number, list: Finding[]) => {
     const now = new Date();
     setLastScan(now);
-    const bad = working.filter((f) => f.sev === 'critical' || f.sev === 'high').length;
-    setHistory((h) => [{ at: now, mode, items, found: working.length, bad }, ...h]);
-    setReadout({ line: `Scan complete · ${working.length} finding${working.length === 1 ? '' : 's'}`, item: '', items });
+    const bad = list.filter((f) => f.sev === 'critical' || f.sev === 'high').length;
+    setHistory((h) => [{ at: now, kind, items, found: list.length, bad }, ...h].slice(0, 50));
+  };
+
+  /**
+   * PRIVACY + SYSTEM — the two checks the browser can run on itself.
+   *
+   * There is no artificial delay and no invented item count: these enumerate a
+   * fixed, small set of real browser facts and finish immediately. The old build
+   * padded them with fake filenames and a random item counter to look busy.
+   */
+  async function runBrowserChecks() {
+    if (scanning) return;
+    setScanning(true);
+    setSurfaceStatus((p) => ({ ...p, privacy: 'scanning', system: 'scanning' }));
+
+    const [sys, priv] = await Promise.all([runSystemChecks(), runPrivacyChecks()]);
+    const fresh = [...sys, ...priv]
+      .filter((f) => !allowedRef.current.has(f.title))
+      .map((f) => ({ ...f, id: uid++ }));
+
+    const working = [
+      ...findings.filter((f) => f.surface !== 'privacy' && f.surface !== 'system'),
+      ...fresh,
+    ];
+    setFindings(working);
+    setSurfaceStatus((p) => ({
+      ...p,
+      privacy: levelFor('privacy', working),
+      system: levelFor('system', working),
+    }));
+    setScanning(false);
+    // Item count is the number of browser facts examined, and it is exact.
+    recordRun('browser', BROWSER_CHECK_COUNT, working);
+  }
+
+  /** LINKS — check one pasted link against DB38's rail. */
+  async function runUrlCheck() {
+    if (urlBusy) return;
+    const url = coerceUrl(urlInput);
+    if (!url) { setUrlResult({ kind: 'invalid' }); return; }
+
+    setUrlBusy(true);
+    setUrlResult(null);
+    // Remember where the cell was, so a failed lookup can put it back exactly.
+    const prevLinks = surfaceStatus.links;
+    setSurfaceStatus((p) => ({ ...p, links: 'scanning' }));
+
+    const outcome = await lookupUrls([url]);
+    const v = outcome.results[0];
+    setUrlBusy(false);
+
+    // Degraded FIRST: a failed lookup must never be rendered as a no-match, and
+    // must never move the surface off its previous state — in EITHER direction.
+    // Restoring `prevLinks` matters most when an earlier check already found
+    // something: dropping back to "not checked" would quietly hide a live
+    // finding that is still sitting in the Threats tab.
+    if (outcome.degraded || !v) {
+      setUrlResult({ kind: 'degraded' });
+      setSurfaceStatus((p) => ({ ...p, links: prevLinks }));
+      return;
+    }
+
+    if (v.verdict === 'malicious') {
+      setUrlResult({ kind: 'malicious', v });
+      const working = [
+        // Re-checking the same link replaces its finding rather than stacking a
+        // duplicate. Checking twice is a normal thing to do and must not inflate
+        // the count — an inflated threat count is its own small lie.
+        ...findings.filter((f) => !(f.surface === 'links' && f.path === v.url)),
+        {
+          id: uid++, surface: 'links' as SurfaceId, sev: 'critical' as Severity,
+          title: urlFindingTitle(v), detail: urlFindingDetail(v),
+          path: v.url, local: true, noact: true,
+        },
+      ];
+      setFindings(working);
+      setSurfaceStatus((p) => ({ ...p, links: levelFor('links', working) }));
+      recordRun('link', 1, working);
+      return;
+    }
+
+    setUrlResult({ kind: 'unknown', url: v.url });
+    setSurfaceStatus((p) => ({ ...p, links: levelFor('links', findings) }));
+    recordRun('link', 1, findings);
+  }
+
+  /**
+   * PASSWORDS — HIBP k-anonymity via the FRONT25 helper.
+   *
+   * The password is hashed in this browser and only the first five hex
+   * characters of the digest are sent. NOTHING is stored: the input is cleared
+   * on success, no finding carries the password, and no history row names it.
+   */
+  async function runPasswordCheck() {
+    if (pwBusy || !pwInput) return;
+    setPwBusy(true);
+    setPwResult(null);
+    setSurfaceStatus((p) => ({ ...p, passwords: 'scanning' }));
+
+    const { pwned, count } = await isPwnedPassword(pwInput);
+    setPwBusy(false);
+    setPwInput(''); // never keep it around
+
+    if (pwned) {
+      setPwResult({ kind: 'pwned', count });
+      const working = [
+        ...findings.filter((f) => f.surface !== 'passwords'),
+        {
+          id: uid++, surface: 'passwords' as SurfaceId, sev: 'high' as Severity,
+          title: 'Password found in a known breach',
+          detail: `${PWNED_PASSWORD_MESSAGE} It has been seen ${count.toLocaleString()} time${count === 1 ? '' : 's'} in breach corpora, which means it is already in the word lists attackers try first. Change it anywhere you have used it. The password itself was never sent and is not stored here.`,
+          local: true, noact: true,
+        },
+      ];
+      setFindings(working);
+      setSurfaceStatus((p) => ({ ...p, passwords: levelFor('passwords', working) }));
+      recordRun('password', 1, working);
+      return;
+    }
+
+    // The helper fails OPEN, so `pwned:false` can also mean "could not check".
+    // It is worded as "not found in the breach lists we could check" for exactly
+    // that reason — never "safe", never "strong".
+    setPwResult({ kind: 'unlisted' });
+    const working = findings.filter((f) => f.surface !== 'passwords');
+    setFindings(working);
+    setSurfaceStatus((p) => ({ ...p, passwords: levelFor('passwords', working) }));
+    recordRun('password', 1, working);
   }
 
   /**
@@ -513,9 +625,9 @@ export function SecurityPage() {
         if (!v || v.verdict !== 'malicious') continue;
         matched++;
         working = [...working, {
-          id: uid++, surface: 'malware', sev: 'critical',
+          id: uid++, surface: 'files', sev: 'critical',
           title: malwareTitle(v), detail: malwareDetail(b.item.file.name, v),
-          path: b.item.relPath, sample: false, local: true,
+          path: b.item.relPath, local: true,
           noact: !b.item.entry, fsEntry: b.item.entry,
         }];
       }
@@ -554,12 +666,12 @@ export function SecurityPage() {
 
     setFindings(working);
     setSurfaceStatus((p) => {
-      const next = levelFor('malware', working);
-      // A degraded lookup must NEVER paint this surface CLEAR. That green is
-      // the false clean this whole pass exists to prevent — if the database
-      // could not be reached, the honest answer is the status quo, not "clear".
-      if (degraded && next === 'clear') return p;
-      return (flagged || matched || p.malware !== 'idle') ? { ...p, malware: next } : p;
+      const next = levelFor('files', working);
+      // A degraded lookup must NEVER paint this surface as checked-and-nothing-
+      // found. That is the false clean this whole surface exists to prevent — if
+      // the database could not be reached, the honest answer is the status quo.
+      if (degraded && next === 'ok') return p;
+      return (flagged || matched || p.files !== 'idle') ? { ...p, files: next } : p;
     });
     setFcStatus({
       phase: 'done', checked, flagged, capped,
@@ -568,6 +680,8 @@ export function SecurityPage() {
     });
     setScanning(false);
     stopRef.current = false;
+    // History gets the TRUE number of files examined by this run.
+    recordRun(meta.folder ? 'folder' : 'files', checked, working);
   }
 
   /** File-pick / drag-drop path. No handles, so actions stay Dismiss-only. */
@@ -606,7 +720,6 @@ export function SecurityPage() {
     if (!picked) return; // Bee cancelled; capability is fine.
 
     setFsRoot(picked.root);
-    setFsWritable(picked.writable);
     skipRef.current = [];
     setSkips([]);
     setShowSkips(false);
@@ -618,9 +731,12 @@ export function SecurityPage() {
     );
     async function* stream(): AsyncGenerator<ScanItem> {
       for await (const e of source) {
-        // Only a writable grant gets handles: an action offered on a read-only
-        // folder would fail, and a button that fails is worse than none.
-        yield { file: e.file, relPath: e.relPath, entry: picked?.writable ? e : undefined };
+        // FRONT33: every folder-scan finding carries its handle, whether or not
+        // write is held yet. Write is requested at the moment the Bee clicks an
+        // action, not at pick time — so the handle is what makes that upgrade
+        // possible later, and withholding it here would disable actions that
+        // are in fact one prompt away.
+        yield { file: e.file, relPath: e.relPath, entry: e };
       }
     }
     await runScanStream(stream(), { folder: picked.root.name, cap: FOLDER_LIMIT });
@@ -634,6 +750,30 @@ export function SecurityPage() {
     setActNotes((n) => ({ ...n, [id]: { ok, text } }));
 
   /**
+   * FRONT33 — the second stage of the two-stage permission.
+   *
+   * The scan held READ only. The moment the Bee actually chooses to change
+   * something on disk, ask for write — inside this click, which is the
+   * transient activation the API requires. An already-granted handle is not
+   * re-prompted, so the second Remove in a session is silent.
+   *
+   * A refusal is an ordinary answer, not an error: the finding stays, with its
+   * detail intact and its path shown, so the Bee can deal with the file
+   * themselves. No dialog, no dead end, nothing thrown at the console.
+   */
+  async function claimWrite(f: Finding): Promise<boolean> {
+    if (!fsRoot) return false;
+    const grant = await ensureWritable(fsRoot);
+    if (grant === 'granted') {
+      return true;
+    }
+    note(f.id!, false, grant === 'denied'
+      ? `Permission to change files was declined, so nothing was touched. The file is still at ${f.path ?? 'the path above'} if you want to handle it yourself.`
+      : `This browser would not grant permission to change files, so nothing was touched. The file is still at ${f.path ?? 'the path above'}.`);
+    return false;
+  }
+
+  /**
    * Quarantine — real, and honestly bounded.
    *
    * A browser has no sandbox to put a file in, so this does the containment it
@@ -644,6 +784,7 @@ export function SecurityPage() {
    */
   async function actQuarantine(f: Finding) {
     if (!f.fsEntry || !fsRoot) return;
+    if (!(await claimWrite(f))) return;
     setActing(f.id!);
     const res = await quarantineFile(f.fsEntry, fsRoot);
     setActing(null);
@@ -659,6 +800,7 @@ export function SecurityPage() {
     if (confirming !== f.id) { setConfirming(f.id!); setTimeout(() => setConfirming((c) => (c === f.id ? null : c)), 3500); return; }
     setConfirming(null);
     if (!f.fsEntry) return;
+    if (!(await claimWrite(f))) return;
     setActing(f.id!);
     const res = await removeFile(f.fsEntry);
     setActing(null);
@@ -668,7 +810,8 @@ export function SecurityPage() {
     afterAction(f.surface, next);
   }
   function actAllow(f: Finding) {
-    securityApi.actOnFinding(f.id!, 'allow');
+    // Dismiss is local only — it suppresses this title for the rest of the
+    // session. There is no server rail to record it against.
     allowedRef.current.add(f.title);
     const next = findings.filter((x) => x.id !== f.id);
     setFindings(next); afterAction(f.surface, next);
@@ -676,6 +819,7 @@ export function SecurityPage() {
   /** Restore — moves the file back out of Quarantine to where it came from. */
   async function actRestore(f: Finding) {
     if (!f.fsEntry || !fsRoot) return;
+    if (!(await claimWrite(f))) return;
     setActing(f.id!);
     const res = await restoreFile(f.fsEntry, fsRoot);
     setActing(null);
@@ -691,6 +835,7 @@ export function SecurityPage() {
     if (confirming !== f.id) { setConfirming(f.id!); setTimeout(() => setConfirming((c) => (c === f.id ? null : c)), 3500); return; }
     setConfirming(null);
     if (!f.fsEntry || !fsRoot) return;
+    if (!(await claimWrite(f))) return;
     setActing(f.id!);
     const res = await purgeQuarantined(f.fsEntry, fsRoot);
     setActing(null);
@@ -711,36 +856,38 @@ export function SecurityPage() {
     <div className="min-h-full w-full bg-[var(--bg)] text-text"
       style={{ '--sec': '#58a6ff', '--sec-deep': '#1f6feb', '--warn': '#f59e0b', '--clear': '#16a34a' } as CSSProperties}>
     <div className="mx-auto max-w-[760px] px-4 pt-5 pb-24">
-      {DEMO_MODE && (
-        <div className="mb-5 flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-[13px] leading-relaxed"
-          style={{ background: 'color-mix(in srgb, var(--warn) 8%, var(--panel))', borderColor: 'color-mix(in srgb, var(--warn) 45%, var(--border))', color: 'var(--text-silver)' }}>
-          <span className="mt-px flex-none rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold tracking-[0.08em]"
-            style={{ background: 'var(--warn)', color: '#07080a' }}>DEMO DATA</span>
-          <span><b className="text-text-silver-bright">Agent surfaces show sample findings</b> until the security agent is
-            connected to this device. Local surfaces (Privacy, System integrity) and the file check below are live, and run on your machine.</span>
-        </div>
-      )}
-
       <div className="mb-1.5 font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
-        <b style={{ color: '#dc2626' }}>SECURITY</b> · DEVICE
+        <b style={{ color: '#dc2626' }}>SECURITY</b> · IN YOUR BROWSER
       </div>
       <h1 className="m-0 text-[28px] font-bold tracking-tight">Security</h1>
-      <p className="mb-6 mt-1 text-sm text-text-dim">The immune system, pointed at your device. Six surfaces, one posture.</p>
+      {/* Said once, plainly, at the top. This is the honest boundary of the
+          whole page and it is never softened further down. */}
+      <p className="mb-6 mt-1 text-sm leading-relaxed text-text-dim">
+        This page checks <b className="text-text-silver-bright">what you hand it</b> — files, a link, a
+        password — and <b className="text-text-silver-bright">what the browser can see about itself</b>.
+        It cannot see the rest of your device, and it never runs in the background. Nothing here is a
+        guess: every result comes from a check that actually ran.
+      </p>
 
       {/* hex posture flower */}
       <div className="mb-2 flex justify-center">
-        <svg viewBox={`0 0 ${HIVE} ${HIVE}`} role="img" aria-label="Device security posture" className="block h-auto w-[min(340px,86vw)]">
+        <svg viewBox={`0 0 ${HIVE} ${HIVE}`} role="img" aria-label="Browser security check status" className="block h-auto w-[min(340px,86vw)]">
           {PETALS.map((s) => {
             const st = surfaceStatus[s.id];
+            const na = s.id === UNAVAILABLE;
             return (
-              <g key={s.id}>
+              /* The unavailable cell is drawn dashed and faded so it reads as
+                 "not part of this" rather than "not yet run". It carries no
+                 status colour and never animates. */
+              <g key={s.id} style={na ? { opacity: 0.45 } : undefined}>
                 <polygon points={hexPoints(s.cx, s.cy, R_PETAL)}
+                  strokeDasharray={na ? '3 3' : undefined}
                   style={{ fill: CELL_FILL[st], stroke: CELL_STROKE[st], strokeWidth: 1.5, transition: 'fill .5s, stroke .5s' }}>
                   {st === 'scanning' && <animate attributeName="stroke-width" values="1.5;3;1.5" dur="1.1s" repeatCount="indefinite" />}
                 </polygon>
-                <text x={s.cx} y={s.cy - 2} textAnchor="middle" style={{ fill: st === 'clear' ? 'var(--clear, #16a34a)' : 'var(--text-silver)', fontSize: 15 }}>{s.glyph}</text>
+                <text x={s.cx} y={s.cy - 2} textAnchor="middle" style={{ fill: st === 'ok' ? 'var(--clear, #16a34a)' : 'var(--text-silver)', fontSize: 15 }}>{s.glyph}</text>
                 <text x={s.cx} y={s.cy + 15} textAnchor="middle" className="font-mono uppercase" style={{ fill: 'var(--text-dim)', fontSize: 9.5, letterSpacing: '.06em' }}>
-                  {s.id === 'spyware' ? 'SPYWARE' : s.id === 'system' ? 'SYSTEM' : s.name.split(' ')[0].toUpperCase()}
+                  {na ? 'DEEP' : s.name.toUpperCase()}
                 </text>
               </g>
             );
@@ -751,56 +898,21 @@ export function SecurityPage() {
         </svg>
       </div>
 
-      {/* readout */}
-      <div className="mx-auto mb-4 min-h-[38px] text-center font-mono text-xs" style={{ color: 'var(--text-dim)' }} aria-live="polite">
-        <span>{readout.line}{readout.items > 0 && !readout.line.startsWith('No scan') ? <> · <span style={{ color: 'var(--sec)' }}>{readout.items.toLocaleString()}</span> items</> : null}</span>
-        {readout.item && <span className="mx-auto block max-w-[520px] overflow-hidden text-ellipsis whitespace-nowrap text-[11px]" style={{ color: 'var(--text-muted)' }}>{readout.item}</span>}
-      </div>
-
-      {/* controls */}
+      {/* The only whole-page action left. There is no "Quick / Deep / Custom
+          scan" any more: those ran a timed animation over invented filenames and
+          a random item counter, then displayed sample findings. This button runs
+          the two checks the browser can genuinely perform on itself, and returns
+          immediately because that is how long they actually take. */}
       <div className="mb-6 flex flex-wrap justify-center gap-2.5">
-        {!scanning ? (
-          <>
-            <button onClick={() => runScan('quick', SURFACES.map((s) => s.id))}
-              className="rounded-xl px-[18px] py-[11px] text-sm font-semibold" style={{ background: 'var(--sec-deep)', color: '#fff' }}>
-              Quick scan<small className="block font-mono text-[10px] font-normal tracking-[0.05em] opacity-75">~30 s · active surfaces</small>
-            </button>
-            <button onClick={() => runScan('deep', SURFACES.map((s) => s.id))}
-              className="rounded-xl border px-[18px] py-[11px] text-sm font-semibold text-text-silver-bright"
-              style={{ background: 'var(--panel)', borderColor: 'var(--border-bright)' }}>
-              Deep scan<small className="block font-mono text-[10px] font-normal tracking-[0.05em] opacity-70">full sweep · all six</small>
-            </button>
-            <button onClick={() => { if (pickerOpen && picked.size) runScan('custom', [...picked]); else setPickerOpen(true); }}
-              aria-expanded={pickerOpen}
-              className="rounded-xl border px-[18px] py-[11px] text-sm font-semibold text-text-silver-bright"
-              style={{ background: 'var(--panel)', borderColor: pickerOpen ? 'var(--sec)' : 'var(--border-bright)' }}>
-              Custom<small className="block font-mono text-[10px] font-normal tracking-[0.05em] opacity-70">{pickerOpen ? 'tap again to start' : 'pick surfaces'}</small>
-            </button>
-          </>
-        ) : (
-          <button onClick={() => { stopRef.current = true; }}
-            className="rounded-xl border px-[18px] py-[11px] text-sm font-semibold"
-            style={{ background: 'var(--panel)', borderColor: 'color-mix(in srgb, #dc2626 60%, var(--border-bright))', color: '#dc2626' }}>
-            Stop scan
-          </button>
-        )}
+        <button type="button" onClick={() => { void runBrowserChecks(); }} disabled={scanning}
+          className="rounded-xl px-[18px] py-[11px] text-sm font-semibold disabled:opacity-45"
+          style={{ background: 'var(--sec-deep)', color: '#fff' }}>
+          Check this browser
+          <small className="block font-mono text-[10px] font-normal tracking-[0.05em] opacity-75">
+            privacy + system · instant
+          </small>
+        </button>
       </div>
-
-      {pickerOpen && !scanning && (
-        <div className="-mt-3 mb-6 flex flex-wrap justify-center gap-2" role="group" aria-label="Choose surfaces to scan">
-          {SURFACES.map((s) => {
-            const on = picked.has(s.id);
-            return (
-              <button key={s.id} aria-pressed={on}
-                onClick={() => setPicked((p) => { const n = new Set(p); if (n.has(s.id)) n.delete(s.id); else n.add(s.id); return n; })}
-                className="rounded-full border px-3 py-1.5 font-mono text-[11px] tracking-[0.05em]"
-                style={{ background: 'var(--panel)', borderColor: on ? 'var(--sec)' : 'var(--border)', color: on ? 'var(--sec)' : 'var(--text-dim)' }}>
-                {s.name}
-              </button>
-            );
-          })}
-        </div>
-      )}
 
       {/* tabs */}
       <div className="mb-4 flex gap-1 overflow-x-auto border-b" style={{ borderColor: 'var(--border)' }} role="tablist" aria-label="Security views">
@@ -824,24 +936,131 @@ export function SecurityPage() {
             {SURFACES.map((s) => {
               const st = surfaceStatus[s.id];
               const n = findings.filter((f) => f.surface === s.id).length;
-              const statusTxt = st === 'idle' ? 'NOT SCANNED' : st === 'scanning' ? 'SCANNING…' : st === 'clear' ? 'CLEAR' : st === 'warn' ? `${n} TO REVIEW` : `${n} THREAT${n === 1 ? '' : 'S'}`;
-              const statusColor = { idle: 'var(--text-muted)', scanning: 'var(--sec)', clear: 'var(--clear, #16a34a)', warn: 'var(--warn)', risk: '#dc2626' }[st];
+              const na = s.id === UNAVAILABLE;
+              const statusTxt = na ? 'NOT POSSIBLE IN A BROWSER'
+                : st === 'idle' ? 'NOT CHECKED'
+                : st === 'scanning' ? 'CHECKING…'
+                : st === 'ok' ? 'CHECKED · NOTHING FOUND'
+                : st === 'warn' ? `${n} TO REVIEW`
+                : `${n} FINDING${n === 1 ? '' : 'S'}`;
+              const statusColor = na ? 'var(--text-muted)' : {
+                idle: 'var(--text-muted)', scanning: 'var(--sec)',
+                ok: 'var(--clear, #16a34a)', warn: 'var(--warn)', risk: '#dc2626', na: 'var(--text-muted)',
+              }[st];
               return (
-                <div key={s.id} className="flex flex-col gap-1.5 rounded-2xl border p-3.5" style={{ background: 'var(--panel)', borderColor: 'var(--border)' }}>
+                /* The deep-scan cell is dimmed and inert: no counts, no badge,
+                   nothing clickable. A truthful placeholder, not a teaser. */
+                <div key={s.id} className="flex flex-col gap-1.5 rounded-2xl border p-3.5"
+                  style={{
+                    background: na ? 'var(--bg)' : 'var(--panel)',
+                    borderColor: 'var(--border)',
+                    borderStyle: na ? 'dashed' : 'solid',
+                    opacity: na ? 0.6 : 1,
+                  }}>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-text-silver-bright">{s.name}</span>
-                    <span className="flex-none rounded-md border px-1.5 py-0.5 font-mono text-[9.5px] tracking-[0.08em]"
-                      style={s.src === 'local'
-                        ? { borderColor: 'color-mix(in srgb, var(--clear, #16a34a) 45%, var(--border))', color: 'var(--clear, #16a34a)' }
-                        : { borderColor: 'var(--border-bright)', color: 'var(--text-muted)' }}>
-                      {s.src === 'local' ? 'LOCAL' : 'AGENT'}
-                    </span>
+                    <span className="text-sm font-semibold" style={{ color: na ? 'var(--text-dim)' : 'var(--text-silver-bright)' }}>{s.name}</span>
+                    {na ? (
+                      <span className="flex-none rounded-md border px-1.5 py-0.5 font-mono text-[9.5px] tracking-[0.08em]"
+                        style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>NEEDS AN APP</span>
+                    ) : (
+                      <span className="flex-none rounded-md border px-1.5 py-0.5 font-mono text-[9.5px] tracking-[0.08em]"
+                        style={{ borderColor: 'color-mix(in srgb, var(--clear, #16a34a) 45%, var(--border))', color: 'var(--clear, #16a34a)' }}>LIVE</span>
+                    )}
                   </div>
                   <div className="flex-1 text-[12.5px] leading-relaxed text-text-dim">{s.desc}</div>
                   <div className="font-mono text-[11px] tracking-[0.05em]" style={{ color: statusColor }}>{statusTxt}</div>
                 </div>
               );
             })}
+          </div>
+
+          {/* ── LINKS ─────────────────────────────────────────────────── */}
+          <div className="mb-2.5 mt-6 font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>Check a link · before you open it</div>
+          <div className="rounded-2xl border p-4" style={{ background: 'var(--panel)', borderColor: 'var(--border-bright)' }}>
+            <p className="mb-3 mt-0 text-[12.5px] leading-relaxed text-text-dim">
+              Paste a link someone sent you. It is checked against a feed of addresses seen distributing
+              malware. <b className="font-semibold text-text-silver-bright">Only the address is sent</b> — the
+              page is never opened, and nothing about you goes with it.
+            </p>
+            <form className="flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); void runUrlCheck(); }}>
+              <input
+                type="url" inputMode="url" value={urlInput} autoComplete="off" spellCheck={false}
+                onChange={(e) => { setUrlInput(e.target.value); setUrlResult(null); }}
+                placeholder="https://example.com/login"
+                aria-label="Link to check"
+                className="min-w-0 flex-1 rounded-lg border px-3 py-2 font-mono text-[12.5px] text-text"
+                style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}
+              />
+              <button type="submit" disabled={urlBusy || !urlInput.trim()}
+                className="rounded-lg border px-3 py-2 text-[12.5px] font-semibold disabled:opacity-45"
+                style={{ background: 'var(--sec-deep)', borderColor: 'var(--sec-deep)', color: '#fff' }}>
+                {urlBusy ? 'Checking…' : 'Check link'}
+              </button>
+            </form>
+            {urlResult && (
+              <div className="mt-3 text-[12.5px] leading-relaxed" aria-live="polite">
+                {urlResult.kind === 'invalid' && (
+                  <span style={{ color: 'var(--warn)' }}>That does not look like a web address. Paste the whole link, including https://</span>
+                )}
+                {urlResult.kind === 'malicious' && (
+                  <b style={{ color: '#dc2626' }}>On the known-bad list — do not open it. See the Threats tab.</b>
+                )}
+                {/* NEVER "safe", NEVER "clean", NEVER a green tick. Absence from
+                    a blocklist is not safety, and this sentence says so. */}
+                {urlResult.kind === 'unknown' && (
+                  <span style={{ color: 'var(--text-dim)' }}>
+                    <b className="text-text-silver-bright">Not on the known-bad list.</b> That is not the same as
+                    safe — most brand-new phishing pages are on no list yet. If you were not expecting this
+                    link, still do not open it.
+                  </span>
+                )}
+                {urlResult.kind === 'degraded' && (
+                  <b style={{ color: 'var(--warn)' }}>Could not check this link — the link database was unreachable. This is not a result.</b>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── PASSWORDS ─────────────────────────────────────────────── */}
+          <div className="mb-2.5 mt-6 font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>Check a password · against known breaches</div>
+          <div className="rounded-2xl border p-4" style={{ background: 'var(--panel)', borderColor: 'var(--border-bright)' }}>
+            <p className="mb-3 mt-0 text-[12.5px] leading-relaxed text-text-dim">
+              Type a password to see whether it already appears in a known data breach.{' '}
+              <b className="font-semibold text-text-silver-bright">The password never leaves this device.</b>{' '}
+              It is scrambled here, and only the first five characters of that scramble are sent — never
+              enough to identify the password. Nothing is stored, and the box is cleared the moment the
+              check finishes.
+            </p>
+            <form className="flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); void runPasswordCheck(); }}>
+              <input
+                type="password" value={pwInput} autoComplete="off" spellCheck={false}
+                onChange={(e) => { setPwInput(e.target.value); setPwResult(null); }}
+                placeholder="type a password"
+                aria-label="Password to check against known breaches"
+                className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-[12.5px] text-text"
+                style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}
+              />
+              <button type="submit" disabled={pwBusy || !pwInput}
+                className="rounded-lg border px-3 py-2 text-[12.5px] font-semibold disabled:opacity-45"
+                style={{ background: 'var(--sec-deep)', borderColor: 'var(--sec-deep)', color: '#fff' }}>
+                {pwBusy ? 'Checking…' : 'Check password'}
+              </button>
+            </form>
+            {pwResult && (
+              <div className="mt-3 text-[12.5px] leading-relaxed" aria-live="polite">
+                {pwResult.kind === 'pwned' ? (
+                  <b style={{ color: '#dc2626' }}>
+                    Found in a known breach — seen {pwResult.count.toLocaleString()} time
+                    {pwResult.count === 1 ? '' : 's'}. Stop using it anywhere. See the Threats tab.
+                  </b>
+                ) : (
+                  <span style={{ color: 'var(--text-dim)' }}>
+                    <b className="text-text-silver-bright">Not found in the breach lists we could check.</b>{' '}
+                    That says nothing about how strong it is, and a password can be breached tomorrow.
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="mb-2.5 mt-6 font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>Local file check · runs in this browser</div>
@@ -890,15 +1109,15 @@ export function SecurityPage() {
             </div>
             {fsAvailable && (
               <p className="mb-0 mt-2 text-[12px] leading-relaxed text-text-dim">
-                A folder scan reads every file inside the folder you choose. Grant write access and
-                findings inside it can be removed or quarantined for real.
+                A folder scan only reads. If something turns up and you choose to remove it, this
+                page asks for permission to change files at that point — not before.
               </p>
             )}
-            {fsRoot && !fsWritable && (
-              <p className="mb-0 mt-2 text-[12px] leading-relaxed" style={{ color: 'var(--warn)' }}>
-                Opened read-only — Remove and Quarantine are not available for this folder.
-              </p>
-            )}
+            {/* FRONT33: the old "Opened read-only - Remove and Quarantine are
+                not available" warning is gone. Read-only is now the NORMAL state
+                after a scan, not a degraded one, and the actions ARE available -
+                they ask for permission when used. Warning about the expected
+                case would be noise. */}
             {folderWorks === false && (
               <p className="mb-0 mt-2 text-[12px] leading-relaxed text-text-dim">
                 Your browser can't select a whole folder — pick files instead.
@@ -983,27 +1202,25 @@ export function SecurityPage() {
             }} />
           </div>
 
-          <div className="mb-2.5 mt-6 font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>Real-time shields</div>
-          {SHIELDS.map((s) => {
-            const needsAgent = s.agent && DEMO_MODE;
-            const on = shields[s.id];
-            return (
-              <div key={s.id} className="mb-2 flex items-center gap-3 rounded-xl border px-3.5 py-3" style={{ background: 'var(--panel)', borderColor: 'var(--border)' }}>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13.5px] font-semibold text-text-silver-bright">{s.name}</div>
-                  <div className="mt-px text-xs text-text-dim">{s.desc}</div>
-                </div>
-                {needsAgent && <span className="font-mono text-[9.5px] tracking-[0.06em]" style={{ color: 'var(--text-muted)' }}>NEEDS AGENT</span>}
-                <button role="switch" aria-checked={on} aria-label={s.name} disabled={needsAgent}
-                  onClick={() => setShields((p) => ({ ...p, [s.id]: !p[s.id] }))}
-                  className="relative h-6 w-[42px] flex-none rounded-full border transition-colors disabled:opacity-40"
-                  style={{ background: on ? 'color-mix(in srgb, var(--sec) 25%, var(--panel-2))' : 'var(--panel-2)', borderColor: on ? 'var(--sec)' : 'var(--border-bright)' }}>
-                  <span className="absolute top-[2px] h-[18px] w-[18px] rounded-full transition-all"
-                    style={{ left: on ? 20 : 2, background: on ? 'var(--sec)' : 'var(--text-dim)' }} />
-                </button>
-              </div>
-            );
-          })}
+          {/* ── WHAT THIS PAGE CANNOT DO ──────────────────────────────── */}
+          {/* The "Real-time shields" block that stood here is DELETED. It was
+              four toggles — web shield, ransomware shield, stalkerware watch,
+              network guard — permanently disabled behind a NEEDS AGENT label.
+              They protected nothing and, with no agent on the roadmap, read as a
+              promise rather than a state. What they described is real and worth
+              saying, so it is said here as prose that claims nothing. */}
+          <div className="mb-2.5 mt-6 font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>What a web page cannot do</div>
+          <div className="rounded-2xl border border-dashed p-4 text-[12.5px] leading-relaxed text-text-dim" style={{ borderColor: 'var(--border)' }}>
+            <p className="mb-2 mt-0">
+              There is no always-on protection here, and this page does not run when it is closed. Blocking
+              bad sites as you browse, guarding folders against ransomware, spotting stalkerware, and
+              watching your network all need software installed on the device itself.
+            </p>
+            <p className="mb-0 mt-0">
+              That software does not exist yet. When it does, this page will say so — until then it will not
+              offer you a switch that does nothing.
+            </p>
+          </div>
         </section>
       )}
 
@@ -1011,8 +1228,10 @@ export function SecurityPage() {
       {tab === 'threats' && (
         <section>
           {sortedFindings.length === 0 ? (
-            <div className="rounded-2xl border border-dashed px-4 py-7 text-center text-[13.5px] text-text-dim" style={{ borderColor: 'var(--border)' }}>
-              No open findings. {lastScan ? 'Your last scan came back clear or everything has been handled.' : 'Run a scan to check this device.'}
+            <div className="rounded-2xl border border-dashed px-4 py-7 text-center text-[13.5px] leading-relaxed text-text-dim" style={{ borderColor: 'var(--border)' }}>
+              {lastScan
+                ? 'Nothing to review from the checks that have run. That covers what was checked — not this whole device.'
+                : 'Nothing checked yet. Hand this page a file, a link, or a password, or check the browser itself.'}
             </div>
           ) : sortedFindings.map((f) => (
             /* Real actions require a real handle. Without one the card offers
@@ -1060,19 +1279,27 @@ export function SecurityPage() {
           ) : history.map((h, i) => (
             <div key={i} className="flex flex-wrap items-baseline gap-3 border-b px-1 py-2.5 text-[13px]" style={{ borderColor: 'var(--border)' }}>
               <span className="min-w-[150px] flex-none font-mono text-[11.5px]" style={{ color: 'var(--text-muted)' }}>{fmtWhen(h.at)}</span>
-              <span className="font-semibold text-text-silver">{h.mode === 'deep' ? 'Deep scan' : h.mode === 'quick' ? 'Quick scan' : 'Custom scan'}</span>
-              <span className="font-mono text-[11.5px] text-text-dim">{h.items.toLocaleString()} items</span>
-              <span className="font-mono text-[11.5px]" style={{ color: h.bad ? '#dc2626' : 'var(--clear, #16a34a)' }}>{h.bad ? `${h.bad} THREATS` : 'CLEAR'}</span>
+              <span className="font-semibold text-text-silver">{HISTORY_LABEL[h.kind]}</span>
+              <span className="font-mono text-[11.5px] text-text-dim">{h.items.toLocaleString()} {HISTORY_UNIT[h.kind]}{h.items === 1 ? '' : 's'}</span>
+              {/* "NOTHING FOUND" — never "CLEAR". This row reports one check,
+                  not the state of the device. */}
+              <span className="font-mono text-[11.5px]" style={{ color: h.bad ? '#dc2626' : 'var(--text-dim)' }}>
+                {h.bad ? `${h.bad} SERIOUS` : h.found ? `${h.found} TO REVIEW` : 'NOTHING FOUND'}
+              </span>
             </div>
           ))}
         </section>
       )}
 
       {/* foot line */}
+      {/* The old footer advertised "AGENT · NOT CONNECTED" and a DEFINITIONS
+          date, both of which implied a product that was about to arrive. What
+          is left is true: where the checks run, what the browser-floor stamp
+          actually dates, and when something last ran. */}
       <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 border-t pt-3.5 font-mono text-[10.5px] tracking-[0.05em]" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
-        <span><Dot color={DEMO_MODE ? 'var(--warn)' : 'var(--clear, #16a34a)'} />AGENT · {DEMO_MODE ? 'NOT CONNECTED' : 'CONNECTED'}</span>
-        <span><Dot color="var(--clear, #16a34a)" />DEFINITIONS · {DEFINITIONS_STAMP}</span>
-        <span>LAST SCAN · {lastScan ? fmtWhen(lastScan).toUpperCase() : 'NEVER'}</span>
+        <span><Dot color="var(--clear, #16a34a)" />CHECKS RUN · IN THIS BROWSER</span>
+        <span>BROWSER FLOORS · {FLOORS_STAMP}</span>
+        <span>LAST CHECK · {lastScan ? fmtWhen(lastScan).toUpperCase() : 'NEVER'}</span>
       </div>
     </div>
     </div>
@@ -1102,7 +1329,6 @@ function FindingCard({ f, actions, busy, note }: {
         <span className="text-sm font-semibold text-text-silver-bright">{f.title}</span>
         <span className="font-mono text-[10.5px] tracking-[0.04em]" style={{ color: 'var(--text-muted)' }}>{sname.toUpperCase()}</span>
         {f.local && <span className="rounded-md border px-1.5 py-0.5 font-mono text-[9.5px] font-semibold tracking-[0.08em]" style={{ color: 'var(--clear, #16a34a)', borderColor: 'color-mix(in srgb, var(--clear, #16a34a) 45%, var(--border))' }}>LOCAL CHECK</span>}
-        {f.sample && <span className="rounded-md px-1.5 py-0.5 font-mono text-[9.5px] font-semibold tracking-[0.08em]" style={{ background: 'var(--warn)', color: '#07080a' }}>SAMPLE</span>}
       </div>
       <div className="my-1.5 text-[12.5px] leading-relaxed text-text-dim" style={{ wordBreak: 'break-word' }}>{f.detail}</div>
       {f.path && (
