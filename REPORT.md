@@ -151,3 +151,59 @@ Stamp `20260809171412` (the version `apply_migration` wrote, not a provisional n
 `supabase/migrations/20260809171412_elections_v1c_public_positions.sql` (3,522 bytes) and
 `supabase/migrations/_drafts/20260809171412_elections_v1c_public_positions_rollback.sql`
 (471 bytes); reconcile MEASURE EXIT=0, the pair version-matched and faithful.
+
+## FRONT37 - /vote proxy mounted between static and the SPA catch-all
+
+`tsc --noEmit` clean, `npm run build` exit 0. Committed; NOT pushed.
+
+Dependency added: **http-proxy-middleware 3.0.7** (v3 required - v2 targets Express 4 and
+this server runs Express 5.2.1).
+
+### Mount order - the thing this pass exists to get right
+
+    app.use(express.static(DIST_DIR, ...))    // assets
+    app.use(createProxyMiddleware({ ... }))   // <- /vote, HERE
+    app.get(/.*/, ...)                        // SPA shell catch-all
+
+Mounted after the catch-all instead, every `/vote` request returns the manual's SPA shell
+with a 200 and the proxy silently never runs - a failure that reads as a bug in VOTE rather
+than a mount-order bug here.
+
+`pathFilter` is used rather than `app.use('/vote', ...)` because Express strips a mount path
+from `req.url`, and VOTE is built with `NEXT_PUBLIC_BASE_PATH=/vote` - it expects to own that
+prefix and emits its assets under `/vote/_next/`. The filter is an exact-or-descendant test,
+`p === '/vote' || p.startsWith('/vote/')`, so a sibling path like `/voters` is NOT captured.
+
+Target comes from `VOTE_INTERNAL_URL` - a SERVER-side variable, not `VITE_`/`NEXT_PUBLIC_`,
+so it is never bundled to the browser. Set it in the Railway dashboard to the private
+hostname; OPS88 recorded it as `http://vote.railway.internal:8080`.
+
+### Verified locally against a stand-in target
+
+The real target is private by design and unreachable from any laptop, so production smoke
+waits for OPS89 + the owner pushes (FRONT37-B). What COULD be proven here was proven, using
+a stub server that echoes the path it receives:
+
+    200  /vote                      -> proxy, saw /vote
+    200  /vote/                     -> proxy, saw /vote/
+    200  /vote/ledger               -> proxy, saw /vote/ledger
+    200  /vote/_next/static/x.css   -> proxy, saw /vote/_next/static/x.css
+    200  /voters                    -> manual SPA shell   (sibling NOT captured)
+    200  /                          -> manual SPA shell
+    200  /atoms/justice             -> manual SPA shell
+
+The prefix is preserved end to end, the browser's Host is passed through unchanged, and
+`X-Forwarded-For` is set.
+
+### Both failure modes exercised, because /vote must never take the manual down
+
+    VOTE_INTERNAL_URL unset   -> warns, does not mount, /vote falls through to the SPA
+                                 shell exactly as before. Manual serves normally.
+    target dead (ECONNREFUSED) -> 502 "The vote service is unavailable." on /vote ONLY.
+                                 / and /atoms/justice still 200. No crash.
+
+### Not done
+
+No push - the owner pushes, and per the sequence of truth that push happens only AFTER
+OPS89 reports the VOTE service serving under the new `/vote` base. Pushing this first would
+point the proxy at a service that still roots at `/`, and every asset would 404.

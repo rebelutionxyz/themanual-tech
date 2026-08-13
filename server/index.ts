@@ -17,6 +17,7 @@
 // imports from src/ — type aliases resolve via tsconfig paths.
 
 import express, { type Request, type Response } from 'express';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import fs from 'node:fs';
 import path from 'node:path';
 import { resolveAstraByHost } from '../src/lib/astras/registry';
@@ -56,6 +57,59 @@ app.use(
     },
   }),
 );
+
+// ─────────────────────────────────────────────────────────────────────
+// /vote → the VOTE service (AtlasVOTE / the Elections astra)
+//
+// MOUNT ORDER IS LOAD-BEARING and this position is the whole point: AFTER
+// express.static, BEFORE the SPA catch-all below. Mounted after the catch-all
+// instead, every /vote request would return the manual's SPA shell with a 200
+// and this proxy would silently never run — a failure that reads as a bug in
+// VOTE rather than a mount-order bug here. (OPS88 finding, FRONT37.)
+//
+// VOTE is a PRIVATE Railway service in this same project — no public
+// subdomain, per DEPLOY AMENDMENT v2. It is reachable only over the private
+// network, which is why nothing here can be smoke-tested from a laptop.
+//
+// THE /vote PREFIX IS PRESERVED, NOT STRIPPED. VOTE is built with
+// NEXT_PUBLIC_BASE_PATH=/vote, so it expects to own that prefix and emits all
+// of its assets under /vote/_next/. `pathFilter` is used rather than
+// app.use('/vote', …) precisely because Express strips a mount path from
+// req.url and we would have to add it straight back.
+const VOTE_INTERNAL_URL = process.env.VOTE_INTERNAL_URL;
+
+if (VOTE_INTERNAL_URL) {
+  app.use(
+    createProxyMiddleware({
+      // Matches /vote exactly and everything beneath it — and nothing else.
+      // A prefix test alone would also swallow sibling paths like /voters.
+      pathFilter: (pathname: string) => pathname === '/vote' || pathname.startsWith('/vote/'),
+      target: VOTE_INTERNAL_URL,
+      // Keep the browser's Host so VOTE sees the public hostname; the private
+      // target does no host-based routing. X-Forwarded-* carries the rest.
+      changeOrigin: false,
+      xfwd: true,
+      ws: false,
+      on: {
+        // A dead or restarting VOTE service must degrade to a plain 502 on
+        // /vote and MUST NOT take the manual down with it.
+        error: (err: Error, _req, res) => {
+          console.error('[server] /vote proxy error:', err.message);
+          const response = res as Response;
+          if (typeof response.headersSent === 'boolean' && !response.headersSent) {
+            response.status(502).type('text/plain').send('The vote service is unavailable.');
+          }
+        },
+      },
+    }),
+  );
+  console.log(`[server] /vote proxying to ${VOTE_INTERNAL_URL}`);
+} else {
+  // NOT FATAL, deliberately. An unset variable must not stop the manual from
+  // serving — /vote simply falls through to the SPA shell below, exactly as it
+  // did before this proxy existed.
+  console.warn('[server] VOTE_INTERNAL_URL unset — /vote is NOT proxied.');
+}
 
 // HTML shell — every non-asset GET returns the SPA shell with per-host
 // <title> + og meta. The SPA's client-side router then handles the path.
