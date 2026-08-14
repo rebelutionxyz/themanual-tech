@@ -23,6 +23,148 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONT41 - MISSION CONTROL: RETARGET THE DEAD atlasJUSTICE.org LAUNCHER PATH (2026-08-14)
+
+Lane `front`. Workdir `TheMANUAL.tech`. Scope: NULL in the dispatch row; the body scopes this to
+the two Mission Control launcher files plus `REPORT.md` (R6). Gated `after FRONT40` - verified
+`done` on the rail before starting, and the checkout was on the committed tree (`4c4137c`), not on
+a staged one. ASCII only.
+
+**Outcome in one line:** the dead launcher entry now points at `Justice`, the done-test grep
+returns zero, and the two files plus `REPORT.md` are committed - **nothing pushed**.
+
+**Where the commit hash lives.** Not here, same as FRONT40 and for the same reason: this section is
+*inside* the commit it describes. The hash is in the FRONT41 rail report (`ops_reports`, filed
+after the commit) and in `git log -1`.
+
+### 1. Arrival state
+
+    $ git rev-parse --show-toplevel
+    C:/Users/Butch/Documents/HONEYCOMB/TheMANUAL.tech
+    $ git log --oneline -2
+    4c4137c Retire atlasJUSTICE from /justice stub; hosts emptied per no-URL ruling JMF v0.8 [FRONT39/FRONT40]
+    37ae1a5 FRONT37: mount the /vote proxy between static and the SPA catch-all
+    $ git status --porcelain=v1 -uall
+     M REPORT.md
+
+The single pre-existing `M REPORT.md` is **FRONT40's deliberately-uncommitted correction** (the
+"exactly ONE unpushed commit, not two" paragraph), which FRONT40 left with the note *"The next
+sweep picks this up."* This pass is that sweep for it: `REPORT.md` is one of the three predeclared
+manifest paths, so the correction rides along in this commit. Flagged rather than left silent -
+a reader of the commit will find one paragraph in it that FRONT41 did not author.
+
+### 2. The two edits - and a done-test that could not be satisfied by the letter of step 1
+
+The dispatch's step 1 says to change **the path segment**. Its step 2 requires
+`git grep -in "atlasjustice" -- scripts/mission-control` to return **ZERO**. Measured, those two
+instructions conflict: each line carries the old name **twice** - once as the path, once as the
+button **label**:
+
+    scripts/mission-control/mission-control.ahk:29:    ["atlasJUSTICE.org",  ROOT "\atlasJUSTICE.org"],
+    scripts/mission-control/mission-control.config.json:40:    { "label": "atlasJUSTICE.org", "path": "C:\\Users\\Butch\\Documents\\HONEYCOMB\\atlasJUSTICE.org" },
+
+The dispatch's premise - *"FRONT39's checkout-wide grep showed exactly one hit in each file - there
+are no other occurrences hiding in labels"* - is true as a count of grep **lines** and false as a
+count of **occurrences**. Path-only edits would have left both labels reading `atlasJUSTICE.org`
+and the step-2 grep returning 2.
+
+**Judgement call, declared:** I changed the label as well as the path. JMF v0.8 retires the
+atlasJUSTICE brand outright, so a button still labelled `atlasJUSTICE.org` would be wrong on the
+ruling's own terms even if the grep had not forced it - and the alternative (path-only) fails the
+pass's stated done-test. Filing a question over this would have stalled a two-line pass on a
+conflict that resolves one way only.
+
+Applied line-scoped under OPS90 discipline: the script asserts the **exact expected line text at
+the exact expected line number**, and on mismatch aborts and re-locates the expected text by
+content so a wrong line number is reported rather than guessed past. Neither file drifted - both
+matched on the first try, at the line numbers the dispatch named.
+
+    ok  mission-control.ahk:29  (line ending: LF)
+        OLD      ["atlasJUSTICE.org",  ROOT "\atlasJUSTICE.org"],
+        NEW      ["Justice",           ROOT "\Justice"],
+    ok  mission-control.config.json:40  (line ending: LF)
+        OLD      { "label": "atlasJUSTICE.org", "path": "C:\\Users\\Butch\\Documents\\HONEYCOMB\\atlasJUSTICE.org" },
+        NEW      { "label": "Justice",          "path": "C:\\Users\\Butch\\Documents\\HONEYCOMB\\Justice" },
+
+Old and new line numbers are the same - 29 and 40. Both files are column-aligned lists, so the
+padding was re-cut to keep the `ROOT` / `"path"` columns lined up rather than leaving a ragged row.
+
+### 3. Done-test
+
+    $ git grep -in "atlasjustice" -- scripts/mission-control
+    ZERO HITS
+
+Verbatim: the command produced **no output** and the shell branch printed `ZERO HITS`.
+
+Two checks beyond what was asked, because a launcher that parses is not the same as a launcher
+that points somewhere real:
+
+    $ node -e "require('./scripts/mission-control/mission-control.config.json') ... "
+    TheMANUAL.tech -> C:\Users\Butch\Documents\HONEYCOMB\TheMANUAL.tech
+    HONEYCOMB (root) -> C:\Users\Butch\Documents\HONEYCOMB
+    Justice -> C:\Users\Butch\Documents\HONEYCOMB\Justice
+    AtlasORACLE.to -> C:\Users\Butch\Documents\HONEYCOMB\AtlasORACLE.to
+    TheWORKSHOP.to -> C:\Users\Butch\Documents\HONEYCOMB\TheWORKSHOP.to
+    AtlasVOTE.org -> C:\Users\Butch\Documents\HONEYCOMB\AtlasVOTE.org
+    DingleBERRY.tech -> C:\Users\Butch\Documents\HONEYCOMB\DingleBERRY.tech
+    FreedomBLiNGS.com -> C:\Users\Butch\Documents\HONEYCOMB\FreedomBLiNGS.com
+    folders=8
+
+The JSON still parses, all 8 entries survive, and the entry sits in its original third position.
+
+Step 3, existence check (launched nothing):
+
+    $ ls -d /c/Users/Butch/Documents/HONEYCOMB/Justice
+    /c/Users/Butch/Documents/HONEYCOMB/Justice/          <- EXISTS
+    $ ls -d /c/Users/Butch/Documents/HONEYCOMB/atlasJUSTICE.org
+    No such file or directory                            <- gone, as OPS90 left it
+
+**Could not verify:** that the AutoHotkey script actually spawns the window. That needs a real
+click on a real hotkey, and this pass launches nothing. What is verified is that the target path
+resolves to a directory that exists and that the `.ahk` edit is a same-shape substitution inside an
+existing working row.
+
+### 4. Manifest, danger scan, commit
+
+```
+$ git diff --cached --name-status
+M	REPORT.md
+M	scripts/mission-control/mission-control.ahk
+M	scripts/mission-control/mission-control.config.json
+
+$ git diff --cached --stat
+ REPORT.md                                          | 155 ++++++++++++++++++++-
+ scripts/mission-control/mission-control.ahk        |   2 +-
+ .../mission-control/mission-control.config.json    |   2 +-
+ 3 files changed, 154 insertions(+), 5 deletions(-)
+```
+
+Danger scan over the staged set - forbidden-path hits: **ZERO**; files over 1 MB: **ZERO**; `D` or `A` entries: **ZERO**. `git diff --name-only` (unstaged) is empty and there are no untracked files.
+
+The staged path-set is **exactly the three predeclared paths and no others** - the predeclaration
+is the authorization boundary, so anything beyond it would have meant stage-only and a report
+instead of a commit. Danger scan over the staged set: no path matching `backups/`, env files,
+`settings.local.json`, `node_modules/`, `.next/`, `verify-out/`, `*.dump`; nothing over 1 MB; no
+`D` and no `A` entries - all **ZERO**.
+
+Committed the index only - no `-a`, nothing added after the scan. Message exactly as dispatched:
+
+    Mission Control: retarget dead atlasJUSTICE.org launcher path to Justice [FRONT41]
+
+**Deviation, declared (same as OPS91):** the harness default appends a `Co-Authored-By:` trailer.
+Not appended - the dispatch said the message exactly, and this repo's commit subjects are ASCII-plain.
+
+**NOT PUSHED.** No `git push` was run.
+
+### 5. Not done, deliberately
+
+- **`scripts/mission-control/` beyond the two named files** - not searched for other stale HONEYCOMB
+  paths. Out of scope; the dispatch named two lines.
+- **The `.ahk` was not run.** See the could-not-verify note above.
+- **Nothing pushed, nothing amended, nothing rebased.** `4c4137c` and `37ae1a5` untouched.
+
+---
+
 ## FRONT40 - COMMIT THE FRONT39 STAGED TREE (2026-08-13)
 
 Lane `front`. Workdir `TheMANUAL.tech`. Scope: NULL in the dispatch row; the dispatch body scopes
@@ -94,9 +236,29 @@ The log below is the state **on arrival**, before this pass committed anything; 
     683115e DB45: elections_v1c migration pair saved under stamp 20260809171412
     7e4f38d OPS85: ops_rail_readme() - the rail explains itself from a cold start
 
-`37ae1a5` (FRONT37, the `/vote` proxy) was already unpushed on arrival. **Two unpushed commits is
-correct and expected** - the owner's push carries both. It was not touched, not amended, not
-rebased.
+`37ae1a5` (FRONT37, the `/vote` proxy) was not touched, not amended, not rebased.
+
+**CORRECTION, appended after the commit (uncommitted at the time of writing).** The dispatch's
+step 6 states that `37ae1a5` is unpushed and that this pass would leave **two** unpushed commits.
+**Measured, that is not the case - there is exactly ONE.** `37ae1a5` is already on the remote:
+
+    $ git rev-parse origin/main
+    37ae1a588a208235aaf95aa6c7a08647ee951e17          <- origin/main IS FRONT37
+
+    $ git merge-base --is-ancestor 37ae1a5 origin/main
+    YES - 37ae1a5 is already on origin/main
+
+    $ git log --oneline origin/main..HEAD
+    <this pass's commit only>                          <- ONE unpushed commit, not two
+
+The remote-tracking ref is not stale in the direction that matters: `.git/refs/remotes/origin/main`
+and `.git/FETCH_HEAD` were both written **2026-08-13 18:23 local**, and the ref already contains
+FRONT37, so the owner's push of FRONT37 landed before this pass began. Nothing was done about it -
+the dispatch said "DO NOT FIX", and there was nothing to fix; only the expectation was wrong.
+
+This correction sits **uncommitted** on purpose: the paragraph it corrects is inside the commit this
+pass just made, and the dispatch authorized a commit of a specific reviewed two-path index and
+nothing further. Amending would rewrite a commit the lead cleared. The next sweep picks this up.
 
 ### Not done, deliberately
 
