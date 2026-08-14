@@ -23,6 +23,226 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONT40 - COMMIT THE FRONT39 STAGED TREE (2026-08-13)
+
+Lane `front`. Workdir `TheMANUAL.tech`. Scope: NULL in the dispatch row; the dispatch body scopes
+this to committing the already-staged FRONT39 index. **Owner word received in lead chat 2026-08-13;
+the lead reviewed the FRONT39 manifest and danger scan.** Commit only - **NO PUSH, human-forever**.
+ASCII only.
+
+**Outcome in one line:** the two staged FRONT39 paths were re-verified, danger-scanned clean, and
+committed; the checkout now carries **two** unpushed commits, which is the expected state -
+**nothing was pushed**.
+
+**Where the commit hash lives.** Not here. This section is *inside* the commit it describes, so the
+hash cannot be written into it without inventing a value before it exists. The hash and the
+`git log --oneline -3` output are recorded in the **rail report for FRONT40** (`ops_reports`, filed
+after the commit), which is the one place they can be stated as fact.
+
+### Step 2 - staged-set verification, verbatim (before this section was written)
+
+    $ git diff --cached --name-only
+    REPORT.md
+    src/lib/astra-catalog.ts
+
+    $ git diff --cached --name-status
+    M	REPORT.md
+    M	src/lib/astra-catalog.ts
+
+    $ git status --porcelain=v1 -uall
+    M  REPORT.md
+    M  src/lib/astra-catalog.ts
+
+Exactly the two expected paths, and **no unstaged change sitting on `src/lib/astra-catalog.ts`** -
+the porcelain lines read `M ` (staged column set, worktree column blank), not `MM`. The stop
+condition in step 2 did not fire.
+
+### Step 3 - danger scan on the staged set, all ZERO
+
+| check | result |
+|---|---|
+| `backups/` | 0 |
+| `*.env*` | 0 |
+| `settings.local.json` | 0 |
+| `node_modules/` | 0 |
+| `.next/` | 0 |
+| `verify-out/` | 0 |
+| `*.dump` | 0 |
+| over 1 MB | 0 - `REPORT.md` 18,791 B, `src/lib/astra-catalog.ts` 20,508 B |
+| deletions (`D`) | 0 - both entries are `M` |
+| renames (`R`) | 0 |
+| outside the workspace | 0 |
+
+`dist/` is gitignored and did not enter the index. REPORT.md is far below the 512 KB rotation gate,
+so no rotation was performed this pass either.
+
+### Step 4/5 - the commit
+
+This section was appended to `REPORT.md` per R6, `REPORT.md` re-staged, and the path-set re-checked
+as still exactly the two before committing. The index alone was committed - message exactly as the
+dispatch specified:
+
+    Retire atlasJUSTICE from /justice stub; hosts emptied per no-URL ruling JMF v0.8 [FRONT39/FRONT40]
+
+### Step 6 - known state, left alone
+
+The log below is the state **on arrival**, before this pass committed anything; the post-commit
+`git log --oneline -3` is in the rail report for the reason given above.
+
+    $ git log --oneline -3
+    37ae1a5 FRONT37: mount the /vote proxy between static and the SPA catch-all
+    683115e DB45: elections_v1c migration pair saved under stamp 20260809171412
+    7e4f38d OPS85: ops_rail_readme() - the rail explains itself from a cold start
+
+`37ae1a5` (FRONT37, the `/vote` proxy) was already unpushed on arrival. **Two unpushed commits is
+correct and expected** - the owner's push carries both. It was not touched, not amended, not
+rebased.
+
+### Not done, deliberately
+
+- **NO PUSH.** The push click is the human's, forever.
+- No deploy started or triggered.
+- No fix attempted on the pre-existing unpushed FRONT37 commit.
+- The two Mission Control launcher paths FRONT39 flagged (`scripts/mission-control/*` still pointing
+  at the folder OPS90 renamed) remain **unfixed and out of scope** here, as they were there.
+
+### Could not verify
+
+- **Nothing on the remote.** This pass ends at a local commit by design, so no assertion is made
+  about `origin/main`.
+
+---
+
+## FRONT39 - RETIRE THE OLD NAME FROM THE /justice STUB COPY (2026-08-13)
+
+Lane `front`. Workdir `TheMANUAL.tech`. Scope: NULL in the dispatch row; the dispatch body scopes
+the work to "the TheMANUAL.tech checkout only", copy-only, on the `/justice` route/stub. ASCII only.
+Ruling driving it: **JMF v0.8 (owner, 2026-08-13)** - the project is Justice, atlasJUSTICE is
+retired, and **NO Justice URL exists or may be written**.
+
+**Outcome in one line:** one tracked file changed (`src/lib/astra-catalog.ts`), the `/justice` stub
+now reads **Justice** with no domain row at all, `src/` greps zero for the old name, build green,
+**nothing committed** - staged and stopped, per the dispatch.
+
+### Step 1 - the grep, verbatim
+
+`git grep -in "atlasjustice"` (tracked files only; no env or secret file was content-read) on a
+clean tree at `37ae1a5`. **Not zero.** 52 hits across 7 files. Grouped by file:
+
+    20  docs/reports/REPORT-archive-002.md
+    19  docs/reports/REPORT-archive-001.md
+     8  supabase/migrations/20260809014029_ops_workdirs_registry_v1.sql
+     2  supabase/migrations/_drafts/20260809014029_ops_workdirs_registry_v1_rollback.sql
+     1  scripts/mission-control/mission-control.config.json
+     1  scripts/mission-control/mission-control.ahk
+     1  docs/OPS54.md
+     4  src/lib/astra-catalog.ts        <- the only in-scope file
+     0  server/index.ts                 <- proxy mount logic never matched; not opened, not touched
+
+### Step 2 - the change (one file, copy and comments only)
+
+`src/lib/astra-catalog.ts`, the `justice` catalog entry and its comments. That entry is the
+**sole source** of what `/justice` renders: `AstraStubPage.tsx` reads `wordmark`, `description`
+and `hosts` straight off it, and `/constellation` + the HQ `AstraStatus` section read the same row.
+
+| line | before | after |
+|---|---|---|
+| 16 | `the workspace trees that exist on disk (AtlasVOTE.org, atlasJUSTICE.org,` | `... (AtlasVOTE.org, Justice,` |
+| 148 | `// DERIVED - workspace tree atlasJUSTICE.org + rail canon JMF v0.3-v0.5` | `// DERIVED - workspace tree Justice + ...` |
+| 150 | `wordmark: 'atlasJUSTICE'` | `wordmark: 'Justice'` |
+| 150 | `hosts: ['atlasJUSTICE.org']` | `hosts: []` |
+
+Two comment lines were added above the entry recording JMF v0.8 as the reason `hosts` is empty, so
+the next reader does not "helpfully" restore a domain.
+
+**JUDGEMENT CALL - `hosts: []` rather than a substitution.** The dispatch says "replace the old name
+with Justice". Applied literally to `hosts` that yields `hosts: ['Justice']`, which is not a domain
+and would render as one; and any real substitution (`justice.org` or similar) is exactly the Justice
+URL the ruling forbids writing. Emptying the array is the only reading that satisfies the ruling.
+
+**Proved non-structural before making it.** Two consumers of `hosts` could in principle change
+behaviour, and neither does:
+- `AstraStubPage.tsx:97` and `AstraStatus.tsx:294` both already guard `entry.hosts.length > 0`, so
+  the "Registered domains (dark)" row simply does not render. No new branch, no component edit.
+- `effectiveStatus()` (astra-catalog.ts:188) upgrades an Astra to `live` when a host intersects
+  `ASTRA_REGISTRY`. `git grep -in "justice" -- src/lib/astras/registry.ts` returns **zero**, so the
+  intersection was already false. Status stays `scaffolded` before and after.
+
+Line 16 was edited as well as the entry: it is a present-tense claim about "trees that exist on
+disk", and after OPS90 renamed that folder to `Justice/` the old spelling was simply wrong.
+
+### Deviation - the done-test as written cannot be met, and should not be
+
+The dispatch's done-test reads "re-run of the step-1 grep returns zero hits". Taken literally over
+the whole checkout that is **unachievable without breaking three other standing rules**, so it was
+not attempted. The 48 out-of-scope hits, and why each stays:
+
+| file(s) | hits | why untouched |
+|---|---|---|
+| `docs/reports/REPORT-archive-001.md`, `-002.md` | 39 | **Write-once by R6.** "never edit a rotated file". They are historical record of passes that ran when the name was current. |
+| `supabase/migrations/20260809014029_*.sql` (+ its `_drafts` rollback) | 10 | **Applied-migration prose.** The comments explain a workdir-string reconciliation that actually ran; rewriting them falsifies the audit trail. |
+| `docs/OPS54.md` | 1 | Historical pass write-up, same class as the archives. |
+| `scripts/mission-control/mission-control.{ahk,config.json}` | 2 | **Structural, not copy** - see the finding below. |
+
+Nothing here is a copy string on the `/justice` route/stub, which is what step 2 scopes. The
+in-scope grep is clean: `git grep -in "atlasjustice" -- src` returns **zero hits**.
+
+### Finding for the lead - a launcher path that is now broken (NOT fixed here)
+
+`scripts/mission-control/mission-control.ahk:29` and `mission-control.config.json:40` both point at
+`C:\Users\Butch\Documents\HONEYCOMB\atlasJUSTICE.org`. **OPS90 renamed that folder to `Justice/` on
+2026-08-13**, so those two entries now reference a path that does not exist - the Mission Control
+button for that tree is dead. It is a real bug and it lives in this checkout, but it is a filesystem
+path (behaviour), not `/justice` stub copy, and the dispatch explicitly says this pass is
+"independent of the OPS90 folder rename". Fixing it here would be a structural change outside the
+stated scope. **Flagged, not touched - it wants its own dispatch.**
+
+### Done-test output, verbatim
+
+    $ npm run build
+    ... vite build ...
+    (!) Some chunks are larger than 500 kB after minification.   <- pre-existing, unrelated
+    built in 18.21s                                              <- GREEN
+
+    $ npx biome lint src/lib/astra-catalog.ts
+    Checked 1 file in 8ms. No fixes applied.                     <- clean
+
+    $ git grep -in "atlasjustice" -- src
+    (no output)                                                  <- ZERO, the in-scope done-test
+
+    $ git status --porcelain=v1 -uall        (before staging REPORT.md)
+     M src/lib/astra-catalog.ts
+
+### Manifest + danger scan
+
+Manifest, exactly two paths, both already tracked, both modifications:
+
+     M src/lib/astra-catalog.ts
+     M REPORT.md                              (this file; R6 - always in scope)
+
+Danger scan, all zero: no path matching `backups/` - `*.env*` - `settings.local.json` -
+`node_modules/` - `.next/` - `verify-out/` - `*.dump`; **no file over 1 MB** (largest staged path is
+this REPORT.md, well under); **no deletions (`D`)**; **no renames (`R`)**; every path inside the
+workspace. `dist/` was regenerated by the build and is gitignored - it does not appear in the
+manifest. REPORT.md was 11,426 bytes before this section, far below the 512 KB rotation gate, so
+**no rotation** was performed.
+
+### Not done, deliberately
+
+- **No commit and no push.** Staged and stopped. The commit word and the push click are the
+  human's, per canon.
+- **No deploy started or triggered.**
+- `server/index.ts` was neither opened nor edited - the grep never matched it, so the mount-order
+  comment was left entirely alone.
+
+### Could not verify
+
+- **The rendered `/justice` page was not loaded in a browser.** The change is proven at the source
+  and by a green build; the visual confirmation that the domain row is gone and the title reads
+  "Justice" waits for whoever next has the app running.
+
+---
+
 ## SWEEP1 - ORGANISE AND COMMIT THE TREE (2026-08-08)
 
 Lane `front`. Workdir `TheMANUAL.tech`. Scope: NULL in the dispatch row. Effort: light. ASCII only.
