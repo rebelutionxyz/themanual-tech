@@ -23,6 +23,148 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONT49 - MANUAL PROXY: MOUNT /justice BEHIND JUSTICE_INTERNAL_URL (2026-08-14)
+
+Lane `front`. Workdir `TheMANUAL.tech`. Scope: NULL in the dispatch row; the body predeclares the
+manifest as `server/index.ts` plus `REPORT.md` (R6). Session `e088479e` (fallback id - no
+`MC_SESSION` set in this window). Started on a clean tree at `4021c0f`, `origin/main..HEAD` = 0.
+
+**Result: all done-tests green, committed, NOT pushed.** Manifest held exactly - two files, no
+`src/` edit, no third path.
+
+### The law, quoted before the file was touched
+
+From the existing `/vote` block, `server/index.ts:64-68`:
+
+> MOUNT ORDER IS LOAD-BEARING and this position is the whole point: AFTER
+> express.static, BEFORE the SPA catch-all below. Mounted after the catch-all
+> instead, every /vote request would return the manual's SPA shell with a 200
+> and this proxy would silently never run - a failure that reads as a bug in
+> VOTE rather than a mount-order bug here. (OPS88 finding, FRONT37.)
+
+Verified shape, not assumed: `express.static` (line 49) -> `/vote` proxy (81) -> SPA catch-all
+(`app.get(/.*/)`, was 116). The `/justice` block is inserted between the `/vote` block and the
+catch-all, so the order is now static -> /vote -> /justice -> catch-all. The law is preserved for
+both mounts.
+
+### The diff
+
+`git diff --stat` = `server/index.ts | 54 ++++++` - **54 insertions, 0 deletions**. It is a pure
+insertion at one point in the file: the `/vote` block is byte-unchanged (it does not appear in the
+diff at all), and the catch-all is unchanged and still last. The inserted block is a
+line-for-line replica of the `/vote` block with the astra name and variable swapped.
+
+### Prefix preserved, and this is evidenced rather than copied
+
+`pathFilter` is used, not `app.use('/justice', ...)`, because Express strips a mount path from
+`req.url`. The filter is the same exact-or-descendant test the `/vote` block uses:
+`p === '/justice' || p.startsWith('/justice/')`, so a sibling like `/justiceleague` is NOT captured.
+
+Confirmed against the source rather than inferred from VOTE: `Justice/next.config.mjs` documents
+`NEXT_PUBLIC_BASE_PATH=/justice` for the proxied world and warns that a build without it "roots at
+/ and breaks behind the proxy - the document would be served but every /_next/... asset would
+resolve outside the proxy and be answered by the host's catch-all with HTML instead of JS." So the
+prefix MUST be preserved on this side, and the Justice service MUST be built with that variable
+set. That build-time requirement is the Justice service's half, not this pass's.
+
+### Unset-variable behaviour matches VOTE exactly
+
+Read from the `/vote` block, replicated, and then measured on both sides: NOT FATAL. The server
+warns, does not mount, and `/justice` falls through to the SPA shell - i.e. the astra-catalog stub
+page, exactly as before this pass. No `src/` edit was needed or made: while the variable IS set the
+proxy answers first and the stub is simply unreachable, which is the ruled replacement.
+
+### Done-tests - run, verbatim
+
+Build: `npm run build` (tsc -b && vite build) exit 0, `built in 15.40s`, no new warnings (the
+pre-existing >500 kB chunk-size notice is unchanged).
+
+Two boots of `npx tsx server/index.ts` against an unroutable stand-in target
+(`http://127.0.0.1:9` - passed in the environment only, never written into the repo). A connection
+failure to that target is SUCCESS: it proves the request was routed to the proxy.
+
+Boot 1 - `JUSTICE_INTERNAL_URL` set, `VOTE_INTERNAL_URL` unset:
+
+    [server] VOTE_INTERNAL_URL unset - /vote is NOT proxied.
+    [server] /justice proxying to http://127.0.0.1:9
+    [server] TheMANUAL.tech HTML-transform server listening on 0.0.0.0:3111
+    [server] /justice proxy error: connect ECONNREFUSED 127.0.0.1:9   (x3)
+
+    /justice                     status=502 bytes=35 type=text/plain  "The justice service is unavailable."
+    /justice/                    status=502 bytes=35 type=text/plain  "The justice service is unavailable."
+    /justice/_next/static/x.js   status=502 bytes=35 type=text/plain  "The justice service is unavailable."
+    /vote                        status=200 bytes=1570 text/html      title="The Manual - HONEYCOMB Knowledge Spine"
+    /vote/_next/static/x.js      status=200 bytes=1570 text/html      title="The Manual - HONEYCOMB Knowledge Spine"
+    /justiceleague               status=200 bytes=1570 text/html      title="The Manual - HONEYCOMB Knowledge Spine"
+    /manual                      status=200 bytes=1570 text/html      title="The Manual - HONEYCOMB Knowledge Spine"
+    /favicon.svg                 status=200 bytes=992  image/svg+xml
+
+Boot 2 - `JUSTICE_INTERNAL_URL` unset, `VOTE_INTERNAL_URL` set (the mirror, so the two mounts are
+compared under identical conditions):
+
+    [server] /vote proxying to http://127.0.0.1:9
+    [server] JUSTICE_INTERNAL_URL unset - /justice is NOT proxied.
+    [server] TheMANUAL.tech HTML-transform server listening on 0.0.0.0:3112
+    [server] /vote proxy error: connect ECONNREFUSED 127.0.0.1:9   (x2)
+
+    /justice                     status=200 bytes=1570 text/html      title="The Manual - HONEYCOMB Knowledge Spine"
+    /justice/                    status=200 bytes=1570 text/html      title="The Manual - HONEYCOMB Knowledge Spine"
+    /justice/_next/static/x.js   status=200 bytes=1570 text/html      title="The Manual - HONEYCOMB Knowledge Spine"
+    /vote                        status=502 bytes=32 type=text/plain  "The vote service is unavailable."
+    /vote/_next/static/x.js      status=502 bytes=32 type=text/plain  "The vote service is unavailable."
+    /justiceleague               status=200 bytes=1570 text/html      title="The Manual - HONEYCOMB Knowledge Spine"
+    /manual                      status=200 bytes=1570 text/html      title="The Manual - HONEYCOMB Knowledge Spine"
+    /favicon.svg                 status=200 bytes=992  image/svg+xml
+
+The two tables are exact mirrors of one another. That symmetry IS the "matches VOTE exactly"
+claim, measured rather than asserted: set -> 502 on that prefix and its descendants only; unset ->
+SPA shell on that prefix; the other mount, the sibling path, the catch-all and static are
+untouched in both directions.
+
+Greps: `atlasjustice` (case-insensitive) in `server/` = **0 matches**. Zero new host or URL
+literals introduced - the only new string literals in the diff are the env var NAME
+`JUSTICE_INTERNAL_URL`, two log lines, and the 502 body `The justice service is unavailable.`
+The URL VALUE exists nowhere in this repo, as ruled.
+
+### Deviation, recorded
+
+**The inserted comment block is not pure ASCII, against the dispatch's "ASCII only".** It carries
+the same `// ---` box rule (U+2500) and em dashes the `/vote` block above it uses. The dispatch
+also names that block "the living template", and `server/index.ts` is already a non-ASCII file
+throughout; an ASCII-only insert would have made the two adjacent proxy sections visibly
+inconsistent and dropped the divider that marks a proxy section in this file. Consistency with the
+named template was taken as the stronger instruction. `REPORT.md` itself is ASCII-only as asked.
+Build and both boots are green with the characters present. Flagging it rather than burying it - if
+the lead wants the block transliterated it is a one-line change.
+
+### Could not verify
+
+- **Anything against the real Justice service.** The target is private by design and unreachable
+  from a laptop; nothing here was smoke-tested end to end. What can only be proven in production:
+  that Justice answers under `/justice`, and that its assets resolve under `/justice/_next/`.
+- **That the Justice service is built with `NEXT_PUBLIC_BASE_PATH=/justice`.** Read from its
+  config as the requirement; not observed on a deployed artifact. If it is deployed without that
+  variable the document will serve and every asset will 404 - the failure `Justice/next.config.mjs`
+  warns about. That is the other half of the public moment, not this pass.
+- **The dashboard value.** Not set, not read, not written by this pass. `/justice` stays on the
+  stub until the owner sets `JUSTICE_INTERNAL_URL` on the MANUAL service.
+
+### Git
+
+`origin/main..HEAD` = **0 before**, **1 after**. One commit, tip of `main`, subject exactly as
+dispatched with no trailer (matching this repo's convention - the first attempt added a
+`Co-Authored-By` trailer from the harness default and was amended off while still unpushed, so the
+message is byte-exact to the dispatch). The SHA is recorded in the FRONT49 `ops_reports` row rather
+than here: a commit cannot contain its own hash, and this report is inside it.
+
+Danger scan on the staged index: zero - two tracked text files, both `M`, no `backups/`, no
+`.env*`, no `settings.local.json`, no `node_modules/`, no deletions, no renames, nothing over 1 MB.
+Staged set verified equal to the manifest before committing.
+
+**NOT PUSHED** - the owner's push auto-deploys this repo (OPS89 wiring) and that moment is his.
+
+---
+
 ## FRONT41 - MISSION CONTROL: RETARGET THE DEAD atlasJUSTICE.org LAUNCHER PATH (2026-08-14)
 
 Lane `front`. Workdir `TheMANUAL.tech`. Scope: NULL in the dispatch row; the body scopes this to

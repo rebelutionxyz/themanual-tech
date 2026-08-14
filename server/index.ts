@@ -111,6 +111,60 @@ if (VOTE_INTERNAL_URL) {
   console.warn('[server] VOTE_INTERNAL_URL unset — /vote is NOT proxied.');
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// /justice → the JUSTICE service (the Justice astra)
+//
+// SAME MOUNT-ORDER LAW as /vote above: AFTER express.static, BEFORE the SPA
+// catch-all. Mounted after the catch-all instead, every /justice request would
+// return the manual's SPA shell with a 200 and this proxy would silently never
+// run.
+//
+// This mount REPLACES the astra-catalog /justice stub page: while the variable
+// is set the proxy answers first and the stub is simply unreachable. The stub
+// stays in src/ untouched and is what /justice falls back to when the variable
+// is unset — the same fall-through /vote has.
+//
+// THE /justice PREFIX IS PRESERVED, NOT STRIPPED. Justice is built with
+// NEXT_PUBLIC_BASE_PATH=/justice (see Justice/next.config.mjs), so it owns that
+// prefix and emits its assets under /justice/_next/. `pathFilter` is used
+// rather than app.use('/justice', …) because Express strips a mount path from
+// req.url and we would have to add it straight back.
+const JUSTICE_INTERNAL_URL = process.env.JUSTICE_INTERNAL_URL;
+
+if (JUSTICE_INTERNAL_URL) {
+  app.use(
+    createProxyMiddleware({
+      // Matches /justice exactly and everything beneath it — and nothing else.
+      // A prefix test alone would also swallow sibling paths.
+      pathFilter: (pathname: string) =>
+        pathname === '/justice' || pathname.startsWith('/justice/'),
+      target: JUSTICE_INTERNAL_URL,
+      // Keep the browser's Host so JUSTICE sees the public hostname; the
+      // private target does no host-based routing. X-Forwarded-* carries the rest.
+      changeOrigin: false,
+      xfwd: true,
+      ws: false,
+      on: {
+        // A dead or restarting JUSTICE service must degrade to a plain 502 on
+        // /justice and MUST NOT take the manual down with it.
+        error: (err: Error, _req, res) => {
+          console.error('[server] /justice proxy error:', err.message);
+          const response = res as Response;
+          if (typeof response.headersSent === 'boolean' && !response.headersSent) {
+            response.status(502).type('text/plain').send('The justice service is unavailable.');
+          }
+        },
+      },
+    }),
+  );
+  console.log(`[server] /justice proxying to ${JUSTICE_INTERNAL_URL}`);
+} else {
+  // NOT FATAL, deliberately — identical to /vote. An unset variable must not
+  // stop the manual from serving — /justice simply falls through to the SPA
+  // shell below, exactly as it did before this proxy existed.
+  console.warn('[server] JUSTICE_INTERNAL_URL unset — /justice is NOT proxied.');
+}
+
 // HTML shell — every non-asset GET returns the SPA shell with per-host
 // <title> + og meta. The SPA's client-side router then handles the path.
 app.get(/.*/, (req: Request, res: Response) => {
