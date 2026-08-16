@@ -13,7 +13,7 @@
 //
 // The list below was DERIVED, not invented — three sources, each recorded:
 //   1. the pre-existing 38-entry canon catalog (canon v1, mirrored here)
-//   2. the workspace trees that exist on disk (AtlasVOTE.org, Justice,
+//   2. the workspace trees that exist on disk (REBELUTION.vote, Justice,
 //      freedomofthe.press, TheHoneycomb.games, MiniWAVES.app, FreedomBLiNGS.com,
 //      DingleBERRY.tech, AtlasORACLE.to, TheMANUAL.tech)
 //   3. the rail canon doc chains in public.ops_docs (ORACLE_MF, JMF, GAMES_MF,
