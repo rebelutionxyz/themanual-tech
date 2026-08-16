@@ -26,7 +26,7 @@ ROOT := "C:\Users\Butch\Documents\HONEYCOMB"
 folders := [
     ["TheMANUAL.tech",    ROOT "\TheMANUAL.tech"],
     ["HONEYCOMB (root)",  ROOT],
-    ["Justice",           ROOT "\Justice"],
+    ["REBELUTION.org",    ROOT "\REBELUTION.org"],
     ["AtlasORACLE.to",    ROOT "\AtlasORACLE.to"],
     ["TheWORKSHOP.to",    ROOT "\TheWORKSHOP.to"],
     ["REBELUTION.vote",   ROOT "\REBELUTION.vote"],

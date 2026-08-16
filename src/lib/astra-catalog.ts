@@ -13,7 +13,7 @@
 //
 // The list below was DERIVED, not invented — three sources, each recorded:
 //   1. the pre-existing 38-entry canon catalog (canon v1, mirrored here)
-//   2. the workspace trees that exist on disk (REBELUTION.vote, Justice,
+//   2. the workspace trees that exist on disk (REBELUTION.vote, REBELUTION.org,
 //      freedomofthe.press, TheHoneycomb.games, MiniWAVES.app, FreedomBLiNGS.com,
 //      DingleBERRY.tech, AtlasORACLE.to, TheMANUAL.tech)
 //   3. the rail canon doc chains in public.ops_docs (ORACLE_MF, JMF, GAMES_MF,
@@ -145,7 +145,7 @@ export const ASTRA_CATALOG: AstraCatalogEntry[] = [
   { slug: 'therank',       wordmark: 'TheRANK',         category: 'governance', hosts: ['TheRank.site'],                                         status: 'scaffolded',                              description: '33-rank engine + identity reputation.', route: '/therank', mount: 'stub', accent: '#F2C14E' },
   { slug: 'legalservices', wordmark: 'Legal Services',  category: 'governance', hosts: ['rebelution.info', 'AtlasADVOCATE.com'],                 status: 'deferred',                                description: 'Legal services directory for Bees.', route: '/legal', mount: 'surface', accent: '#C94C4C' },
   { slug: 'willtestament', wordmark: 'Will & Testament',category: 'governance', hosts: ['FinalWaggle.com'],                                      status: 'deferred',                                description: 'Estate + final-wishes management.', route: '/willtestament', mount: 'stub', accent: '#7A6C5D' },
-  // DERIVED — workspace tree Justice + rail canon JMF v0.3–v0.5
+  // DERIVED — workspace tree REBELUTION.org + rail canon JMF v0.3–v0.5
   // ("justice_* LIVE", commit 08074d0). Not in canon v1.
   // JMF v0.8 (owner, 2026-08-13): the project is Justice; the old name is retired
   // and NO Justice URL exists or may be written — hence `hosts: []`, not a domain.
