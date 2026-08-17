@@ -14,7 +14,7 @@
 // The list below was DERIVED, not invented — three sources, each recorded:
 //   1. the pre-existing 38-entry canon catalog (canon v1, mirrored here)
 //   2. the workspace trees that exist on disk (REBELUTION.vote, REBELUTION.org,
-//      freedomofthe.press, TheHoneycomb.games, MiniWAVES.app, FreedomBLiNGS.com,
+//      freedomofthe.press, TheHoneycomb.games, REBELUTION.ing, FreedomBLiNGS.com,
 //      REBELUTION.icu, AtlasORACLE.to, TheMANUAL.tech)
 //   3. the rail canon doc chains in public.ops_docs (ORACLE_MF, JMF, GAMES_MF,
 //      VOTE_MF, IDENTITY_MODEL, H24_GESTURES)
