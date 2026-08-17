@@ -34,6 +34,7 @@
         "npm:clsx@^2.1.1",
         "npm:dotenv@^17.4.2",
         "npm:express@^5.2.1",
+        "npm:http-proxy-middleware@^3.0.7",
         "npm:libsodium-wrappers-sumo@~0.8.4",
         "npm:livekit-client@^2.20.2",
         "npm:lucide-react@0.447",

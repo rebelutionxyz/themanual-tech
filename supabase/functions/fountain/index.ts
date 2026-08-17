@@ -3,11 +3,33 @@
 // (fountain_register_pledge / fountain_begin_close / fountain_pledge_captured /
 //  fountain_pledge_canceled / fountain_finalize_close — all service-role RPCs).
 //
-// MONEY PATH — NO CUSTODY, 0% PLATFORM FEE (locked Jun 10 2026):
-// PaymentIntents are DIRECT CHARGES on the campaign manager's Express Connect
-// account ({ stripeAccount: manager_connect_account }). Fiat flows contributor →
-// manager; Stripe fees are borne by the manager; the platform holds no fiat and
-// takes no application fee.
+// MONEY PATH — NO CUSTODY. PaymentIntents are DIRECT CHARGES on the campaign
+// manager's Express Connect account ({ stripeAccount: manager_connect_account }).
+// Fiat flows contributor → manager; Stripe's own processing fees are borne by the
+// manager; the platform never holds the funds.
+//
+// v15 (DB50, 2026-08-17) — PLATFORM FEE ACTIVATED. Butch ruled option A on the
+// FUND_MF v0.1 FEE stanza: activate the EXISTING 2% design. v14 set no
+// application_fee_amount at all, and the "0% platform fee" this header used to
+// assert was that FUNCTION BEHAVIOUR described as if it were a ruling. It was
+// never ruled. What is ruled: platform_pct on fee_schedule.fee_key='give'.
+//   * THE RATE IS READ AT CALL TIME, through fee_resolve('give', <astra>) —
+//     never hardcoded, never cached in this module. Editing the row changes the
+//     next pledge; nothing needs redeploying.
+//   * fee_resolve() filters on `active`, so the row's active flag is a live kill
+//     switch: inactive → resolves NULL → this function omits
+//     application_fee_amount entirely and charges no platform fee.
+//   * application_fee_amount is how a platform takes a cut of a DIRECT charge
+//     without the money entering its balance — Stripe splits at settlement. The
+//     Fountain is NOT moved to destination charges and the platform stays out of
+//     the flow of the manager's funds.
+//   * AON: no capture, no charge; no charge, no fee. A campaign that misses its
+//     goal cancels every authorization and the platform collects NOTHING. The
+//     fee is only ever collected on a funded campaign.
+//   * DISCLOSURE is the pledge screen's job (FRONT). /pledge returns
+//     platform_fee_cents + platform_fee_pct so it has the exact number, and
+//     fee_resolve is EXECUTE-able by `authenticated` so the screen can quote the
+//     rate BEFORE a PaymentIntent exists.
 //
 // PATTERN B — CHARGE AT CLOSE: /pledge creates a manual-capture PI (authorize
 // only) and registers the pledge. /close runs the AON/KWYR verdict and then
@@ -60,7 +82,7 @@ Deno.serve(async (req) => {
 
     const { data: campaign, error: cErr } = await sb
       .from('give_campaigns')
-      .select('id, slug, status, funding_model, currency, manager_connect_account')
+      .select('id, slug, status, funding_model, currency, manager_connect_account, astra_id')
       .eq('id', campaignId)
       .maybeSingle();
     if (cErr) {
@@ -73,7 +95,64 @@ Deno.serve(async (req) => {
       return errorResponse('Campaign is not financially configured');
     }
 
+    // ---- platform fee, resolved from the database on every single pledge ----
+    //
+    // p_astra is the campaign's astra slug so a per-astra 'give' rate would apply.
+    // p_bee is deliberately NOT passed: fee_schedule.bee_ref could reasonably mean
+    // either the campaign manager (a negotiated rate) or the contributor (a
+    // discount), the two resolve to different money, and nothing has ruled which.
+    // Passing NULL can only under-match to the global rate; passing a guess could
+    // charge the wrong one. NO bee_ref 'give' row may be created until that is
+    // ruled — DB50 flagged it.
+    let astraSlug: string | null = null;
+    if (campaign.astra_id) {
+      const { data: astra } = await sb
+        .from('astra_registry').select('slug').eq('id', campaign.astra_id).maybeSingle();
+      astraSlug = (astra?.slug as string | undefined) ?? null;
+    }
+
+    const { data: fee, error: feeErr } = await sb.rpc('fee_resolve', {
+      p_fee_key: 'give',
+      p_astra: astraSlug,
+      p_bee: null,
+    });
+    if (feeErr) {
+      // Do NOT fall through to a 0% charge. An unreadable fee schedule means the
+      // platform does not know what it is entitled to, and guessing in either
+      // direction is worse than declining the pledge.
+      console.error('fountain pledge fee_resolve failed', {
+        campaignId, message: feeErr.message,
+      });
+      return errorResponse('Fee schedule unavailable', 503);
+    }
+
+    // fee_resolve filters on `active`, so a dormant row arrives here as null and
+    // means exactly one thing: no platform fee on this pledge.
+    const feePct = fee && typeof fee === 'object'
+      ? Number((fee as Record<string, unknown>).platform_pct ?? 0)
+      : 0;
+    let applicationFeeCents = 0;
+    if (Number.isFinite(feePct) && feePct > 0) {
+      const f = fee as Record<string, number | null>;
+      applicationFeeCents = Math.round((amountCents * feePct) / 100);
+      if (f.min_fee_cents != null) applicationFeeCents = Math.max(applicationFeeCents, Number(f.min_fee_cents));
+      if (f.max_fee_cents != null) applicationFeeCents = Math.min(applicationFeeCents, Number(f.max_fee_cents));
+      // Stripe rejects an application fee above the charge, and a fee equal to the
+      // charge would leave the campaign nothing. Both are configuration errors, not
+      // contributor problems — clamp and log rather than failing the pledge.
+      if (applicationFeeCents >= amountCents) {
+        console.error('fountain pledge fee clamped — fee_schedule would take the whole donation', {
+          campaignId, amount_cents: amountCents, fee_pct: feePct, computed_fee_cents: applicationFeeCents,
+        });
+        applicationFeeCents = amountCents - 1;
+      }
+      if (applicationFeeCents < 0) applicationFeeCents = 0;
+    }
+
     // Direct charge on the manager's Connect account, authorize-only (Pattern B).
+    // The fee is set at create; /close captures the full amount, so the split
+    // Stripe applies at settlement is exactly this number. A cancelled
+    // authorization never becomes a charge, and collects nothing.
     let pi;
     try {
       pi = await stripe.paymentIntents.create(
@@ -82,7 +161,14 @@ Deno.serve(async (req) => {
           currency: campaign.currency ?? 'usd',
           capture_method: 'manual',
           automatic_payment_methods: { enabled: true },
-          metadata: { bee_id: beeId, campaign_id: campaign.id, campaign_slug: campaign.slug },
+          ...(applicationFeeCents > 0 ? { application_fee_amount: applicationFeeCents } : {}),
+          metadata: {
+            bee_id: beeId,
+            campaign_id: campaign.id,
+            campaign_slug: campaign.slug,
+            platform_fee_cents: String(applicationFeeCents),
+            platform_fee_pct: String(feePct),
+          },
         },
         { stripeAccount: campaign.manager_connect_account },
       );
@@ -115,12 +201,19 @@ Deno.serve(async (req) => {
       return errorResponse('Pledge registration failed', 500);
     }
 
-    console.log('fountain pledge ok', { campaign: campaign.slug, bee_id: beeId, amount_cents: amountCents, pi: pi.id });
+    console.log('fountain pledge ok', {
+      campaign: campaign.slug, bee_id: beeId, amount_cents: amountCents, pi: pi.id,
+      platform_fee_cents: applicationFeeCents, platform_fee_pct: feePct,
+    });
     return jsonResponse({
       ok: true,
       pledge: reg,
       client_secret: pi.client_secret,
       stripe_account: campaign.manager_connect_account,
+      // For the pledge screen's disclosure. platform_fee_cents is the exact amount
+      // Stripe will route to the platform at capture; the rest reaches the manager.
+      platform_fee_cents: applicationFeeCents,
+      platform_fee_pct: feePct,
     });
   }
 

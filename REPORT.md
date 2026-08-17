@@ -23,6 +23,519 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONT58 - /mc LIVE BOARD SHIPPED. RULING TAKEN: COMMIT AS BUILT, FOLDER LANDS WITH DB51 (2026-08-17)
+
+**Dispatch.** FRONT58, lane `front`, workdir `TheMANUAL.tech`, `scope` empty. Session `d1f50dbe`
+(fallback id). Reported in two parts: **FRONT58-Q below carries the full build detail and the
+measurement**, and is not repeated here. This section records the ruling, what changed after it, and
+the close.
+
+**THE RULING (lead, 2026-08-17), verbatim in substance:** *don't wait on DB51 - the apply needs a
+human click and that could be a while. Commit the board as built, with the honest banner intact, and
+close. The folder column lands in a follow-on pass once DB51 applies. That frees the terminal
+instead of parking it.*
+
+So the answer to FRONT58-Q section 3 is **path (a)** - `ops_workdirs` gets the `_admin_read` policy
+its three sibling rail tables already carry - handled by **DB51**, not by this pass and not by the
+fallback (b). Nothing in the code changed in response: the hook already reads
+`ops_dispatch_location`, so the FOLDER column starts working the moment DB51 applies, with no
+front-end change at all. That was the point of building it against the view rather than around it.
+
+**What ships today, and what does not.** The board is live: it polls, it stops when the rail is
+quiet, it shows heartbeat age against the database's own threshold, and it has a FOLDER column.
+**That column reads "—" under an amber banner until DB51 applies** - the banner says
+*"FOLDER unavailable - public.ops_dispatch_location returned nothing. Every folder cell below reads
+'—' for that reason, NOT because the pass has no folder."* Shipping a dash with no explanation is
+the failure this banner exists to prevent; shipping it WITH the explanation is a board that tells
+the truth about its own gap. Kept intact per the ruling.
+
+**No code changed between the question and the close.** The two files committed are byte-identical
+to the ones described in FRONT58-Q section 4. Re-verified at commit time rather than assumed:
+
+```
+npm run build   -> ✓ built in 17.40s   BUILD_EXIT=0
+npx biome check src/lib/useRailBoard.ts src/pages/MissionControlPage.tsx
+                -> Checked 2 files in 29ms. No fixes applied.   LINT_EXIT=0
+```
+
+**Commit.**
+
+```
+4257e873a361789090edd6e25faec0f82752e7af
+FRONT58 - /mc live board: poll while claimed, folder column, heartbeat states
+
+ src/lib/useRailBoard.ts          | 343 ++++++++++++++++++++
+ src/pages/MissionControlPage.tsx | 686 ++++++++++++++++++++++++---------------
+ 2 files changed, 766 insertions(+), 263 deletions(-)
+```
+
+Staged by name and verified before committing: `git diff --cached --name-only` returned exactly the
+two paths above and nothing else. The commit itself is path-scoped (`git commit -- <two paths>`),
+so none of the other sessions' work in this tree could be swept into it.
+
+**One note on the commit mechanics, recorded because it cost a retry.** The first attempt passed the
+message inline as multiple `-m` blocks and was **denied at the permission layer**. The retry wrote
+the identical message to a file and used `git commit -F`, which succeeded. Nothing about the message
+content changed between the two - only the transport. Worth knowing for the next pass that commits.
+
+**PUSHED: NO.** The dispatch says NO PUSH and the push click is canon regardless.
+
+**DB51 IS ALREADY AUTHORED.** By the time this pass committed, the tree carried
+`supabase/migrations/20260817193000_db51_ops_workdirs_admin_read_v1.sql` plus its rollback and a
+done-test under `_drafts/`, untracked - another session acting on the same ruling. Not mine, not
+touched, named here only so the follow-on knows the file exists and is waiting on the human click.
+
+**REPORT.md WAS NOT COMMITTED, deliberately.** At commit time the working copy of this file carried
+**another session's OPS98 section** alongside FRONT58-Q - both complete, neither mine to attribute.
+`git commit -- REPORT.md` would have folded a second pass's report into a FRONT58 commit. The two
+source files were committed path-scoped instead, and this file is left for the sweep that will pick
+up the whole tree. Recorded because "the report is not in the same commit as the code" is the kind
+of thing that looks like an oversight later.
+
+**Not touched, restated at close:** FRONT52's nav and redirect files, OPS98's route removal,
+`src/App.tsx` (not opened), `ops_rail_readme()` (OPS100 owns it), RLS anywhere, the
+`supabase_realtime` publication, and every other session's untracked work in this tree - `deno.lock`,
+`supabase/functions/fountain/index.ts`, `supabase/functions/give-webhook/index.ts`, and eight
+`supabase/migrations/**` files were all left exactly as found.
+
+**Still could not verify (unchanged from FRONT58-Q section 6):** the board was never rendered in a
+browser - that needs a signed-in admin session this session must not obtain - and the
+past-threshold heartbeat state was never exercised, because every claim on the rail stayed fresh and
+manufacturing a stale one would mean writing to `ops_dispatches`. **The visual check is genuinely
+outstanding and belongs to whoever lands the DB51 follow-on**, when there will finally be a folder
+to look at.
+
+---
+
+## FRONT58-Q - QUESTION FILED. THE BOARD IS BUILT AND GREEN; THE FOLDER READ IS DENIED BY RLS (2026-08-17)
+
+**Dispatch.** FRONT58, lane `front`, workdir `TheMANUAL.tech`, `scope` empty. Claimed by session
+`d1f50dbe` (fallback id - `MC_SESSION` unset). Dispatch left `claimed` per R4.
+
+**THE QUESTION, IN ONE LINE.** `public.ops_dispatch_location` - the view this dispatch names as the
+folder source - returns **zero rows to an authenticated admin**, because `public.ops_workdirs` has
+RLS enabled with **no policies at all**. The dispatch is explicit that this is not mine to answer:
+*"If /mc has no working read path for these rows, STOP and file FRONT58-Q - do not add a public
+policy, do not disable RLS, do not ship a service key to the browser. That decision is the owner's."*
+So: filed, and stopped.
+
+**Everything that does NOT depend on that read is built, green, and lint-clean.** Details below.
+
+---
+
+### 1. The measurement, not an inference
+
+I did not read this off the catalog and reason about it. I executed as the `authenticated` role
+carrying the admin's uid, inside a transaction that was rolled back. No write of any kind.
+
+```sql
+BEGIN;
+SET LOCAL role authenticated;
+SET LOCAL request.jwt.claims = '{"sub":"<butch bee uuid>","role":"authenticated"}';
+...
+ROLLBACK;
+```
+
+Result, verbatim:
+
+```
+acting as: authenticated / uid=ab696a36-... / is_platform_admin=true
+ops_dispatches visible rows: 265
+ops_workdirs visible rows:   0
+ops_dispatch_location rows:  0
+ops_stale_claims rows:       0
+ops_stale_threshold_minutes: 120
+```
+
+The same reads as `postgres` return 265 / 19 / 265 / 0 / 120. So:
+
+- **`ops_dispatches` is fine** - 265 rows through the existing admin policy. The queue half of /mc
+  works and has always worked.
+- **`ops_workdirs` returns 0** to the admin. That is the whole cause.
+- **`ops_dispatch_location` returns 0** as a consequence: it is
+  `security_invoker=true` (confirmed in `pg_class.reloptions`) and its body is
+  `FROM ops_dispatches d JOIN ops_workdirs w ON w.slug = d.workdir` - an INNER join, so zero
+  visible workdirs means zero visible rows regardless of how many dispatches are readable.
+- **`ops_stale_claims` returning 0 is HONEST, not a second defect.** I checked its definition: it
+  does not touch `ops_workdirs`. It returns only claims already past the threshold, and at the time
+  of measurement every claim had pinged within minutes. Same 0 as `postgres`.
+- **`ops_stale_threshold_minutes()` works for `authenticated`** (`proacl` carries
+  `authenticated=X/postgres`), so the "never hardcode the threshold" requirement is satisfiable and
+  is satisfied.
+
+### 2. Why it is in this state - not a mystery, a one-day-old migration
+
+`TheMANUAL.tech/supabase/migrations/20260816210315_ops_workdirs_enable_rls.sql`, currently
+**untracked in the repo**, entire body:
+
+```sql
+-- Close the RLS gap the Supabase advisor flagged 2026-08-16: ops_workdirs was the
+-- only rail table without RLS, leaving it readable/writable to anon+authenticated.
+-- Deny-all (RLS on, zero policies) matches ops_reports / ops_dispatches / ops_docs:
+-- rail tables are invisible to app clients by design; service_role bypasses RLS.
+ALTER TABLE public.ops_workdirs ENABLE ROW LEVEL SECURITY;
+```
+
+**The comment's premise is wrong on two of the three tables it cites.** Measured:
+
+```
+ops_build_steps | ops_build_steps_admin_read | SELECT | {authenticated}
+ops_dispatches  | ops_dispatches_admin_read  | SELECT | {authenticated}
+ops_reports     | ops_reports_admin_read     | SELECT | {authenticated}
+
+ops_ tables with RLS ON and NO policy:
+  ops_dispatches_workdir_backup_db43
+  ops_docs
+  ops_messages
+  ops_workdirs
+```
+
+`ops_dispatches` and `ops_reports` are **not** deny-all - each carries an `_admin_read` policy that
+is exactly what makes /mc work today. `ops_workdirs` was given the ENABLE without the matching
+policy, so it landed a tier stricter than the tables it was meant to match. Closing the advisor gap
+was right; the row that got missed is the read policy.
+
+I am not asserting the policy is the correct fix - that is the ruling I am asking for. I am
+asserting the measurement.
+
+### 3. THE QUESTION
+
+The dispatch names three things I must not do (public policy, disable RLS, service key to the
+browser) and I have done none of them. What I need is a ruling on which path to take. As I read it
+there are three, and they are not equally good:
+
+**(a) Give `ops_workdirs` the same `_admin_read` policy its siblings have.** One migration,
+`USING (is_platform_admin())`, `TO authenticated`. It widens nothing beyond what the admin can
+already read - the admin already sees all 265 dispatch rows including the `workdir` slug column, so
+the folder path adds no information the same session cannot already obtain. It also restores the
+pattern the other three rail tables follow. This is a **db-lane migration under the MIGRATION
+AMENDMENT** - named dispatch, recorded pre-flight, rollback stated in the dispatch, ask-gated apply.
+Not mine to write and not mine to apply.
+
+**(b) Do not read `ops_workdirs` at all - render the folder from `ops_dispatches.workdir`,** which
+is already readable and already on this board's rows. The board would show the workdir SLUG
+(`REBELUTION.fund`) rather than the registry's `rel_path`. For every row on the rail today the two
+are identical except `HONEYCOMB`, whose slug is `HONEYCOMB` and whose `rel_path` is `.`. It needs no
+migration and no ruling on RLS at all. It costs `repo` / `is_git_repo` / `active`, and it
+contradicts the dispatch's instruction to read the view - which is why I did not just do it.
+
+**(c) Leave it.** The board ships with the folder column reading a documented "unavailable" state
+until someone wants it. Honest, and useless for the thing the owner actually asked for.
+
+**My read, offered as input, not a decision:** (a) is the one that matches the pattern already
+established for the other three rail tables, and (b) is a genuinely cheap fallback that would have
+this working today with no database change at all. If the answer is "do (b) now and (a) later", the
+front-end change is about ten lines and this pass can finish immediately.
+
+### 4. What IS built, green and lint-clean
+
+Nothing below depends on the blocked read. Both files build and lint clean; **neither is committed**
+(see section 7).
+
+**NEW - `src/lib/useRailBoard.ts`** (the data hook the manifest names):
+
+- **Poll cadence, chosen and stated as the dispatch asks.** `LIVE_MS = 8_000` while any pass is
+  `claimed`; `IDLE_MS = 60_000` when none is. 8s because that is the band the dispatch suggested and
+  the numbers that move on this board (heartbeat age, elapsed) are minute-grained - a faster poll
+  would buy nothing visible. 60s idle because the dispatch permits a slow background check to notice
+  a claim appearing: 60 reads an hour instead of 450, and a new claim surfaces well inside the time
+  it takes anyone to look up.
+- **It genuinely stops.** The cadence is driven by whether any row is `claimed`, recomputed on every
+  read. An idle board is not on the fast poll at all.
+- **A `setTimeout` CHAIN, not `setInterval`.** The next read is scheduled only after the previous one
+  lands, so a slow response can never stack requests. That is the standard failure of an
+  interval-driven poller and it is worth the extra six lines to not have it.
+- **Hidden tabs read nothing**, and return fires an immediate read. Judgement call, not dispatched:
+  "must not hammer the database all night" is most true of a tab nobody is looking at, and a board
+  that refreshed on return would otherwise show stale data for up to a minute. Stated here because
+  it is a behaviour the dispatch did not ask for.
+- **Inert until admin.** `useRailBoard(enabled)` issues zero queries when false, so a signed-out or
+  non-admin visitor produces no traffic rather than a stream of reads that each return nothing.
+- **Threshold from the database.** `supabase.rpc('ops_stale_threshold_minutes')`, read once, never
+  hardcoded. Confirmed executable by `authenticated`.
+- **Four reads in one `Promise.all`**, matched client-side on `pass` (UNIQUE via
+  `ops_dispatches_pass_uidx`). No new view, no new join - as instructed.
+- **`heartbeatState(minutes, threshold)`** returns `current` / `quiet` / `past-threshold`. `quiet`
+  begins at half the threshold. **That fraction is a display choice and the file says so**: the
+  database owns the only number that means anything, and the middle band exists purely so a watcher
+  sees a pass drifting before it crosses. Nothing acts on `quiet`.
+
+**EDITED - `src/pages/MissionControlPage.tsx`**:
+
+- Queue is now a real column table with a header row:
+  `state | PASS | LANE | STATUS | FOLDER | WAITS ON | CLAIMED BY | HEARTBEAT`, exactly the set the
+  dispatch specifies. Title and timing sit on a sub-row spanning the width - at 70 characters a
+  ninth column would have squeezed every other column to nothing.
+- Page container widened `max-w-4xl` -> `max-w-6xl`. Recorded because it also widens the
+  build-progress board below the queue, which was not asked for.
+- **Cadence is on screen**: a pulsing dot with "live - refreshing every 8s while a pass is claimed",
+  or "idle - nothing is claimed, checking once a minute", plus the last-read clock time and a note
+  that it pauses while the tab is hidden. A board that refreshes silently is indistinguishable from
+  one that has frozen.
+- **Heartbeat column** shows silence as `12m` / `3h 4m`, coloured by the three-state ladder, with a
+  `no ping` marker when `heartbeat_at` is NULL and the age is therefore measured from `claimed_at`
+  (R2c's case - a claim that never pinged is silent from the moment it was taken).
+- **The pulse now follows the heartbeat, not the status.** Previously any claimed row pulsed unless
+  it was in `ops_stale_claims`. Now only a `current` row pulses, so a pass drifting quiet stops
+  looking alive before it crosses the threshold.
+- **Suspicion, not verdict, said on the page**: *"A claim silent past 120m raises a suspicion, not a
+  verdict. This board never releases one - ask the window first."* The counter reads
+  `(n suspect)` rather than `(n stale)`. **There is no release control and the comment in the file
+  says there will not be one** - release is admin-gated at the database and takes a mandatory reason.
+- **Three failure banners, all distinguishing "empty" from "could not read"** - queue, stale, and
+  now folder. The folder banner exists precisely because of section 1: every FOLDER cell reading
+  "—" because the view was denied looks identical to every pass having no folder.
+- **The folder cell renders three different facts differently**: a path; `unregistered` in amber
+  when the view WAS readable but holds no row for that pass (the inner join drops a dispatch whose
+  workdir is not in the registry - a real state); and `—` under the banner when the view could not
+  be read at all. `rel_path` of `.` renders as `workspace root`, and an inactive workdir is marked
+  `(retired)`.
+- **No dispatch or report body is selected or rendered anywhere.** Titles only, per the hard
+  constraint. Checked by grep: the only `body` tokens in either file are the two comments forbidding
+  it, JSX `<tbody>` tags, and the unrelated `body` prop on the local `Gate` component (its own
+  copy string). `DISPATCH_COLS`, `STALE_COLS` and `LOCATION_COLS` name no body column.
+
+**Verification, verbatim:**
+
+```
+npm run build   -> ✓ built in 21.18s      BUILD_EXIT=0
+npx biome check src/lib/useRailBoard.ts src/pages/MissionControlPage.tsx
+                -> Checked 2 files in 18ms. No fixes applied.   LINT_EXIT=0
+```
+
+(The chunk-size warnings in the build output are pre-existing and untouched by this pass.)
+
+### 5. Constraints honoured
+
+- **No RLS was loosened.** No policy added, none dropped, RLS disabled nowhere. No service key
+  anywhere near the browser - the hook uses the same anon-client-plus-session path /mc already used.
+- **No new view, no new join.** The hook reads `ops_dispatch_location` as it stands.
+- **Realtime untouched.** Nothing added to the `supabase_realtime` publication; no `postgres_changes`
+  subscription exists in either file.
+- **Read-only.** This pass wrote **no rows to any ops table** except its own heartbeat pings and
+  this report. `ops_rail_readme()` was not touched - OPS100 owns it.
+- **Disclaimers, as the dispatch requires.** FRONT52's nav and redirect files
+  (`src/components/shell/sidebarNav.ts`, the `/give` -> `/fund` redirect in `src/App.tsx`) were
+  **not touched**. OPS98's route removal (the `/give` lazy routes in `src/App.tsx`, and
+  `src/pages/give/**`) was **not touched** - and note OPS98 has itself filed OPS98-Q. `src/App.tsx`
+  was not opened for editing by this pass at all; the `/mc` route it already carries needed no
+  change.
+
+### 6. Could not verify
+
+- **THE BOARD WAS NOT OBSERVED IN A BROWSER.** The dispatch asks for a screenshot-equivalent
+  description with at least one claimed row showing its folder. **I cannot honestly produce that**:
+  the folder read is denied (section 1), so no folder would appear, and rendering /mc at all needs a
+  signed-in admin session, which needs credentials this session must not read. What is verified is
+  the compile and the lint, not the pixels. When the ruling lands, whoever finishes this pass should
+  do the visual check as the last step.
+- **The three-state heartbeat ladder was not observed against a real past-threshold row.** Every
+  claim on the rail was fresh throughout this pass, and manufacturing a stale one would mean writing
+  to `ops_dispatches` - out of scope and forbidden. The `current` state is the only one seen.
+- **The `unregistered` folder state is currently unreachable** and untested: as `postgres`, zero
+  dispatches lack a matching workdir row. It is coded for because the view's inner join makes it a
+  real possibility, not because it was seen.
+
+### 7. State at close - NOT COMMITTED, and why
+
+The dispatch says ROUTINE COMMIT on green, and the build IS green. I did not commit, because R4 says
+a filed question stops the pass and the ruling in section 3 could change the approach - if the answer
+is (b), `useRailBoard.ts` changes shape before it should be in history.
+
+Two uncommitted files, both new-or-edited by this pass only:
+
+```
+ M src/pages/MissionControlPage.tsx
+?? src/lib/useRailBoard.ts
+```
+
+**One risk worth naming:** the repo already carried unrelated untracked work when I claimed
+(`deno.lock`, six `supabase/migrations/*.sql`, `supabase/functions/give-webhook/index.ts`), and
+other sessions are working in this same tree. A whole-repo sweep would fold my two files into
+someone else's commit. That is recoverable, not dangerous - but if the lead would rather have them
+committed under their own message, "commit FRONT58's two files" is a one-word ruling and I will do
+it path-scoped.
+
+**Question filed. Stopped.**
+
+---
+
+## OPS98 - CLOSED AS ALREADY SATISFIED BY FRONT52. RULING (a), BUTCH, 2026-08-17. NOTHING DELETED.
+
+Lane `ops`. Workdir `TheMANUAL.tech`. Scope: NULL in the dispatch row; the body declares the
+manifest as "the two lazy route registrations and any now-orphaned components they exclusively
+imported", plus `REPORT.md`, always in scope (R6). Session `7c2e4fe2` (fallback id — no
+`MC_SESSION` in this window). Arrival state: `HEAD` `1a41a5c` (FRONT52), `origin/main..HEAD` = 2.
+
+**RULING: (a) — Butch, 2026-08-17.** OPS98 closes as **already satisfied by FRONT52**. The
+retirement of the two lazy `/give` routes happened inside FRONT52's rename at `1a41a5c`; there is
+nothing left to delete. **No code change was made by this pass, and none was required.**
+
+**Disposition, from the lead's ruling, recorded because it settles what §7(b) left open:** *the
+Vite routes at `App.tsx:298-299` **are the live FUND surface** until the Next.js astra deploys
+behind the proxy. Retirement is not re-queued as its own pass — it **moves into the deploy
+sequence**.* So the delete/keep manifest in §7(b) below is not a future OPS dispatch; it is a step
+of whichever named DEPLOY AMENDMENT v2 dispatch sets `FUND_INTERNAL_URL`, executed once
+`themanual.tech/fund` is confirmed served by the FUND service. Until that day these routes are
+load-bearing and **must not be deleted by any pass**. This section is the record.
+
+**Result: `OPS98-Q` filed, ruled (a), dispatch closed `done`. Zero source files edited, no
+component deleted, no build run (nothing to type-check). The only file this pass writes is
+`REPORT.md`.** The question as filed is the `OPS98-Q` row in `ops_reports`; §§1-9 below are its
+report-of-record copy, kept intact because they are the evidence the ruling rests on. §10 and §11
+were written after the ruling.
+
+### 1. The precondition passes. That is not why the question was filed.
+
+The dispatch's own STOP condition — "the FRONT52 301 is in place and `/give` resolves to `/fund`"
+— **is satisfied**, verified at HEAD rather than read off FRONT52's report:
+
+- `server/index.ts:226-248` — the real HTTP 301, exact-or-descendant, slug and query preserved.
+- `src/App.tsx:479-480` — the client half, `/give` and `/give/*` → `RedirectGiveToFund`.
+
+So the stated stop condition never fired. The question is filed on a different defect: **the
+manifest the dispatch names is not in the tree, and the nearest executable reading of it is
+destructive.**
+
+### 2. FRONT52 did not leave the routes behind — it moved them
+
+The dispatch was written before FRONT52 ran, and assumes FRONT52 added `/fund` *alongside* a
+surviving `/give`. It did not; it renamed the path on the same two lazy routes:
+
+| line | at HEAD |
+|---|---|
+| `src/App.tsx:81-82` | lazy imports of `CampaignPage` / `GivePage` from `@/pages/give/…` (unchanged) |
+| `src/App.tsx:298-299` | `<Route path="/fund" …>` and `<Route path="/fund/:slug" …>` |
+
+`path="/give"` now appears **twice** in `src/`, both at lines 479-480 — the redirect half.
+**There is no `/give` lazy route left to retire.** Deleting 479-480 instead would break every
+in-app `<Link to="/give">`, the opposite of the dispatch's intent.
+
+### 3. The nearest executable reading takes the FUND surface dark today
+
+Deleting `App.tsx:298-299` does not 404 — it soft-bounces, which is worse, because it passes a
+careless smoke test. Read off three source lines:
+
+1. `src/lib/surfaces.ts:161-164` — the entry is `slug: 'give'` with only the **display name**
+   changed to `FUND` (deliberate: the slug is the join key into ACCENT / popupAccent /
+   parent_surface). So `SURFACE_BY_SLUG` has **no `'fund'` key**.
+2. Delete the route and `/fund` falls to `src/App.tsx:467` `<Route path="/:slug"
+   element={<SurfacePage />} />`.
+3. `src/pages/SurfacePage.tsx:13-15` — `if (!surface) return <Navigate to="/manual" replace />`.
+
+Net: `/fund` → `/manual`; `/fund/save-the-bees` → past `/:slug` to `App.tsx:482` `*` → `/`;
+`/give` → 301 → `/fund` → `/manual`. All three real `give_campaigns` rows unreachable, and the
+retired URL redirecting into a hole.
+
+### 4. Nothing else serves `/fund` — the "now that /fund serves" premise is not met
+
+- FRONT51 shipped the `/fund` proxy **dormant**. `FUND_INTERNAL_URL` is unset and
+  `server/index.ts:222` warns and falls through by design. FRONT51 called the unset state "inert,
+  not broken" — inert *because* the SPA route catches it.
+- The FUND astra is not deployed and not committed: OPS97's `REBELUTION.fund` is **untracked** at
+  the workspace root. FRONT53 / FRONT54 / FRONT55 are STAGE ONLY and still claimed; FRONT56 is
+  still queued.
+- No deploy dispatch exists. DEPLOY AMENDMENT v2 requires a named dispatch, ask-gated, owner at
+  the dashboard; `FUND_INTERNAL_URL` is an owner action per FRONT51's named-setter record.
+
+FRONT52 predicted this collision in its could-not-verify section: *"this pass makes /fund a live
+manual surface, and the FUND astra will later take that path away from it."* OPS98 is that later
+— it arrived before the astra did.
+
+### 5. The SEO defect named in the dispatch body did not move
+
+The body justifies the deletion with "1,576 bytes, generic title, zero occurrences of the word in
+the HTML". Still true — **of `/fund`**, which FRONT52 measured returning the same 1,570-byte
+generic shell. The rename changed *which* URL is generic, not *whether* it is. Deleting the
+routes yields a redirect to `/manual`, not real HTML. Only the FUND service's server-rendered
+output fixes it — FRONT55's SEO kit, behind the deploy. **No SEO gain is available to this pass
+at any manifest.**
+
+### 6. Exclusivity, proven now so the ruling can execute without re-deriving it
+
+- **Exclusive** (safe to delete with the routes): `src/pages/give/GivePage.tsx` (imported only by
+  `App.tsx:82`), `src/pages/give/CampaignPage.tsx` (only by `App.tsx:81`).
+- **Shared — must not be deleted:** `src/pages/give/GiveLayout.tsx`.
+  `src/pages/community/CommunityLayout.tsx:16` imports `type { GiveOutletCtx, GiveView }` from it
+  and uses them at 121, 269, 304. A folder-level delete of `src/pages/give/` breaks the community
+  shell's build. **This is the shared component the dispatch told me to prove before deleting.**
+- **Not orphaned:** the `surfaces.ts` `slug: 'give'` entry and everything keyed on it are schema
+  join keys per FUND_MF v0.1, not route registrations. If the surface entry stays while the
+  routes go, `/fund` resolves to nothing (§3). Its disposition is part of the ruling.
+
+### 7. The question — one of two
+
+**(a) Close OPS98 as already satisfied.** The retirement happened inside FRONT52's rename; the two
+lazy `/give` routes stopped existing at `1a41a5c`. Nothing to delete.
+
+**(b) Re-gate OPS98 behind the FUND deploy** — a named DEPLOY AMENDMENT v2 dispatch that sets
+`FUND_INTERNAL_URL` and confirms `themanual.tech/fund` is served by the FUND service with zero
+fixture data. On that day the manifest is exactly: delete `App.tsx:81-82`, `App.tsx:298-299`,
+`GivePage.tsx`, `CampaignPage.tsx`; **keep** `GiveLayout.tsx`, `App.tsx:479-480`,
+`server/index.ts:226-248`; and **rule on** `surfaces.ts` slug `'give'` + `astra-catalog.ts` route
+`/fund` — whether the manual keeps an astra-switcher entry pointing at the proxied FUND service or
+drops FUND from its own surface registry.
+
+### 8. Flagged, not mine, not fixed
+
+1. **Still standing from FRONT52:** `src/lib/surfaces.ts:167-168` `purpose` reads *"Zero fees on
+   kindness."* FUND_MF v0.1 records Butch's 2026-08-17 ruling **activating** the 2% platform fee,
+   and DB50 is claimed right now to flip it. User-visible copy contradicting ratified canon; wants
+   its own dispatch **before** any live pledge.
+2. **The tree is dirty with other sessions' work** — two modified (`deno.lock`,
+   `supabase/functions/fountain/index.ts`) and nine untracked (`give-webhook/index.ts`, five
+   2026-08-14/08-16 migrations, and the DB48/DB50 migration + rollback pairs). None mine, none
+   touched. The five older migrations have now been reported unswept by **three consecutive
+   passes** (FRONT51, FRONT52, this); a SWEEP should carry them, while the DB48/DB50 pairs should
+   wait for those passes to close.
+
+### 9. Could not verify
+
+- **Runtime behaviour of the deletion.** The bounce chain in §3 is read off the three source lines
+  quoted, **not measured by execution** — measuring it would mean making the destructive edit this
+  question exists to avoid. Stated plainly rather than dressed up as a probe.
+- **Production.** FRONT51 and FRONT52 are committed and not pushed, so `themanual.tech` today
+  still serves the old `/give` SPA routes and has no `/fund` at all. Every path here is local.
+- **No build was run** — nothing was edited, so there was nothing to type-check.
+
+### 10. The close, measured rather than asserted
+
+Ruling (a) is a claim about the tree — *the `/give` lazy routes no longer exist* — so it was
+checked rather than taken on trust. Every `/give` URL literal in `src/`, exhaustively:
+
+| file:line | what it is | verdict |
+|---|---|---|
+| `src/App.tsx:132` | comment | not a route |
+| `src/App.tsx:475` | comment | not a route |
+| `src/App.tsx:479` | `<Route path="/give" element={<RedirectGiveToFund />} />` | **FRONT52's redirect — keep** |
+| `src/App.tsx:480` | `<Route path="/give/*" element={<RedirectGiveToFund />} />` | **FRONT52's redirect — keep** |
+| `src/lib/bookmarks.ts:73` | `url: (r) => ` + backtick `/give/${r.slug}` | **emitter, see §11** |
+| `src/lib/quickSearch.ts:50` | `toUrl: (r) => ` + backtick `/give/${r.slug}` | **emitter, see §11** |
+
+**Zero lazy route registrations on `/give` remain.** The two that exist are the redirect half, and
+both are explicitly *keep* under the ruling. The retirement is complete and OPS98's work is
+FRONT52's commit `1a41a5c`.
+
+### 11. FOUND DURING THE CLOSE — two live `/give` emitters FRONT52 missed. NOT FIXED: WRONG LANE.
+
+`src/lib/bookmarks.ts:73` and `src/lib/quickSearch.ts:50` still build **`/give/<slug>`** URLs — the
+bookmarks list and quick-search results both link a campaign at the retired path.
+
+- **Not broken.** `App.tsx:480` catches them client-side and `server/index.ts:226-248` catches them
+  on a cold load, so both land on `/fund/<slug>` with the slug intact. This is a **wasted redirect
+  hop on every bookmark and every search click**, not a dead link.
+- **But it contradicts FRONT52's own report,** which lists under RENAMED: *"every /give URL the UI
+  emits -> /fund"*. These two were missed. Recording it against that claim rather than filing it as
+  a fresh discovery, because the value is in the correction.
+- **Not fixed here, deliberately.** Two reasons, either sufficient: it is outside this dispatch's
+  declared manifest (*"the two lazy route registrations and any now-orphaned components they
+  exclusively imported"* — these are neither), and **R5 puts `src/` under the `front` lane while
+  this is an `ops` pass**. A two-line fix I am confident about is still a lane violation, and the
+  cost of being wrong about "confident" is what the rule is for. Wants a `front` dispatch; both
+  edits are `/give/` -> `/fund/` in a template literal.
+
+---
+
 ## FRONT52 - GiVE RENAMED TO FUND IN THE LIVE SPA; /give 301s TO /fund (2026-08-17)
 
 Lane `front`. Workdir `TheMANUAL.tech`. Scope: NULL in the dispatch row; the body predeclares the
