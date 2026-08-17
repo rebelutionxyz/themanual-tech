@@ -30,7 +30,7 @@ folders := [
     ["AtlasORACLE.to",    ROOT "\AtlasORACLE.to"],
     ["TheWORKSHOP.to",    ROOT "\TheWORKSHOP.to"],
     ["REBELUTION.vote",   ROOT "\REBELUTION.vote"],
-    ["DingleBERRY.tech",  ROOT "\DingleBERRY.tech"],
+    ["REBELUTION.icu",    ROOT "\REBELUTION.icu"],
     ["FreedomBLiNGS.com", ROOT "\FreedomBLiNGS.com"]
 ]
 
