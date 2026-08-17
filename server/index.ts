@@ -165,6 +165,63 @@ if (JUSTICE_INTERNAL_URL) {
   console.warn('[server] JUSTICE_INTERNAL_URL unset — /justice is NOT proxied.');
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// /fund → the FUND service (the Crowdfunding astra, formerly GIVE)
+//
+// SAME MOUNT-ORDER LAW as /vote and /justice above: AFTER express.static,
+// BEFORE the SPA catch-all. This block APPENDS after /justice and never before
+// an existing astra (ASTRA_STANDARD v1.0 item 7 — the order is
+// static → /vote → /justice → /fund → catch-all). Mounted after the catch-all
+// instead, every /fund request would return the manual's SPA shell with a 200
+// and this proxy would silently never run.
+//
+// SHIPS DORMANT. There is no /fund entry in the astra catalog and no FUND
+// service wired yet: with FUND_INTERNAL_URL unset this mount is INERT, not
+// broken — /fund falls through to the SPA shell exactly as it does today. The
+// proxy wakes the moment the owner sets the variable at the dashboard and
+// redeploys. (FRONT49's dormant-proxy → named-setter → wake sequence.)
+//
+// THE /fund PREFIX IS PRESERVED, NOT STRIPPED. FUND is built with
+// NEXT_PUBLIC_BASE_PATH=/fund per ASTRA_STANDARD v1.0 item 2, so it owns that
+// prefix and emits its assets under /fund/_next/. `pathFilter` is used rather
+// than app.use('/fund', …) because Express strips a mount path from req.url and
+// we would have to add it straight back.
+const FUND_INTERNAL_URL = process.env.FUND_INTERNAL_URL;
+
+if (FUND_INTERNAL_URL) {
+  app.use(
+    createProxyMiddleware({
+      // Matches /fund exactly and everything beneath it — and nothing else.
+      // A prefix test alone would also swallow siblings like /funding.
+      pathFilter: (pathname: string) => pathname === '/fund' || pathname.startsWith('/fund/'),
+      target: FUND_INTERNAL_URL,
+      // Keep the browser's Host so FUND sees the public hostname; the private
+      // target does no host-based routing. X-Forwarded-* carries the rest.
+      changeOrigin: false,
+      xfwd: true,
+      ws: false,
+      on: {
+        // A dead or restarting FUND service must degrade to a plain 502 on
+        // /fund and MUST NOT take the manual down with it.
+        error: (err: Error, _req, res) => {
+          console.error('[server] /fund proxy error:', err.message);
+          const response = res as Response;
+          if (typeof response.headersSent === 'boolean' && !response.headersSent) {
+            response.status(502).type('text/plain').send('The fund service is unavailable.');
+          }
+        },
+      },
+    }),
+  );
+  console.log(`[server] /fund proxying to ${FUND_INTERNAL_URL}`);
+} else {
+  // NOT FATAL, deliberately — identical to /vote and /justice. An unset
+  // variable must not stop the manual from serving; /fund simply falls through
+  // to the SPA shell below. This is the DORMANT state and it is the expected
+  // one until the owner sets the variable.
+  console.warn('[server] FUND_INTERNAL_URL unset — /fund is NOT proxied.');
+}
+
 // HTML shell — every non-asset GET returns the SPA shell with per-host
 // <title> + og meta. The SPA's client-side router then handles the path.
 app.get(/.*/, (req: Request, res: Response) => {

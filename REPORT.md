@@ -23,6 +23,188 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONT51 - MANUAL PROXY: MOUNT /fund BEHIND FUND_INTERNAL_URL, DORMANT (2026-08-17)
+
+Lane `front`. Workdir `TheMANUAL.tech`. Scope: NULL in the dispatch row; the body predeclares the
+manifest as the Express serving layer plus the env-setter record, and `REPORT.md` is always in
+scope (R6). Session `7519c43c` (fallback id - no `MC_SESSION` set in this window). Started on a
+clean tree at `5be630f`, `origin/main..HEAD` = 0.
+
+**Result: all done-tests green, committed, NOT pushed.** Manifest held exactly - two files
+(`server/index.ts`, `REPORT.md`), no `src/` edit, no third path.
+
+### 1. The law, and where /fund had to land
+
+ASTRA_STANDARD v1.0 item 7, read from the rail before the file was touched:
+
+> MOUNT ORDER LAW. The manual serves static -> /vote -> /justice -> /fund ->
+> catch-all. New astras append before the catch-all, never before an existing
+> astra.
+
+Verified shape as found, not assumed - `express.static` (line 50) -> `/vote` proxy (86) ->
+`/justice` proxy (139) -> SPA catch-all `app.get(/.*/)` (was 170). The `/fund` block is inserted
+**between the `/justice` block and the catch-all**, which satisfies both halves of item 7 at once:
+before the catch-all, after every existing astra.
+
+After the edit, `grep -n` on the same anchors:
+
+```
+50:  express.static(DIST_DIR, {
+86:      pathFilter: (pathname: string) => pathname === '/vote' || pathname.startsWith('/vote/'),
+139:      pathFilter: (pathname: string) =>                       <- /justice
+196:      pathFilter: (pathname: string) => pathname === '/fund' || pathname.startsWith('/fund/'),
+227:app.get(/.*/, (req: Request, res: Response) => {              <- catch-all, still last
+```
+
+`git diff --stat` = `server/index.ts | 57 +++++` - **57 insertions, 0 deletions.** A pure insertion
+at one point. Zero deletions is the machine-checkable form of "nothing that exists was reordered":
+the `/vote` and `/justice` blocks do not appear in the diff at all, and the catch-all is unchanged
+and still last.
+
+### 2. It ships DORMANT, and dormant is a state that had to be measured
+
+The dispatch's requirement - *absent env means the mount is inert, not broken* - is not a comment,
+it is a behaviour, so it was measured on both sides rather than asserted from the `/vote` and
+`/justice` precedent.
+
+Two boots of `server/index.ts` under `tsx`, against an unroutable stand-in target `http://127.0.0.1:9`
+passed in the **environment only** and never written into the repo. A connection failure to that
+target is SUCCESS - it proves the request reached the proxy instead of the catch-all.
+
+**Boot A - `FUND_INTERNAL_URL` set (the woken state):**
+
+```
+[server] VOTE_INTERNAL_URL unset - /vote is NOT proxied.
+[server] JUSTICE_INTERNAL_URL unset - /justice is NOT proxied.
+[server] /fund proxying to http://127.0.0.1:9
+[server] TheMANUAL.tech HTML-transform server listening on 0.0.0.0:3877
+[server] /fund proxy error: connect ECONNREFUSED 127.0.0.1:9   (x3)
+
+200  /                          bytes=1570  text/html  title="The Manual · HONEYCOMB Knowledge Spine"
+502  /fund                      bytes=32    text/plain "The fund service is unavailable."
+502  /fund/                     bytes=32    text/plain "The fund service is unavailable."
+502  /fund/_next/static/x.js    bytes=32    text/plain "The fund service is unavailable."
+200  /funding                   bytes=1570  text/html  title="The Manual · HONEYCOMB Knowledge Spine"
+200  /vote                      bytes=1570  text/html  title="The Manual · HONEYCOMB Knowledge Spine"
+200  /justice                   bytes=1570  text/html  title="The Manual · HONEYCOMB Knowledge Spine"
+```
+
+Three things are proven here, not one. `/fund/_next/static/x.js` returning **502 rather than a
+200 SPA shell** is the mount-order law passing its own test - had the block landed after the
+catch-all, that asset request would have been answered with HTML and the proxy would never have
+run. `/funding` returning 200 proves the exact-or-descendant `pathFilter` does not swallow
+siblings, which a bare `startsWith('/fund')` would have. And `/` unaffected proves a dead FUND
+target degrades to a plain 502 on `/fund` alone without taking the manual down.
+
+**Boot B - `FUND_INTERNAL_URL` unset (the shipped state):**
+
+```
+[server] FUND_INTERNAL_URL unset - /fund is NOT proxied.
+[server] TheMANUAL.tech HTML-transform server listening on 0.0.0.0:3878
+
+200  /fund                      bytes=1570  text/html  title="The Manual · HONEYCOMB Knowledge Spine"
+200  /fund/                     bytes=1570  text/html  title="The Manual · HONEYCOMB Knowledge Spine"
+200  /fund/_next/static/x.js    bytes=1570  text/html  title="The Manual · HONEYCOMB Knowledge Spine"
+200  /vote                      bytes=1570  text/html  title="The Manual · HONEYCOMB Knowledge Spine"
+200  /justice                   bytes=1570  text/html  title="The Manual · HONEYCOMB Knowledge Spine"
+```
+
+Warn, do not mount, do not exit - `/fund` falls through to the SPA shell exactly as it did before
+this pass existed. **This is what ships.** The proxy wakes when the owner sets the variable and
+redeploys, per FRONT49's dormant-proxy -> named-setter -> wake sequence.
+
+One difference from `/justice` worth stating rather than leaving to be discovered: `/justice` has
+an astra-catalog stub page behind it (`src/lib/astra-catalog.ts`, `route: '/justice'`,
+`mount: 'stub'`), so its unset fall-through renders a real page. **`grep -rn "/fund" src/` returns
+zero matches** - there is no `/fund` catalog entry, so the dormant fall-through is the SPA's own
+unknown-route handling, not a stub. That is inert, which is what the dispatch asked for. Adding a
+catalog entry was NOT done: it is outside this pass's declared manifest.
+
+### 3. The named setter - FUND_INTERNAL_URL
+
+Per ASTRA_STANDARD v1.0 item 8 and the VOTE_INTERNAL_URL lesson (FRONT49), every new env var gets
+a named setter and **no value is ever written into a file or a report**.
+
+| variable | service | setter | when |
+|---|---|---|---|
+| `FUND_INTERNAL_URL` | the **MANUAL** service | **owner**, at the Railway dashboard | after a FUND private service exists; requires a MANUAL redeploy to take effect |
+
+Same shape as the existing `VOTE_INTERNAL_URL` and `JUSTICE_INTERNAL_URL` - the FUND service's
+private internal host. The value appears in no file, no commit, and no report. It is the owner's
+hand at the dashboard, and until that hand moves the mount stays dormant, which is the correct and
+expected state today.
+
+Two dependencies recorded because they are the failure mode that makes a correct mount look broken,
+and both belong to the FUND service's own build rather than to this pass:
+
+- FUND must be built with `NEXT_PUBLIC_BASE_PATH=/fund` (ASTRA_STANDARD item 2). This proxy
+  **preserves the `/fund` prefix and does not strip it** - `pathFilter` is used rather than
+  `app.use('/fund', …)` precisely because Express strips a mount path from `req.url`. A FUND build
+  without that variable roots at `/` and every `/fund/_next/...` asset resolves outside the proxy.
+- `NEXT_PUBLIC_*` variables bake at **build** time (DEPLOY_AMENDMENT v2 term 3), so they must exist
+  before the FUND service's first successful build, not after.
+
+### 4. Done-tests, run, verbatim
+
+```
+npm run build          BUILD_EXIT=0     tsc -b && vite build, "built in 15.12s"
+```
+
+No new warnings. The pre-existing `>500 kB chunk` notice is unchanged. `tsc -b` covers this file -
+`tsconfig` `"include": ["src", "server"]` - so the build is a real type-check of the edit, not just
+a bundle of `src/`.
+
+### 5. Deviations, judgement calls, and one method error worth recording
+
+- **No `src/` edit, no catalog entry, no FUND service files.** FRONT52's files are explicitly
+  disclaimed: nothing in this pass touches, creates, or depends on them. The manifest is
+  `server/index.ts` + `REPORT.md`.
+- **The named setter is recorded here rather than inserted as a dispatch row.** The dispatch says
+  "add a NAMED SETTER ... in the deploy env dispatch"; R7 forbids INSERTing into `ops_dispatches`
+  from a terminal absolutely. Recording it in the report of record and the R3 report is the same
+  resolution FRONT49 reached ("this report is the named-setter record"). Flagged rather than
+  silently reinterpreted.
+- **A method error, caught and fixed rather than reported as a result.** The first probe run
+  spawned the server with `shell: true`, so `child.kill()` killed the shell and not the node
+  grandchild; a stale listener from an earlier session was already holding the reused port, and the
+  probe measured *that* process. The tell was a self-contradicting transcript - the server log said
+  `/fund proxying` and `VOTE unset`, while the probes returned 502 on `/vote` and 200 on `/fund`.
+  The rewrite spawns without a shell, **asserts the port is free before boot and that the listening
+  PID belongs to this child's own tree after boot** (`FOREIGN: none` in both boots above), and
+  kills with `taskkill /T /F`, confirming `listeners after kill: none`. Both boots above are from
+  the corrected harness. Recorded because an unverified port is exactly how a probe reports a
+  neighbour's behaviour as your own.
+
+### 6. Could not verify
+
+- **Anything behind a real FUND service.** No FUND service exists yet, so the woken path is proven
+  only against an unroutable stand-in - it proves the request reaches the proxy and that failure
+  degrades correctly, not that FUND renders. The end-to-end smoke of record (ASTRA_STANDARD item 10)
+  belongs to the pass that ships FUND.
+- **Production behaviour of the dormant mount.** Measured locally only. It cannot be smoke-tested
+  from a laptop: the manual's Railway service is where it runs, and this pass is NOT PUSHED.
+
+### 7. Manifest and commit
+
+Manifest, `git status --porcelain=v1 -uall` before staging:
+
+```
+ M REPORT.md
+ M server/index.ts
+```
+
+Danger scan against the SWEEP gates: zero paths matching `backups/`, `*.env*`, `settings.local.json`,
+`node_modules/`, `.next/`, `verify-out/`, `*.dump`; no file over 1 MB; no deletion, no rename. Two
+paths, both inside the workspace, both declared.
+
+**Where the commit hash lives.** Not here, same as FRONT41 / FRONT40 and for the same reason: this
+section is *inside* the commit it describes, so it cannot name its own hash without an amend. The
+hash is in the FRONT51 rail report (`ops_reports`, filed after the commit) and in `git log -1`.
+
+**NOT PUSHED.** The push is the owner's click.
+
+---
+
 ## FRONT49 - MANUAL PROXY: MOUNT /justice BEHIND JUSTICE_INTERNAL_URL (2026-08-14)
 
 Lane `front`. Workdir `TheMANUAL.tech`. Scope: NULL in the dispatch row; the body predeclares the
