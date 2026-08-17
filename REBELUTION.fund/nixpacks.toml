@@ -1,0 +1,50 @@
+# Nixpacks build config -- used by Railway. (FUND)
+#
+# Ported from the VOTE app's nixpacks.toml by way of Justice's, which is the
+# working artifact this shape was proven on. Same reasoning, restated rather
+# than referenced, because the next person to read this file will be standing in
+# this folder.
+#
+# NIXPACKS, not the Dockerfile builder TheMANUAL.tech uses, and the reason is
+# NEXT_PUBLIC_*. Those values are INLINED INTO THE BUNDLE AT BUILD TIME, not
+# read at runtime -- so they must exist during `next build`, not merely in the
+# running container. Nixpacks gets the service's variables during build for
+# free; the Dockerfile path would need every one of them threaded through
+# `buildArgs`. Fewer moving parts, same result.
+#
+# Consequence worth knowing: changing an env var in the Railway dashboard does
+# NOT take effect until the service is REDEPLOYED. Setting
+# NEXT_PUBLIC_DATA_SOURCE=live on a built service and reloading the page will
+# not switch it, and neither will setting NEXT_PUBLIC_BASE_PATH.
+#
+# ---------------------------------------------------------------------------
+# THE OPS89 LESSON, FOR WHOEVER FILLS IN THE DASHBOARD (stated as fact, not as
+# a warning to interpret): Railway's `railwayConfigFile` setting RESOLVES FROM
+# THE REPO ROOT, not from the service's root directory. This app lives in a
+# subfolder of the workspace repo, so the value to enter is:
+#
+#     REBELUTION.fund/railway.json
+#
+# NOT `railway.json`. Seven silent build failures were spent on this exact
+# distinction before it was written down. ASTRA_STANDARD v1.0 §6 makes both the
+# in-folder railway.json AND the dashboard Root Directory required -- neither
+# substitutes for the other.
+# ---------------------------------------------------------------------------
+#
+# `npm run build` runs the live-only build guard first (package.json
+# `prebuild` -> scripts/build-guard.mjs, then scripts/href-check.mjs). A service
+# that is not configured to read the live record FAILS THE BUILD here rather
+# than deploying green and quietly serving fixtures. That is deliberate: treat a
+# build that stops in this phase as the guard working, and fix the variables.
+
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm ci --no-audit --no-fund"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm run start"

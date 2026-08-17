@@ -1,0 +1,45 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+*.tsbuildinfo
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# env
+.env
+.env*.local
+
+# done-test output
+/verify-out
+
+# ─────────────────────────────────────────────────────────────────────
+# DB dumps — NEVER commit raw production data.
+# The live dump sits at <honeycomb-root>/backups/ and is already ignored by
+# the enclosing repo's .gitignore. This entry is defence-in-depth for the day
+# REBELUTION.fund/ becomes its own repo.
+# ─────────────────────────────────────────────────────────────────────
+backups/
+
+# Logs
+*.log
+
+# ─────────────────────────────────────────────────────────────────────
+# Claude Code settings: the shared allowlist IS committed; personal
+# overrides are not. Do not ignore .claude/settings.json.
+# ─────────────────────────────────────────────────────────────────────
+.claude/settings.local.json
+!.claude/settings.json

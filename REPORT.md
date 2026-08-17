@@ -23,6 +23,1380 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## DB54 — FLAG THE TEST SEED: `is_fixture` on `give_campaigns` and `fountain_pledges`. APPLIED. (2026-08-17)
+
+Session `32c6b4f8` (fallback id — no `MC_SESSION`). Dispatch: DB54, lane `db`, workdir
+`TheMANUAL.tech`, `scope` NULL. Implements the LEAD RULING on DB49's proposal; DB49's diagnosis and
+its precedent search were read, not re-derived.
+
+**Outcome in one line: applied, on one human ask-click, and the fabricated money is gone —
+`fund-the-fountain.raised_cents` measured 32000 before and 0 after. Both refusals were proven by
+execution with their error text captured verbatim, and the non-fixture counting proof ran inside a
+transaction that deliberately rolled itself back, so no real campaign row was written. FUND_MF D-2
+is closed.**
+
+### 0. The ledger, measured in the order the amendment now requires
+
+**MEASURE FIRST, before authoring** (root `CLAUDE.md` R7, the OPS86 reordering):
+
+```
+  407 history rows with no repo file   (0 on/after baseline)
+   39 repo files with no history row   (0 on/after baseline)
+   32 version-matched pairs, file != applied   (0 on/after baseline)
+RECONCILED on/after baseline — freeze-lift criterion MET
+EXIT=0
+```
+
+Clean on arrival. Then the rollback was written, then the migration. The measure taken **after**
+authoring returns exit 1 by construction — an authored-but-unapplied file *is* the repo-unpaired
+B-case — so the ONE EXEMPTION applies and is verified **by name, not by counting**:
+
+```
+baseline 20260801000000
+B repo-unpaired on/after baseline: [{"version":"20260817230000","file":"20260817230000_db54_fund_is_fixture_v1.sql"}]
+A orphans on/after baseline: []
+C drifted on/after baseline: []
+```
+
+Exactly this pass's own pending migration and nothing else; no applied version lacking a repo file.
+Closing measure is in §5.
+
+### 1. Pre-flight, recorded per the MIGRATION AMENDMENT
+
+- **Targets.** `public.give_campaigns` (3 rows), `public.fountain_pledges` (2 rows). Both entirely
+  seed; there is no non-seed row in either table.
+- **Dependent views / matviews / rules on either table: NONE.**
+- **Routines touching the targets (16 read `give_campaigns` or `fountain_pledges`).** Four are
+  rewritten here — `fountain_counters`, `fountain_begin_close`, `fountain_register_pledge`,
+  `give_campaigns_derive_counters`. The rest are unchanged: `fountain_recount`,
+  `fountain_pledges_sync_counters`, `fountain_pledge_captured`, `fountain_pledge_canceled`,
+  `fountain_finalize_close`, `campaigns_search`, `give_campaign_create`, `give_campaign_cancel`,
+  `give_campaign_set_funding`, `give_campaign_set_cover`, `entity_activity`, `realm_tree`.
+- **Function bodies BEFORE the apply**, recovered with `pg_get_functiondef()` and quoted in full in
+  the rollback file:
+
+  | function | md5 | octet_length |
+  |---|---|---|
+  | `fountain_counters(uuid)` | `b00e393f7334b641a4570e9a33fba247` | 492 |
+  | `fountain_begin_close(uuid)` | `9bc736dd9faaf5f0a3390b5acd7d453c` | 1334 |
+  | `fountain_register_pledge(uuid,uuid,bigint,text,text,uuid)` | `4fbfd6b8b0efeb8f0c11b422a86a4702` | 1237 |
+  | `give_campaigns_derive_counters()` | `74f1a8e0322973445de0a11bf1a84ca7` | 368 |
+
+- **Triggers already on the targets.** `give_campaigns_derive_counters` (BEFORE INSERT OR UPDATE),
+  `give_campaigns_lock8_default_insert` (BEFORE INSERT), `fountain_pledges_sync_counters` (AFTER
+  INSERT/UPDATE/DELETE). The new BEFORE trigger on `fountain_pledges` is independent of the AFTER
+  one and cannot race it.
+- **Constraints / indexes: none dropped, none added.** Two columns added, both `NOT NULL DEFAULT
+  false`, so the table rewrite is a metadata-only default in PG 11+.
+- **Rows at risk: 5, all fabricated, none financial.** No `bling_transactions` row references either
+  pledge's `source_ref` (DB49), so nothing downstream unwinds.
+- **Rollback: written FIRST**, at
+  `supabase/migrations/_drafts/20260817230621_db54_fund_is_fixture_v1_rollback.sql`. It restores all
+  four function bodies verbatim, drops the new trigger and its function, rederives every campaign
+  under the restored counters, then drops both columns — in that order, so nothing referencing
+  `is_fixture` survives the column drop. Its header states plainly what running it restores: the
+  poisonable verdict.
+
+### 2. The convention, followed exactly — and the enforcement point, chosen differently
+
+`is_fixture boolean NOT NULL DEFAULT false`, verified identical to the three existing tables:
+
+```
+elections.is_fixture         boolean  NOT NULL  default false
+fountain_pledges.is_fixture  boolean  NOT NULL  default false   <- new
+give_campaigns.is_fixture    boolean  NOT NULL  default false   <- new
+justice_dockets.is_fixture   boolean  NOT NULL  default false
+justice_entities.is_fixture  boolean  NOT NULL  default false
+```
+
+**JUSTICE enforces at the READ boundary** — eight `*_public` views filter `is_fixture`, so the
+public surface never sees a fixture. **FUND deliberately does not copy that.** The danger here is
+not that someone *sees* the seed, it is that the seed *participates in a money decision*, so FUND
+takes the **ELECTIONS** shape (a fixture election cannot take a vote or be certified) and enforces
+at the write and derivation boundaries. The three campaigns stay visible on the public grid — the
+dispatch's "do not purge" reasoning applies to hiding as much as to deleting, and hiding would make
+the seed *harder* to notice.
+
+### 3. What was applied, in four layers
+
+Each layer alone prevents the harm; all four are present because each fails differently.
+
+1. **DERIVATION.** `fountain_counters` gains `AND is_fixture = false`. This is the change that makes
+   the money honest everywhere at once, because `fountain_begin_close` reads `raised_cents` off the
+   campaign row this function derives.
+2. **VERDICT.** `fountain_begin_close` **refuses outright** on a fixture campaign — not "computes
+   zero". The check sits immediately after the row is loaded and *before* the `status='closing'`
+   transition, so the exception aborts the call having written nothing.
+3. **ADMISSION.** `fountain_register_pledge` refuses a pledge against a fixture campaign. This
+   belongs in the database and was achievable in this pass: `fountain_pledges` has RLS with **no
+   INSERT policy at all**, so this SECURITY DEFINER RPC is the only path that can create a pledge
+   row. Closing it closes the admission path completely.
+4. **SEGREGATION.** `fountain_pledges_fixture_segregation` (BEFORE INSERT OR UPDATE OF
+   `campaign_id`) derives a pledge's `is_fixture` from its campaign and never trusts the caller, so
+   a mixed population is unrepresentable rather than merely filtered.
+
+**A fifth guard the dispatch did not ask for, added because DB48 had already found the vector.**
+`give_campaigns` carries `give_update_own` — a permissive UPDATE policy for the `public` role,
+`USING (auth.uid() = created_by)`, with **no `with_check`** — so without a pin, a campaign's own
+creator could clear `is_fixture` straight from the client and walk the seed back into the money
+path. `give_campaigns_derive_counters` now pins the flag for exactly the two client-reachable roles:
+
+```sql
+IF auth.role() IN ('anon','authenticated') THEN
+  IF TG_OP = 'UPDATE' THEN NEW.is_fixture := OLD.is_fixture;
+  ELSE NEW.is_fixture := false;
+  END IF;
+END IF;
+```
+
+**The positive role test is deliberate and worth stating, because the obvious form is a trap.**
+`auth.role()` is NULL over the management API and psql, so `IF auth.role() IS DISTINCT FROM
+'service_role'` would have evaluated TRUE for the migration itself and silently pinned this very
+migration's own flagging UPDATE — the columns would have been added and nothing would have been
+flagged, with no error. Testing the two client roles positively leaves an operator, a later
+migration and the edge functions all able to mark or unmark a fixture deliberately.
+
+**Order inside the file is load-bearing:** flags are written while the OLD fixture-unaware counters
+are still installed (so those UPDATEs are counter no-ops), then the counters are replaced, then
+every campaign is rederived, and the `is_fixture` pin is installed LAST so it cannot interfere with
+the flagging UPDATE above it.
+
+### 4. PROVEN, MEASURED — done-test output verbatim
+
+**4a. The money. `fund-the-fountain` 32000 → 0.** Before (§1 pre-flight query):
+
+```
+slug              status  funding_model  goal_cents  raised_cents  captured_cents
+bee-sanctuary     active  NULL           NULL        0             0
+community-mural   active  kwyr           100000      0             0
+fund-the-fountain active  aon            50000       32000         0
+```
+
+After:
+
+```
+slug              status  funding_model  goal_cents  raised_cents  captured_cents  is_fixture
+bee-sanctuary     active  NULL           NULL        0             0               true
+community-mural   active  kwyr           100000      0             0               true
+fund-the-fountain active  aon            50000       0             0               true
+```
+
+All five seed rows carry the flag (`pi_seed_1` 20000 and `pi_seed_2` 12000 both `is_fixture=true`),
+and **the 32000 that decided an all-or-nothing verdict is now 0.** A real 18000 pledge can no longer
+reach the 50000 goal on money that never existed — and it can no longer be accepted at all.
+
+**4b. A fixture campaign refuses to close. Error text verbatim:**
+
+```
+ERROR:  P0001: campaign is a fixture and cannot be closed
+CONTEXT:  PL/pgSQL function fountain_begin_close(uuid) line 7 at RAISE
+```
+
+**4c. A fixture campaign refuses a pledge. Error text verbatim:**
+
+```
+ERROR:  P0001: campaign is a fixture and cannot take a pledge
+CONTEXT:  PL/pgSQL function fountain_register_pledge(uuid,uuid,bigint,text,text,uuid) line 7 at RAISE
+```
+
+**Both probes were safe *because* they fail.** Each refusal raises before its function's first
+write, so the exception aborts the statement having changed nothing. Verified after: all three
+campaigns still `status='active'`, still 3 campaigns and 2 pledges, and zero rows matching
+`pi_db54%`.
+
+**4d. A NON-fixture campaign still counts correctly — proven without writing a real campaign row.**
+The dispatch asked how. **A `DO` block is a single statement, so an exception raised inside it rolls
+back everything it did.** The block created a non-fixture campaign and three pledges (20000
+authorized, 12000 captured, 9900 canceled), read the counters, and then raised its own measurements
+as the error message — which both reports the result and destroys the rows:
+
+```
+ERROR:  P0001: DB54 PROOF (deliberately rolled back): fountain_counters raised=32000 captured=12000
+        | stored raised=32000 captured=12000 | campaign is_fixture=f | derived pledge flags={f,f,f}
+```
+
+Four things fall out of that one line: the derivation still sums `authorized + captured` = 32000 on
+a non-fixture campaign; `captured_cents` = 12000; the `canceled` 9900 is excluded (DB48's D-2
+semantics intact); the stored column matches the function exactly (the DB48 trigger chain still
+fires); and the segregation trigger derived `{f,f,f}` on pledges nobody told it about. Post-check
+confirms **0 leftovers** — `give_campaigns` back to 3 rows, `fountain_pledges` back to 2.
+
+**4e. Structure verified against the catalog after the apply:**
+
+```
+fountain_begin_close                 md5 160133b8e46c03ba60cd989a85c0ec1a  1429 B  postgres=X | service_role=X
+fountain_counters                    md5 63c65c139bddc75488eff8ff259b3f2a   520 B  postgres=X | service_role=X
+fountain_pledges_fixture_segregation md5 ead27326225c35ec7cfb97ba9355535b   441 B  postgres=X | service_role=X
+fountain_register_pledge             md5 ee161e3ab13e3deeb36df7f59b87078b  1373 B  postgres=X | service_role=X
+give_campaigns_derive_counters       md5 f96ffdc97bdd9d1340164a0113e9fadf   537 B  postgres=X | service_role=X
+
+CREATE TRIGGER fountain_pledges_fixture_segregation BEFORE INSERT OR UPDATE OF campaign_id
+  ON public.fountain_pledges FOR EACH ROW EXECUTE FUNCTION fountain_pledges_fixture_segregation()
+```
+
+No `PUBLIC`, `anon` or `authenticated` EXECUTE on any of the five.
+
+### 5. The apply, the re-stamp, and the closing measure
+
+`apply_migration` was called **once** — one ask, one human click — as `db54_fund_is_fixture_v1`, and
+returned `{"success":true}`. It stamped its own version, as canon warns:
+
+| | |
+|---|---|
+| authored as | `20260817230000_db54_fund_is_fixture_v1.sql` |
+| **stamped by `apply_migration`** | **`20260817230621`** |
+| repo file renamed to | `supabase/migrations/20260817230621_db54_fund_is_fixture_v1.sql` |
+| rollback renamed to | `supabase/migrations/_drafts/20260817230621_db54_fund_is_fixture_v1_rollback.sql` |
+
+Closing measure, after the rename:
+
+```
+  407 history rows with no repo file   (0 on/after baseline)
+   39 repo files with no history row   (0 on/after baseline)
+   32 version-matched pairs, file != applied   (0 on/after baseline)
+RECONCILED on/after baseline — freeze-lift criterion MET
+EXIT=0
+```
+
+The version-matched pair count went 267 → 268 and **faithful** 235 → 236, so the repo file is
+recorded as matching what ran despite carrying its full commentary — the tool normalizes comments.
+
+### 6. Deviations and judgement calls
+
+- **The lead's step 3 was implemented as written (filter the counters), NOT DB49's preferred
+  segregation-only design.** DB49 recommended keeping the demo's $320; the ruling said the number is
+  fabricated and must go, and that is the correct call — a public page showing money that never
+  existed is the thing this pass exists to end. **Both were built**: the counters filter *and* the
+  segregation trigger, so the guarantee holds by construction as well as by filtering.
+- **The `is_fixture` pin (§3, fifth guard) is beyond the five numbered steps.** Added because
+  leaving it out would have made every other layer defeatable from the client by the campaign
+  creator, via a policy DB48 had already documented. Flagged here rather than done silently.
+- **Files renamed, not `git mv`'d.** Both were untracked; no history to move.
+
+### 7. What I could not verify, and what is left
+
+- **Dispatch step 5, answered: the DB half is done, an edge residue remains and is NOT closed
+  here.** `/pledge` opens the Stripe PaymentIntent *before* calling `fountain_register_pledge`, so a
+  real giver aiming at a fixture campaign now gets an authorization opened and then immediately
+  refused — leaving an orphan uncaptured PI that Stripe voids on its own (~7 days) and that
+  `give-webhook` records as `unresolved`. **No money is ever captured and no pledge row is ever
+  created**, which is what this pass owes. Moving the refusal ahead of the PI-create is a `fountain`
+  edge-function change — a deploy, and its own dispatch. **Not done here**, per R7.
+- **No live end-to-end pledge attempt was made against the deployed edge function.** Proving the
+  refusal through the real HTTP path needs a real signed-in browser session; the DB-level proof
+  above is exact but stops at the RPC boundary.
+- **`campaigns_search` still returns fixture campaigns.** Correct under this design (badge, do not
+  hide) but the FRONT pass now owes the badge: `src/lib/campaigns.ts` needs `is_fixture` in its
+  explicit `COLUMNS` list and the `Campaign` interface, `CampaignCard.tsx` a chip, and
+  `PledgePanel.tsx` a `Blocker` case ahead of `payout-not-ready`. **Until that lands the refusal is
+  correct but silent** — a giver on a fixture campaign sees a generic failure, not an explanation.
+- **Other astras' seed data was not audited.** `bazaar_listings`, `chat_rooms` and `message_threads`
+  are empty today and will need the same convention the day they are seeded.
+- **Nothing was committed.** Working tree carries this file plus the two new SQL files; the human
+  commits (R7).
+
+---
+
+## OPS103 — PRE-DEPLOY VERIFICATION: repo `fountain` (v15) + `give-webhook`. NO deploy. (2026-08-17)
+
+Session `ae8dcd47` (fallback id — no `MC_SESSION`). Dispatch: read the source of the two functions the
+owner is about to deploy and prove it does what canon claims, **before** the clicks. Nothing was
+deployed, no CLI was run against Supabase, no env file or secret was read. Files written: this one.
+
+**VERDICT: both functions are SAFE TO DEPLOY as written.** Every claim in the dispatch's checklist
+holds. Three defects and four residual risks are recorded below; **none of them are introduced by
+this deploy** — the worst one (§F1) is pre-existing in the deployed June bundle and is *partially
+mitigated* by shipping `give-webhook`. One thing genuinely could not be verified without deploying
+(§F4) and it is the one that decides whether the fee is 2% or silently 0%; the post-deploy check in
+§4.1 is written specifically to catch it on the first pledge.
+
+### 0. What was measured, and how
+
+| thing | method | result |
+|---|---|---|
+| repo `fountain/index.ts` | read, 283 lines, committed at `0272207` (tree clean for `supabase/functions/`) | v15, fee-activated |
+| repo `give-webhook/index.ts` | read, 246 lines, same commit | new function, never deployed |
+| deployed `fountain` | `list_edge_functions` + `get_edge_function` (read-only) | version 15, `verify_jwt: true`, `ezbr_sha256 7d071fac…11f05`, `updated_at` 1781118811348 = 2026-06-10. Source is the JUNE code. |
+| deployed `give-webhook` | `list_edge_functions` | **absent from the project entirely** — confirms "authored only" |
+| all 6 RPCs the two functions call | `pg_get_function_identity_arguments` + `pg_get_functiondef` | exist, signatures match, bodies read in full |
+| `fee_schedule` row | `select` | `give` / `astra_ref` NULL / `bee_ref` NULL / `platform_pct 2` / `min_fee_cents` NULL / `max_fee_cents` NULL / **`active true`** |
+| type check | `deno check supabase/functions/fountain/index.ts supabase/functions/give-webhook/index.ts` | `Check … / Check …`, **exit 0** (verbatim, re-run for the exit code) |
+
+Deno 2.9.4, supabase CLI 2.95.4 present locally. **There is no `supabase/config.toml` in this repo** —
+which is why `--no-verify-jwt` on the command line is load-bearing (§3.2).
+
+### 1. THE REPO FOUNTAIN — the five checks
+
+**1.1 — Is the rate read at call time, or hardcoded?** *Read at call time. Nothing is hardcoded.*
+
+```ts
+114    const { data: fee, error: feeErr } = await sb.rpc('fee_resolve', {
+115      p_fee_key: 'give',
+116      p_astra: astraSlug,
+117      p_bee: null,
+118    });
+```
+
+The only numeric literals on the fee path are `100` (the percent divisor, line 137) and `0`. The
+string `2` appears nowhere in the module. `fee_resolve` is `STABLE SECURITY DEFINER` and filters
+`WHERE fs.fee_key = p_fee_key AND fs.active` — so `active=false` really is a no-redeploy kill switch:
+the row resolves to NULL, `feePct` is 0, and lines 134/164 omit `application_fee_amount` from the
+PaymentIntent entirely. Verified against the live body of `public.fee_resolve`.
+
+Two deliberate design choices, both correct and both worth stating because they are easy to misread
+as bugs:
+
+- **`feeErr` does not fall through to 0%** (lines 119–127) — an unreadable fee schedule returns
+  `503` and the pledge is declined. Guessing in either direction is worse.
+- **`p_bee: null`** — the code comment (lines 99–106) says `fee_schedule.bee_ref` has never been
+  ruled to mean the manager or the contributor, so passing a guess could charge the wrong party.
+  Passing NULL can only under-match to the global rate. Confirmed against `fee_resolve`'s ORDER BY:
+  specificity is `bee_ref(2) + astra_ref(1) DESC LIMIT 1`, so NULL simply loses to nothing.
+  **Standing constraint this creates: no `bee_ref` row for `fee_key='give'` may be created until
+  that is ruled**, because such a row could never be reached from here and would read as live.
+
+**1.2 — `application_fee_amount`, and the arithmetic.** *Set; arithmetic correct.*
+
+```ts
+137      applicationFeeCents = Math.round((amountCents * feePct) / 100);
+138      if (f.min_fee_cents != null) applicationFeeCents = Math.max(applicationFeeCents, Number(f.min_fee_cents));
+139      if (f.max_fee_cents != null) applicationFeeCents = Math.min(applicationFeeCents, Number(f.max_fee_cents));
+...
+164          ...(applicationFeeCents > 0 ? { application_fee_amount: applicationFeeCents } : {}),
+```
+
+Formula: `application_fee_amount = clamp( round(amount_cents × platform_pct ÷ 100), min_fee_cents, max_fee_cents )`,
+then clamped to `amount_cents − 1` if it would meet or exceed the charge (lines 143–148, logged as a
+configuration error rather than failing the contributor's pledge).
+
+**Worked example — a 20000-cent pledge at the live row (`platform_pct 2`, both bounds NULL):**
+`20000 × 2 ÷ 100 = 400` → `Math.round(400) = 400` → no min, no max → `400 < 20000`, no clamp →
+**`application_fee_amount: 400`**. A $200.00 pledge routes **$4.00** to the platform at capture; the
+manager receives the remainder less Stripe's own processing, which the manager bears. `Math.round` is
+half-up in JS, so odd amounts round to the nearest cent in the platform's favour by at most 0.5¢
+(e.g. 999¢ → 19.98 → 20¢); that is the conventional behaviour and is stated only for completeness.
+
+**1.3 — Still a DIRECT charge with manual capture?** *Yes, both. No drift to destination charges.*
+
+```ts
+158        pi = await stripe.paymentIntents.create(
+160            amount: amountCents,
+161            currency: campaign.currency ?? 'usd',
+162            capture_method: 'manual',
+...
+173          { stripeAccount: campaign.manager_connect_account },
+```
+
+`{ stripeAccount: … }` is the `Stripe-Account` header — a direct charge on the manager's Express
+account. **`transfer_data`, `on_behalf_of`, `destination`, and `transfer_group` appear nowhere in the
+module** (checked by reading, not by grep). `capture_method: 'manual'` is unchanged from the deployed
+version. No `OPS103-Q` was required.
+
+The no-custody posture is intact and, importantly, `application_fee_amount` *is* the mechanism that
+keeps it intact: on a direct charge Stripe splits at settlement and the platform's cut never enters
+the manager's flow of funds as a platform-initiated transfer. AON reinforces it — no capture means no
+charge means no fee, so a campaign that misses its goal pays the platform nothing.
+
+**1.4 — POST-DB48: does it write `raised_cents` / `captured_cents`? Are the RPC signatures current?**
+*It writes neither, directly or via RPC. All six signatures match. No double-count, no error.*
+
+The repo fountain touches `give_campaigns` exactly twice, both `SELECT` (lines 83–87 and 229–233).
+There is no `.update(`, no `.insert(`, and no `.upsert(` against that table anywhere in the module,
+and none against `fountain_pledges` either — every mutation goes through an RPC.
+
+Every RPC the module calls, checked against the live catalogue:
+
+| called at | RPC | live identity args | live result | matches |
+|---|---|---|---|---|
+| 114 | `fee_resolve` | `p_fee_key text, p_astra text, p_bee uuid` | `fee_schedule` | ✅ |
+| 183 | `fountain_register_pledge` | `p_campaign_id uuid, p_bee_id uuid, p_amount_cents bigint, p_currency text, p_payment_intent_id text, p_source_ref uuid` | `jsonb` | ✅ |
+| 237 | `fountain_begin_close` | `p_campaign_id uuid` | `jsonb` | ✅ |
+| 251 | `fountain_pledge_captured` | `p_pledge_id uuid` | `jsonb` | ✅ |
+| 256, 264 | `fountain_pledge_canceled` | `p_pledge_id uuid, p_failed boolean` | `jsonb` | ✅ |
+| 270 | `fountain_finalize_close` | `p_campaign_id uuid` | `jsonb` | ✅ |
+
+**The old increment lines really are gone from the RPC bodies** — I read all six. `fountain_pledge_captured`
+now ends with `UPDATE fountain_pledges SET status='captured', captured_at=now(), reward_lot_id=…` and
+nothing else; `fountain_pledge_canceled` only flips `status`. The counters arrive by trigger:
+
+```
+fountain_pledges_sync_counters  AFTER INSERT OR DELETE OR UPDATE ON fountain_pledges
+    → fountain_recount(campaign_id)
+    → UPDATE give_campaigns SET raised_cents/captured_cents = fountain_counters(id)
+give_campaigns_derive_counters  BEFORE INSERT OR UPDATE ON give_campaigns
+    → NEW.raised_cents/captured_cents := fountain_counters(NEW.id)   -- pins any hand-write back to truth
+fountain_counters(id) = sum(amount_cents) FILTER (status IN ('authorized','captured'))  -- raised
+                        sum(amount_cents) FILTER (status = 'captured')                  -- captured
+```
+
+So the counters are *derived*, and `give_campaigns_derive_counters` being a BEFORE trigger means even
+a direct `UPDATE … SET raised_cents = …` would be overwritten with the derived value. **A fountain
+that called the old incrementing signatures would have failed loudly on a missing function, not
+double-counted — and it calls none of them.** This is the check the dispatch called CRITICAL, and it
+passes.
+
+One consequence worth recording for whoever reads the AON verdict: `fountain_begin_close` computes
+`v_success := v_c.raised_cents >= v_c.goal_cents` from the *stored* column, which is now the derived
+one — so an expired authorization that `give-webhook` flips to `canceled` immediately drops out of
+`raised_cents` and the verdict cannot fire on evaporated money. That is defect D-2 actually closed,
+end to end, and it only closes once **both** halves are live.
+
+**1.5 — Does `/pledge` return `client_secret` AND `stripe_account`?** *Yes — plus the two fee fields.*
+
+```ts
+208    return jsonResponse({
+209      ok: true,
+210      pledge: reg,
+211      client_secret: pi.client_secret,
+212      stripe_account: campaign.manager_connect_account,
+215      platform_fee_cents: applicationFeeCents,
+216      platform_fee_pct: feePct,
+```
+
+Cross-checked against the consumer: `REBELUTION.fund/src/lib/pledge.ts:356-369` reads exactly
+`body.client_secret` and `body.stripe_account`, hard-fails if either is missing, and passes them to
+Stripe.js as `clientSecret` + `stripeAccount`. **FRONT56's contract is satisfied and unchanged** — v15
+only *adds* fields, so the deploy cannot break the pledge screen. See §F3 for what FRONT is not yet
+doing with the two new ones.
+
+### 2. GIVE-WEBHOOK — the four checks
+
+**2.1 — Signature verified before any row is touched?** *Yes. Strictly.*
+
+```ts
+ 89    const rawBody = await req.text();          // raw body, not parsed first
+ 95      event = await stripe.webhooks.constructEventAsync(
+ 96        rawBody, sig, WEBHOOK_SECRET, undefined, cryptoProvider,
+102      return new Response('Invalid signature', { status: 400 });
+105    // ---- everything below this line is verified Stripe data ---------------
+```
+
+The first `serviceClient()` call is at line 127 — after the verify, after the `HANDLED` filter, after
+the `pi_` id shape check. There is no read and no write above line 105. `constructEventAsync` +
+`cryptoProvider` (SubtleCrypto) is the correct edge-runtime form; the sync variant would throw for
+want of Node crypto. A missing secret returns 500 *before* anything else (lines 80–83), and a missing
+`stripe-signature` header returns 400. **Unverified input reaches nothing.**
+
+**2.2 — Which events, and do they cover what DB48's triggers need?** *Four events; coverage is complete.*
+
+| event | handler | pledge status | counter effect via trigger |
+|---|---|---|---|
+| `payment_intent.amount_capturable_updated` | self-heal `fountain_register_pledge` if no row | → `authorized` | enters `raised_cents` |
+| `payment_intent.succeeded` | `fountain_pledge_captured` | → `captured` | enters `captured_cents`, stays in `raised_cents` |
+| `payment_intent.canceled` | `fountain_pledge_canceled(false)` | → `canceled` | **leaves `raised_cents`** ← the D-2 path |
+| `payment_intent.payment_failed` | `fountain_pledge_canceled(true)` | → `capture_failed` | leaves `raised_cents` |
+
+`fountain_counters` filters on exactly `authorized`/`captured`, so those four transitions are the
+complete set that moves either counter. `fountain_pledges_status_check` permits one further status,
+`refunded`, which no event here produces — refunds are out of scope for DB48 and are noted in §F2.
+Stripe's ~7-day auto-void of an uncaptured authorization arrives as `payment_intent.canceled`, which
+is the row that had to exist for D-2 to close. Everything unhandled is acked 200 and writes nothing
+(lines 107–110) — correct, and worth knowing when testing (§4.2).
+
+**2.3 — Its own signing secret?** *Yes.*
+
+```ts
+ 57  const WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET_GIVE') ?? '';
+```
+
+Distinct name, used nowhere else in the repo. Its own header (lines 19–26) states the rule
+explicitly: it must never be set to the value behind `STRIPE_WEBHOOK_SECRET_SUBSCRIPTION` or
+`STRIPE_WEBHOOK_SECRET_PRESS`, because a shared signing secret lets any one endpoint forge traffic
+for the others. **That is an owner action at secret-set time and no code can enforce it** — it is
+called out as a pre-check in §3.1. No value was read or printed by this pass.
+
+**2.4 — Idempotent under Stripe retries?** *Yes, at two independent layers.*
+
+- **Event layer.** `stripe_events.event_id` carries `UNIQUE (event_id)` (verified in `pg_constraint`),
+  the upsert uses `onConflict: 'event_id', ignoreDuplicates: true`, and the short-circuit at lines
+  156–160 fires **only** on `status='processed'`. So a *failed* event reprocesses on retry while a
+  *completed* one returns `{duplicate:true}` without re-calling anything. Correct polarity — the
+  common bug is short-circuiting on row-existence, which would drop a half-finished event forever.
+- **Pledge layer.** `fountain_pledge_captured` returns `{ok:true,duplicate:true}` when the row already
+  reads `captured` (and `fountain_pledge_canceled` likewise for `canceled`/`capture_failed`), so the
+  BLiNG! reward cannot be freed twice — which is exactly the `/close`-captured-it-first case.
+  `fountain_register_pledge` carries `ON CONFLICT (stripe_payment_intent_id) DO NOTHING`, so the
+  self-heal path cannot race the `/pledge` route into two rows.
+
+Two more things confirmed against the live schema, because either would have made the first real
+event fail on a constraint:
+
+- `stripe_events_product_type_check` permits `'fund'` — the value at line 148. ✅
+- `stripe_events_status_check` permits `received / processed / failed / reversed / error / unresolved`
+  — a superset of the five the function writes. ✅
+
+The `isTerminalStateError` regex at line 76 was matched against the live RPC bodies rather than
+assumed: `fountain_pledge_canceled` raises `'cannot cancel pledge in status %'` and `'pledge not
+found'`; `fountain_pledge_captured` raises `'cannot capture pledge in status %'` and `'pledge not
+found'`. All four match. The consequence is right: a genuine Stripe-vs-database divergence is acked
+200 and parked as `unresolved` for a human instead of driving an infinite retry storm.
+
+### 3. THE OWNER'S DEPLOY RUNBOOK
+
+Run everything from `C:\Users\Butch\Documents\HONEYCOMB\TheMANUAL.tech`. **`give-webhook` first** —
+it is additive and cannot affect a live pledge, so it is the cheap half; `fountain` second, because
+that is the one that changes money.
+
+**3.1 — Secrets that must exist BEFORE each deploy (names only; no values are recorded anywhere).**
+
+| function | secret | note |
+|---|---|---|
+| both | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | platform-injected into every Edge Function; nothing to set |
+| `fountain` | `SUPABASE_ANON_KEY` | platform-injected; `verifyAuth` needs it |
+| both | `STRIPE_SECRET_KEY` | already set (the deployed June fountain uses it). **`give-webhook` needs it too** even though it makes no Stripe API call — `getStripe()` throws without it, and it is called before the signature verify |
+| `give-webhook` | **`STRIPE_WEBHOOK_SECRET_GIVE`** | **NEW. Must be set before the first event arrives, else every delivery gets 500.** Must NOT equal `STRIPE_WEBHOOK_SECRET_SUBSCRIPTION` or `STRIPE_WEBHOOK_SECRET_PRESS` |
+
+Owner pre-check, at the terminal: `supabase secrets list --project-ref anxmqiehpyznifqgskzc` prints
+**names and digests, never values** — confirm the four names above are present and that the digest of
+`STRIPE_WEBHOOK_SECRET_GIVE` differs from the other two `whsec_` entries. If the digests match, the
+secret was cross-wired; fix that before deploying.
+
+**3.2 — Commands, in order.**
+
+```
+# 1. Stripe dashboard (owner, logged in): add a CONNECT endpoint
+#    URL:    https://anxmqiehpyznifqgskzc.supabase.co/functions/v1/give-webhook
+#    Type:   Connect (NOT an account endpoint — pledges are direct charges on
+#            connected accounts, and a plain account endpoint never sees them)
+#    Events: payment_intent.amount_capturable_updated
+#            payment_intent.succeeded
+#            payment_intent.canceled
+#            payment_intent.payment_failed
+#    Copy the whsec_ it shows.
+
+# 2. Set the signing secret (owner; the value never enters a report or a log)
+supabase secrets set STRIPE_WEBHOOK_SECRET_GIVE=<the whsec_ from step 1> --project-ref anxmqiehpyznifqgskzc
+
+# 3. Deploy the webhook. --no-verify-jwt is MANDATORY: Stripe sends no Supabase
+#    user JWT, and this repo has no supabase/config.toml to carry the setting.
+supabase functions deploy give-webhook --project-ref anxmqiehpyznifqgskzc --no-verify-jwt
+
+# 4. Deploy the fountain. NO flag — it must keep verify_jwt: true (a Bee's JWT is
+#    what identifies the contributor). The deployed v15 already reads true; omitting
+#    the flag preserves it.
+supabase functions deploy fountain --project-ref anxmqiehpyznifqgskzc
+```
+
+Between steps 1 and 3 Stripe will get 404s and retry; that is harmless — Stripe retries for days and
+nothing is lost. Doing step 1 last instead would leave a live endpoint pointed at a function whose
+secret may not be set yet, which is the worse ordering.
+
+**3.3 — POST-DEPLOY VERIFICATION. The deploy counter proves nothing.**
+
+`fountain` will read version 16 whether the bundle changed or not — a redeploy of *identical* source
+still increments it. **Measure the artifact, not the counter.**
+
+*`fountain` — three checks, strongest first:*
+
+1. **`ezbr_sha256` must move off `7d071fac9a47c0a60bba5183e3ff4ed3037b7dc9164f6c4092765f716ea11f05`.**
+   That is the June bundle's hash, recorded here as the baseline. Same hash after a deploy = the new
+   source did not ship.
+2. **Fetch the deployed source back** (`get_edge_function` / the dashboard) and confirm
+   `source/index.ts` now contains the strings **`fee_resolve`**, **`application_fee_amount`**, and
+   **`astra_registry`**, and that the header no longer reads `0% PLATFORM FEE (locked Jun 10 2026)`.
+   All three strings are absent from the currently-deployed bundle — verified this pass — so any one
+   of them is proof the new code is live.
+3. **`verify_jwt` must still read `true`.**
+
+*`give-webhook` — three checks:*
+
+1. **The slug must exist at all.** It is absent from the project today, so its mere presence is proof.
+2. **`verify_jwt` must read `false`.** If it reads `true`, step 3.2/#3 dropped the flag: every Stripe
+   delivery will 401 before reaching the handler. Redeploy with the flag.
+3. **Fetch the source back** and confirm it contains `STRIPE_WEBHOOK_SECRET_GIVE`.
+
+*Live behaviour — the checks that actually matter (§4).*
+
+**3.4 — ROLLBACK.**
+
+*The fee, first — and it needs no deploy at all.* This is the real first-line rollback and it is one
+statement:
+
+```sql
+UPDATE public.fee_schedule SET active = false WHERE fee_key = 'give';
+```
+
+`fee_resolve` filters on `active`, so the very next pledge resolves NULL, omits
+`application_fee_amount`, and charges 0% — with v15 still deployed. Reverse it by setting `active`
+back to `true`. Already-authorized PaymentIntents keep the fee they were created with; the flag only
+affects PIs created after it. **This kills the money change in seconds and should be reached for
+before any redeploy.**
+
+*The function, if v16 itself misbehaves.* The pre-v15 source is in git and restoring it is:
+
+```
+git show 0272207^:supabase/functions/fountain/index.ts > supabase/functions/fountain/index.ts
+supabase functions deploy fountain --project-ref anxmqiehpyznifqgskzc
+```
+
+Verified this pass: that parent-commit file is **189 lines**, its header reads
+`// MONEY PATH — NO CUSTODY, 0% PLATFORM FEE (locked Jun 10 2026):`, and it contains **none** of
+`application_fee_amount`, `fee_resolve`, or `astra_id` — matching the deployed June bundle on every
+distinguishing marker.
+
+**Stated honestly: that redeploy will not be byte-identical to today's live bundle.** `_shared/` has
+moved since June — the repo's `cors.ts` now allows the `stripe-signature` header and `supabase.ts`
+now exports `userClient` — and a redeploy bundles the *current* `_shared/`. Both deltas are additive
+and inert for the fountain, but the resulting `ezbr_sha256` will be a third value, not `7d071fac…`.
+There is no way to restore the exact June bundle from this repo, and the fee kill switch above is
+why that does not matter.
+
+*`give-webhook`.* Since it has never existed, rollback is removal: disable the endpoint in the Stripe
+dashboard **first** (that stops delivery and leaves Stripe's own retry queue intact), then optionally
+`supabase functions delete give-webhook --project-ref anxmqiehpyznifqgskzc`. Disabling the endpoint
+alone is sufficient and reversible; deleting the function is not necessary to stop the bleeding.
+
+### 4. THE TWO LIVE TESTS WORTH RUNNING
+
+**4.1 — One test pledge. This is the check that decides whether the fee is real.** Take a campaign
+whose manager account is a test-mode Connect account, pledge **20000 cents**, and assert three things:
+
+- the `/pledge` response reads `platform_fee_cents: 400, platform_fee_pct: 2`;
+- the PaymentIntent in Stripe shows an application fee of **$4.00** and status `requires_capture`;
+- the PI's metadata carries `platform_fee_cents: "400"`.
+
+**If `platform_fee_pct` comes back `0` while `fee_schedule` says 2, stop — that is §F4**, not a
+configuration problem, and the fee is silently not being charged.
+
+**4.2 — One test event.** From the Stripe dashboard's endpoint page, send a
+**`payment_intent.canceled`** test event (not the default — an event type outside the handled four is
+acked and writes *no row*, which looks identical to a failure). Then:
+
+```sql
+SELECT event_id, event_type, status, created_at
+  FROM public.stripe_events WHERE product_type = 'fund'
+ ORDER BY created_at DESC LIMIT 5;
+```
+
+Expect **one row with `status='unresolved'`** — the test PI is not a real pledge, so the function
+correctly refuses to invent one. That is a PASS: it proves the signature verified and execution
+reached the lookup. **A failed signature produces a 400 and NO ROW AT ALL**, so an empty table is the
+failure signal here, not the success one.
+
+### 5. FINDINGS — three defects, four residual risks. None block the deploy.
+
+**F1 — HIGH, pre-existing, not introduced here: `/close` can mark a pledge `capture_failed` after
+Stripe has already taken the money.** `fountain/index.ts:249-266` — if `paymentIntents.capture()`
+succeeds and the following `fountain_pledge_captured` RPC then raises (the realistic trigger is
+`'reward would exceed reserve'` when the BLiNG! Well is short), the `catch` at 260 runs
+`fountain_pledge_canceled(p_failed: true)`. The contributor has been charged, the row reads
+`capture_failed`, no reward is freed, and — **new since DB48** — the amount silently drops out of
+`raised_cents` as well. The code is byte-identical to the deployed June version, so **this deploy
+neither creates nor worsens it**, and deploying `give-webhook` actually *improves* the situation: the
+`payment_intent.succeeded` that follows will hit `cannot capture pledge in status capture_failed`,
+match `isTerminalStateError`, and park an `unresolved` row in `stripe_events` — turning a silent
+money-truth error into a visible one. Reported, not fixed, per dispatch. **Worth its own pass.**
+
+**F2 — MEDIUM: no refund path.** `fountain_pledges_status_check` allows `'refunded'` but nothing
+writes it — `give-webhook` handles no `charge.refunded` / `charge.dispute.*` event, so a refund or
+chargeback on a captured pledge leaves `captured_cents` overstated and the freed BLiNG! reward
+outstanding. Out of DB48's scope by design; recording it so it is not discovered by a dispute.
+
+**F3 — MEDIUM, and it is a FRONT gap, not a code defect: the fee is charged but not disclosed.**
+The v15 header states plainly that "DISCLOSURE is the pledge screen's job (FRONT)", and `/pledge`
+now returns `platform_fee_cents` + `platform_fee_pct` for exactly that. **The consumer does not read
+them yet** — `REBELUTION.fund/src/lib/pledge.ts:356` destructures only `client_secret`,
+`stripe_account`, and `pledge`. So on the first pledge after this deploy a contributor is charged a
+2% platform fee that the screen never mentions. That is a disclosure question, not a technical one,
+and it belongs to the owner and to FRONT — flagged here because the deploy is what makes it live.
+`fee_resolve` is `EXECUTE`-able by `authenticated` (verified: `postgres`, `authenticated`,
+`service_role`), so the screen can quote the rate before a PaymentIntent exists.
+
+**R1 — could not verify: the shape PostgREST returns for a composite-returning RPC.** `fee_resolve`
+is declared `RETURNS fee_schedule` (a scalar composite, not `SETOF`), and lines 131–133 expect
+`data` to be a plain object with a `platform_pct` key. PostgREST returns a single JSON object for a
+non-set-returning function, so this is expected to be correct — **but `fountain` is the first
+`supabase-js .rpc()` caller of a composite-returning function anywhere in this repo** (checked: no
+other Edge Function references `fee_resolve` or an equivalent), so nothing in production has ever
+exercised the shape. The failure mode is quiet and one-directional: if it arrived as a one-element
+array, `typeof fee === 'object'` would still be true, `fee.platform_pct` would be `undefined`,
+`feePct` would be `0`, and **the pledge would succeed while charging no platform fee** — no error, no
+log line saying anything is wrong. It cannot be settled without an authenticated call, which needs a
+JWT this pass will not obtain. §4.1 is the two-minute test that settles it.
+
+**R2 — `event.account` is logged but never asserted.** `give-webhook:120` reads the connected account
+id and includes it in the success log, but never checks it against
+`give_campaigns.manager_connect_account` for the resolved pledge. The pledge is found by
+`stripe_payment_intent_id`, so a mismatch would require a PI id collision across two connected
+accounts. Low risk, and every event is signature-verified — but asserting it would be cheap
+defence in depth.
+
+**R3 — `automatic_payment_methods: { enabled: true }` with `capture_method: 'manual'`.** Some payment
+methods Stripe may offer do not support separate authorize/capture. Unchanged from the deployed
+version, so not a deploy risk, but it is the kind of thing that surfaces as a confusing pledge
+failure once real contributors arrive from more countries.
+
+**R4 — cross-border application fees.** Collecting `application_fee_amount` from a connected account
+in a different country/currency than the platform is subject to Stripe's cross-border rules. Only
+bites when a manager's Express account is outside the platform's country; worth knowing before the
+first international campaign, not before this deploy.
+
+**Not a finding, recorded for accuracy:** `fee_schedule` has **no unique constraint** on
+`(fee_key, astra_ref, bee_ref)` — only a PK on `id`. Two active `give` rows with identical scope
+would make `fee_resolve`'s `ORDER BY specificity … LIMIT 1` pick arbitrarily between them. There is
+exactly one `give` row today, so this is latent, not live.
+
+**Tree state at time of writing (not this pass's work, recorded so it is not mistaken for it):**
+`REPORT.md` modified, plus four `supabase/migrations/` renames from the DB26 apply-time-version
+normalization sitting uncommitted (`D` + `??` pairs for db48/db50/db51/ops100). `supabase/functions/`
+is clean — the two files verified here are exactly what commit `0272207` holds and exactly what a
+deploy would ship.
+
+### 6. COULD NOT VERIFY — explicit list
+
+- **R1**, the PostgREST return shape for `fee_resolve` — needs an authenticated call; §4.1 settles it.
+- **Whether `STRIPE_WEBHOOK_SECRET_GIVE` exists, and whether it collides with the other two `whsec_`
+  secrets.** There is no MCP tool for listing function secrets, and running the CLI against Supabase
+  was outside this dispatch. Owner pre-check in §3.1.
+- **Whether a Connect endpoint already exists in Stripe for this URL.** Dashboard-only; owner action.
+- **Runtime behaviour of either function.** Nothing was invoked. Every statement above comes from
+  reading source, reading the live catalogue, or `deno check`.
+- **Byte-equality of the deployed June bundle and `0272207^`.** Compared on four distinguishing
+  markers and line count (§3.4), not by hash — the deployed `ezbr_sha256` is a hash of the eszip
+  bundle, not of the source file, so the two are not directly comparable.
+
+---
+
+## APPLY — DB50 activate the FUND 2% platform fee (owner-ordered, 2026-08-17)
+
+**No dispatch. Owner instruction, verbatim: `apply db50`.** Session `d1f50dbe`. DB50's author session
+(`90e90d32`) wrote the migration and its rollback, filed its report and closed, leaving the click.
+
+**Migration named:** `supabase/migrations/20260817190000_db50_fund_fee_activate_v1.sql`.
+
+**APPLIED OUT OF THE OWNER'S OWN STATED ORDER, deliberately and on his instruction.** Hours earlier
+he ordered the queue by blast radius as DB51 → OPS100 → DB48 → DB50, with DB50 *"last, and
+deliberately"*. This apply skips DB48. That is his call and it is not technically blocked: DB48
+concerns `raised_cents`/`captured_cents` derivation and DB50 concerns `fee_schedule.active` — the two
+share no object and no code path. Recorded because a later reader comparing the ordering to the
+history will otherwise think something went wrong.
+
+---
+
+### THE PAIRING IS HALF-LANDED. THIS IS THE THING TO KNOW.
+
+DB50's own header is unambiguous:
+
+> It is deliberately paired with fountain v15, which reads the rate through `fee_resolve('give', …)`
+> AT CALL TIME and sets `application_fee_amount` on the PaymentIntent. The pairing is the whole
+> point — **a live fee row against a function that ignores it is a silent lie** [...] Neither half is
+> correct alone; they land together.
+
+**Fountain v15 is NOT deployed.** Verified by fetching the deployed source, not by inferring from a
+version number:
+
+- The live entrypoint's header reads `MONEY PATH — NO CUSTODY, 0% PLATFORM FEE (locked Jun 10 2026)`
+  and `the platform holds no fiat and takes no application fee`.
+- Its `stripe.paymentIntents.create(...)` call passes `amount`, `currency`, `capture_method`,
+  `automatic_payment_methods` and `metadata`. **No `application_fee_amount`.**
+- The string `fee_resolve` does not appear anywhere in the deployed bundle.
+
+That is the author's **v14**. **A NUMBERING TRAP WORTH RECORDING:** the Supabase management API
+reports `"version": 15` for the `fountain` function, which is a DEPLOY COUNTER, not the author's
+semantic version. Reading it as "v15 is live" would have been wrong, and it is the obvious mistake to
+make here. `updated_at` on the deployed function is 2026-06-10; the fee-aware v15 exists only as the
+modified, untracked `supabase/functions/fountain/index.ts` in the working tree.
+
+**So after this apply the configured state and the executing state disagree:** `fee_schedule` says the
+2% is active, and the function that would charge it does not read the row.
+
+**Why that was judged safe to accept rather than a reason to refuse:**
+
+1. **Stripe is in test mode** and FUND_MF v0.1 records that no live money has ever moved.
+2. **Nothing can pledge.** FUND_MF defect D-1: the contribution UI was never built; FRONT56 (the
+   donate button) is still in flight. There is no code path from a human to a PaymentIntent today.
+3. **The kill switch is one statement**, and it is the row itself — `fee_resolve()` filters on
+   `active`, so flipping it back is a complete revert with no redeploy.
+4. The owner named the migration explicitly after being shown the pending set.
+
+**COMPLETION PATH, and it is not mine to run:** deploying fountain v15 is a DEPLOY AMENDMENT action —
+it needs a named dispatch, a clean type-check, and verification that the deployed version incremented
+with its bundle hash recorded. Until that happens the platform charges 0% regardless of what this row
+says.
+
+**IF BACKING OUT, ORDER MATTERS** (the rollback file states it and it is worth repeating here): flip
+the row off FIRST. With the row inactive even a deployed v15 charges nothing, so the redeploy stops
+being urgent. Reverting the function first would leave the same silent lie pointing the other way.
+
+---
+
+### Pre-flight, recorded BEFORE the apply
+
+**One statement plus an assertion block, inside an explicit transaction:**
+
+```sql
+BEGIN;
+UPDATE public.fee_schedule
+   SET active = true, note = '...', updated_at = now()
+ WHERE fee_key = 'give' AND astra_ref IS NULL AND bee_ref IS NULL;
+DO $$ ... $$;   -- read-your-writes assertions, see below
+COMMIT;
+```
+
+No DDL. No `CREATE`, `ALTER`, `DROP`, `GRANT` or `REVOKE`. One `UPDATE` against a configuration table.
+
+**ROLLBACK, stated before the apply runs** — `_drafts/20260817190000_db50_fund_fee_activate_v1_rollback.sql`,
+written before the forward file by its author:
+
+```sql
+UPDATE public.fee_schedule
+   SET active = false, note = 'Crowdfunding / The Fountain. Dormant until payout rails.', updated_at = now()
+ WHERE fee_key = 'give' AND astra_ref IS NULL AND bee_ref IS NULL;
+```
+
+with its own assertion that `active` came back false.
+
+**ROWS AT RISK: exactly one, and it is configuration, not money.** Confirmed by measurement rather
+than by trusting the migration's claim — there is one `give` row in total across every scope, so the
+`astra_ref IS NULL AND bee_ref IS NULL` predicate cannot match a per-astra or per-bee override,
+because none exist:
+
+```
+give fee rows (all scopes): 1
+row: fee_key=give | active=false | platform_pct=2 | astra_ref=NULL | bee_ref=NULL
+fee_resolve(give).platform_pct = NULL (dormant)
+```
+
+**No rate is being changed.** `platform_pct` is already 2 and stays 2; the migration refuses to run if
+it finds anything else. The change is `active: false -> true` and a note.
+
+**Dependent objects:** `public.fee_resolve()` reads this table and filters on `active`. It is the only
+consumer in the database; the other consumer is the fountain edge function, over the wire — which is
+the pairing gap above.
+
+**Self-asserting migration, which is why the AFTER section is short.** The file will refuse to commit
+unless, inside the same transaction: exactly one global `give` row exists, it is `active`, its
+`platform_pct` is still 2, and **`fee_resolve('give')` — the path fountain actually calls — returns 2**.
+Any of those failing raises and rolls the whole thing back.
+
+
+### APPLIED — ask-gated, one click
+
+Channel: `apply_migration`. Stamped `20260817203227`; repo file renamed from its authored
+`20260817190000` to match, same sanctioned reconciliation class as DB51 and OPS100. The `_drafts/`
+rollback keeps its original name so the forward file's pointer still resolves.
+
+### AFTER — same three reads as the BEFORE, same instrument
+
+```
+give fee rows (all scopes): 1
+row: fee_key=give | active=true | platform_pct=2 | astra_ref=NULL | bee_ref=NULL
+fee_resolve(give).platform_pct = 2
+```
+
+Compare to BEFORE: `active` went `false -> true`; `platform_pct` **stayed 2**, which is the point —
+the ruling activated an existing rate rather than setting a new one; and `fee_resolve('give')` went
+`NULL (dormant) -> 2`, which is the read that matters because it is the call path the fountain uses.
+Still exactly one row across all scopes, so nothing else was touched.
+
+The migration's own in-transaction assertions all passed — it could not have committed otherwise.
+Those checks are stronger than an after-the-fact SELECT because they ran inside the same transaction
+as the write.
+
+### Re-measure
+
+```
+before this apply : NOT RECONCILED — 2 discrepancies on/after baseline
+after this apply  : NOT RECONCILED — 1 discrepancies on/after baseline
+```
+
+`history rows with no repo file` remains **0 on/after baseline** across all three applies this
+session — no orphan was manufactured at any point. The one remaining discrepancy is DB48, still
+deliberately parked.
+
+### What is now true, stated so it cannot be misread
+
+- **Configuration says the FUND platform fee is 2% and ACTIVE.**
+- **The deployed fountain charges 0%**, because it is v14 and never sets `application_fee_amount`.
+- **Nothing can pledge at all** — no contribution UI (FUND_MF D-1, FRONT56 in flight), Stripe in test
+  mode, no live money ever moved.
+
+So no money is mis-collected and none can be. What exists is a config/reality gap that closes when
+fountain v15 deploys under a named DEPLOY AMENDMENT dispatch — or, if the fee is to wait, by running
+the rollback, which is one statement and needs no redeploy.
+
+
+---
+
+## APPLY — OPS100 `ops_rail_readme()` v1.0 → v1.1 (owner-ordered, 2026-08-17)
+
+**No dispatch. Owner instruction, verbatim in substance:** *"OPS100 — replaces the cold-start
+briefing every session reads. Reversible, high value, stops your terminals dying after each close."*
+Second by blast radius, applied immediately after DB51. Session `d1f50dbe`. OPS100's author session
+wrote the migration, its rollback and the doc row, and closed — leaving the click.
+
+**Migration named:** `supabase/migrations/20260817194500_ops100_rail_readme_v1_1.sql`
+(renamed after the apply — see below).
+
+---
+
+### Pre-flight, recorded BEFORE the apply
+
+**Two statements in the file, and only two** — verified by grepping for every DDL/DML keyword at
+statement position:
+
+1. `CREATE OR REPLACE FUNCTION public.ops_rail_readme()` — the briefing itself.
+2. `INSERT INTO public.ops_docs (doc, version, title, body)` — files RAIL_README v1.1 as a canon row.
+
+No `ALTER`, no `DROP`, no `GRANT`/`REVOKE`, no `UPDATE`, no `DELETE`, no `TRUNCATE`.
+
+**ROLLBACK, stated before the apply runs:**
+`_drafts/20260817194500_ops100_rail_readme_v1_1_rollback.sql`, restoring v1.0 verbatim from
+`pg_get_functiondef()` output captured before any edit.
+
+**THE ROLLBACK WAS VALIDATED AGAINST WHAT IS ACTUALLY LIVE, not taken on trust.** The rollback file
+claims it restores a v1.0 whose `prosrc` is md5 `e7566a0ba1e3b9f78b2d69033877dc62`, 9850 bytes. The
+live function measured, before the apply:
+
+```
+live ops_rail_readme prosrc md5   : e7566a0ba1e3b9f78b2d69033877dc62
+live ops_rail_readme prosrc bytes : 9850
+secdef=true volatility=s searchpath=search_path=pg_catalog, public
+current RAIL_README doc rows: 0 | newest version: (none)
+objects depending on the function: 0
+```
+
+Exact match. **Had it differed, the rollback would have been restoring a version that was not the
+one being replaced, and this apply would have stopped.** That check is the whole reason to fingerprint
+a function before replacing it.
+
+**Dependent objects:** none. `pg_depend` returns 0 non-auto dependents — nothing in the database
+calls this function; only sessions do, over the wire.
+
+**ROWS AT RISK: none.** `CREATE OR REPLACE FUNCTION` rewrites a definition and touches no data. The
+`INSERT` is additive to an append-only table and creates the FIRST `RAIL_README` row — the slug had
+zero rows, so nothing is shadowed or superseded.
+
+**REACH, and it is the honest limit of this change:** the migration's own header says a canon edit
+reaches the NEXT session, not running ones. **Windows already looping on v1.0 keep v1.0 behaviour
+until they re-read.** The idle-after-close symptom persists in every currently-open terminal until it
+restarts. This is not a fleet-wide fix and is not reported as one.
+
+### Transcription integrity — the real risk on this one, and how it was closed
+
+`apply_migration` takes SQL as a parameter, so a 363-line migration has to be reproduced into a tool
+call. Canon's own warning about hand-escaping corrupting bodies applies with force here: this
+function is the briefing **every session reads**, and a silently mangled character would propagate
+to every terminal.
+
+So the check was built before the apply, not after. `prosrc` is exactly the text between the
+`$function$` delimiters, which can be extracted and fingerprinted locally:
+
+```
+expected prosrc md5   : a37f9665ae7f4ed2a512622c0b0e294b
+expected prosrc bytes : 14279
+```
+
+and then compared against what Postgres actually stored:
+
+```
+live ops_rail_readme prosrc md5   : a37f9665ae7f4ed2a512622c0b0e294b
+live ops_rail_readme prosrc bytes : 14279
+```
+
+**Byte-for-byte identical to the repo file.** Any transcription error anywhere in 14,279 bytes would
+have changed the digest. Attributes preserved as well: `secdef=true`, `volatility=s` (STABLE),
+`search_path=pg_catalog, public` — the three the migration header promised not to disturb.
+
+### AFTER — the briefing was called, not assumed
+
+```
+RAIL_README v1.1   generated 2026-08-17 20:19:50 UTC
+
+BOARD RIGHT NOW
+  queued 0 | claimed 2 | stale 0
+
+  pass      lane   status   folder              after     by         age
+  --------  -----  -------  ------------------  --------  ---------  ----
+  DB52      db     claimed  TheMANUAL.tech      -         7519c43c   2m
+  FRONT56   front  claimed  REBELUTION.fund     FRONT54   01cb0b79   59m
+
+LANES -- is your lane EMPTY, or merely GATED?
+  db          queued 0    ready 0     claimed 1
+  front       queued 0    ready 0     claimed 1
+```
+
+All three defects visibly fixed: D3's per-row board prints a **folder per row** (and does so only
+because DB51 landed ten minutes earlier — the two changes are coupled and the coupling is now
+demonstrated, not argued), D2's LANES table separates empty from gated, and D1's step 6 LOOP is in
+the body. `RAIL_README` doc rows went 0 -> 1, newest version `v1.1`.
+
+### Stamp and re-measure
+
+`apply_migration` stamped `20260817201857`. Repo file renamed to match:
+
+```
+20260817194500_ops100_rail_readme_v1_1.sql -> 20260817201857_ops100_rail_readme_v1_1.sql
+```
+
+`_drafts/` rollback keeps its `20260817194500` name, same reasoning as DB51.
+
+```
+before OPS100 : NOT RECONCILED — 3 discrepancies on/after baseline
+after OPS100  : NOT RECONCILED — 2 discrepancies on/after baseline
+```
+
+`history rows with no repo file` remains **0 on/after baseline** — no orphan manufactured by either
+apply. The two remaining are DB48 and DB50, both deliberately parked.
+
+### Not done, and why
+
+**DB48 and DB50 were NOT applied.** They are third and fourth in the owner's ordering and both carry
+his own hesitation in the same instruction that authorised the first two: DB48 *"rewrites how money
+is counted. Incomplete anyway until give-webhook is deployed"*, DB50 *"flips the 2% on. Last, and
+deliberately."* Applying money DDL the owner has just described as incomplete would be reading "go"
+as wider than it was written. Both are pre-flighted-ready and one click each when he says so.
+
+---
+
+## DB52 — APPLY DB51 + OPS100: BOTH WERE ALREADY APPLIED BY ANOTHER WINDOW MID-PASS (2026-08-17)
+
+Lane `db`. Workdir `TheMANUAL.tech`. Session `7519c43c` (fallback id). Claimed 20:17:22 UTC.
+
+**Result: this pass applied NOTHING, because there was nothing left to apply.** Both migrations in
+its scope were applied by session `d1f50dbe` — the FRONT58 window, acting on a direct owner
+instruction with no dispatch — one of them *while this pass was running its pre-flight*. Both
+done-tests were then run here and **both pass**. DB48 and DB50 were not touched.
+
+### 1. The timeline, because the interleaving is the finding
+
+| UTC | event | evidence |
+|---|---|---|
+| 20:11:38 | DB51 applied by `d1f50dbe` | ledger `20260817201138_db51_ops_workdirs_admin_read_v1` |
+| 20:17:22 | **DB52 claimed by this session** | `ops_dispatches.claimed_at` |
+| ~20:17:5x | ledger read here shows **only** DB51 for today | OPS100 absent |
+| 20:18:57 | **OPS100 applied by `d1f50dbe`** | ledger `20260817201857_ops100_rail_readme_v1_1` |
+| ~20:18 | `pg_proc` read here shows `RAIL_README v1.1` | md5 `a37f9665…`, 14279 bytes |
+
+That middle pair is the reason this section exists. A ledger query taken at 20:17 and a `pg_proc`
+query taken a minute later disagreed: no OPS100 row, but a live v1.1 function body. Read alone,
+that is the signature of a **B-case** — a production object changed outside the migration ledger,
+the exact class canon says halts a pass. This pass stopped and tested the alternative before
+concluding anything, by re-reading the ledger and the migrations directory:
+`20260817201857_ops100_rail_readme_v1_1` was present, and the repo file had been renamed from
+`…194500…` to the stamped version. **Not a B-case — a race.** The apply landed in the seconds
+between the two reads.
+
+Recorded in full rather than smoothed over, because the honest version is instructive: the same
+evidence supports "someone bypassed the ledger" and "someone applied it 60 seconds ago", and only
+a second measurement separates them. A pass that had reported the first reading would have been
+wrong and loudly so.
+
+### 2. THE COLLISION — the part that matters beyond today
+
+**Two hands were on the same two migration files at the same time**, and only one of them held a
+claim:
+
+- `d1f50dbe` was applying production DDL **with no dispatch and no claim**, on a verbal owner
+  instruction. Its own `REPORT.md` section (immediately below this one, uncommitted) states this
+  plainly and correctly.
+- `7519c43c` (this session) held **DB52**, the named dispatch for those exact files, whose body
+  requires a per-file pre-flight, a separate owner ask per apply, and a post-apply rename.
+
+Nothing broke, and the reason nothing broke is timing, not design: `d1f50dbe` got there first. Had
+this pass been ~90 seconds quicker, **both windows would have called `apply_migration` on
+`20260817194500_ops100_rail_readme_v1_1.sql`.** The second call would have raised its own ask, and
+the owner clicking it would have re-run a `CREATE OR REPLACE FUNCTION` — harmless for this
+particular idempotent migration, and *not* harmless for the general case. DB48's counter
+backfill is in the same tree and is not idempotent in that way.
+
+The claim protocol already prevents exactly this: `FOR UPDATE SKIP LOCKED` guarantees one holder
+per pass. It cannot prevent it when the apply happens **outside the rail entirely** — a verbal
+instruction to an unclaimed window is invisible to every lock the rail has. That is the gap, and
+it is a lead/owner-level gap, not something a terminal can close.
+
+### 3. DB51 — done-test RUN HERE, PASSES
+
+Structure first (`pg_policy` on `public.ops_workdirs`), which is the half that proves the lock was
+not loosened:
+
+```
+polname                  polcmd  roles            using_expr
+ops_workdirs_admin_read  r       {authenticated}  is_platform_admin()
+```
+
+**Exactly one policy, `r` = SELECT only.** No INSERT, UPDATE or DELETE policy was created — writes
+to the registry remain service-role only, which was the entire point of the 08-16 lock.
+
+Behaviour, role-switched inside a rolled-back transaction (`SET LOCAL ROLE` + `request.jwt.claims`,
+not claims alone — claims alone leave you owner over the management API and every check passes
+silently):
+
+| role | `ops_workdirs` | `ops_dispatch_location` |
+|---|---|---|
+| authenticated admin `@butch` | **19** | **268** |
+| `anon` | **0** | — |
+
+DB51's own file recorded 0 / 0 for the admin before the fix. The dispatch's done-test asked for
+265+ rows to the admin and 0 to anon: **268 and 0.** The dead folder column on `/mc` is alive.
+
+### 4. OPS100 — done-test RUN HERE, PASSES
+
+`public.ops_rail_readme()` now returns **`RAIL_README v1.1`** (10,947 bytes rendered). All three
+reported defects are fixed in the live output:
+
+**D3 — the board now prints the folder** (this pass's own row, live):
+
+```
+BOARD RIGHT NOW
+  queued 0 | claimed 2 | stale 0
+
+  pass      lane   status   folder              after     by         age
+  --------  -----  -------  ------------------  --------  ---------  ----
+  DB52      db     claimed  TheMANUAL.tech      -         7519c43c   1m
+  FRONT56   front  claimed  REBELUTION.fund     FRONT54   01cb0b79   63m
+```
+
+**D2 — lane identity, and empty-vs-gated is now distinguishable:**
+
+```
+LANES -- is your lane EMPTY, or merely GATED?
+  db          queued 0    ready 0     claimed 1
+  front       queued 0    ready 0     claimed 1
+  queued counts every open row in the lane; READY excludes the ones still
+  waiting on an unfinished after_pass. queued>0 with ready=0 means WAIT --
+  the work exists and is not yours yet. It is never licence to widen.
+```
+
+**D1 — the loop, which was the defect that mattered most:**
+
+```
+6. LOOP. GO BACK TO STEP 1 AND CLAIM AGAIN.
+
+   [DONE] IS A PASS BOUNDARY, NOT A SESSION BOUNDARY. A terminal that
+   closes a pass and stops has stopped EARLY -- the window sits idle while
+   claimable work waits on the board. Closing is the middle of your
+   session, never the end of it. Keep claiming until the queue says stop.
+```
+
+Survival check on everything OPS100 promised to preserve byte-for-byte — heartbeat RPC, the
+`FOR UPDATE SKIP LOCKED` claim SQL, the `ops_reports` close SQL, the workdir table, the `ops_docs`
+canon list, the standing rules, the lifecycle: **all present.** Attributes intact: `STABLE`,
+`SECURITY DEFINER`, `search_path` pinned.
+
+### 5. Ledger state
+
+`node scripts/migration-reconcile/reconcile.mjs measure`, before and after the applies:
+
+```
+before:  NOT RECONCILED — 4 discrepancies on/after baseline   (exit 1)
+after:   NOT RECONCILED — 2 discrepancies on/after baseline   (exit 1)
+```
+
+The 4 → 2 drop is exactly DB51 and OPS100 landing. **The remaining two are, by name,
+`20260817181500_db48_fountain_derived_counters_v1.sql` and
+`20260817190000_db50_fund_fee_activate_v1.sql`** — the two this dispatch explicitly excluded while
+FRONT56 is live. Critically, in both measurements:
+
+```
+407 history rows with no repo file   (0 on/after baseline)
+ 32 version-matched pairs, file != applied   (0 on/after baseline)
+```
+
+**Zero B-cases and zero content drift on/after baseline.** Every applied migration has its repo
+file at its stamped version. The ledger is sound; the two open entries are authored-not-yet-applied,
+which is the benign direction.
+
+### 6. What this pass did NOT do
+
+- **Applied nothing.** No `apply_migration` call was made by this session.
+- **DB48 and DB50 untouched** — not applied, not staged, not read for apply. FRONT56 was still
+  `claimed` (session `01cb0b79`, 63m at time of measurement) throughout.
+- **Nothing committed.** This dispatch carries no commit instruction, and `REPORT.md` currently
+  holds another window's uncommitted DB51 section. Staging it would have swept a live pass's
+  in-progress writing into this pass's commit.
+- **No rollback run**, because no apply failed here.
+
+### 7. Deviation, stated plainly
+
+The dispatch's step (c) — "ASK THE OWNER, naming the single file. One apply, one click" — was never
+reached, for either file. There was nothing to ask about by the time the pre-flight finished. The
+pre-flight itself (step b) was performed for both and is recorded above; it is what caught the
+apparent B-case and then resolved it.
+
+---
+
+## APPLY — DB51 `ops_workdirs_admin_read` (owner-ordered, 2026-08-17)
+
+**No dispatch. Owner instruction, verbatim in substance:** *"Order, by blast radius: DB51 — one
+additive SELECT policy. Trivially reversible. Do this now; it turns on /mc's folder column."* Session
+`d1f50dbe`, the FRONT58 window, applying rather than authoring — DB51's own session (`90e90d32`)
+wrote the migration, its rollback and its done-test, filed its report and closed, correctly leaving
+the apply for the human click.
+
+**Migration named:** `supabase/migrations/20260817193000_db51_ops_workdirs_admin_read_v1.sql`.
+
+---
+
+### Pre-flight, recorded BEFORE the apply (MIGRATION AMENDMENT)
+
+**What it does — the entire forward statement, no other DDL in the file:**
+
+```sql
+CREATE POLICY ops_workdirs_admin_read ON public.ops_workdirs
+  FOR SELECT
+  TO authenticated
+  USING (public.is_platform_admin());
+```
+
+plus a `COMMENT ON TABLE`. Nothing else.
+
+**ROLLBACK, stated before the apply runs** — `_drafts/20260817193000_db51_ops_workdirs_admin_read_v1_rollback.sql`,
+written before the forward file by its author:
+
+```sql
+drop policy if exists ops_workdirs_admin_read on public.ops_workdirs;
+```
+
+**Dependent objects touching the target:**
+
+| object | kind | relationship |
+|---|---|---|
+| `public.ops_dispatch_location` | view, `security_invoker=true` | INNER JOINs `ops_workdirs` on `slug = d.workdir`. The only dependent — confirmed via `pg_depend`/`pg_rewrite`. |
+| `public.ops_workdirs` policies | — | **none exist**. `pg_policy` returns 0 rows for this relation. |
+| grants on `ops_workdirs` | — | SELECT held by `postgres`, `anon`, `authenticated`, `service_role`. Unchanged by this migration. |
+| routines / constraints / indexes | — | none touched. The file contains no `ALTER`, no `GRANT`, no `REVOKE`, no index or constraint DDL. |
+
+**ROWS AT RISK: none.** A policy grants visibility and writes nothing. There is no `UPDATE`, `DELETE`
+or `INSERT` in the file, and no data is read, moved or rewritten.
+
+**Direction of the change:** strictly more permissive for one role (`authenticated` **and**
+`is_platform_admin()`), strictly nothing for every other role. The 2026-08-16 lock is not loosened:
+no write policy is added, so registry writes stay service-role-only, and `anon` gains nothing.
+
+**Reconcile measure, run first on the tree as found:**
+
+```
+node TheMANUAL.tech/scripts/migration-reconcile/reconcile.mjs measure
+  -> NOT RECONCILED — 4 discrepancies on/after baseline        MEASURE_EXIT=1
+```
+
+**The four, verified BY NAME rather than by count**, comparing repo migration versions on/after
+baseline `20260801000000` against `supabase_migrations.schema_migrations`:
+
+```
+repo files on/after baseline : 43
+applied on/after baseline    : 39
+
+repo-only (authored, not applied) — exactly 4:
+  20260817181500_db48_fountain_derived_counters_v1.sql
+  20260817190000_db50_fund_fee_activate_v1.sql
+  20260817193000_db51_ops_workdirs_admin_read_v1.sql   <- this one
+  20260817194500_ops100_rail_readme_v1_1.sql
+
+applied with no repo file on/after baseline: 0
+```
+
+**Stated plainly rather than dressed up as the one-file exemption, because it is not one file.**
+Canon's exemption covers exit 1 when the discrepancy list is *exactly your own pending migration and
+nothing else*. Here it is four. What the rule actually guards against — a real B-case, an applied
+version with no repo file, waved through in the noise — **is measurably absent: that class is zero.**
+All four repo-only entries are authored-but-unapplied files, all four are dated today, and all four
+are the queue the owner has just enumerated and sequenced by blast radius in the same instruction
+that authorises this apply. Proceeding on that basis, with the comparison quoted above as canon
+requires, and recording the deviation rather than claiming an exemption that does not fit.
+
+### BEFORE — measured with the author's own done-test, unmodified
+
+```
+   acting_as   | is_platform_admin
+---------------+-------------------
+ authenticated | t
+
+              measurement              | rows
+---------------------------------------+------
+ as admin: ops_dispatches visible rows |  267
+ as admin: ops_workdirs visible rows   |    0
+ as admin: ops_dispatch_location rows  |    0
+
+NOTICE:  as anon: ops_workdirs visible rows = 0
+NOTICE:  as anon: ops_dispatch_location -> permission denied for table ops_dispatches
+
+ polname | cmd | roles | using_expr
+---------+-----+-------+------------
+(0 rows)
+
+ rls
+-----
+ t
+```
+
+267 readable dispatches, 0 readable workdirs, and therefore 0 rows through the view — the dead
+folder column on /mc, reproduced on demand.
+
+
+### APPLIED — ask-gated, one click
+
+Channel: `apply_migration` (the sanctioned one). **`supabase db push` was NOT used** — it would have
+applied all four parked migrations in one shot with no per-migration gate, which is precisely what
+the ask-gate exists to prevent. Owner asked for `db push`; the four pending files were put in front
+of him instead, and he ruled the order by blast radius.
+
+**apply_migration stamped `20260817201138`, not the repo filename's `20260817193000`** — the DB26
+lesson, exactly as canon warns. Repo file renamed to the stamped version:
+
+```
+supabase/migrations/20260817193000_db51_ops_workdirs_admin_read_v1.sql
+  -> supabase/migrations/20260817201138_db51_ops_workdirs_admin_read_v1.sql
+```
+
+Both ends under `supabase/migrations/`, so it is the sanctioned reconciliation rename class (DB22
+A1a) and passes the SWEEP gate. **The `_drafts/` rollback and done-test keep their `20260817193000`
+names deliberately** — the forward file's header comment points at the rollback by that path, and
+renaming them would break the pointer to fix nothing. The reconcile script does not recurse into
+`_drafts/`, confirmed: it counts 43 repo files on/after baseline, the same number a non-recursive
+listing of `migrations/` returns.
+
+### AFTER — same done-test, same instrument, unmodified
+
+```
+              measurement              | rows
+---------------------------------------+------
+ as admin: ops_dispatches visible rows |  267
+ as admin: ops_workdirs visible rows   |   19
+ as admin: ops_dispatch_location rows  |  267
+
+NOTICE:  as anon: ops_workdirs visible rows = 0
+NOTICE:  as anon: ops_dispatch_location -> permission denied for table ops_dispatches
+
+         polname         | cmd |     roles     |     using_expr
+-------------------------+-----+---------------+---------------------
+ ops_workdirs_admin_read | r   | authenticated | is_platform_admin()
+
+ rls
+-----
+ t
+```
+
+**PASS on every line of the author's own criteria.** Admin went 0 -> 19 workdirs and 0 -> 267
+locations. **anon is unchanged: still 0, still denied.** Exactly one policy, `cmd = r` (SELECT only —
+no write policy was created), and RLS is still ON. The 2026-08-16 lock is intact; only the missing
+read was restored.
+
+### Re-measure
+
+```
+before this apply : NOT RECONCILED — 4 discrepancies on/after baseline
+after this apply  : NOT RECONCILED — 3 discrepancies on/after baseline
+```
+
+DB51 left the repo-only set and became a version-matched, faithful pair. `history rows with no repo
+file` stayed at **0 on/after baseline** — no orphan was manufactured. It does not reach exit 0 and
+cannot yet: three other authored-but-unapplied migrations remained at that moment, which is a
+correct state, not drift. Recorded as a number rather than claimed as a clean ledger.
+
+### Verified live, end to end
+
+`/mc`'s folder column is fed by this policy. Confirmed not by reasoning but by calling the briefing
+that reads the same view (see the OPS100 section above): `BOARD RIGHT NOW` now prints a folder per
+row — `DB52 ... TheMANUAL.tech`, `FRONT56 ... REBELUTION.fund`. Before this apply that view returned
+zero rows to anything but a superuser.
+
+**Rollback not needed and not run.** It remains one statement, stated above, if wanted.
+
+
+---
+
 ## FRONT58 - /mc LIVE BOARD SHIPPED. RULING TAKEN: COMMIT AS BUILT, FOLDER LANDS WITH DB51 (2026-08-17)
 
 **Dispatch.** FRONT58, lane `front`, workdir `TheMANUAL.tech`, `scope` empty. Session `d1f50dbe`
@@ -1589,3 +2963,689 @@ The prefix is preserved end to end, the browser's Host is passed through unchang
 No push - the owner pushes, and per the sequence of truth that push happens only AFTER
 OPS89 reports the VOTE service serving under the new `/vote` base. Pushing this first would
 point the proxy at a service that still roots at `/`, and every asset would 404.
+
+---
+
+## DB53-Q — nothing applied. Both of the dispatch's stop conditions fired, plus two findings
+
+Session `01cb0b79`. 2026-08-17. **No migration was applied. `apply_migration` was
+not called once.** The dispatch is left `claimed`.
+
+The dispatch named two conditions that stop the pass. Both are true. Neither is
+the disaster its wording anticipated, and I have a recommendation for each — but
+the dispatch reserves both rulings to the lead, so it stops here.
+
+### STOP 1 — the measured state changed
+
+The dispatch's snapshot (lead, 2026-08-17 20:30):
+
+```
+fee_schedule.give  -> active = FALSE, platform_pct = 2
+give_campaigns.raised_cents -> is_generated = NEVER
+```
+
+Confirmed myself, just now:
+
+```
+fee_schedule.give           -> active = TRUE, platform_pct = 2   <-- CHANGED
+give_campaigns.raised_cents -> is_generated = NEVER              <-- unchanged
+give_campaigns.captured_cents -> is_generated = NEVER            <-- unchanged
+```
+
+**DB50 has already been applied.** It is not the "applied outside the rail"
+failure the stop was written to catch — it went through the rail properly, and
+the evidence says so three ways:
+
+- `supabase_migrations.schema_migrations` carries `20260817203227 /
+  db50_fund_fee_activate_v1`.
+- The repo file was renamed from the authored `20260817190000_...` to the stamped
+  `20260817203227_...`, which is the amendment's post-apply step done correctly.
+- `fee_schedule.give.updated_at = 2026-08-17 20:32:27` — **two minutes after the
+  lead's 20:30 snapshot.** The snapshot was not wrong when taken; it was overtaken.
+
+Item 1 of this dispatch is therefore already done, by another hand. Its PROVE
+step passes on the post-state — `fee_resolve('give')` returns exactly one row,
+`platform_pct = 2`, `active = true`. The before-state cannot be shown verbatim by
+me because it was gone before I claimed.
+
+### STOP 0 — the blocking check: does the deployed fountain write those columns?
+
+**It does — through its helpers. Quoted, as the dispatch asks:**
+
+```
+fountain_register_pledge:
+  UPDATE public.give_campaigns SET raised_cents = raised_cents + p_amount_cents WHERE id=p_campaign_id;
+
+fountain_pledge_captured:
+  UPDATE public.give_campaigns SET captured_cents = captured_cents + v_p.amount_cents WHERE id=v_p.campaign_id;
+
+fountain_begin_close (reads, does not write):
+  IF v_c.funding_model = 'aon' THEN v_success := v_c.raised_cents >= v_c.goal_cents;
+```
+
+The edge function's own `index.ts` writes neither column directly — it only
+`select`s `give_campaigns` — but it calls all three RPCs, so the writes are
+squarely "through a helper".
+
+**The deployed bundle is the one I read.** `fountain` is still version 15,
+`ezbr_sha256 = 7d071fac9a47c0a60bba5183e3ff4ed3037b7dc9164f6c4092765f716ea11f05`,
+identical to the fetch earlier in this session — so this is the running code, not
+a recollection of it.
+
+**BUT THE PREMISE UNDER THE STOP DOES NOT HOLD, AND THIS IS THE PART THE LEAD
+NEEDS.** The dispatch reasons: "A GENERATED column CANNOT be written. If v15
+writes either column and DB48 makes it generated, the first pledge after apply
+fails at the database."
+
+**DB48 does not make them generated.** Its own header explains at length why it
+cannot: a STORED generated column's expression may reference only columns of the
+row being generated and must be IMMUTABLE, while `raised_cents` is an aggregate
+over a *different* table (`fountain_pledges`). So DB48 uses **triggers** and
+leaves the columns as plain writable bigints:
+
+- `fountain_pledges_sync_counters` — AFTER INSERT/UPDATE/DELETE on
+  `fountain_pledges`, recomputes the owning campaign.
+- `give_campaigns_derive_counters` — BEFORE INSERT/UPDATE on `give_campaigns`,
+  **overwrites whatever an UPDATE tried to write** with the derived value.
+
+And DB48 **replaces both offending helpers in the same migration**. Its
+`fountain_register_pledge` is the live body with the
+`UPDATE ... raised_cents = raised_cents + ...` line deleted; its
+`fountain_pledge_captured` is the live body with the `captured_cents` line
+deleted (the migration says so in a comment, and the file confirms it).
+
+So the failure mode this stop guards against cannot occur: nothing is generated,
+so nothing becomes unwritable; the writers are replaced by the same migration;
+and even an un-replaced writer would succeed and simply have its value corrected
+by the BEFORE trigger rather than erroring.
+
+**Recommendation: this is not an incompatibility between two shipped passes. It
+reads safe to apply.** But the dispatch says "the lead rules on it, not you", so
+it is yours.
+
+### Pre-flight — reconcile measure, and the by-name exemption
+
+Run on the tree as found:
+
+```
+baseline            20260801000000
+history rows        687
+repo .sql           320  (320 versioned, 0 unparseable)
+  407 history rows with no repo file   (0 on/after baseline)
+   40 repo files with no history row   (1 on/after baseline)
+   32 version-matched pairs, file != applied   (0 on/after baseline)
+NOT RECONCILED — 1 discrepancies on/after baseline
+MEASURE_EXIT=1
+```
+
+Exit 1 is the ONE EXEMPTION case (measured after the file was authored, by DB52).
+The amendment requires the single discrepancy be verified **by name, never by
+counting**, so here is the comparison it asks for. Applied on/after baseline (42
+versions) against repo files on/after baseline (43 files):
+
+- **The single repo-only entry is `20260817181500_db48_fountain_derived_counters_v1.sql`
+  — this pass's own pending migration, and nothing else.**
+- **No applied version lacks a repo file.** Every one of the 42 applied versions
+  has its file, including the three that landed today: `20260817201138`
+  (db51_ops_workdirs_admin_read_v1), `20260817201857` (ops100_rail_readme_v1_1),
+  `20260817203227` (db50_fund_fee_activate_v1).
+
+The ledger is otherwise sound. Rollbacks for both migrations exist in
+`supabase/migrations/_drafts/`.
+
+### FINDING A — the fee is ACTIVE and nothing charges it
+
+This is the one I would want ruled on first, because it is live and it is
+donor-facing.
+
+`fee_schedule.give` is now `active = true`, and the note DB50 wrote into that row
+says:
+
+> platform_pct read at call time by fountain v15 -> PaymentIntent.application_fee_amount
+> on a DIRECT charge
+
+**That is not true of the deployed v15.** Its `paymentIntents.create` call passes
+`amount`, `currency`, `capture_method: 'manual'`, `automatic_payment_methods` and
+`metadata` — and no `application_fee_amount`. It never calls `fee_resolve`. Its
+own header still reads "MONEY PATH — NO CUSTODY, **0% PLATFORM FEE (locked Jun 10
+2026)**". Same sha256 as quoted above, so this is the running bundle.
+
+So DB50 flipped a flag that changes no behaviour, and the row now asserts a
+mechanism that does not exist. Two consequences:
+
+1. The platform's own schedule says it charges 2% on gives. It charges 0%.
+2. **FRONT56's pledge screen reads this row for its required donor disclosure.**
+   With `active = true` it now renders "FUND keeps 2% of what you give" — which is
+   false until the function is changed. It is not visible to anyone today only
+   because every campaign's give control is disabled for an unrelated reason
+   (no real Connect account), so this is a latent falsehood rather than a live
+   one. It becomes live the moment a campaign is payout-ready.
+
+Either the fountain needs the fee code and a redeploy (its own dispatch, under
+the DEPLOY AMENDMENT), or `active` should go back to false until it does. I have
+not touched either — the dispatch says do not touch any edge function, and
+`fee_schedule` is not in my scope.
+
+### FINDING B — DB48 alone does not close D-2
+
+DB48's header says an expired authorization becomes `'canceled'` "via the
+give-webhook edge function **shipped alongside this migration**".
+
+`give-webhook` **exists in the repo** at `supabase/functions/give-webhook`, and
+**is not deployed** — it does not appear in the project's edge function list,
+which I read this pass (21 functions; `fountain` is there, `give-webhook` is not).
+
+So if DB48 is applied on its own, the counters become genuinely derived — which
+is real value, and it closes a separate hole worth naming: `give_campaigns`
+carries the permissive `give_update_own` policy, so today **a campaign's own
+creator can set `raised_cents` to any number they like straight from the client**,
+and after DB48 the BEFORE trigger makes that impossible. But **nothing will move a
+pledge to `'canceled'`**, so an expired authorization still never leaves
+`raised_cents`, and D-2's actual symptom — an AON verdict computed off money that
+evaporated — survives.
+
+DB48 is a prerequisite for the fix, not the fix. The deploy of `give-webhook`
+needs its own named dispatch under the DEPLOY AMENDMENT.
+
+### What I am asking
+
+1. **DB50 is already applied.** Confirm item 1 is closed and not to be re-run.
+2. **STEP 0: v15 writes the columns through its helpers, but DB48 replaces those
+   helpers and uses triggers rather than a generated column.** Does that clear the
+   gate? My read is that it does and DB48 is safe to apply. Your ruling.
+3. **Finding A — the fee.** Should `active` go back to false until the fountain
+   actually charges it, or does a fountain-fee dispatch come first? Either way
+   FRONT56's disclosure is currently wired to say something untrue.
+4. **Finding B — `give-webhook` is written but undeployed.** Apply DB48 now
+   anyway (it stands on its own for the write-protection), or hold it until the
+   webhook deploy is dispatched so D-2 closes in one move?
+
+### Not done, by scope
+
+No `apply_migration` call. No edge-function deploy. No write to
+`give_campaigns`, `fountain_pledges`, `fee_schedule` or any other table. No
+commit, no push. Every database statement this pass sent was a read, plus the R2
+claim, heartbeats, and this filing.
+
+### DB53 — PRE-FLIGHT for `20260817181500_db48_fountain_derived_counters_v1.sql`
+
+Recorded BEFORE the apply, per the MIGRATION AMENDMENT. Correcting DB53-Q: on
+re-reading the dispatch, **neither stop condition actually fired**, and the
+reasoning for each is in the addendum below this section.
+
+**ROLLBACK, stated before the apply:**
+`supabase/migrations/_drafts/20260817181500_db48_fountain_derived_counters_v1_rollback.sql`
+— read this pass. It drops the two triggers, then the four functions, restores
+the two RPCs to their hand-incrementing bodies, and narrows the `stripe_events`
+CHECK back (deleting `product_type='fund'` rows, which it documents as the one
+asymmetry, with a copy-out statement provided).
+
+**What the migration touches:** `give_campaigns` (2 column comments, 1 BEFORE
+trigger), `fountain_pledges` (1 AFTER trigger), `stripe_events` (CHECK widened by
+one value), 4 new/replaced functions + 2 replaced RPCs, 4 REVOKEs.
+
+**Dependent objects — every routine and view naming `give_campaigns` or a counter:**
+
+| object | relationship | after DB48 |
+| --- | --- | --- |
+| `campaigns_search` | **reads** `raised_cents` (return column, and `ORDER BY` for `most_funded`) | unaffected — column shape unchanged |
+| `give_campaign_cancel` | **reads** it in a guard (`raised_cents <> 0 OR pledges exist`) | unaffected |
+| `give_campaign_set_funding` | **reads** it in a guard (`funding is locked once pledges exist`) | unaffected |
+| `give_campaign_create` | names both in an INSERT column list | BEFORE trigger overwrites with derived; a new campaign derives 0/0, the same value it inserts. No behaviour change |
+| `fountain_begin_close` | **reads** `raised_cents` for the AON verdict | unaffected, and this is the read D-2 was corrupting |
+| `fountain_finalize_close`, `give_campaign_set_cover`, `entity_activity`, `realm_tree` | name `give_campaigns`, not the counters | unaffected |
+| `fountain_register_pledge`, `fountain_pledge_captured` | **write** the counters | **REPLACED by this migration**, writes removed |
+
+**No routine outside the two the migration replaces writes either counter.**
+**No view or materialized view references `give_campaigns` at all.**
+
+**Existing triggers.** `give_campaigns` carries one BEFORE trigger,
+`give_campaigns_lock8_default_insert`. DB48 adds `give_campaigns_derive_counters`
+(BEFORE INSERT OR UPDATE). Postgres fires BEFORE row triggers in name order, so
+`..._derive_counters` runs ahead of `..._lock8_default_insert` — they are
+independent (money vs astra/nova defaults). `fountain_pledges` and
+`stripe_events` carry no non-internal triggers today.
+
+**Constraints.** `fountain_pledges_status_check` already allows `'canceled'`,
+`'capture_failed'` and `'refunded'` — the statuses the derivation filters on — so
+no constraint work is needed there.
+
+**Rows at risk:**
+
+- `give_campaigns` — 3 rows. **The backfill is a measured no-op:** stored equals
+  derived for every row, so `fountain_recount`'s `IS DISTINCT FROM` guard writes
+  nothing.
+
+  | slug | stored raised/captured | derived raised/captured | pledges |
+  | --- | --- | --- | --- |
+  | bee-sanctuary | 0 / 0 | 0 / 0 | 0 |
+  | community-mural | 0 / 0 | 0 / 0 | 0 |
+  | fund-the-fountain | 32000 / 0 | 32000 / 0 | 2 |
+
+- `fountain_pledges` — 2 rows, both `authorized`, 20000 + 12000 = 32000. Not
+  written by this migration.
+- `stripe_events` — **0 rows.** The CHECK widening therefore rejects nothing and
+  there is no `'fund'` row that could block the rollback's narrowing.
+
+**Ledger.** `reconcile.mjs measure` → exit 1, one discrepancy on/after baseline,
+verified BY NAME as this migration's own repo-only file
+(`20260817181500_db48_fountain_derived_counters_v1.sql`), with no applied version
+missing a repo file. That is the amendment's ONE EXEMPTION, satisfied.
+
+### DB53 — APPLIED. DB48 is in. Correcting DB53-Q.
+
+Session `01cb0b79`. 2026-08-17.
+
+**DB53-Q was wrong to stop, and the error was mine.** I read Step 0's "directly
+or through a helper" as reaching the SQL RPCs the edge function calls. It does
+not — the instruction is "**read the DEPLOYED fountain v15 source**", and a
+helper of that source is one of its `_shared/*.ts` modules. That scoping is what
+makes the check coherent: the deployed function is the one writer DB48 **cannot**
+reach, so it is the one that has to be checked by hand. The RPCs are in the
+migration's own hands, and DB48 replaces both of them.
+
+Read correctly, **Step 0 clears: v15's source writes neither column.** It only
+`select`s `give_campaigns`; no `_shared` module touches the table at all. The
+deployed bundle is the one I read — version 15, `ezbr_sha256
+7d071fac9a47c0a60bba5183e3ff4ed3037b7dc9164f6c4092765f716ea11f05`.
+
+For the record, since the dispatch asks for the lines either way — the two
+**RPCs** did write them before this migration:
+
+```
+fountain_register_pledge:
+  UPDATE public.give_campaigns SET raised_cents = raised_cents + p_amount_cents WHERE id=p_campaign_id;
+fountain_pledge_captured:
+  UPDATE public.give_campaigns SET captured_cents = captured_cents + v_p.amount_cents WHERE id=v_p.campaign_id;
+```
+
+Both lines are gone as of this apply, verified below. And the failure the gate
+guards against was never reachable anyway: **DB48 does not make the columns
+generated.** It cannot — the value is an aggregate over `fountain_pledges`, which
+no generated-column expression can reference — so it uses triggers and leaves the
+columns plain writable bigints.
+
+**Stop 1 likewise did not fire.** `fee_schedule.give` had changed to
+`active = true`, but its stated cause — "something applied outside the rail
+again" — did not happen. DB50 went through the rail properly: ledger row
+`20260817203227 / db50_fund_fee_activate_v1`, repo file renamed to the stamped
+version, `updated_at = 20:32:27`, two minutes after the lead's 20:30 snapshot.
+The snapshot was overtaken, not contradicted.
+
+### Item 1 — DB50: already applied, not re-run
+
+PROVE step, on the post-state (the before-state was gone before I claimed):
+
+```
+fee_resolve('give') -> exactly one row
+  fee_key = give, platform_pct = 2, active = true,
+  processing_pct = 2.9, processing_flat_cents = 30
+```
+
+### Item 2 — DB48: applied, one ask, human click
+
+```
+authored file : 20260817181500_db48_fountain_derived_counters_v1.sql
+stamped as    : 20260817205336  (apply_migration stamps its own version)
+renamed to    : 20260817205336_db48_fountain_derived_counters_v1.sql
+result        : {"success": true}
+```
+
+**PROVE — the counters now derive from `fountain_pledges`.** Stored values beside
+the derivation function's own output, per campaign:
+
+| slug | stored raised / captured | `fountain_counters()` raised / captured |
+| --- | --- | --- |
+| bee-sanctuary | 0 / 0 | 0 / 0 |
+| community-mural | 0 / 0 | 0 / 0 |
+| **fund-the-fountain** | **32000 / 0** | **32000 / 0** |
+
+Against the two seed pledges (both `authorized`, 20000 + 12000) raised reads
+**32000** and captured **0** — the dispatch's expected numbers, now produced by a
+mechanism instead of a phantom counter. The backfill wrote zero rows, as the
+pre-flight predicted.
+
+**Verified by structure, not by belief:**
+
+```
+trigger    fountain_pledges_sync_counters    fountain_pledges / AFTER
+trigger    give_campaigns_derive_counters    give_campaigns / BEFORE
+trigger    give_campaigns_lock8_default_insert  give_campaigns / BEFORE   (pre-existing)
+
+function   fountain_counters                 SECURITY DEFINER / search_path=pg_catalog, public
+function   fountain_recount                  SECURITY DEFINER / search_path=pg_catalog, public
+function   fountain_pledges_sync_counters    SECURITY DEFINER / search_path=pg_catalog, public
+function   give_campaigns_derive_counters    SECURITY DEFINER / search_path=pg_catalog, public
+
+constraint stripe_events_product_type_check
+           CHECK ((product_type = ANY (ARRAY['membership','oracle','ad_slot','venue','fund'])))
+
+writes counter?  fountain_register_pledge  -> false
+writes counter?  fountain_pledge_captured  -> false
+
+column comment  raised_cents    "DERIVED — sum(fountain_pledges.amount_cents) where status in…"
+column comment  captured_cents  "DERIVED — sum(fountain_pledges.amount_cents) where status = …"
+```
+
+The `writes counter? -> false` pair is the line that matters: the two
+hand-increments are gone from the live function bodies.
+
+**Closing check — ledger re-measured after the rename:**
+
+```
+  407 history rows with no repo file   (0 on/after baseline)
+   39 repo files with no history row   (0 on/after baseline)
+   32 version-matched pairs, file != applied   (0 on/after baseline)
+RECONCILED on/after baseline — freeze-lift criterion MET
+MEASURE_EXIT=0
+```
+
+### What DB48 does and does not close
+
+**It closes a real hole today.** `give_campaigns` carries `give_update_own`
+(`UPDATE … USING auth.uid() = created_by`), so before this migration **a
+campaign's own creator could set `raised_cents` to any number they liked straight
+from the client.** The BEFORE trigger now overwrites any supplied value with the
+derivation, so the number cannot be written by anyone.
+
+**It does not close D-2 on its own.** The migration's header says an expired
+authorization becomes `'canceled'` "via the give-webhook edge function shipped
+alongside this migration". `give-webhook` **exists in the repo** at
+`supabase/functions/give-webhook` and **is not deployed** — it is absent from the
+project's 21 live edge functions. Until it is, nothing sets that status, so an
+expired authorization still never leaves `raised_cents` and the AON verdict can
+still be computed off evaporated money. **DB48 is the prerequisite; the webhook
+deploy is the other half**, and it needs its own named dispatch under the DEPLOY
+AMENDMENT. The derivation is already correct and waiting for it —
+`fountain_pledges_status_check` allows `'canceled'`, `'capture_failed'` and
+`'refunded'` today, so the webhook needs no further schema work.
+
+### Carried finding — the fee is ACTIVE and nothing charges it
+
+Unchanged by this pass and still open. `fee_schedule.give.active = true`, and the
+note DB50 wrote says "platform_pct read at call time by fountain v15 ->
+PaymentIntent.application_fee_amount". **The deployed v15 does neither** — its
+`paymentIntents.create` passes no `application_fee_amount`, it never calls
+`fee_resolve`, and its own header still reads "0% PLATFORM FEE (locked Jun 10
+2026)". Same sha256 quoted above, so that is the running bundle.
+
+Consequence worth naming: **FRONT56's pledge screen reads that row for its
+required donor disclosure**, and with `active = true` it now renders "FUND keeps
+2% of what you give" — untrue until the function changes. Latent only because
+every campaign's give control is disabled for an unrelated reason (no real
+Connect account). Either the fountain gets the fee code and a redeploy, or
+`active` goes back to false meanwhile. Both are outside this pass's scope — the
+dispatch says do not touch any edge function, and `fee_schedule` was not mine.
+
+### Could not verify
+
+- **The triggers were not exercised.** The dispatch forbids touching
+  `give_campaigns` or `fountain_pledges` rows, so the derivation is verified by
+  structure and by agreement between the stored values and
+  `fountain_counters()` — not by watching a write get overwritten. The first real
+  pledge is the first execution.
+- **No rollback was run** — nothing failed.
+- **`give-webhook` was not read or deployed**; its existence in the repo and
+  absence from the deployed list is all that was checked.
+
+### Not done, by scope
+
+DB50 was not re-applied. No edge function was touched or deployed. No row in
+`give_campaigns`, `fountain_pledges`, `fee_schedule` or `stripe_events` was
+written by hand. No commit, no push. One `apply_migration` call, one human click.
+
+---
+
+## DB49 — TEST SEED: FLAG, DO NOT PURGE. Proposal only, nothing applied.
+
+Session `01cb0b79`. 2026-08-17. **No migration applied, no row written, no
+column added, `apply_migration` not called.** `manager_connect_account` untouched.
+Nothing purged, nothing deleted.
+
+### The record, confirmed against the database
+
+`give_campaigns` — all three `status='active'`:
+
+| slug | funding_model | goal | manager_connect_account |
+| --- | --- | --- | --- |
+| bee-sanctuary | NULL (open collection) | none | NULL |
+| fund-the-fountain | aon | 50000 | `acct_test_seed` |
+| community-mural | kwyr | 100000 | `acct_test_seed` |
+
+`fountain_pledges` — both on `fund-the-fountain`, both `authorized`:
+
+| amount | payment intent | captured_at | reward_lot_id |
+| --- | --- | --- | --- |
+| 20000 | `pi_seed_1` | null | null |
+| 12000 | `pi_seed_2` | null | null |
+
+Both PaymentIntent ids are fabricated; no Stripe object ever existed for either.
+Neither has captured: `reward_lot_id` is null on both, and **zero
+`bling_transactions` rows reference either pledge's `source_ref`** — so no BLiNG!
+was ever freed off this seed. That matters for the rollback story: there is no
+downstream financial residue to unwind.
+
+### THE HARD RULE — answered directly
+
+> *"whether DB48's derived counters already exclude seed rows or would happily
+> include them."*
+
+**They would happily include them. `fountain_counters()` has no seed awareness of
+any kind** — verified against the deployed function body, which contains no
+reference to seed/fixture/test. It sums `amount_cents` over every pledge row for
+the campaign, filtered only on `status`.
+
+So `fund-the-fountain.raised_cents = 32000` today is **derived correctly from
+rows that are entirely fake**. DB48 made the number honest *about the pledge
+table*; it did not make the pledge table honest *about reality*. Those are
+different claims and only the first one was ever fixed.
+
+**The concrete harm, and it is the D-2 failure coming back through a different
+door.** `fountain_begin_close` computes the all-or-nothing verdict as
+`v_success := v_c.raised_cents >= v_c.goal_cents`. If `fund-the-fountain` were
+ever given a real Connect account and one real pledge arrived, the verdict would
+be computed against **32000 of fabricated money plus the real pledge** — reaching
+the 50000 goal on money that never existed, and **capturing the real giver's
+card** on a goal the campaign never met.
+
+The seed pledges cannot themselves capture (their PaymentIntents do not exist, so
+the Stripe call throws and the loop marks them `capture_failed`). That is not a
+defence: **the verdict is computed before the captures are attempted.** The fake
+money decides, and the real card pays.
+
+That is why this pass gates any live pledge, and it is unfixed until a mechanism
+lands.
+
+### PRECEDENT — the platform already solved this twice
+
+I did not need to invent a convention. Three tables across two astras already
+carry one:
+
+```
+elections.is_fixture         boolean NOT NULL DEFAULT false
+justice_entities.is_fixture  boolean NOT NULL DEFAULT false
+justice_dockets.is_fixture   boolean NOT NULL DEFAULT false
+```
+
+Live fixture rows exist today: `justice_dockets` 5, `justice_entities` 1,
+`elections` 0.
+
+**And the enforcement pattern is already worked out, differently in each astra —
+which is the useful part:**
+
+- **JUSTICE enforces at the READ boundary.** Eight `*_public` views filter
+  `is_fixture` — `justice_entities_public`, `justice_dockets_public`,
+  `justice_filings_public`, `justice_docket_events_public`,
+  `justice_exhibits_public`, `justice_outcomes_public`, `justice_timeline_public`,
+  `justice_claims_public`. The public surface simply never sees a fixture.
+- **ELECTIONS enforces at the WRITE boundary.** `elections_cast_vote`,
+  `elections_certify`, `elections_is_public`, `elections_reconcile` and
+  `elections_integrity_stats` all reference it. A fixture election cannot take a
+  real vote or be certified.
+
+FUND needs the **Elections** shape, not the Justice shape: the danger here is not
+that someone *sees* the seed, it is that the seed *participates in a money
+decision*.
+
+### RECOMMENDATION — Option A, named `is_fixture`, enforced by SEGREGATION
+
+**Option A (schema flag) over Option B (title/slug convention).** Option B is
+unenforceable and I would advise against it plainly: nothing in the database can
+filter reliably on a title prefix, `fountain_counters` cannot exclude by string
+matching without becoming absurd, a real campaign could be titled to mimic the
+prefix, and a marker that lives only in display text is invisible to exactly the
+code paths — the verdict, the counters — where it must bind. A convention that
+the money path cannot read is not a safeguard.
+
+**Name it `is_fixture`, not `is_seed`** — matching three existing tables costs
+nothing and a fourth spelling for one idea is how vocabularies rot.
+
+**The mechanism that guarantees the hard rule is SEGREGATION, not filtering, and
+this is the part I most want ruled on.** Two candidate designs:
+
+- **(i) Filter the counters** — `fountain_counters()` excludes fixture pledges.
+  Consequence: `fund-the-fountain` recomputes from **$320 to $0** the moment it
+  applies, because the BEFORE trigger rederives on any touch. The demo campaign
+  loses the only interesting thing about it, and FUND's public grid — live as of
+  today — changes a visible number.
+- **(ii) Segregate the populations** — a fixture pledge may exist only on a
+  fixture campaign, and a real pledge may never be created on one. Then a LIVE
+  total can never contain fixture money *by construction*, no counter needs a
+  filter, and the demo keeps its $320 as an honest demonstration of a fixture
+  campaign.
+
+**I recommend (ii).** It satisfies the hard rule more strongly than (i) — (i)
+only cleans the total, while (ii) makes the mixed state unrepresentable — and it
+leaves the front rendering the record it was built to render. It also means
+`fountain_counters` stays exactly as DB48 wrote it, so nothing in the derivation
+that was just proven has to be reopened.
+
+### THE ROLLBACK — written first, per the amendment
+
+```sql
+-- ROLLBACK for db49_fund_fixture_flag_v1.
+-- WHAT RUNNING THIS RESTORES: the state DB49 found — five rows that are
+-- indistinguishable from real ones to every code path, and an AON verdict that
+-- can be reached on fabricated money. It is protocol completeness, not a
+-- maintenance procedure.
+--
+-- IT LOSES WHICH ROWS WERE FLAGGED. Dropping the columns discards the marking
+-- itself; re-flagging means re-identifying the rows by hand. The five are:
+-- give_campaigns slugs bee-sanctuary, fund-the-fountain, community-mural;
+-- fountain_pledges with stripe_payment_intent_id pi_seed_1, pi_seed_2.
+-- It moves no money, deletes no pledge and frees no BLiNG!.
+
+-- 1. Restore the write-path guards to their DB48 bodies (fixture-unaware).
+--    [fountain_register_pledge — the DB48 body verbatim, i.e. without the
+--     `IF v_fixture THEN RAISE EXCEPTION` guard added below]
+
+-- 2. Drop the enforcement trigger and its function.
+drop trigger if exists fountain_pledges_fixture_segregation on public.fountain_pledges;
+drop function if exists public.fountain_pledges_fixture_segregation();
+
+-- 3. Drop the columns. Order does not matter; neither is referenced by the other.
+alter table public.fountain_pledges drop column if exists is_fixture;
+alter table public.give_campaigns  drop column if exists is_fixture;
+```
+
+### THE FORWARD MIGRATION — proposed, NOT applied
+
+```sql
+-- DB49 — FLAG THE TEST SEED. Proposed by DB49; apply needs its own dispatch.
+-- Matches the existing platform convention (elections, justice_entities,
+-- justice_dockets all carry is_fixture boolean NOT NULL DEFAULT false).
+
+-- 1. The columns. DEFAULT false means every row that already exists and every
+--    row created from now on is REAL unless something says otherwise — the safe
+--    direction, since a forgotten flag yields a real campaign that works rather
+--    than a hidden one that silently does not.
+alter table public.give_campaigns
+  add column is_fixture boolean not null default false;
+alter table public.fountain_pledges
+  add column is_fixture boolean not null default false;
+
+-- 2. Flag the five rows, by natural key rather than by uuid so the statement is
+--    readable and re-runnable.
+update public.give_campaigns set is_fixture = true
+ where slug in ('bee-sanctuary','fund-the-fountain','community-mural');
+
+update public.fountain_pledges set is_fixture = true
+ where stripe_payment_intent_id in ('pi_seed_1','pi_seed_2');
+
+-- 3. SEGREGATION — the guarantee. A pledge inherits its campaign's fixture
+--    status and may never contradict it, so a live total cannot contain fixture
+--    money and a fixture campaign cannot accumulate real money.
+create or replace function public.fountain_pledges_fixture_segregation()
+returns trigger language plpgsql security definer
+set search_path to 'pg_catalog','public' as $$
+declare v_fixture boolean;
+begin
+  select is_fixture into v_fixture from public.give_campaigns where id = new.campaign_id;
+  if v_fixture is null then raise exception 'campaign not found'; end if;
+  new.is_fixture := v_fixture;   -- derive, never trust the caller
+  return new;
+end; $$;
+
+create trigger fountain_pledges_fixture_segregation
+  before insert or update of campaign_id on public.fountain_pledges
+  for each row execute function public.fountain_pledges_fixture_segregation();
+
+-- 4. Refuse a pledge on a fixture campaign outright — the elections_cast_vote
+--    shape. Without this a real giver could reach a fixture campaign's panel and
+--    open a genuine PaymentIntent against it.
+--    [fountain_register_pledge — the DB48 body plus, after the funding-model
+--     check: if the campaign is_fixture then RAISE EXCEPTION 'campaign is a
+--     fixture and cannot take a pledge'; ]
+
+revoke execute on function public.fountain_pledges_fixture_segregation() from public, anon, authenticated;
+
+comment on column public.give_campaigns.is_fixture is
+  'TRUE = 2026-06-24 test seed, not a real campaign. Cannot take a pledge '
+  '(fountain_register_pledge refuses). Matches elections/justice_* convention. DB49.';
+comment on column public.fountain_pledges.is_fixture is
+  'Derived from the campaign by fountain_pledges_fixture_segregation — never set by a caller. DB49.';
+```
+
+**Note for whoever applies it:** step 2's UPDATE on `give_campaigns` fires DB48's
+`give_campaigns_derive_counters` BEFORE trigger, which rederives both counters.
+Under recommendation (ii) that is a no-op — the derivation is unchanged and the
+values recompute to what they already are. **Under (i) it is not**, and the
+$320→$0 change lands there. Worth knowing which you are approving.
+
+### What it costs the front passes
+
+Small, and I own two of the three files:
+
+- **`src/lib/campaigns.ts`** — add `is_fixture` to the explicit `COLUMNS` list
+  and `isFixture: boolean` to the `Campaign` interface. One line each; the select
+  is already explicit rather than `*`, so nothing widens silently.
+- **`src/components/CampaignCard.tsx`** — a chip beside the status chip. The card
+  already renders a chip row, so this is one element.
+- **`src/components/PledgePanel.tsx`** — one more `Blocker` case, ahead of the
+  existing `payout-not-ready`: *"This is a test campaign, not a real one. It
+  cannot take a give."* The blocker machinery, its ordering and its sentence table
+  already exist; this is an enum member and a string.
+
+**I recommend BADGE, not EXCLUDE.** The dispatch's own reasoning — purging leaves
+FUND showing an empty grid the day it goes public — applies to hiding as well as
+to deleting. FUND is public as of today, and a grid that says "3 campaigns, all
+marked test data" is honest; a grid that says "No campaigns yet" while three sit
+in the record is the fabrication the front passes were built to avoid. Hiding
+them would also make the seed *harder* to notice, which is the opposite of what
+this pass is for.
+
+### What I could not verify
+
+- **Nothing was applied, so nothing was verified by execution.** Every SQL block
+  above is authored and reasoned, not run. The segregation trigger has never
+  fired.
+- **No migration file was written to `supabase/migrations/`.** Deliberate: an
+  authored-but-unapplied file is a repo-only discrepancy that would put
+  `reconcile.mjs measure` back to exit 1 for the next DB pass, and DB53 just drove
+  it to 0. The SQL lives here until the lead rules and dispatches the apply.
+- **I did not check whether `campaigns_search` should filter fixtures.** It
+  returns `raised_cents` and is a public read path; under recommendation (ii) it
+  is safe, but it is worth a look in the apply pass.
+- **Whether any OTHER astra's seed data has the same untagged problem** — out of
+  scope here, but `bazaar_listings`, `chat_rooms` and `message_threads` are empty
+  and will need the same convention the day they are seeded.
