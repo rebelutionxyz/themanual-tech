@@ -34,7 +34,7 @@ const DOORWAYS = [
   { label: 'INTEL', to: '/intel' },
   { label: 'UNITE', to: '/unite' },
   { label: 'RULE', to: '/rule' },
-  { label: 'GIVE', to: '/give' },
+  { label: 'FUND', to: '/fund' },
   { label: 'BAZAAR', to: '/bazaar' },
 ];
 

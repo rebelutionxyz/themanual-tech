@@ -222,6 +222,32 @@ if (FUND_INTERNAL_URL) {
   console.warn('[server] FUND_INTERNAL_URL unset — /fund is NOT proxied.');
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// /give → /fund, HTTP 301 PERMANENT (FUND_MF v0.1: the astra formerly called
+// GiVE is FUND; copy, docs, UI and URLs say FUND).
+//
+// This is the ONLY place a real status code exists. React Router's <Navigate>
+// is a client-side swap that answers 200 with the SPA shell, which reads to a
+// crawler as two live URLs for one body of content — exactly the split-equity
+// failure FUND_MF's SEO stanza names. The route table carries a matching
+// client-side redirect for in-app <Link> navigation, which never reaches here.
+//
+// MOUNT ORDER: before the SPA catch-all, for the same reason the proxies are.
+// It sits AFTER the astra proxies and touches none of them — /give matches no
+// proxy pathFilter, so this block is order-independent with respect to them
+// and is placed last purely to keep the static → /vote → /justice → /fund
+// sequence above it unbroken.
+//
+// THE SLUG IS PRESERVED: /give/foo → /fund/foo, never a bare /fund. Query
+// strings ride along; fragments never reach a server.
+app.use((req: Request, res: Response, next: () => void) => {
+  const p = req.path;
+  if (p !== '/give' && !p.startsWith('/give/')) return next();
+  // originalUrl minus path is the query string; req.query would re-encode it.
+  const qs = req.originalUrl.slice(p.length);
+  res.redirect(301, `/fund${p.slice('/give'.length)}${qs}`);
+});
+
 // HTML shell — every non-asset GET returns the SPA shell with per-host
 // <title> + og meta. The SPA's client-side router then handles the path.
 app.get(/.*/, (req: Request, res: Response) => {

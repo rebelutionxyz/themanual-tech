@@ -129,7 +129,9 @@ const COMMUNITY_PREFIXES = [
   '/intel',
   '/unite',
   '/rule',
-  '/give',
+  // FUND (was GiVE) — the surface moved to /fund per FUND_MF v0.1. '/give' is
+  // NOT listed: it no longer renders a page, it redirects to /fund.
+  '/fund',
   '/pulse',
   '/bazaar',
   '/comms',
@@ -289,8 +291,12 @@ function AppContent() {
             <Route path="/unite/:slug" element={<GroupPage />} />
             <Route path="/rule" element={<EventsPage />} />
             <Route path="/rule/:id" element={<EventPage />} />
-            <Route path="/give" element={<GivePage />} />
-            <Route path="/give/:slug" element={<CampaignPage />} />
+            {/* FUND — renamed from GiVE (FUND_MF v0.1, 2026-08-17). The page
+              components still live under pages/give/ and keep their Give*
+              identifiers; only the URL and the visible copy move. The old
+              /give URLs redirect (below, outside this layout route). */}
+            <Route path="/fund" element={<GivePage />} />
+            <Route path="/fund/:slug" element={<CampaignPage />} />
 
             {/* COMMS — Bee-to-Bee DMs + groups (v1 text layer, 2026-07-10).
               Backend RPCs were already deployed; this is their first UI.
@@ -464,6 +470,15 @@ function AppContent() {
           {/* Legacy redirects: old /s/foo URLs → /foo */}
           <Route path="/s/:slug" element={<RedirectSlashS />} />
 
+          {/* GiVE → FUND (FUND_MF v0.1). The SLUG IS PRESERVED: /give/foo lands
+            on /fund/foo, not on the FUND index. These two routes are the
+            CLIENT-side half only — an in-app <Link to="/give"> never touches
+            the server, so it needs its own redirect. The permanent HTTP 301
+            that search engines and bookmarks see is issued by the Express
+            serving layer, which is the only place a real status code exists. */}
+          <Route path="/give" element={<RedirectGiveToFund />} />
+          <Route path="/give/*" element={<RedirectGiveToFund />} />
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
           </Suspense>
@@ -560,4 +575,19 @@ function RedirectSlashS() {
   const { pathname } = useLocation();
   const flat = pathname.replace(/^\/s\//, '/');
   return <Navigate to={flat} replace />;
+}
+
+/**
+ * GiVE → FUND, slug preserved (FUND_MF v0.1). `replace` so the retired URL
+ * never lands in history — a Back press from /fund/foo must not bounce off
+ * /give/foo and redirect forward again.
+ *
+ * The anchored `^\/give` rewrite maps /give → /fund and /give/foo → /fund/foo
+ * in one expression. Anchoring matters: an unanchored replace would also
+ * rewrite a slug that happens to contain "give".
+ */
+function RedirectGiveToFund() {
+  const { pathname, search, hash } = useLocation();
+  const moved = pathname.replace(/^\/give/, '/fund');
+  return <Navigate to={`${moved}${search}${hash}`} replace />;
 }

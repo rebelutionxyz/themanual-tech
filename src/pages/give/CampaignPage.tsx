@@ -119,11 +119,11 @@ export function CampaignPage() {
           This campaign doesn't exist.
         </p>
         <Link
-          to="/give"
+          to="/fund"
           className="mt-3 inline-block"
           style={{ color: GIVE_COLOR, fontSize: '13px' }}
         >
-          ← Back to GIVE
+          ← Back to FUND
         </Link>
       </div>
     );
@@ -147,12 +147,12 @@ export function CampaignPage() {
     <div className="min-h-full bg-white">
       <div className="safe-pad-x mx-auto max-w-3xl px-4 py-6 md:px-8 md:py-8">
         <Link
-          to="/give"
+          to="/fund"
           className="mb-3 inline-flex items-center gap-1 font-mono text-zinc-500 transition-colors hover:text-zinc-800"
           style={{ fontSize: '11px' }}
           data-size="meta"
         >
-          <ArrowLeft size={11} /> GIVE
+          <ArrowLeft size={11} /> FUND
         </Link>
 
         {/* Cover */}

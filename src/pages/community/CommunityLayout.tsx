@@ -76,7 +76,8 @@ const UNFILTERED_VIEWS: IntelView[] = ['mythreads', 'saved', 'home'];
 function surfaceFromPath(pathname: string): Surface {
   if (pathname.startsWith('/unite')) return 'unite';
   if (pathname.startsWith('/rule')) return 'rule';
-  if (pathname.startsWith('/give')) return 'give';
+  // FUND lives at /fund now (FUND_MF v0.1); the surface KEY stays 'give'.
+  if (pathname.startsWith('/fund')) return 'give';
   if (pathname.startsWith('/pulse')) return 'pulse';
   if (pathname.startsWith('/bazaar')) return 'bazaar';
   if (pathname.startsWith('/comms')) return 'comms';
@@ -260,11 +261,11 @@ export function CommunityLayout() {
       return;
     }
     if (surface === 'bazaar') {
-      // BAZAAR sidebar items are route links; this guards the give-fallthrough.
+      // BAZAAR sidebar items are route links; this guards the FUND fallthrough.
       return;
     }
-    // give
-    if (location.pathname !== '/give') navigate('/give');
+    // give (FUND — surface key unchanged, route is /fund)
+    if (location.pathname !== '/fund') navigate('/fund');
     setGiveView(id as GiveView);
   }
 

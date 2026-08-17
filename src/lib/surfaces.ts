@@ -159,7 +159,9 @@ export const SURFACES: SurfaceDef[] = [
   },
   {
     slug: 'give',
-    name: 'GIVE',
+    // Display name only — FUND per FUND_MF v0.1 (2026-08-17). `slug` is the
+    // join key into ACCENT / popupAccent / parent_surface and stays 'give'.
+    name: 'FUND',
     function: 'Crowdfunding',
     description: 'Movement funding. Kindness. Productive generosity.',
     purpose:

@@ -169,7 +169,7 @@ function CreateCampaignForm() {
         endsAt: endsIso,
         locationText: locationText.trim() || null,
       });
-      navigate(`/give/${createdSlug}`);
+      navigate(`/fund/${createdSlug}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create campaign');
       setSubmitting(false);
@@ -197,7 +197,7 @@ function CreateCampaignForm() {
 
           <Field
             label="URL slug"
-            hint={slugOk ? `/give/${effectiveSlug}` : 'a–z, 0–9, hyphen · 2–60'}
+            hint={slugOk ? `/fund/${effectiveSlug}` : 'a–z, 0–9, hyphen · 2–60'}
           >
             <input
               value={effectiveSlug}
@@ -326,7 +326,7 @@ export function CampaignCard({
   return (
     <li>
       <Link
-        to={`/give/${campaign.slug}`}
+        to={`/fund/${campaign.slug}`}
         className="block h-full overflow-hidden rounded-lg p-4 transition-shadow hover:shadow-md"
         style={realmCardStyle(GIVE_COLOR)}
       >

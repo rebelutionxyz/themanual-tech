@@ -23,6 +23,169 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONT52 - GiVE RENAMED TO FUND IN THE LIVE SPA; /give 301s TO /fund (2026-08-17)
+
+Lane `front`. Workdir `TheMANUAL.tech`. Scope: NULL in the dispatch row; the body predeclares the
+manifest as nav/menu component, route table, redirect config, and `REPORT.md` is always in scope
+(R6). Session `7519c43c` (fallback id). Started clean at `5be630f`, `origin/main..HEAD` = 0
+(FRONT51's commit `5e2b630` landed during this session, so the arrival state for this pass is
+`5e2b630`, ahead 1 and unpushed).
+
+**Result: build green, redirect measured, rename confirmed in a real browser against live data,
+committed, NOT pushed.**
+
+### 1. What moved, and the line that was NOT crossed
+
+FUND_MF v0.1's identity stanza is the whole rule: *copy, docs, UI, folder and URLs say FUND;
+schema identifiers are unchanged.* Applied here as a hard split, following the ORACLE_MF v1.27
+precedent (users-not-bees platform-wide, schema untouched):
+
+| renamed (read by a human) | left alone (joined on by a machine) |
+|---|---|
+| `SURFACE_FRIENDLY.give` → `FUND` (page-header noun) | the surface **key** `'give'` in every map |
+| `ASTRA_SWITCHER` label `GiVE` → `FUND` | `give_campaigns`, `fountain_pledges`, `fee_key='give'` |
+| `SURFACE_LABEL.give` → `FUND` (chips, dropdowns) | `PARENT_SURFACES` `'give'` — a `parent_surface` **enum value** |
+| `surfaces.ts` `name: 'GIVE'` → `FUND` | `surfaces.ts` `slug: 'give'` |
+| `NovaPage` nav item `GIVE` → `FUND` | `GIVE_COLOR`, `GiveView`, `GivePage`, `pages/give/` |
+| `HomePage` surface-name list `GIVE` → `FUND` | the FreedomBLiNGs **verb** GIVE (see below) |
+| `CampaignPage` back-links `← Back to GIVE` / `GIVE` → FUND | |
+| every `/give` URL emitted by the UI → `/fund` | |
+
+**The FreedomBLiNGs GIVE is a different word and was deliberately not touched.**
+`FreedomblingsSidebar` (`label: 'Give'`, `/freedomblings/move`) and `MovePage`'s `GIVE` tab are the
+currency triad Give · Get · Offer — a firewall-**approved** verb, not the astra name. Renaming them
+would have broken the language firewall in the name of following a rename. Same reasoning spared
+`bling_send`'s `useGive()` hook.
+
+### 2. The routes, and the two halves of one redirect
+
+The surface now answers at `/fund` and `/fund/:slug`; `/give` and `/give/*` redirect, slug
+preserved. **The old lazy routes and page components were NOT deleted** — the dispatch reserves
+that for OPS98. `pages/give/GivePage.tsx` and `CampaignPage.tsx` are unchanged apart from the URLs
+and link text they emit, and they are what `/fund` renders.
+
+A redirect needs both halves, and they are not interchangeable:
+
+- **Express, `server/index.ts`** — a real **HTTP 301**. This is the only place a status code
+  exists. It is what a bookmark, an external link, and a crawler see.
+- **Route table, `App.tsx`** — `RedirectGiveToFund`, a client-side `<Navigate replace>`. An in-app
+  `<Link to="/give">` never reaches the server, so without this half a stale internal link would
+  simply 404 into the SPA catch-all.
+
+Ship only the client half and every retired URL answers **200 with the SPA shell** — which reads
+to a crawler as two live URLs serving one body of content, exactly the split-equity failure
+FUND_MF's SEO stanza names. Ship only the server half and in-app navigation breaks. Both, or the
+rename is only half done.
+
+`replace` on the client half is deliberate: a Back press from `/fund/foo` must not land on
+`/give/foo` and be pushed forward again. The rewrite is **anchored** (`^\/give`) so a campaign slug
+containing the word "give" is never rewritten mid-path.
+
+### 3. Done-tests, run, verbatim
+
+**Build** — `npm run build`, `BUILD_EXIT=0`, `tsc -b && vite build`, "built in 17.11s". No new
+warnings; the pre-existing >500 kB chunk notice is unchanged.
+
+**The 301, measured at the Express layer** (server booted on a port asserted free and asserted to
+be owned by this probe's own child PID — `FOREIGN: none`; the FRONT51 harness lesson):
+
+```
+301  /give                              Location=/fund
+301  /give/                             Location=/fund/
+301  /give/save-the-bees                Location=/fund/save-the-bees
+301  /give/save-the-bees?ref=email&x=1  Location=/fund/save-the-bees?ref=email&x=1
+200  /giveaway                          Location=-      bytes=1570   <- NOT captured
+200  /fund                              Location=-      bytes=1570
+200  /fund/save-the-bees                Location=-      bytes=1570
+200  /                                  Location=-      bytes=1570
+```
+
+Slug preserved, query string preserved, and `/giveaway` proves the prefix test is
+exact-or-descendant rather than a bare `startsWith('/give')`.
+
+**The rename, confirmed in a real browser against live production data** — server booted locally,
+Chrome driven to `http://localhost:3881/give`:
+
+- Landed on `/fund`. Astra dropdown reads **FUND**; page header reads **Explore FUND**; the green
+  surface accent, sidebar items (Explore · Create Campaign · My Campaigns) and utility tail all
+  resolve, which is the proof that `surfaceFromPath` still maps the new path onto the unchanged
+  `'give'` key. Three real campaigns rendered.
+- Clicking a campaign card went to `/fund/fund-the-fountain` — the card link emits the new URL.
+- The old deep link `/give/fund-the-fountain?ref=oldlink` landed on
+  `/fund/fund-the-fountain?ref=oldlink` — **slug and query survived the 301** — showing real data
+  (`@butch`, `$320 raised of $500 goal`, All-or-nothing), with the back-link reading **← FUND**.
+
+**Lint** — `npm run lint` exits 1 with **23 pre-existing errors repo-wide**, none of them this
+pass's. Of the ten files touched, only `CampaignPage.tsx` reports any, and both are
+`lint/a11y/useSemanticElements` on `role="status"` constructs that are **present at `HEAD`
+unchanged** (`git show HEAD:… | grep -n 'role="status"'` returns the same two). Stated rather than
+quietly claimed green.
+
+### 4. Deviations and judgement calls
+
+- **The 301 is in `server/index.ts`, which the dispatch could be read as disclaiming.** The
+  dispatch lists "redirect config" in the manifest *separately from* "route table", and says
+  "disclaim the Express **mount layer** — that is FRONT51". A real 301 cannot exist anywhere but
+  the server, so this reads as: the proxy **mount blocks** are FRONT51's and untouched, while the
+  redirect is this pass's. Measured against that reading: the three proxy blocks are byte-identical
+  in the diff, the mount order `static → /vote → /justice → /fund → catch-all` is unchanged, and
+  the redirect is a pure insertion between the last proxy and the catch-all. **If the lead intended
+  no server edit at all, this block is the one thing to revert** — the client half stands alone and
+  the rename still works, minus the true status code.
+- **`astra-catalog.ts` `route: '/give'` → `/fund`** — a route reference that emits a link, so a
+  route-table change rather than a copy change. Its `wordmark: 'Crowdfunding'` was left alone: the
+  word "Give" does not appear in it, and renaming a wordmark is a brand call, not a sweep.
+- **`surfaces.ts` `name: 'GIVE'` → `FUND`** was included as a nav/heading-layer display name. Its
+  neighbouring `purpose` string was **not** edited — see could-not-verify below.
+- **Comments naming the old brand were left in place** (e.g. `GlobalSidebar`'s "brand casing like
+  GiVE / COMMs is intentional"). Comments are not visible copy and are outside the declared
+  manifest; flagged rather than swept, since a stale brand form in a comment is the kind of thing
+  FRONT39 was dispatched to clean deliberately.
+- **No schema identifier was touched**, so the dispatch's STOP condition never fired.
+
+### 5. Flagged for the lead — not fixed, because not mine
+
+- **`surfaces.ts` line ~166 now contradicts ratified canon.** The FUND surface `purpose` reads
+  "Zero fees on kindness." FUND_MF v0.1 records Butch's 2026-08-17 ruling activating the existing
+  **2%** platform fee, and requires donor-facing disclosure on the pledge screen. That is
+  user-visible copy stating a fee policy — a copy/policy change, not a rename, and outside this
+  manifest. It needs its own dispatch, and it wants doing before any live pledge.
+- **A concurrent session is writing in this tree.** During this pass, `deno.lock` gained an
+  `http-proxy-middleware` entry and these appeared untracked:
+  `supabase/functions/give-webhook/index.ts`,
+  `supabase/migrations/20260817181500_db48_fountain_derived_counters_v1.sql`, and its rollback
+  under `_drafts/`. That is DB48 (FUND_MF's D-2 fix), not this pass. **None of it was staged.**
+- Five older untracked migrations (2026-08-14 / 08-16) are still sitting in the tree, as recorded
+  in the FRONT51 section. A SWEEP should carry them.
+
+### 6. Could not verify
+
+- **The `/fund` SPA routes once a real FUND service exists.** FRONT51's proxy takes `/fund` the
+  moment `FUND_INTERNAL_URL` is set, at which point these SPA routes become unreachable — the same
+  precedence the `/justice` stub sits behind. Everything measured here is the interim, dormant
+  state, which is the state that ships today.
+- **Production behaviour.** Measured locally only; NOT PUSHED.
+- **The `Donate` button remains inert** — visible in the browser check as
+  "SOON — DONATIONS OPEN WITH THE FIAT RAIL". That is FUND_MF's open defect D-1 (FRONT56), not a
+  regression from this pass.
+
+### 7. Manifest and commit
+
+Eleven code paths plus `REPORT.md`. `deno.lock` and every untracked path above were **excluded by
+name** and left exactly as found. Staged by name and verified: `git diff --cached --name-only`
+equalled the manifest exactly.
+
+Danger scan against the SWEEP gates: zero paths matching `backups/`, `*.env*`,
+`settings.local.json`, `node_modules/`, `.next/`, `verify-out/`, `*.dump`; no file over 1 MB; no
+deletion, no rename; every path inside the workspace.
+
+**Where the commit hash lives.** Not here — this section is inside the commit it describes. The
+hash is in the FRONT52 rail report (`ops_reports`) and in `git log -1`.
+
+**NOT PUSHED.** The push is the owner's click.
+
+---
+
 ## FRONT51 - MANUAL PROXY: MOUNT /fund BEHIND FUND_INTERNAL_URL, DORMANT (2026-08-17)
 
 Lane `front`. Workdir `TheMANUAL.tech`. Scope: NULL in the dispatch row; the body predeclares the

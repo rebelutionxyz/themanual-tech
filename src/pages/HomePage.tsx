@@ -80,7 +80,7 @@ export function HomePage() {
           </div>
           <div className="flex flex-wrap justify-center gap-1.5">
             {[
-              'BLiNG!', 'INTEL', 'UNITE', 'RULE', 'COMMS', 'GIVE', 'CHAT', 'PULSE',
+              'BLiNG!', 'INTEL', 'UNITE', 'RULE', 'COMMS', 'FUND', 'CHAT', 'PULSE',
               'BAZAAR', 'BRAND', 'PRIZE', 'PROMOTION', 'MANUAL', 'SECURE', 'SAFE',
               'PRODUCTION', 'EDU', 'VOTE', 'LEGAL',
             ].map((name) => (

@@ -108,7 +108,11 @@ export const SURFACE_FRIENDLY: Record<string, string> = {
   intel: 'INTEL',
   unite: 'Groups',
   rule: 'Events',
-  give: 'Give',
+  // FUND — renamed from GiVE per FUND_MF v0.1 (2026-08-17). Copy and URLs say
+  // FUND; the surface KEY stays `give`, exactly as the schema identifiers do
+  // (give_campaigns, fountain_pledges, fee_key='give'). ORACLE_MF v1.27
+  // precedent: rename what is read, never what is joined on.
+  give: 'FUND',
   comms: 'COMMs',
   security: 'Security',
 };
@@ -129,7 +133,9 @@ export const ASTRA_SWITCHER: AstraSwitchItem[] = [
   { label: 'RULE', slug: 'rule', to: '/rule', icon: Calendar },
   { label: 'PULSE', slug: 'pulse', to: '/pulse', icon: Radio },
   { label: 'JUSTICE', slug: 'justice', to: '/realm/justice', icon: Scale },
-  { label: 'GiVE', slug: 'give', to: '/give', icon: HeartHandshake },
+  // FUND (was GiVE) — FUND_MF v0.1. `slug` is the internal surface key and is
+  // deliberately NOT renamed; it joins to ACCENT, popupAccent and buildItems.
+  { label: 'FUND', slug: 'give', to: '/fund', icon: HeartHandshake },
   { label: 'INTEL', slug: 'intel', to: '/intel', icon: MessagesSquare },
   { label: 'COMMs', slug: 'comms', to: '/comms', icon: MessageCircle },
   { label: 'BAZAAR', slug: 'bazaar', to: '/bazaar', icon: Store },

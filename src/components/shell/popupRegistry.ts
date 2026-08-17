@@ -52,7 +52,8 @@ export const SURFACE_LABEL: Record<CommunitySurface, string> = {
   intel: 'INTEL',
   unite: 'Groups',
   rule: 'Events',
-  give: 'Give',
+  // FUND — renamed from GiVE per FUND_MF v0.1. Key unchanged (see sidebarNav).
+  give: 'FUND',
   pulse: 'Pulse',
   bazaar: 'Bazaar',
   comms: 'COMMs',
@@ -66,7 +67,9 @@ export const SURFACE_LABEL: Record<CommunitySurface, string> = {
 export function surfaceFromPath(pathname: string): CommunitySurface {
   if (pathname.startsWith('/unite')) return 'unite';
   if (pathname.startsWith('/rule')) return 'rule';
-  if (pathname.startsWith('/give')) return 'give';
+  // The FUND surface moved from /give to /fund (FUND_MF v0.1). /give itself no
+  // longer reaches a page — it redirects — so only /fund is matched here.
+  if (pathname.startsWith('/fund')) return 'give';
   if (pathname.startsWith('/pulse')) return 'pulse';
   if (pathname.startsWith('/bazaar')) return 'bazaar';
   if (pathname.startsWith('/comms')) return 'comms';
