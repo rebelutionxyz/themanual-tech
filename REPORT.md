@@ -23,6 +23,96 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## DB79 — THE PROVIDER CATALOG. Schema + the single margin anchor + a seed band-map, rehearsed forward→rollback; NOTHING APPLIED. One ask. (2026-08-18)
+
+Session `79a4fea9` (fallback id). Dispatch DB79, lane `db`, workdir **`TheMANUAL.tech-db`**, effort
+MEDIUM, propose-first. Both migration files rehearsed against production inside a self-rolling-back
+transaction; **nothing applied**, only `supabase/**` reads + the two draft files. One ask at the end.
+
+### WHAT THIS PROPOSES
+
+Pricing moves OUT of code and INTO a catalog — a price change becomes a row update with a date, not
+a deploy (ORACLE_MF v1.47).
+
+- **`providers`** — id, name, base_url, `auth_secret_name` (the NAME of the secret, never the key —
+  the route reads it by name, DB77/DB78), `dialect` (openai_compat | anthropic | gemini |
+  groq_compat), active.
+- **`models`** — id, provider_id (FK), model_string, `band` (free|standard|frontier, **NULLABLE**
+  until the owner rules), `price_in` / `price_out` / `price_cached` (provider USD per MTok),
+  `checked_at` (the drift-honesty column — the date the price was last verified; NULL = never),
+  active.
+- **`h24_tokens_per_mtok(usd, band)`** — THE ANCHOR, in exactly one place. `1000 h24 = $1`; margin
+  `3x` standard, `2.5x` frontier, free = 0. The ledger and the composer picker both read this
+  function, so the anchor lives nowhere else. **Verified**: `h24(3,'standard')=9000`,
+  `h24(5,'frontier')=12500`, `h24(1,'free')=0` — reproducing the live `oracle_model_rates` exactly.
+- **RLS from birth** — active rows publicly readable (the picker is product surface); writes
+  service-role only (no write policy → anon/auth denied, service role bypasses).
+
+### THE SEED — verified where I could verify, PROPOSED where I could not
+
+**ACTIVE, verified USD prices** (reproduce the live rate card through the anchor):
+
+| provider | model | band | $in/$out/$cached (MTok) | checked_at |
+|---|---|---|---|---|
+| anthropic | claude-opus-5 | frontier | 5 / 25 / 0.50 | 2026-07-27 |
+| anthropic | claude-sonnet-5 | standard | 3 / 15 / 0.30 | 2026-07-27 |
+| anthropic | claude-haiku-4-5 | free | 1 / 5 / 0.10 | 2026-07-27 |
+| groq | llama-3.1-8b-instant | free | 0.05 / 0.08 / — | 2026-07-28 |
+
+**PROPOSED, prices NULL / `active=false`** — the default band map for your single-word rulings. The
+model ids AND prices are **unverified proposals** (I cannot browse live rate cards); they sit inactive
+and unpriced so the public picker never shows an unpriced model. One-line reasoning each:
+
+| provider | model | proposed band | why |
+|---|---|---|---|
+| openai | gpt-5 | frontier | the flagship — top-end reasoning, priced with opus |
+| openai | gpt-5-mini | standard | the value workhorse — sonnet-class cost/quality |
+| deepseek | deepseek-reasoner | frontier | its reasoning model, frontier-adjacent quality at low cost |
+| deepseek | deepseek-chat | standard | the cheap general workhorse |
+| mistral | mistral-large-latest | frontier | Mistral's flagship |
+| mistral | mistral-small-latest | standard | the value tier |
+| xai | grok-4 | frontier | xAI's flagship; no clear value model wired yet |
+| gemini | gemini-2.5-pro | frontier | Google's flagship |
+| gemini | gemini-2.5-flash | standard | the fast value model |
+
+**Bands are your taste** — this map is a proposal, not a decision. Correct any band with a word.
+
+### REHEARSAL — proven, production untouched
+
+```
+FORWARD  :: h24(3,std)=9000 · h24(5,fr)=12500 · h24(1,free)=0 · providers=7 · models=13 · active=4
+ROLLBACK :: tables_remaining=0 · function_remaining=0
+```
+
+Both ran inside one self-rolling-back transaction, so the catalog tables never landed in production —
+the rehearsal proves the forward applies and the rollback fully reverses it.
+
+### THE ONE ASK (nothing is applied until you click)
+
+Apply `supabase/migrations/_drafts/db79_provider_catalog_v1.sql` (rollback
+`..._v1_rollback.sql`). It creates the catalog with the four verified Anthropic/Groq rows live and
+the nine proposals inactive. Then, at your pace: rule the bands (single words) and supply verified
+prices + a `checked_at` for the providers you want live — a follow-up flips those rows active. Until
+then the catalog changes nothing: the route still reads its existing rate path (repointing the route
+at this catalog is a later, separate pass).
+
+### FILES
+
+```
+supabase/migrations/_drafts/db79_provider_catalog_v1.sql            (forward, proposal)
+supabase/migrations/_drafts/db79_provider_catalog_v1_rollback.sql   (rollback, authored first)
+```
+
+### COULD NOT VERIFY
+
+- **Non-Anthropic prices and model ids are UNVERIFIED** — I cannot browse live rate cards, so those
+  nine rows carry NULL prices, NULL `checked_at`, and `active=false`. That is the honest state, and
+  the `checked_at` column exists precisely so a price is never live without a verification date.
+- **The route is NOT repointed at this catalog** — out of scope. Today's billing still runs off
+  `oracle_model_rates`; this catalog is inert until a later pass wires the route to read it.
+
+---
+
 ## DB78 — THE GEMINI ADAPTER. Third dialect in the metered door, deno-checked; live proof BLOCKED-ON-KEY (GEMINI_API_KEY absent). (2026-08-18)
 
 Session `79a4fea9` (fallback id). Dispatch DB78, lane `db`, workdir **`TheMANUAL.tech-db`**, effort
