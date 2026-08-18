@@ -40,7 +40,7 @@
 // cost; can be added later with a dedicated event table or new column.
 
 import { errorResponse, handleCors, jsonResponse } from '../_shared/cors.ts';
-import { verifyAuth } from '../_shared/auth.ts';
+import { isServiceRolePrincipal, verifyAuth } from '../_shared/auth.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { assembleCrossAstraCanon } from './canon.ts';
 
@@ -208,6 +208,14 @@ interface RouteBody {
   astra_slug?:   unknown;
   category?:     unknown;
   confirm_cost?: unknown;
+  // DB75 — INTERNAL-CALLER FIELDS. Honoured ONLY when the caller presents the
+  // service-role principal (isServiceRolePrincipal); a user cannot reach this
+  // path, so these cannot be abused to buy free compute or override a model.
+  internal?:     unknown;  // must be === true for the internal path to engage
+  caller?:       unknown;  // the true caller label, e.g. 'generate-questions'
+  model?:        unknown;  // model override (parity: haiku-gen, sonnet-validate)
+  system?:       unknown;  // system-prompt override — REPLACES canon for internal
+  max_tokens?:   unknown;  // max-tokens override (parity: gen@4096, validate@256)
 }
 
 interface AnthropicUsage {
@@ -532,9 +540,44 @@ Deno.serve(async (req) => {
     return errorResponse('Method not allowed', 405);
   }
 
-  const auth = await verifyAuth(req);
-  if (!auth.ok) return errorResponse(auth.error, auth.status);
-  const beeId = auth.userId;
+  // ─── AUTH: user directive, or DB75 INTERNAL astra-to-engine call. ───
+  //
+  // The internal path is detected FIRST, because verifyAuth 401s a service-role
+  // token (a service role is not a user). An internal call is gated on BOTH the
+  // service-role principal AND an explicit `internal: true` in the body, so an
+  // ordinary service-role invocation is never silently metered as an astra call.
+  // Everything below that reads `isInternal` is additive: with isInternal false
+  // the user directive path is byte-for-byte what it was.
+  let beeId: string | null;
+  let isInternal = false;
+  let internalCaller: string | null = null;
+  if (isServiceRolePrincipal(req)) {
+    // Body is needed to confirm the internal intent; parse it once here and
+    // reuse it below (the user path parses at the same point).
+    let peek: RouteBody;
+    try {
+      peek = await req.clone().json();
+    } catch {
+      return errorResponse('Invalid JSON body');
+    }
+    if (peek.internal === true) {
+      if (typeof peek.caller !== 'string' || peek.caller.trim().length === 0) {
+        return errorResponse('internal call requires a non-empty caller label');
+      }
+      isInternal = true;
+      internalCaller = peek.caller.trim().slice(0, 80);
+      beeId = null;
+    } else {
+      // A service-role call that is not declared internal is not a supported
+      // shape — the route serves user directives and internal astra calls, and
+      // a service principal is never a user.
+      return errorResponse('service-role calls must set internal:true', 400);
+    }
+  } else {
+    const auth = await verifyAuth(req);
+    if (!auth.ok) return errorResponse(auth.error, auth.status);
+    beeId = auth.userId;
+  }
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) {
@@ -558,7 +601,10 @@ Deno.serve(async (req) => {
   if (
     typeof body.directive !== 'string'
     || body.directive.trim().length === 0
-    || body.directive.length > MAX_DIRECTIVE_CHARS
+    // The 10k char cap is a user-abuse guard. An internal caller's prompt is
+    // trusted platform text (a question-generation batch prompt can exceed it),
+    // so the cap is bypassed for the service principal only.
+    || (!isInternal && body.directive.length > MAX_DIRECTIVE_CHARS)
   ) {
     return errorResponse(
       `directive must be a non-empty string ≤ ${MAX_DIRECTIVE_CHARS} chars`,
@@ -579,7 +625,10 @@ Deno.serve(async (req) => {
   // Refused as early as tier is known — ahead of the rate-cap RPC, the astra
   // lookup, the escrow pre-check, the directive row insert and, above all, the
   // provider call. Zero spend, zero orphan rows. Free tier is untouched.
-  if (!PAID_TIERS_ENABLED && tier !== 'free') {
+  // The paid-tier gate is a USER-billing gate; an internal call is never billed a
+  // user's way, so it is not subject to it. Internal parity needs the paid
+  // models (sonnet for validation) regardless of the user-facing paid-tier flag.
+  if (!isInternal && !PAID_TIERS_ENABLED && tier !== 'free') {
     console.log('atlasoracle-route paid tier refused', { bee_id: beeId, tier });
     return jsonResponse({
       error: 'tier_unavailable',
@@ -614,25 +663,32 @@ Deno.serve(async (req) => {
   const service = serviceClient();
 
   // ─── Rate cap check (BEFORE astra lookup / balance check / directive insert). ───
-  const { data: rateCapResult, error: rateCapErr } = await service.rpc(
-    'atlasoracle_check_rate_caps',
-    { p_bee_id: beeId, p_tier: tier },
-  );
-  if (rateCapErr) {
-    console.error('atlasoracle-route rate cap check failed', {
-      bee_id: beeId, tier, message: rateCapErr.message,
-    });
-    return errorResponse('Rate cap check failed', 500);
-  }
-  if (rateCapResult?.allowed === false) {
-    console.log('atlasoracle-route rate capped', {
-      bee_id: beeId, tier, caps_hit: rateCapResult.caps_hit,
-    });
-    return jsonResponse({
-      error: 'Rate cap reached. Try again later.',
-      retry_after_seconds: rateCapResult.retry_after_seconds ?? 60,
-      caps_hit: rateCapResult.caps_hit ?? [],
-    }, 429);
+  //
+  // Bee-scoped, so it does not apply to an internal caller: a 3,246-row question
+  // batch is not a Bee's usage shape and atlasoracle_check_rate_caps would 429 it.
+  // Internal callers are trusted platform code; their throttling is the batch
+  // job's own concern, not this per-Bee cap.
+  if (!isInternal) {
+    const { data: rateCapResult, error: rateCapErr } = await service.rpc(
+      'atlasoracle_check_rate_caps',
+      { p_bee_id: beeId, p_tier: tier },
+    );
+    if (rateCapErr) {
+      console.error('atlasoracle-route rate cap check failed', {
+        bee_id: beeId, tier, message: rateCapErr.message,
+      });
+      return errorResponse('Rate cap check failed', 500);
+    }
+    if (rateCapResult?.allowed === false) {
+      console.log('atlasoracle-route rate capped', {
+        bee_id: beeId, tier, caps_hit: rateCapResult.caps_hit,
+      });
+      return jsonResponse({
+        error: 'Rate cap reached. Try again later.',
+        retry_after_seconds: rateCapResult.retry_after_seconds ?? 60,
+        caps_hit: rateCapResult.caps_hit ?? [],
+      }, 429);
+    }
   }
 
   // ─── Resolve astra_id (themanual fallback per OG HUMAN direction). ───
@@ -660,9 +716,16 @@ Deno.serve(async (req) => {
       if (match) {
         astraId = match.id;
       } else {
-        console.warn('atlasoracle-route astra_slug unknown', {
-          bee_id: beeId, astra_slug: astraSlug,
-        });
+        // For an internal caller this is EXPECTED, not a warning: 'trivia' /
+        // 'games' have no astra_registry row (minting one is DB73's job), so the
+        // FK stays pointed at themanual and the true caller is recorded in
+        // caller_astra on the row below. For a user directive an unknown slug is
+        // still just a soft warning, unchanged.
+        if (!isInternal) {
+          console.warn('atlasoracle-route astra_slug unknown', {
+            bee_id: beeId, astra_slug: astraSlug,
+          });
+        }
       }
     }
   }
@@ -670,7 +733,13 @@ Deno.serve(async (req) => {
   // ─── Rate lookup (rates as data — OPS15). ───
   const providerModelForRate = TIER_PROVIDER_MODEL[tier];
   let rate: ModelRate | null = null;
-  if (tier !== 'free') {
+  // Internal callers skip pricing: they name their own model (which need not be
+  // the tier's model), so pricing against TIER_PROVIDER_MODEL[tier] would record
+  // a cost for the wrong model. Internal rows carry accurate token COUNTS; an
+  // audit prices those against the real provider from the rate card if it wants a
+  // number, exactly as the routing log does. rate === null ⇒ cost 0, debit
+  // skipped, balance skipped — all already guarded.
+  if (tier !== 'free' && !isInternal) {
     const { data: rateRow, error: rateErr } = await service
       .from('oracle_model_rates')
       .select('input_tokens_per_m, output_tokens_per_m, cached_input_per_m, cache_write_per_m')
@@ -714,7 +783,8 @@ Deno.serve(async (req) => {
 
   // ─── Frontier cost-preview gate (now reachable — see the constant). ───
   if (
-    tier === 'frontier'
+    !isInternal
+    && tier === 'frontier'
     && estimatedCostTokens > FRONTIER_PREVIEW_THRESHOLD_TOKENS
     && !confirmCost
   ) {
@@ -741,8 +811,11 @@ Deno.serve(async (req) => {
   // Calls oracle_token_available (OPS49). Free tier costs 0 and skips it.
   // This runs BEFORE the directive row insert and before the provider call, so
   // an underfunded Bee costs the platform nothing.
+  // Internal callers have no token balance and are not billed, so the pre-check
+  // is skipped for them — the debit is skipped too (below), keeping the two in
+  // lockstep: metered (counts recorded), never billed (no ledger row).
   let balanceBefore = 0;
-  if (estimatedCostTokens > 0) {
+  if (estimatedCostTokens > 0 && !isInternal) {
     // OPS49: read through oracle_token_available, NOT oracle_token_balances.
     // The view sums every 'grant' row forever and has no notion of expires_at,
     // so for a Bee whose plan cycle has ended it reports the expired plan
@@ -780,11 +853,15 @@ Deno.serve(async (req) => {
   const { data: pendingRow, error: insertErr } = await service
     .from('atlasoracle_directives')
     .insert({
+      // bee_id is NULL for an internal call (DB75 migration made it nullable);
+      // caller_kind/caller_astra carry the attribution instead.
       bee_id: beeId,
       astra_id: astraId,
       directive_category: category,
       tier,
       status: 'pending',
+      caller_kind: isInternal ? 'internal' : 'user',
+      caller_astra: isInternal ? internalCaller : null,
     })
     .select('id')
     .single();
@@ -813,28 +890,60 @@ Deno.serve(async (req) => {
   // to prove that is to fire it — not to reason that it would. It cannot change
   // pricing, tier, or which providers are eligible; the worst a Bee can do by
   // typing it is get Haiku instead of Groq on a tier that costs them nothing.
-  const maxTokens = TIER_MAX_TOKENS[tier];
+  // DB75 — INTERNAL OVERRIDES, service-principal only. Parity requires that
+  // generate-questions keeps its own models (haiku for generation, sonnet for
+  // validation), its own max_tokens (4096 / 256), and above all its own SYSTEM
+  // PROMPT — the route's whole value-add for a user directive is grounding it in
+  // platform canon, which is exactly WRONG for a question-generation prompt. So
+  // for an internal caller: skip canon, use the caller's system; use the caller's
+  // model and max_tokens where given. Non-internal path is untouched.
+  const internalModel =
+    isInternal && typeof body.model === 'string' && body.model.length > 0
+      ? body.model
+      : null;
+  const internalSystem =
+    isInternal && typeof body.system === 'string' ? body.system : null;
+  const internalMaxTokens =
+    isInternal && typeof body.max_tokens === 'number' && body.max_tokens > 0
+      ? Math.min(body.max_tokens, 8192)
+      : null;
+
+  const maxTokens = internalMaxTokens ?? TIER_MAX_TOKENS[tier];
   const thinkingCfg = TIER_THINKING[tier];
-  const canonText = assembleCrossAstraCanon();
+  // The system prompt: the caller's for an internal call, platform canon for a
+  // user directive.
+  const canonText = internalSystem ?? assembleCrossAstraCanon();
   const forceFallback = directive.startsWith('[OPS21-FORCE-FALLBACK]');
 
   const ladder: ProviderSpec[] = [];
-  if (tier === 'free' && groqKey && !forceFallback) {
+  if (isInternal && internalModel) {
+    // One rung, the caller's chosen Anthropic model. Internal calls do not use
+    // the free-tier Groq ladder — they name the model they need for parity.
     ladder.push({
-      kind: 'openai-compatible',
-      model: GROQ_FREE_MODEL,
-      url: GROQ_URL,
-      apiKey: groqKey,
-      label: GROQ_FREE_MODEL,
+      kind: 'anthropic',
+      model: internalModel,
+      url: ANTHROPIC_URL,
+      apiKey,
+      label: internalModel,
+    });
+  } else {
+    if (tier === 'free' && groqKey && !forceFallback) {
+      ladder.push({
+        kind: 'openai-compatible',
+        model: GROQ_FREE_MODEL,
+        url: GROQ_URL,
+        apiKey: groqKey,
+        label: GROQ_FREE_MODEL,
+      });
+    }
+    ladder.push({
+      kind: 'anthropic',
+      model: TIER_PROVIDER_MODEL[tier],
+      url: ANTHROPIC_URL,
+      apiKey,
+      label: TIER_PROVIDER_MODEL[tier],
     });
   }
-  ladder.push({
-    kind: 'anthropic',
-    model: TIER_PROVIDER_MODEL[tier],
-    url: ANTHROPIC_URL,
-    apiKey,
-    label: TIER_PROVIDER_MODEL[tier],
-  });
 
   let attempt: ProviderAttempt | null = null;
   let providerModel = ladder[0].model;
@@ -938,8 +1047,13 @@ Deno.serve(async (req) => {
   //
   // amount_tokens is NEGATIVE for a debit; the ledger CHECK enforces the sign.
   // atlasoracle_debit / _credit are NOT called and NOT modified (OPEN-7).
+  // DB75: INTERNAL IS METERED, NOT BILLED. The token counts and provider land on
+  // the directive row in the finalize below (visibility — "the platform sees
+  // every token", ORACLE_MF v1.51), but NO oracle_token_ledger debit is written:
+  // an internal caller has no Bee to charge. balanceAfter stays null, exactly as
+  // it does for a free-tier user directive.
   let balanceAfter: number | null = null;
-  if (finalCostTokens > 0) {
+  if (finalCostTokens > 0 && !isInternal) {
     // OPS49: the debit is no longer written here. oracle_debit_tokens owns it.
     //
     // It computes availability server-side under a per-bee advisory lock,

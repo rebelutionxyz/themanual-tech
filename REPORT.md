@@ -23,6 +23,146 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## DB75 — THE ROUTER BYPASS SWEEP. Internal-caller path BUILT (rollback-first proposal); apply + deploy + live-verify are the owner's gated clicks. (2026-08-18)
+
+Session `79a4fea9` (fallback id — no `MC_SESSION`). Dispatch DB75, lane `db`, workdir
+`TheMANUAL.tech`, effort MEDIUM (the build is LARGE — money/auth/schema on a live pipeline). This is
+the re-queued DB75: a prior worker (`b4718c47`) delivered the sweep and filed DB75-Q, went stale, and
+the lead released + requeued behind FRONT79 (now `done`, tree commit-clean — W-19 satisfied).
+
+**Deno type-check clean, migration rehearsed to byte-identical, supabase/** committed. NOTHING
+APPLIED, NOTHING DEPLOYED, no key touched.** Apply, deploy and live-verify are all human-gated and
+are presented below for the owner's clicks.
+
+### THE BLOCKER IS RULED — v1.51 lifted the STOP
+
+DB75-Q asked how internal callers route; **ORACLE_MF v1.51 ruled it**: one metered door, internal
+callers route through `atlasoracle-route` as a service principal, **metered (visible, costed) but not
+billed a user's way**, attributed by caller. The prior worker's stop condition ("do not invent a
+billing exemption") is therefore lifted — v1.51 IS the ruling. The key stays the owner's to delete.
+
+### STEP 1 — SWEEP RE-VERIFIED against the current tree (unchanged: 2 bypasses)
+
+```
+api.anthropic.com / provider-key grep over supabase/functions/**  →
+  atlasoracle-route/{index,canon}.ts   the route itself — legitimate
+  generate-questions/index.ts          BYPASS 1 (holds ANTHROPIC_API_KEY, direct fetch)
+  trivia-host/index.ts                 BYPASS 2 (same shape, fires once per B Battles event)
+```
+
+Provider-day (v1.47) added no new edge-function bypass; the two are exactly the prior worker's find.
+The other 25 functions and `_shared/` are clean.
+
+### WHAT BUILDING IT REVEALED — the route is a canon router, not a raw gateway
+
+v1.51 resolved auth/billing/attribution, but building surfaced what the policy ruling did not touch:
+`atlasoracle-route` grounds every user directive in **platform canon** and picks the model **by
+tier**. `generate-questions` and `trivia-host` send their OWN system prompts (question-gen
+instructions, the TRIVIA_Claude emcee voice) and need specific models (haiku-gen@4096,
+sonnet-4-6-validate, haiku-host@150). Routing them unchanged would replace their prompts with canon
+and their models with the tier's — failing the dispatch's own **parity** gate (step 3) by
+construction. Since the dispatch MANDATES parity, the route must carry caller-supplied system/model/
+max_tokens for internal calls. That determined the design; it is not a new discretionary decision.
+
+### STEP 2 — THE INTERNAL-CALLER PATH, built. Purely additive; the user billing path is byte-unchanged.
+
+**Schema** (`supabase/migrations/_drafts/db75_internal_caller_path_v1.sql`, rollback-first):
+- `atlasoracle_directives.bee_id` → **DROP NOT NULL** (an internal call has no Bee).
+- `+ caller_kind text NOT NULL DEFAULT 'user' CHECK (user|internal)` — every existing row reads
+  `user`, retroactively true, no backfill.
+- `+ caller_astra text` (nullable) — the true caller label (`generate-questions`, `trivia-host`).
+- partial index on `(caller_astra, created_at) WHERE caller_kind='internal'`.
+- **RLS untouched and correct by construction**: the select-own policy is `auth.uid() = bee_id`; an
+  internal row has `bee_id IS NULL`, which never matches any `auth.uid()`, so users never see
+  internal rows — they are platform rows, admin/service-role visible. No policy change needed.
+
+**Route** (`atlasoracle-route/index.ts`) — every change gated on `isInternal`, which is false for
+users, so the user path is byte-for-byte unchanged:
+- Auth: internal is detected BEFORE `verifyAuth` (which 401s a service-role token). Gated on BOTH the
+  service-role principal (`isServiceRolePrincipal`, new in `_shared/auth.ts`) AND `internal:true` in
+  the body — an ordinary service-role call is never silently metered as an astra call. A user cannot
+  forge a service_role JWT, so users cannot reach this path.
+- Skips, all for internal only: rate-cap (Bee-scoped, would 429 a 3,246-row batch), the balance
+  402 pre-check (no balance to check), the frontier confirm gate, the paid-tier guard, and the
+  **debit** (metered-not-billed).
+- Overrides, service-principal only: `model`, `system` (REPLACES canon), `max_tokens` — this is what
+  preserves parity. Internal uses a one-rung Anthropic ladder at the caller's model.
+- Attribution: `bee_id=NULL`, `caller_kind='internal'`, `caller_astra=<caller>`; `astra_id` stays the
+  real `themanual` row (no `trivia`/`games` registry slug exists — that is DB73's job — so the FK
+  stays valid and the true caller lives in `caller_astra`).
+- Pricing skipped for internal (its model need not be the tier's, so tier-priced cost would be
+  wrong-model): rate=null → cost 0 → debit/balance skipped. The row carries accurate token COUNTS;
+  an audit prices those against the real provider via the rate card, exactly as the routing log does.
+
+**The two functions**, rerouted behind `ORACLE_ROUTE_ENABLED` (default ON = routed):
+- `callClaude` in each now POSTs to `atlasoracle-route` as the service principal
+  (`internal:true, caller, model, system, max_tokens`) and reads `.response`. Same model, same
+  system, same max_tokens as before → parity by construction; the only change is the call is now
+  recorded in `atlasoracle_directives` instead of invisible.
+- **The DIRECT path is retained behind the switch** — rollback is a flag flip
+  (`ORACLE_ROUTE_ENABLED=false`), not a redeploy. This is the DB75-Q safe-shape recipe, and it
+  matters most for `trivia-host`, which runs live during an event where a redeploy is the expensive
+  move.
+- The `ANTHROPIC_API_KEY` 503 guard on each is now conditional on the direct path, so a routed run
+  does not 503 after the owner deletes the key.
+
+### PROOF — what could be proven without the gated apply/deploy
+
+```
+deno check atlasoracle-route _shared/auth.ts generate-questions trivia-host   → EXIT 0 (all four)
+
+migration rehearsal (forward → rollback in one self-rolling-back transaction):
+  AFTER-FORWARD :: bee_id_nullable=YES, has_caller_kind=true, has_caller_astra=true
+  VERDICT       :: pre == post, IDENTICAL=t, 19 rows untouched, transaction rolled back
+```
+
+The rehearsal proves the forward lands exactly the three schema changes and the rollback restores the
+byte-identical pre-state, with production unchanged.
+
+### WHAT I DID NOT DO — the gates, held
+
+- **The migration is NOT applied.** The dispatch names no migration file and states no rollback
+  (MIGRATION AMENDMENT requires both to apply). It is authored rollback-first and rehearsed; the
+  apply is the owner's ask-gated click. **Named for the click:**
+  `supabase/migrations/_drafts/db75_internal_caller_path_v1.sql`, rollback
+  `..._v1_rollback.sql` — the rollback is additive-reversal and refuses to run if internal rows
+  already exist (it will not delete audit history to force the constraint back).
+- **Nothing is deployed.** Under the DEPLOY AMENDMENT the deploy is named by the dispatch but
+  ask-gated and must follow the migration apply; live-verify (one real generation run appearing in
+  `atlasoracle_directives` with `caller_astra='generate-questions'`, metered-not-billed) is the
+  closing check after deploy.
+- **The key is NOT named for deletion yet.** It is live and load-bearing on BOTH functions until a
+  routed run is verified. Per v1.51 the sequence is: apply → deploy → verify live → THEN report
+  "safe to delete ANTHROPIC_API_KEY on generate-questions and trivia-host" → the owner clicks. A
+  worker never deletes a key.
+
+### THE OWNER'S GO SEQUENCE (each a click; nothing here is automated)
+
+1. Apply `db75_internal_caller_path_v1.sql` (ask-gated). Rollback stated above.
+2. Deploy `atlasoracle-route`, `generate-questions`, `trivia-host` (ask-gated; bundles type-check
+   clean).
+3. Verify live: one generation run → a row in `atlasoracle_directives` with
+   `caller_kind='internal'`, `caller_astra='generate-questions'`, real token counts, and NO
+   `oracle_token_ledger` debit. Questions of the same shape (parity).
+4. On green, both `ANTHROPIC_API_KEY`s become safe to delete from Edge Function secrets — owner
+   deletes.
+
+Rollback at any point before step 4 is `ORACLE_ROUTE_ENABLED=false` (flag flip) and the migration
+rollback; after step 4 the key must be restored first.
+
+### COULD NOT VERIFY
+
+- **No live call was made** — apply and deploy are gated, so the routed path was type-checked and the
+  migration rehearsed, not exercised end to end. Parity is argued by construction (identical model/
+  system/max_tokens) and must be confirmed by the step-3 live run.
+- **`PAID_TIERS_ENABLED = true`** in the route contradicts a stale header comment (OPS11 prose); the
+  const is truth (OPS15 re-opened paid tiers). Flagged by the prior worker, left as-is — not this
+  pass's to edit.
+- The internal path's per-batch throttling is left to the calling job; the route intentionally
+  exempts internal callers from the Bee rate cap.
+
+---
+
 ## FRONT79 — h24 SHELL v1. The Claude pattern, built to the LOCKED spec, real data only. (2026-08-18)
 
 Session `79a4fea9` (fallback id — no `MC_SESSION`). Dispatch FRONT79, lane `front`, workdir

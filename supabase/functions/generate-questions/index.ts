@@ -13,6 +13,18 @@ const GEN_MODEL = Deno.env.get("GEN_MODEL") ?? "claude-haiku-4-5-20251001";
 const VALIDATE_MODEL = Deno.env.get("VALIDATE_MODEL") ?? "claude-sonnet-4-6";
 const ANTHROPIC_VERSION = "2023-06-01";
 
+// DB75 — THE METERED DOOR. ORACLE_MF v1.51 rules that internal astra-to-engine
+// calls route through atlasoracle-route, not a direct provider bypass. When
+// ORACLE_ROUTE_ENABLED (default), callClaude below routes through it as the
+// service principal (internal, metered-not-billed, caller='generate-questions').
+//
+// The DIRECT path is RETAINED behind the switch so rollback is a flag flip, not a
+// redeploy (safe-shape recipe from DB75-Q). Once a routed generation run is
+// verified live, ANTHROPIC_API_KEY on THIS function is safe for the OWNER to
+// delete from Edge Function secrets — a worker never deletes it.
+const ORACLE_ROUTE_ENABLED = (Deno.env.get("ORACLE_ROUTE_ENABLED") ?? "true") !== "false";
+const ROUTE_URL = `${SUPABASE_URL}/functions/v1/atlasoracle-route`;
+
 const REALMS = [
   "culture","geography","health","history","human_activities","justice",
   "math","philosophy","reference","religion","science","self","society","tech",
@@ -40,6 +52,38 @@ function decodeRole(token: string): string | null {
 }
 
 async function callClaude(model: string, system: string, user: string, maxTokens = 1024): Promise<string> {
+  // DB75: the one metered door. Same model, same system prompt, same max_tokens
+  // as the direct call below — PARITY by construction, because the route's
+  // internal path uses the caller's overrides verbatim and skips canon. The
+  // difference is only that the call is now recorded in atlasoracle_directives
+  // (caller='generate-questions'), metered-not-billed, instead of invisible.
+  if (ORACLE_ROUTE_ENABLED) {
+    const res = await fetch(ROUTE_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${SERVICE_ROLE}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        directive: user,
+        internal: true,
+        caller: "generate-questions",
+        astra_slug: "trivia",
+        model,
+        system,
+        max_tokens: maxTokens,
+        tier: "standard",
+      }),
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`atlasoracle-route ${res.status}: ${t.slice(0, 500)}`);
+    }
+    const data = await res.json();
+    return (data?.response ?? "").trim();
+  }
+
+  // DIRECT path — retained as the flag-flip rollback (ORACLE_ROUTE_ENABLED=false).
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -150,8 +194,11 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
 
-  if (!ANTHROPIC_API_KEY) {
-    return json({ error: "ANTHROPIC_API_KEY not set as a Supabase function secret. Butch must set it before generation." }, 503);
+  // DB75: the key is only needed on the DIRECT path. When routing through the
+  // metered door the route holds the key, so once the owner deletes this
+  // function's ANTHROPIC_API_KEY the guard must not 503 a routed run.
+  if (!ORACLE_ROUTE_ENABLED && !ANTHROPIC_API_KEY) {
+    return json({ error: "ANTHROPIC_API_KEY not set as a Supabase function secret. Butch must set it before generation, or enable ORACLE_ROUTE_ENABLED to route through atlasoracle-route." }, 503);
   }
   if (!SUPABASE_URL || !SERVICE_ROLE) return json({ error: "service env missing" }, 500);
 

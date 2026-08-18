@@ -12,6 +12,13 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const HOST_MODEL = Deno.env.get("HOST_MODEL") ?? "claude-haiku-4-5-20251001";
 const ANTHROPIC_VERSION = "2023-06-01";
 
+// DB75 — THE METERED DOOR (see generate-questions for the full note). trivia-host
+// fires once per B Battles event, so it is the busier of the two bypasses; routing
+// it makes every emcee line visible in atlasoracle_directives (caller='trivia-host'),
+// metered-not-billed. Direct path retained behind the switch as the flag-flip rollback.
+const ORACLE_ROUTE_ENABLED = (Deno.env.get("ORACLE_ROUTE_ENABLED") ?? "true") !== "false";
+const ROUTE_URL = `${SUPABASE_URL}/functions/v1/atlasoracle-route`;
+
 const EVENTS = new Set(["room_open", "question_intro", "answer_reveal", "leaderboard_update", "wrap"]);
 
 const CORS = {
@@ -57,6 +64,30 @@ EVENT GUIDE:
 - wrap: send the room off — congratulate the winner, thank the Bees, leave them wanting the next round.`;
 
 async function callClaude(system: string, user: string): Promise<string> {
+  // DB75: route through the metered door — same model, system, max_tokens as the
+  // direct call, so the emcee's voice is unchanged. The strip of surrounding
+  // quotes is applied to the result either way.
+  if (ORACLE_ROUTE_ENABLED) {
+    const res = await fetch(ROUTE_URL, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${SERVICE_ROLE}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        directive: user,
+        internal: true,
+        caller: "trivia-host",
+        astra_slug: "trivia",
+        model: HOST_MODEL,
+        system,
+        max_tokens: 150,
+        tier: "standard",
+      }),
+    });
+    if (!res.ok) throw new Error(`atlasoracle-route ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    const data = await res.json();
+    return (data?.response ?? "").trim().replace(/^["']|["']$/g, "");
+  }
+
+  // DIRECT path — retained as the flag-flip rollback (ORACLE_ROUTE_ENABLED=false).
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": ANTHROPIC_VERSION, "content-type": "application/json" },
@@ -98,7 +129,8 @@ function buildUserContext(event: string, body: any): string {
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
-  if (!ANTHROPIC_API_KEY) return json({ error: "ANTHROPIC_API_KEY not set as a Supabase function secret." }, 503);
+  // DB75: the key is only needed on the direct path; a routed run needs none.
+  if (!ORACLE_ROUTE_ENABLED && !ANTHROPIC_API_KEY) return json({ error: "ANTHROPIC_API_KEY not set (or enable ORACLE_ROUTE_ENABLED to route through atlasoracle-route)." }, 503);
 
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
   const isServiceRole = decodeRole(token) === "service_role";
