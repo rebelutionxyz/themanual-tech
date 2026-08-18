@@ -441,6 +441,598 @@ that no row reads `abandoned`** — so the rollback statement must move any such
   is outside this pass's scope and would rewrite the report of record.
 
 ---
+## DB69 — APPLIED 20260818115111: the three seed campaigns DELETED, the test campaign flagged out of the totals. Rollback rehearsed to byte-identical BEFORE the apply; all three slugs now 404 live and the sitemap has dropped them. (2026-08-18)
+
+Session `ee600096` (fallback id — no `MC_SESSION`). Dispatch DB69, lane `db`, workdir
+`TheMANUAL.tech`. Applies DB68's proposal unchanged, on the owner's ruling. The pre-flight this half
+records was written **before** the apply, per the MIGRATION AMENDMENT; the post-apply verification is
+appended below it.
+
+### THE LEDGER MEASURE — taken FIRST, before either file was authored
+
+```
+node TheMANUAL.tech/scripts/migration-reconcile/reconcile.mjs measure
+  baseline 20260801000000 | history 693 | repo .sql 325
+    407 history rows with no repo file   (0 on/after baseline)
+     39 repo files with no history row   (0 on/after baseline)
+     32 version-matched pairs, file != applied   (0 on/after baseline)
+  RECONCILED on/after baseline — freeze-lift criterion MET
+EXIT=0
+```
+
+### PRE-FLIGHT — the state being changed
+
+**Before, measured:**
+
+| table | rows before |
+|---|---|
+| `give_campaigns` | **4** |
+| `fountain_pledges` | **7** |
+| `stripe_events` | 4 |
+| `bees` | 18 |
+| `notifications` | 231 |
+| `bling_transactions` | 22 |
+| `drops_ledger` | 10 |
+| `atom_surfaces` | 0 |
+
+The last six are the control set: nothing in this migration touches them, and the post-apply read
+below proves it rather than asserting it.
+
+| campaign | fixture | raised | captured | pledges |
+|---|---|---|---|---|
+| `bee-sanctuary` | yes | 0 | 0 | **none** |
+| `community-mural` | yes | 0 | 0 | **none** |
+| `fund-the-fountain` | yes | 0 | 0 | `pi_seed_1` 20000, `pi_seed_2` 12000 |
+| `fund-live-test-20260817` | **no** | **1300** | **1300** | 5 (incl. `…0e2ndpCB`, the first real charge) |
+
+**Dependent objects, from DB68 and not re-derived:** one FK (`fountain_pledges_campaign_id_fkey`,
+`ON DELETE NO ACTION`), zero text/jsonb references to the three slugs or uuids anywhere else in the
+database, no DELETE policy on `give_campaigns`. Three triggers participate — `give_campaigns_derive_counters`,
+`fountain_pledges_fixture_segregation`, `lock8_default_astra_and_nova` — and each is named in the
+rollback file with what it rewrites and why that is correct.
+
+**Rows at risk: five deleted, six updated.** Three campaign rows and two pledge rows are destroyed.
+One campaign row and five pledge rows have `is_fixture` flipped to true. Nothing else in the database
+is written.
+
+### THE ROLLBACK — written first, and REHEARSED rather than asserted
+
+`supabase/migrations/_drafts/20260818114500_db69_drop_seed_campaigns_v1_rollback.sql`. It carries
+**every column of every deleted row** written out explicitly — a deleted row cannot be restored from
+a key — plus the two un-flag statements and a recount.
+
+**The rehearsal.** In one self-rolling-back block (structurally so: it ends in `RAISE EXCEPTION`,
+there is no commit path through it), the migration's forward statements ran and then the rollback
+file's statements ran, and whole-table `jsonb_agg(to_jsonb(row) ORDER BY id)` snapshots were compared
+before and after:
+
+```
+DB69-REHEARSAL (rolled back)
+  deleted = 2 pledges / 3 campaigns
+  mid-state: campaigns 1, kept campaign raised 0
+  campaigns_identical = TRUE      pledges_identical = TRUE
+```
+
+**Both tables came back byte-identical, whole-table, every column.** Not a row count, not a spot
+check — the complete JSON of both tables before the forward statements equals the complete JSON after
+the rollback statements. That is the dispatch's "verify it would actually reconstruct all five rows",
+answered by doing it.
+
+The rehearsal also proves the two numbers the apply should produce: **2 pledges and 3 campaigns
+deleted**, leaving **1 campaign reading 0**.
+
+### THE ROLLBACK STATEMENT, stated before the apply as the amendment requires
+
+```sql
+-- INSERT the three give_campaigns rows and the two fountain_pledges rows, full column lists,
+-- campaigns before pledges (FK + the segregation trigger both force that order);
+-- then UPDATE fountain_pledges/give_campaigns SET is_fixture = false for fund-live-test-20260817;
+-- then PERFORM fountain_recount(id) for every campaign. Restores raised 1300 / captured 1300.
+```
+
+---
+
+### APPLIED — 2026-08-18 11:51:11 UTC, one human click
+
+`apply_migration` stamped **`20260818115111`**, not the `20260818114500` the files were authored
+under. Both files were renamed to the stamped version and their two cross-references updated:
+
+| | authored as | renamed to |
+|---|---|---|
+| migration | `supabase/migrations/20260818114500_db69_drop_seed_campaigns_v1.sql` | `supabase/migrations/20260818115111_db69_drop_seed_campaigns_v1.sql` |
+| rollback | `_drafts/20260818114500_..._rollback.sql` | `_drafts/20260818115111_..._rollback.sql` |
+
+**Ledger re-measured after the rename: EXIT 0**, with 0 / 0 / 0 discrepancies on or after the
+baseline. The apply manufactured no drift.
+
+The migration's own guards and done-test ran inside the apply. Both would have aborted the whole
+migration: the pre-guard checks the three fixture campaigns exist, hold no non-seed pledge, and that
+the campaign to keep is present; the done-test checks the counts, the flags, the counters, the
+absence of orphans, and that the first-real-charge pledge survives with both stamps.
+
+### PROVEN, MEASURED BOTH SIDES
+
+**Four campaigns before, one after — and no other table lost a row:**
+
+| table | before | after | |
+|---|---|---|---|
+| `give_campaigns` | 4 | **1** | −3, the three seed campaigns |
+| `fountain_pledges` | 7 | **5** | −2, `pi_seed_1` and `pi_seed_2` |
+| `stripe_events` | 4 | 4 | unchanged |
+| `bees` | 18 | 18 | unchanged |
+| `notifications` | 231 | 231 | unchanged |
+| `bling_transactions` | 22 | 22 | unchanged |
+| `drops_ledger` | 10 | 10 | unchanged |
+| `atom_surfaces` | 0 | 0 | unchanged |
+
+The six control tables are the answer to "no other table lost a row" — read, not assumed. `bees` in
+particular is worth naming: `pi_seed_2` was attributed to the **treasury bee**, and deleting a
+pledge does not touch the bee it names.
+
+**The surviving campaign:**
+
+```
+slug                     is_fixture  raised  captured  pledges  flagged_pledges
+fund-live-test-20260817  true        0       0         5        5
+```
+
+`raised_cents` and `captured_cents` are **0/0** — the $13.00 has left the public totals — and all
+five pledge rows carry the flag, which is what took it out (the counter reads the PLEDGE's flag).
+The campaign flag is the half that stops `fountain_register_pledge` accepting anything new.
+
+**What survived intact**, asserted inside the migration rather than eyeballed after: the
+`pi_3U5crDAPNY1rgvEA0e2ndpCB` pledge, still `captured`, still 1300 cents, still carrying both
+`authorized_at` and `captured_at`. The record of the platform's first real charge — and of DB65's
+26-cent fee and no-custody proof — is untouched. The `payment_intent.succeeded` event carrying
+`application_fee_amount: 26` is likewise untouched in `stripe_events`, which the row count above
+confirms.
+
+### THE GRID'S CAMPAIGN COUNT — one card, not zero, exactly as DB68 predicted
+
+`listCampaigns()` now returns **one** row, so the grid renders **one card**: `fund-live-test-20260817`,
+carrying the "Test data" chip, at $0 given / $0 confirmed, under `LedgerStrip`'s
+`fixtures === campaigns.length` branch — *"Every campaign listed here is test data — seed rows kept
+so the screens have something to render. None is a real campaign asking for money."*
+
+**FRONT53's empty state is still not reached**, because `is_fixture` is not a visibility filter.
+DB68 flagged this as the dispatch's one wrong premise and it holds after the apply: reaching the
+empty grid needs a front-side fixture filter, which is FRONT65's outstanding recommendation and not
+this pass's to build.
+
+### WHAT `/fund/bee-sanctuary` RETURNS — a clean 404, observed, and the whole ISR window watched
+
+**All three deleted slugs return HTTP 404 live.** Watched from the delete through to convergence,
+each fetch on a distinct URL so no cached answer could be mistaken for a live one:
+
+| UTC | `bee-sanctuary` | `fund-the-fountain` | `community-mural` | sitemap |
+|---|---|---|---|---|
+| 11:35 (before) | 200 | 200 | 200 | all 5 URLs |
+| 11:51:11 | **the delete** | | | |
+| ~11:54 | **200** (cached) | — | — | — |
+| ~11:58 | **404** | 200 (cached) | — | all 5 URLs |
+| ~12:00 | — | **404** | 200 (cached) | — |
+| ~12:02 | — | — | **404** | **front door + the kept campaign only** |
+
+**Not a 500 and not a redirect** in any of the six reads. `next.config.mjs` carries no redirects and
+the tree has no middleware, so a loop is unreachable; `dynamicParams = true` plus `getCampaign()`'s
+`notFound()` on a missing row is the path a deleted slug takes, which is why no rebuild was needed
+for any of this.
+
+**The staggered turnover is the mechanism working, not a fault.** Each page holds its own ISR entry
+with its own 300-second timer, so they expire independently — the first read of `bee-sanctuary`
+three minutes after the delete was still the cached 200, exactly the window DB68 named in advance.
+Every slug had converged within about eleven minutes, and **the sitemap dropped the three fixture
+URLs on its own timer** — no deploy, no rebuild, no cache purge.
+
+The branded title `No campaign at this address · FUND` is **still not confirmed over the wire**: a
+404 returns no body to the fetcher available here. It is read from
+`src/app/[slug]/not-found.tsx:43` in the deployed source and from FRONT65's probe of a built
+server. What this pass proves is the status and the absence of a 500 or a redirect.
+
+### DEVIATIONS
+
+- **`curl` is not permitted at this root**, which nearly cost this verification. `WebFetch` caches
+  per URL for 15 minutes and that collides badly with a 300-second ISR window — the fetch taken
+  inside the window cached a 200, and re-fetching the same URL returns that cached answer rather
+  than the live one. **The workaround was a distinct query string per read** (`?db69=recheck`,
+  `?db69=r2`, `?db69=r3`), which changes WebFetch's cache key while resolving to the same route;
+  that is what made the table above possible. Recorded rather than hidden, because the first read
+  looked like a failed 404 and was only a cached page. `curl` is logged in
+  `logs/permission-needed.md` with this reasoning — it would give the status *and* the body, which
+  is what the untested title claim above actually needs.
+- **Nothing else deviated.** The migration applied is DB68's proposal unchanged, statement for
+  statement.
+
+### COULD NOT VERIFY
+
+- **The 404's rendered title**, for the reason above.
+- **Whether Google had already indexed the three fixture URLs**, and therefore how long they linger
+  in results. They were in the live sitemap at priority 0.9 from FUND going public until 12:02
+  today; a 404 is the mechanism that drops them, and the timing is Google's.
+- **The grid and the LedgerStrip line are read from source, not rendered.** No FUND build was run
+  this pass; the "one badged card at $0" claim follows from `listCampaigns()` returning one flagged
+  row and from the branch conditions in `CampaignCard.tsx:55` and `LedgerStrip.tsx:105`.
+- **The two orphaned PaymentIntents** (`…1AWRU5WR` $13, `…3ZCi7Lry` $11, both `authorized` with
+  `authorized_at` NULL) still sit on the kept campaign and are now flagged as fixtures. They count
+  toward nothing and this pass did not touch them; DB67's reap proposal owns them.
+
+---
+
+## DB68 — DELETING THE THREE SEED CAMPAIGNS. Proposal only, zero writes. Nothing cascades, both seed pledges are on ONE campaign, and the dispatch's empty grid does not happen. (2026-08-18)
+
+Session `ee600096` (fallback id — no `MC_SESSION`). Dispatch DB68, lane `db`, workdir
+`TheMANUAL.tech`. **Zero writes.** No row deleted, no flag flipped, no migration authored into
+`supabase/migrations/`, no `apply_migration` call, no Stripe call. Every measurement below is a
+SELECT, a catalog read, a read of the FUND source, or an anonymous GET of a public URL.
+
+**On why no migration file exists yet.** The dispatch says apply nothing, and an authored-but-
+unapplied file in `supabase/migrations/` **is** a ledger discrepancy — the repo-only B-case that
+makes the next `reconcile.mjs measure` exit 1 for the next pass. So the forward SQL and the
+full-row rollback are carried **in this report**, complete and runnable, for the pass that is
+dispatched to apply them. Author the files then, rollback first, in that order.
+
+### FRONT65's FACTS, RE-MEASURED RATHER THAN INHERITED
+
+The dispatch says FRONT65's facts govern. All four were checked against the source and the live
+site this pass, not taken on trust — and all four hold:
+
+| FRONT65 said | verified how | holds? |
+|---|---|---|
+| `is_fixture` does not hide a campaign | `listCampaigns()` at `src/lib/campaigns.ts:229-231` is `.from('give_campaigns').select(COLUMNS).order('created_at')` — **no `.eq('is_fixture', false)`, no filter of any kind** | **yes** |
+| the counter filters the PLEDGE's flag | `fountain_counters` body read from `pg_get_functiondef`: `FROM public.fountain_pledges … AND is_fixture = false` | **yes** |
+| `sitemap.ts` iterates the same unfiltered list | `src/app/sitemap.ts` loops `result.campaigns` with no fixture test — and the **live** sitemap confirms it below | **yes** |
+| the $12 hold is already cancelled, chain ran unaided | `payment_intent.canceled` at 03:15:23, pledge `…167xTETd` now `canceled` — DB66 measured the same event and recorded it | **yes** |
+
+---
+
+## 1. THE DELETION — what references `give_campaigns`, and in what order
+
+### Every foreign key pointing at the table: there is exactly ONE
+
+```
+conname                            from                          to               on_delete
+fountain_pledges_campaign_id_fkey  fountain_pledges.campaign_id   give_campaigns   NO ACTION ('a')
+```
+
+**Nothing else in the database references `give_campaigns` by key.** A sweep of every column in
+every `public` table found exactly one column named for a campaign — `fountain_pledges.campaign_id`
+— and no other.
+
+**And nothing references the three by NAME either.** Every `text` / `varchar` / `json` / `jsonb`
+column in every `public` table was scanned for the three slugs *and* the three UUIDs, excluding only
+`give_campaigns` itself and the `ops_*` rail tables (which hold this prose):
+
+```
+DB68-SLUGSCAN (no hits anywhere outside give_campaigns and the ops_* rail tables)
+```
+
+So: **no `atom_surfaces` row, no `notifications` row, no `stripe_events` payload, no `realm_path`
+reference, nothing.** The dispatch's stated failure mode — a cascade taking something unexpected —
+**cannot occur**, and not merely because nothing else points at the table: `NO ACTION` cascades
+nothing *by construction*. The failure mode of this FK is the opposite one — the DELETE **fails
+loudly** while a pledge row remains, which is exactly the guard rail wanted here.
+
+Two smaller findings from the same sweep:
+
+- **`fountain_pledges.reward_lot_id` has no foreign key at all.** It is a bare `bigint` with no
+  constraint to any lots table; both seed rows carry NULL, so there is nothing to unwind either way.
+  Worth recording as latent debt, not as a blocker for this pass.
+- **`give_campaigns` has no DELETE policy.** Its RLS is `give_public_read` (SELECT, `USING true`),
+  `give_insert_own` (INSERT, `auth.uid() = created_by`) and `give_update_own` (UPDATE, same). **No
+  policy grants DELETE to any client role**, so no browser session can perform this even in
+  principle; a migration running as `postgres` bypasses RLS regardless. The deletion is
+  owner-channel-only by construction.
+
+### WHICH CAMPAIGN HOLDS THE SEED PLEDGES — the dispatch asked; the answer is BOTH ON ONE
+
+**`pi_seed_1` (20000) and `pi_seed_2` (12000) are BOTH on `fund-the-fountain`.**
+`bee-sanctuary` and `community-mural` have **zero pledge rows** — they delete with no dependency at
+all.
+
+```
+campaign            pi          pledge id                             cents  status      bee
+fund-the-fountain   pi_seed_1   6f543bb8-f449-42c7-829e-ad3b275ddcfc  20000  authorized  ab696a36 (creator)
+fund-the-fountain   pi_seed_2   4791d2cd-e152-4452-a9ca-24f3046ab761  12000  authorized  0000…0bee (TREASURY)
+bee-sanctuary       —           (none)
+community-mural     —           (none)
+```
+
+`pi_seed_2`'s giver is the **treasury bee** `@combtreasury` (`…0bee`). Nothing depends on that here
+— the row is fabricated and deleting it moves no BLiNG! — but it is worth naming, because a
+fabricated pledge attributed to the treasury is the kind of row that would badly mislead anyone
+auditing treasury activity later.
+
+Both are `authorized` with `authorized_at` NULL, so under DB58 *and* DB66 they already count toward
+nothing. **DB67 flagged them too**: its reap predicate would have swept these two, which is why it
+argued the predicate must carry `is_fixture = false`. Deleting them removes that trap entirely.
+
+### THE ORDER, and the SQL
+
+Pledges first, campaigns second. `NO ACTION` makes the reverse order fail rather than corrupt, but
+the order below never tests that.
+
+```sql
+-- PRE-GUARD. Halts if the three fixtures hold anything other than the two known seed rows.
+DO $guard$
+DECLARE v_n int; v_unexpected int;
+BEGIN
+  SELECT count(*) INTO v_n FROM public.give_campaigns
+   WHERE id IN ('09af82d2-a1b6-424f-93b6-370112dc3a13',
+                '77435523-9f92-44f1-920c-b00ac92e8db8',
+                'fa40c585-d86d-4396-9b8a-90e92af741db')
+     AND is_fixture = true;
+  IF v_n <> 3 THEN RAISE EXCEPTION 'DB68: expected 3 fixture campaigns, found %', v_n; END IF;
+
+  SELECT count(*) INTO v_unexpected FROM public.fountain_pledges
+   WHERE campaign_id IN ('09af82d2-a1b6-424f-93b6-370112dc3a13',
+                         '77435523-9f92-44f1-920c-b00ac92e8db8',
+                         'fa40c585-d86d-4396-9b8a-90e92af741db')
+     AND stripe_payment_intent_id NOT IN ('pi_seed_1','pi_seed_2');
+  IF v_unexpected > 0 THEN
+    RAISE EXCEPTION 'DB68: % unexpected pledge(s) on a fixture campaign — STOP, this is not a seed row', v_unexpected;
+  END IF;
+END $guard$;
+
+-- STEP 1 — the two seed pledges. Triple-guarded: by id, by fixture flag, by intent id.
+DELETE FROM public.fountain_pledges
+ WHERE id IN ('6f543bb8-f449-42c7-829e-ad3b275ddcfc',
+              '4791d2cd-e152-4452-a9ca-24f3046ab761')
+   AND is_fixture = true
+   AND stripe_payment_intent_id IN ('pi_seed_1','pi_seed_2');
+-- expect DELETE 2
+
+-- STEP 2 — the three campaigns. Guarded by id AND by the fixture flag.
+DELETE FROM public.give_campaigns
+ WHERE id IN ('09af82d2-a1b6-424f-93b6-370112dc3a13',
+              '77435523-9f92-44f1-920c-b00ac92e8db8',
+              'fa40c585-d86d-4396-9b8a-90e92af741db')
+   AND is_fixture = true;
+-- expect DELETE 3
+
+-- DONE-TEST — invariants, not today's numbers.
+DO $test$
+DECLARE v_c int; v_p int; v_orphan int;
+BEGIN
+  SELECT count(*) INTO v_c FROM public.give_campaigns;
+  IF v_c <> 1 THEN RAISE EXCEPTION 'DB68: expected 1 campaign remaining, found %', v_c; END IF;
+
+  SELECT count(*) INTO v_c FROM public.give_campaigns WHERE slug = 'fund-live-test-20260817';
+  IF v_c <> 1 THEN RAISE EXCEPTION 'DB68: the surviving campaign is not the live test campaign'; END IF;
+
+  SELECT count(*) INTO v_p FROM public.fountain_pledges;
+  IF v_p <> 5 THEN RAISE EXCEPTION 'DB68: expected 5 pledges remaining, found %', v_p; END IF;
+
+  SELECT count(*) INTO v_orphan FROM public.fountain_pledges p
+   WHERE NOT EXISTS (SELECT 1 FROM public.give_campaigns c WHERE c.id = p.campaign_id);
+  IF v_orphan > 0 THEN RAISE EXCEPTION 'DB68: % orphaned pledge(s)', v_orphan; END IF;
+END $test$;
+```
+
+**Every DELETE carries `AND is_fixture = true` on top of an explicit id list.** That is deliberate
+belt-and-braces: an id list alone is already exact, but the flag is the predicate that makes a
+mistyped id fail closed instead of taking the live campaign — the one row in this table that must
+not be lost.
+
+---
+
+## 2. THE ROLLBACK — full row data, because a DELETE rollback that carries ids restores nothing
+
+Campaigns first, then pledges (the FK direction). Captured verbatim from `to_jsonb()` this pass.
+
+```sql
+-- 1. THE THREE CAMPAIGNS
+INSERT INTO public.give_campaigns
+  (id, slug, title, description, status, funding_model, goal_cents, raised_cents, captured_cents,
+   currency, location_text, location_coords, cover_url, starts_at, ends_at, closed_at, created_at,
+   created_by, astra_id, nova_id, parent_id, parent_surface, realm_path, is_fixture,
+   manager_connect_account)
+VALUES
+  ('09af82d2-a1b6-424f-93b6-370112dc3a13','bee-sanctuary','Bee Sanctuary',
+   'Early draft — funding details to come.','active',NULL,NULL,0,0,
+   'usd',NULL,NULL,NULL,'2026-06-24T17:55:01.362471+00',NULL,
+   NULL,'2026-06-24T17:55:01.362471+00','ab696a36-e3aa-4c78-8137-eb46d3b4e9c6',
+   '16c5f71e-8a5d-49e7-86c7-4ff64c4590ac',NULL,NULL,'give',ARRAY['Science'],true,NULL),
+  ('77435523-9f92-44f1-920c-b00ac92e8db8','community-mural','Community Mural',
+   'Commission a mural for the commons.','active','kwyr',100000,0,0,
+   'usd','Seattle, WA','(-122.3321,47.6062)',NULL,'2026-06-24T17:55:01.362471+00',NULL,
+   NULL,'2026-06-24T17:55:01.362471+00','ab696a36-e3aa-4c78-8137-eb46d3b4e9c6',
+   '16c5f71e-8a5d-49e7-86c7-4ff64c4590ac',NULL,NULL,'give',ARRAY['Culture'],true,'acct_test_seed'),
+  ('fa40c585-d86d-4396-9b8a-90e92af741db','fund-the-fountain','Fund the Fountain',
+   'Help seed the Fountain so creators can raise BLiNG!-rewarded support.','active','aon',50000,0,0,
+   'usd',NULL,NULL,NULL,'2026-06-24T17:55:01.362471+00',NULL,
+   NULL,'2026-06-24T17:55:01.362471+00','ab696a36-e3aa-4c78-8137-eb46d3b4e9c6',
+   '16c5f71e-8a5d-49e7-86c7-4ff64c4590ac',NULL,NULL,'give',ARRAY['Society'],true,'acct_test_seed');
+
+-- 2. THE TWO SEED PLEDGES
+INSERT INTO public.fountain_pledges
+  (id, campaign_id, bee_id, amount_cents, currency, stripe_payment_intent_id, status, source_ref,
+   reward_lot_id, created_at, captured_at, authorized_at, is_fixture)
+VALUES
+  ('6f543bb8-f449-42c7-829e-ad3b275ddcfc','fa40c585-d86d-4396-9b8a-90e92af741db',
+   'ab696a36-e3aa-4c78-8137-eb46d3b4e9c6',20000,'usd','pi_seed_1','authorized',
+   'f86ee3b5-5895-48b1-ba74-f285794d7dcc',NULL,'2026-06-24T17:55:01.362471+00',NULL,NULL,true),
+  ('4791d2cd-e152-4452-a9ca-24f3046ab761','fa40c585-d86d-4396-9b8a-90e92af741db',
+   '00000000-0000-0000-0000-000000000bee',12000,'usd','pi_seed_2','authorized',
+   'a4fd8283-e848-4d2f-9471-fba81d88215f',NULL,'2026-06-24T17:55:01.362471+00',NULL,NULL,true);
+```
+
+Every value above is verbatim from `to_jsonb()`. The column order is written out explicitly rather
+than relying on table order, so a future column addition cannot silently shift a value into the
+wrong slot.
+
+**THREE TRIGGERS TOUCH THIS RESTORE, and all three were read before claiming it is faithful:**
+
+1. **`give_campaigns_derive_counters`** (BEFORE INSERT OR UPDATE) **overwrites** `NEW.raised_cents`
+   and `NEW.captured_cents` from `fountain_counters()`. The literals above are therefore ignored —
+   the counters are *derived* on restore, not restored. For these rows that is harmless and exact:
+   the seed pledges are `is_fixture = true`, `fountain_counters` excludes them, so the derived
+   answer is 0/0, which is what the stored values are today. **A rollback of a campaign holding real
+   pledges would NOT restore its counters by value** — it would recompute them, which is the right
+   behaviour and is worth knowing before anyone reuses this shape.
+2. **`fountain_pledges_fixture_segregation`** (BEFORE INSERT OR UPDATE OF campaign_id) **overwrites**
+   `NEW.is_fixture` from the parent campaign. Campaigns are restored first and are fixtures, so the
+   pledges come back `true` either way. It also raises `campaign not found` if the parent is absent
+   — which is precisely why the order above cannot be reversed.
+3. **`lock8_default_astra_and_nova`** (BEFORE INSERT) only fills `astra_id` / `nova_id` when NULL.
+   `astra_id` is supplied explicitly, `nova_id` is genuinely NULL in all three rows and stays NULL
+   in a migration context where no `request.nova_id` GUC is set. No-op, verified by reading it.
+
+**What the rollback cannot restore: nothing.** These rows have no dependents, no sequence values, no
+generated ids — every column is supplied. The restore is faithful in a way most DELETE rollbacks are
+not, and that is a property of these rows, not of the technique.
+
+---
+
+## 3. THE TEST CAMPAIGN — the shape still holds, with one ordering detail
+
+**Confirmed: flag `is_fixture = true` on `fund-live-test-20260817` AND on all five pledge rows.**
+The three deletions do not change that recommendation — they are independent rows with no
+interaction.
+
+```sql
+UPDATE public.give_campaigns  SET is_fixture = true WHERE slug = 'fund-live-test-20260817';
+UPDATE public.fountain_pledges SET is_fixture = true
+ WHERE campaign_id = (SELECT id FROM public.give_campaigns WHERE slug = 'fund-live-test-20260817');
+-- expect UPDATE 1, UPDATE 5
+```
+
+**The ordering detail, measured rather than assumed:** flagging the campaign does **not** propagate
+to its pledges. `fountain_pledges_fixture_segregation` fires on `INSERT OR UPDATE OF campaign_id`
+only, so a campaign-side flag flip touches no pledge row, and an explicit
+`UPDATE fountain_pledges SET is_fixture = true` does not re-fire it either — the value sticks in
+whichever order the two statements run. Both statements are required; neither implies the other.
+
+**Effect on the money, under DB66:** `fountain_counters` excludes fixture pledges, so
+`raised_cents` and `captured_cents` both go **1300 → 0**, and the DB48 trigger writes that through
+on the pledge UPDATE without a recount loop. The $13.00 disappears from `LedgerStrip`'s aggregate on
+the front page.
+
+**Effect on giving:** `fountain_register_pledge` refuses a fixture campaign outright (DB54), so no
+new give can be taken on it. That — not visibility — is what the flag actually buys.
+
+**What survives:** every row. The `…0e2ndpCB` pledge, its `authorized_at` and `captured_at` stamps,
+and the `payment_intent.succeeded` payload in `stripe_events` carrying `application_fee_amount: 26`.
+The record of the platform's first real charge, and of DB65's no-custody proof, stays intact and
+readable. That is the whole reason not to delete it.
+
+---
+
+## 4. THE SEO CONSEQUENCE — checked live, and one correction to make about what it buys
+
+**All four slugs are in the LIVE sitemap right now**, fetched this pass from
+`https://themanual.tech/fund/sitemap.xml`:
+
+```
+https://themanual.tech/fund                          priority 1
+https://themanual.tech/fund/fund-live-test-20260817  priority 0.9
+https://themanual.tech/fund/bee-sanctuary            priority 0.9
+https://themanual.tech/fund/community-mural          priority 0.9
+https://themanual.tech/fund/fund-the-fountain        priority 0.9
+```
+
+So the exposure is real and current, not hypothetical.
+
+**A slug absent from the database returns a clean 404 — measured live, not assumed.** A GET of
+`https://themanual.tech/fund/no-such-campaign-db68` (a slug that has never existed) returned
+**HTTP 404**. Not a 500, not a redirect: there are no redirects in `next.config.mjs` and no
+middleware in the tree, so a loop is unreachable. **The route handles an ABSENT slug, which is the
+case the dispatch asked about — not merely an inactive one**, because `getCampaign()` filters on
+`slug` alone with no status test, and a missing row calls `notFound()`.
+
+*Could not verify live:* the branded **title**. The 404 response returned no body to the fetcher, so
+`No campaign at this address · FUND` is read from `src/app/[slug]/not-found.tsx:43` and from
+FRONT65's probe of the built server — **the string is confirmed in the code that is deployed, but
+this pass did not see it rendered over the wire.**
+
+**The sitemap regenerates on the ISR floor — no rebuild, no deploy.** `src/app/sitemap.ts` carries
+`export const revalidate = 300`, added by FRONT48 for exactly this reason (without it Next builds
+the route fully static and freezes it at build time). The campaign page carries `revalidate = 300`
+and `dynamicParams = true`. So after the deletion:
+
+- within ≤5 minutes the sitemap stops listing the three slugs,
+- within ≤5 minutes `/fund/bee-sanctuary` starts returning 404,
+- **and for up to those 5 minutes a crawler can still be served the cached 200.** That window is
+  expected behaviour, not a defect.
+
+**The correction worth stating: deletion is the only one of the available moves that actually
+removes a URL from the index.** Dropping a URL from a sitemap is a hint about what to crawl, not an
+instruction to forget. The three deletions therefore *do* fully resolve their own SEO exposure — a
+404 is the mechanism Google acts on. **The kept test campaign gets no such benefit**: it will keep
+returning 200 at priority 0.9 forever unless a front pass adds `robots: { index: false }` to
+`generateMetadata` for fixture campaigns. That is FRONT65's recommendation and it remains
+outstanding; nothing in this pass addresses it.
+
+---
+
+## 5. THE EMPTY GRID — the dispatch's premise is wrong, and this is the one item to rule on
+
+**The dispatch says: "With three gone and one flagged, a visitor sees NO campaigns." That is not
+what happens.** It follows from the dispatch's own item — FRONT65's correction 1 — which the rest of
+the dispatch then does not carry through: **`is_fixture` does not hide anything.** With the three
+deleted and the test campaign flagged, `listCampaigns()` still returns one row and the grid still
+renders one card.
+
+**What a visitor actually sees after this plan:**
+
+- **one campaign card** for `fund-live-test-20260817`, carrying the "Test data" chip
+  (`CampaignCard.tsx:55`),
+- with **$0 given / $0 confirmed** on it, the flag having zeroed the counters,
+- and a `LedgerStrip` line that takes its `fixtures === campaigns.length` branch:
+  *"Every campaign listed here is **test data** — seed rows kept so the screens have something to
+  render. None is a real campaign asking for money."*
+
+That is honest — arguably more honest than an empty grid, since it discloses rather than hides — but
+it is **not** the empty state, and the ruling should be made knowing that.
+
+**The empty state does exist and does render.** `src/app/page.tsx` branches on
+`campaigns.length === 0` before reaching the grid and returns:
+
+> **No campaigns yet** — *"Nothing is listed because nothing is there. When a campaign opens it
+> appears here — this page never shows an example one."*
+
+**It is not a defect and it needs no work — it is simply unreachable while any campaign row exists.**
+The read-failure state is a separate branch with different words (`Campaigns could not be read`),
+which is the distinction that matters: an empty grid will never be shown for a database that did not
+answer.
+
+**So the empty grid needs one of two decisions, and both are the lead's:**
+
+1. **A front pass** filters fixtures out of `listCampaigns()` (or out of the grid and `sitemap.ts`),
+   at which point the empty state renders and the test campaign survives as a direct-link-only
+   record. This is FRONT65's recommendation and the only route to an empty grid that keeps the
+   evidence.
+2. **Accept the single badged card** until a flagship campaign exists next month, and do nothing
+   more.
+
+There is no DB-side move that produces an empty grid without deleting the row the owner ruled must
+be kept.
+
+---
+
+## ZERO-WRITES ATTESTATION
+
+`REPORT.md` and this `ops_reports` row are the only things written. No `give_campaigns` row, no
+`fountain_pledges` row, no flag flipped, no DELETE, no migration file authored, no `apply_migration`
+call, no Stripe call. The single non-SELECT statement executed was a read-only `DO` block that scans
+the catalog and ends in `RAISE EXCEPTION` (the slug sweep) — it writes nothing by construction.
+
+## COULD NOT VERIFY
+
+- **The 404 title over the wire**, as stated in §4 — the code is confirmed, the rendered response
+  body was not seen by this session.
+- **Nothing was applied**, so every "expect DELETE 2 / DELETE 3" above is derived from the row
+  inventory and the FK definition, not from having run it. The done-test is written to catch the
+  case where that derivation is wrong.
+- **Whether Google has actually fetched the three fixture URLs.** They are in the live sitemap at
+  priority 0.9 and have been since FUND went public; whether a crawler has taken them is not
+  readable from here and would need Search Console.
+- **The front-side claims are read from source, not from a running build.** No FUND dev server was
+  started and no page was rendered this pass; the live checks were two anonymous GETs.
+- **`fountain_pledges.reward_lot_id` has no FK**, so nothing proves what it once pointed at. Both
+  seed rows carry NULL, so it does not affect this pass either way.
+
+---
+
 ## DB66 — raised_cents COUNTS ONLY MONEY THAT MOVED. APPLIED 20260818032122, ledger re-measured 0. The 2500 was already 1300 six minutes before the apply — proven by counterfactual instead. (2026-08-18)
 
 Session `ee600096` (fallback id — no `MC_SESSION`). Dispatch DB66, lane `db`, workdir
@@ -6415,3 +7007,150 @@ immediately and only the Stripe-side tidiness remains.
 - **No orphan has ever been reaped**, so the harm chain described above is reasoned
   from the RPC's status guard and give-webhook's terminal-error branch, not
   observed.
+
+---
+
+## FRONT66-Q — the screens are stranded, but not the way the dispatch says. NO CODE CHANGED.
+
+Session `01cb0b79`. 2026-08-18. **No file edited, nothing built, nothing
+committed.** The prescribed fix has no valid target and I am not going to invent
+one.
+
+### THE SYMPTOM IS REAL. THE MECHANISM IS NOT WHAT THE DISPATCH ASSUMES.
+
+The dispatch says the management screens "live on SPA paths" that the `/fund`
+proxy shadows, and prescribes narrowing `pathFilter` so those paths fall through.
+
+**There are no such paths.** The SPA registers exactly two routes under `/fund`,
+and Next.js owns both of them:
+
+```
+src/App.tsx:298   <Route path="/fund"       element={<GivePage />} />
+src/App.tsx:299   <Route path="/fund/:slug" element={<CampaignPage />} />
+```
+
+That is the complete set. There is no `/fund/manage`, no `/fund/create`, no
+`/fund/mine`. **So there is nothing to narrow the filter to** — the only path that
+would have to fall through is `/fund` itself, and letting that through takes the
+public Next.js grid offline, which is the opposite of the intent.
+
+### WHERE THE SCREENS ACTUALLY LIVE — the inventory, from source
+
+**"Start a campaign", "My Campaigns" and "Explore" are not routes. They are three
+tab values on one path.**
+
+```
+src/pages/give/GiveLayout.tsx:5      export type GiveView = 'discover' | 'mine' | 'create'
+src/pages/community/CommunityLayout.tsx:268   if (location.pathname !== '/fund') navigate('/fund');
+                                              setGiveView(id as GiveView);
+```
+
+Selecting any of them navigates to **`/fund`** and flips internal state. The
+"complete Start a campaign form" the lead saw at `localhost:3000/fund` is
+`GivePage` in its `create` view — it is the `/fund` route, not a child of it.
+
+**Everything else the lead listed is on its own top-level path, and the `/fund`
+proxy never touches any of it:**
+
+| screen | path | shadowed by /fund? |
+| --- | --- | --- |
+| Creators Studio | `/studio` | **no** |
+| Notifications | `/notifications` | **no** |
+| Saved | `/bookmarks` | **no** |
+| Reported | `/intel/reported` | **no** |
+| Premium | `/premium` | **no** |
+| Business | `/business` | **no** |
+| Advertise | `/promotion` | **no** |
+
+They appeared in the sidebar *while the lead was standing on `/fund`*, which is
+what made them look like `/fund` children. They are reachable in production today.
+
+**So the true defect is narrower and harder than the dispatch describes: the SPA's
+campaign-management UI and the Next.js public surface both want the same URL,
+`/fund`.** Create Campaign and My Campaigns genuinely are unreachable in
+production — the lead's observation is correct — but they are unreachable because
+their path *is* `/fund`, not because they sit beneath it.
+
+FRONT52's rename is what created the collision: these screens were at `/give`,
+which nothing shadowed. FRONT51's proxy and FRONT52's rename are each right alone,
+exactly as the dispatch says — but the collision they produce is a **URL ownership
+conflict**, not a filter that is too wide.
+
+### ITEM 2 — THE RULE, which is worth more than the fix
+
+The dispatch proposes: *Next.js owns the public read surface, the SPA owns
+authenticated management.* That rule is right about intent and **unimplementable
+as a sub-path split**. Stated so the next astra can use it:
+
+> **A proxied astra prefix is EXCLUSIVELY owned by the proxied service. If the SPA
+> keeps any surface for that astra, it must live OUTSIDE the prefix — never on a
+> sub-path of it.**
+
+Two reasons, both concrete:
+
+1. **The dynamic segment eats the sub-path.** The astra owns `/fund/[slug]`. Any
+   management sub-path — `/fund/manage`, `/fund/new` — is indistinguishable from a
+   campaign slug, so the split can only be maintained by a reserved-word list that
+   grows every time a screen is added and silently makes those slugs unusable
+   forever.
+2. **`pathFilter` is prefix-shaped.** FRONT51 chose it over `app.use('/fund', …)`
+   precisely because Express strips a mount path and a stripped prefix breaks a
+   service built with `NEXT_PUBLIC_BASE_PATH=/fund`. Carving exceptions into that
+   filter reintroduces, by hand, the ambiguity the prefix rule exists to remove.
+
+### ITEM 4 — THE COLLISION IS REAL AND ALREADY REACHABLE
+
+Yes, it is possible. `GivePage` builds a slug with
+`/^[a-z0-9-]{2,60}$/` (`src/pages/give/GivePage.tsx:156`) and there is **no
+reserved-word check**. A giver can create a campaign slugged `manage`, `new`,
+`sitemap` or `robots` today.
+
+`sitemap` and `robots` are the sharper case: Next.js already owns
+`/fund/sitemap.xml` and `/fund/robots.txt`, so a campaign slugged `sitemap` is
+merely unreachable, but one slugged `robots.txt`-adjacent could shadow SEO
+surfaces depending on how the route matches.
+
+**This is a finding for the lead, not a fix in this pass**, per the dispatch. It
+needs a reserved-slug guard wherever campaigns are created — and note that guard
+belongs in the **database** (`give_campaign_create`), not only the SPA form, since
+the Next.js app and any future client can create campaigns too.
+
+### THE OPTIONS — for the lead to rule
+
+1. **Move SPA management outside `/fund`.** e.g. `/studio/campaigns` or
+   `/my/campaigns`. **My recommendation.** It needs *no* proxy change at all, no
+   reserved-word guard, and it satisfies the rule above rather than carving an
+   exception into it. Cost: the SPA route registration plus the internal links
+   that point at `/fund` (`sidebarNav.ts`, `NovaPage.tsx`, `CampaignPage.tsx`,
+   `CommunityLayout.tsx`) — **more than the two files this dispatch budgets**,
+   which is why I stopped rather than starting it.
+2. **`/fund/manage` plus a reserved-slug guard.** Implementable in the filter, but
+   it takes on the permanent slug tax described above, and the guard must land in
+   the same change or a campaign named `manage` breaks it on day one.
+3. **Port to Next.js.** Explicitly forbidden by this dispatch, and rightly — it is
+   a real project.
+4. **Leave it stranded** and treat campaign creation as a Next.js job whenever
+   FRONT builds it. Honest, but it means no one can create a campaign in
+   production in the meantime, which is presumably not acceptable.
+
+### WHAT I DID NOT DO, and why
+
+- **No filter change.** There is no set of paths to add; the literal instruction
+  cannot be executed.
+- **No route move.** Option 1 is my recommendation but it is a user-facing URL
+  change across five-plus files, past the dispatch's stated budget, and it changes
+  where a screen lives — a product decision, not a serving-layer tweak.
+- **No commit, no build.** Nothing changed, so there was nothing to build or
+  commit. The dispatch's "STOP AT: green local build + commit" has no subject.
+
+### Could not verify
+
+- **Nothing was measured in production.** The inventory is from source. The claim
+  that `/fund` is currently served by Next.js in production follows from the
+  proxy's `pathFilter` and `FUND_INTERNAL_URL` being set, which I read but did not
+  probe externally.
+- **I did not confirm the reserved-slug collision by creating a campaign named
+  `manage`.** That would be a production write on a live surface and is not mine
+  to make; the absence of a guard is read from the source regex.
+- **I did not enumerate every internal link to `/fund`** beyond the five files the
+  grep surfaced — option 1's true cost should be re-grepped by whoever takes it.
