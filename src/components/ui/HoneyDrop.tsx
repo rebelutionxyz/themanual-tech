@@ -4,15 +4,12 @@ interface HoneyDropProps {
   /** Passthrough so HoneyDrop can slot into LucideIcon positions (color is ignored — the drop is always gold). */
   style?: React.CSSProperties;
   animate?: boolean;
-  /**
-   * When true, applies the `animate-bling-hop` motion (hop/skip/jump signature
-   * per MMF §15.1). Caller is responsible for toggling on/off — see SiteHeader's
-   * use of the `bling-hop` window event.
-   */
-  hopping?: boolean;
-  /** Spine marker — lets the shell tag the drop as a spine element for
-   *  verification without wrapping it in a span that would shift its baseline. */
-  'data-spine'?: string;
+  /* FRONT78: `hopping` and `data-spine` are gone. Both existed only for the
+     SPINE drop in SiteHeader, which the owner retired; the hop keyframe went
+     with them after a grep confirmed this file was its only consumer. HoneyDrop
+     itself is untouched and still draws the BLiNG! mark across LensRow,
+     Bookmarks, Studio and the rest — it was never a spine component, it was
+     borrowed by one. */
 }
 
 /**
@@ -24,10 +21,8 @@ export function HoneyDrop({
   className,
   style,
   animate = false,
-  hopping = false,
-  'data-spine': dataSpine,
 }: HoneyDropProps) {
-  const animClass = hopping ? 'animate-bling-hop' : animate ? 'animate-honey-drop' : '';
+  const animClass = animate ? 'animate-honey-drop' : '';
   return (
     <svg
       width={size}
@@ -37,7 +32,6 @@ export function HoneyDrop({
       style={style}
       className={`inline-block ${animClass} ${className ?? ''}`}
       aria-hidden="true"
-      data-spine={dataSpine}
     >
       <defs>
         <radialGradient id="honeyGrad" cx="0.35" cy="0.3" r="0.8">

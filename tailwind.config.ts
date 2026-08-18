@@ -53,7 +53,8 @@ export default {
       },
       animation: {
         'honey-drop': 'honey-drop 0.6s ease-out',
-        'bling-hop': 'bling-hop 0.9s cubic-bezier(0.32, 0.72, 0.35, 1)',
+        // 'bling-hop' retired FRONT78 with the spine drop it animated. Grepped
+        // first: HoneyDrop.tsx was its only consumer, and that prop is gone too.
         'pulse-slow': 'pulse 3s ease-in-out infinite',
         'slide-in-right': 'slide-in-right 0.18s ease-out',
         // Promotion top-ticker (Phase C Component D, Code 24, 2026-05-08).
@@ -67,17 +68,7 @@ export default {
           '50%': { transform: 'translateY(0) scale(1.05)', opacity: '1' },
           '100%': { transform: 'translateY(0) scale(1)', opacity: '1' },
         },
-        // BLiNG! drop hop/skip/jump — three vertical hops with subtle horizontal sway.
-        // Astra-ID motion signature per MMF §15.1; gated to astra contexts at the call site.
-        'bling-hop': {
-          '0%':   { transform: 'translate(0, 0) scale(1)' },
-          '15%':  { transform: 'translate(0, -6px) scale(1.06)' },
-          '30%':  { transform: 'translate(1px, 0) scale(1)' },
-          '50%':  { transform: 'translate(1px, -4px) scale(1.04)' },
-          '65%':  { transform: 'translate(-1px, 0) scale(1)' },
-          '85%':  { transform: 'translate(-1px, -2px) scale(1.02)' },
-          '100%': { transform: 'translate(0, 0) scale(1)' },
-        },
+        // 'bling-hop' keyframes deleted FRONT78 — see the animation block above.
         'slide-in-right': {
           '0%': { transform: 'translateX(8px)', opacity: '0' },
           '100%': { transform: 'translateX(0)', opacity: '1' },

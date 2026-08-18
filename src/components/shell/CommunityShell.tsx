@@ -7,7 +7,6 @@ import { RealmStrip } from '@/components/shell/RealmStrip';
 import { RealmTreeSlider } from '@/components/shell/RealmTreeSlider';
 import { RightRail } from '@/components/shell/RightRail';
 import type { SidebarItem } from '@/components/shell/sidebarNav';
-import { fireBlingHop } from '@/lib/spine';
 import { type CSSProperties, type ReactNode, useState } from 'react';
 
 /**
@@ -70,20 +69,9 @@ export function CommunityShell({
     () => typeof window !== 'undefined' && window.innerWidth < 768,
   );
 
-  /* SPINE 5 — the drop hops on SIDEBAR OPEN. Fired here rather than inside
-     GlobalSidebar because this is where the state actually flips; the sidebar
-     only asks. Firing on OPEN only, never on close: the design's motion says
-     "something arrived", and playing it on the way out would make it noise.
-     `fireBlingHop` is a window event, so the header listening for it needs no
-     handle on this tree — the two shells share no provider.
-
-     The fire sits OUTSIDE the state updater deliberately. An updater is not a
-     place for effects: React invokes it twice under StrictMode, which would
-     dispatch the event twice and restart the hop mid-flight. */
-  function toggleCollapsed() {
-    if (collapsed) fireBlingHop();
-    setCollapsed((v) => !v);
-  }
+  /* FRONT78: the `bling-hop` dispatch that used to fire here is gone with the
+     spine drop it drove (owner: "we dont need the bling drop"). The toggle is
+     back to being only a toggle. */
 
   return (
     <div
@@ -116,7 +104,7 @@ export function CommunityShell({
           activeItemId={activeItemId}
           onSelect={onSelect}
           collapsed={collapsed}
-          onToggleCollapse={toggleCollapsed}
+          onToggleCollapse={() => setCollapsed((v) => !v)}
           brandingOverride={branding}
           hideAstraSwitcher={hideAstraSwitcher}
         />

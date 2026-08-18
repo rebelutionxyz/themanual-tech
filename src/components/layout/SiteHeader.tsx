@@ -1,27 +1,41 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { useAstra, useCopy } from '@/lib/astras/AstraContext';
 import { ManualLogo } from '@/components/ui/ManualLogo';
-import { HoneyDrop } from '@/components/ui/HoneyDrop';
-import { useBlingHop } from '@/hooks/useSpine';
 import { SPINE_BLACK } from '@/lib/spine';
 import { UtilityChrome } from './UtilityChrome';
+
+/* THE h24 SURFACE WEARS ITS OWN WORDMARK — FRONT78, owner: "its h24.tech not
+   themanual". `/h24` and the two paths that answer to it (ORACLE_MF v1.24 keeps
+   `/oracle` live as the legacy path and `/here24` as the rename's redirect) show
+   `h24.tech` in the top bar; every other route still reads TheMANUAL.tech.
+
+   DISPLAY ONLY. The h24.tech DOMAIN stays DARK per v1.24 — no DNS, no deploy
+   config, no host change of any kind. This is a string in a header, and calling
+   it anything more would be a lie about what shipped. */
+const H24_PATHS = new Set(['/h24', '/oracle', '/here24']);
 
 export function SiteHeader() {
   const { configured } = useAuth();
   const astra = useAstra();
-  const wordmark = astra?.wordmark ?? 'TheMANUAL.tech';
+  const { pathname } = useLocation();
+
+  // Matched on the FIRST SEGMENT, not the whole path: /h24 has child routes and
+  // an exact-match test would drop the wordmark the moment a reader went one
+  // level deeper into the same surface.
+  const onH24 = H24_PATHS.has(`/${pathname.split('/').filter(Boolean)[0] ?? ''}`);
+
+  // An astra host still wins over both: on a real astra the header is that
+  // astra's, and h24 is not the surface being visited.
+  const wordmark = astra?.wordmark ?? (onH24 ? 'h24.tech' : 'TheMANUAL.tech');
   // wordmarkShort: explicit value from config, or derive from full wordmark via toUpperCase().
   // Fallback ensures AtlasINTEL.fyi (no wordmarkShort set) produces 'ATLASINTEL'.
   const wordmarkShort = astra
     ? (astra.wordmarkShort ?? astra.wordmark.toUpperCase())
-    : 'TheMANUAL.tech';
+    : onH24
+      ? 'h24.tech'
+      : 'TheMANUAL.tech';
   const accentColor = astra?.accent;
-
-  /* SPINE 5 — the drop hops on sidebar open. The hook owns the
-     prefers-reduced-motion check and returns a permanent false for a viewer who
-     asked for less motion, so there is no second place to get that wrong. */
-  const hopping = useBlingHop();
 
   /* data-bees-label is a verification artifact for Component B's useCopy()
      mechanism. On HoneyComb astras (and foundation), expect 'Bees'. On
@@ -75,16 +89,11 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        {/* SPINE 5 — THE DROP. Honey, RIGHT OF THE WORDMARK, hops-skips-jumps on
-            sidebar open. Outside the Link above on purpose: the drop is a spine
-            element, not part of the home affordance, and swallowing it into the
-            logo hit-target would make it a navigation control it is not. */}
-        <HoneyDrop
-          size={15}
-          hopping={hopping}
-          className="flex-shrink-0"
-          data-spine="drop"
-        />
+        {/* THE DROP IS RETIRED — FRONT78, owner: "its h24.tech not themanual we
+            dont need the bling drop". It sat here for exactly one pass and never
+            shipped. `HoneyDrop` itself lives on: it is still the BLiNG! mark in
+            LensRow, Bookmarks, Studio and elsewhere. What went is the SPINE
+            drop, its hop, and the `bling-hop` event that drove it. */}
 
         <div className="flex-1" />
 

@@ -23,6 +23,235 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## DB76 — THE CONSENT LEDGER. Schema proposed, sovereignty walked column by column, nothing applied. (2026-08-18)
+
+**Pass:** DB76 · lane `db` · workdir `TheMANUAL.tech` · session `b4718c47`
+**Outcome:** proposal delivered. **Zero writes to any project table, zero DDL.** Two draft SQL files
+under `supabase/migrations/_drafts/`, rollback authored first. One ask at the bottom, and it is a
+real fork — the answer changes a column.
+
+Model read: ORACLE_MF **v1.43** (build cut, DB76 named), **v1.39** (the Access model, five scopes),
+**v1.31** (the hybrid sealed / opt-in fork). Quoted where it binds.
+
+### THE SHAPE — two tables, four enums, three routines
+
+```
+consent_grants     WHO may do WHAT with WHICH of yours, UNTIL WHEN
+consent_receipts   every USE of a grant, append-only, metadata only
+```
+
+Enums rather than free text throughout: `consent_scope_kind` (7 values), `consent_grantee_kind` (5),
+`consent_capability` (6), `consent_mode` (2). Enumerated verbs cannot be turned into content.
+
+**The five v1.39 scopes, and which are greenfield.** The dispatch asked for all five modelled even
+where nothing consumes them yet, and for the greenfield ones named. Measured against what exists in
+production today:
+
+| v1.39 scope | `scope_kind` | points at | consumer today? |
+|---|---|---|---|
+| 1. FILES/FOLDERS | `file` | `media_assets.id` | **yes** — Creator Studio Media Library, real table, RLS `bee_id = auth.uid()` |
+| 1. FILES/FOLDERS | `folder` | `media_folders.id` | **yes** — same |
+| 2. PEOPLE | `person_reseal` | `bees.id` | **table yes, mechanism GREENFIELD** — the COMMS reseal itself is not built |
+| 3. DEVICES | `device` | `dingleberry_devices.id` | **yes** — real table, enrolled devices |
+| 4. ASTRAS | `astra` | `astra_registry.id` | **yes** — and see DB73, that registry is mid-reconcile |
+| 5. OUTSIDE | `connector` | *nothing* | **GREENFIELD** — no connector table exists |
+| 5. OUTSIDE | `agent_in` | *nothing* | **GREENFIELD** — no agent table exists |
+
+So: five of seven kinds point at a table that exists right now. Two do not, and rather than invent
+tables for them, they carry a **CHECK-constrained slug** (`scope_ref_key`) until their tables land.
+A `CASE` constraint enforces that the greenfield kinds use the text form and the other five use the
+uuid form — you cannot mix them by accident.
+
+**Why the pointer is not a foreign key.** `scope_ref` is polymorphic across five tables, and Postgres
+has no polymorphic FK. The alternatives were five nullable FK columns (ugly, and the CHECK matrix
+gets worse) or a trigger. I chose the trigger and I am naming the trade: **integrity here is enforced
+by `consent_grants_check_scope_ref()`, not by the planner.** It fails closed — an unhandled
+`scope_kind` raises rather than falling through — and it does one extra thing worth having: for
+`file` / `folder` / `device` it checks the target `bee_id` matches the subject, so **a grant over
+someone else's file is rejected at write time**, not caught later by a reader.
+
+### THE SOVEREIGNTY CHECK — every column, why none of them is content
+
+The dispatch asked for the walk. Here it is, all of it.
+
+**`consent_grants`**
+
+| column | why it is not content |
+|---|---|
+| `id` | generated uuid |
+| `subject_bee_id` | identity, not content. Never supplied by the browser — read from `auth.uid()` |
+| `scope_kind` | one of 7 enum labels |
+| `scope_ref` | **a uuid pointer.** Carries zero bytes of the thing. Resolving it requires a separate read that RLS governs independently |
+| `scope_ref_key` | **the only at-risk column, and it is constrained.** Slug regex `^[a-z0-9][a-z0-9._-]{0,127}$` — `x.com`, `mastodon-social`. Cannot hold a sentence, a path, or a filename with spaces or capitals |
+| `grantee_kind` | 5 enum labels |
+| `grantee_ref` | uuid pointer |
+| `grantee_key` | same slug constraint |
+| `capability` | 6 enum labels — verbs |
+| `mode` | 2 enum labels |
+| `granted_at` / `expires_at` / `revoked_at` | timestamps |
+
+**`consent_receipts`** — same columns in object form, plus:
+
+| column | why it is not content |
+|---|---|
+| `grant_id` | uuid FK |
+| `subject_bee_id` | identity; copied from the grant by the routine, never trusted from the caller |
+| `action` | enum verb |
+| `object_ref` / `object_key` | pointer, and the same slug constraint |
+| `directive_id` | uuid FK to `atlasoracle_directives`, itself metadata-only by design |
+| `tokens_metered` | `numeric(20,6)`, matching `oracle_token_ledger.amount_tokens` exactly. A number |
+| `occurred_at` | timestamp |
+
+**The honest summary: there is no text column in this design that a caller could stuff content
+into.** The two text columns exist only for the two greenfield scopes, and both are shape-constrained
+at the table. That constraint is not decoration — a free-text `scope_ref_key` is exactly how a
+"metadata only" table becomes a content table in eighteen months, one careless caller at a time.
+
+### THE FILENAME QUESTION — flagged, and it is not hypothetical
+
+The dispatch says: *"object ref (METADATA ONLY — never content, never filenames if filenames are
+ruled content; flag that question)."*
+
+**Flagging it with a finding attached: the platform has already answered it the other way, in
+production, in the vault's own table.** `public.media_assets` today holds
+
+```
+file_name    text NOT NULL      <- the filename, in the clear
+title        text
+alt_text     text
+description  text
+tags         text[]
+```
+
+all plaintext, all under RLS but none of them sealed. So if filenames are ruled content, **the
+existing Media Library is already a standing violation of the sovereignty sentence**, and that is a
+separate remediation pass, not something this schema can fix.
+
+What DB76 can do — and does — is **not repeat it**. The consent ledger stores `object_ref uuid` and
+never a name. That is deliberate and it is why the design is safe under *either* ruling:
+
+- **If filenames ARE content:** this schema is already compliant. Nothing changes here. The
+  `media_assets.file_name` question becomes its own pass.
+- **If filenames are NOT content:** this schema is still compliant, just stricter than it needs to
+  be. The cost is that the Access view must join to `media_assets` to show the user a readable name,
+  which is one extra read under a policy the user already owns. I regard that as the right price.
+
+I did not resolve it, because it is a sovereignty ruling and those are the owner's.
+
+### RLS FROM BIRTH
+
+- `ENABLE` **and `FORCE`** row level security on both tables. `FORCE` matters: without it the table
+  owner bypasses RLS, and the owner is who a `SECURITY DEFINER` routine runs as.
+- **Exactly one policy per table, and it is a `SELECT`:** `subject_bee_id = auth.uid()`, `TO
+  authenticated`. This matches the established house pattern — `media_assets_owner_select`,
+  `media_folders_owner_select` and `dingleberry_devices_read` all read `bee_id = auth.uid()`, so
+  `bees.id` = the auth user id is a verified assumption here, not a guess.
+- **There is deliberately no INSERT / UPDATE / DELETE policy on either table.** With RLS on and no
+  policy for a command, that command is denied. The absence *is* the deny rule.
+- **anon gets no policy and no grant**, revoked **by role name** — `REVOKE ALL ... FROM anon` — not
+  `FROM PUBLIC`. This project hands `anon` and `authenticated` their own role-level privileges via
+  `ALTER DEFAULT PRIVILEGES`, which a `REVOKE ... FROM PUBLIC` does not touch. Same for the
+  routines. Verify by reading `pg_proc.proacl` / `pg_class.relacl` back after applying; do not assume.
+- The verify block asserts `relrowsecurity AND relforcerowsecurity` on both tables and that **no
+  non-SELECT policy exists** on either.
+
+### THE WRITE PATH — the `give_campaign_create` lesson, applied
+
+`give_campaign_create` is `SECURITY DEFINER` and takes **fourteen arguments, none of which is the
+owner**. That is the pattern, and all three routines here follow it:
+
+- **`consent_grant(...)`** — takes what is being granted and to whom. Takes **no subject argument
+  at all**; the subject is `auth.uid()` and raises if null. The browser can never name whose things
+  these are.
+- **`consent_revoke(p_grant_id)`** — sets `revoked_at`, **never deletes.** The grant is the reason
+  its receipts exist; deleting it would orphan the user's own history. Idempotent (re-revoking is a
+  no-op returning the original timestamp), scoped to `subject_bee_id = auth.uid()`, and it
+  **deliberately does not distinguish "not yours" from "no such grant"** — telling a caller that a
+  grant exists but belongs to someone else is an information leak.
+- **`consent_receipt_write(...)`** — `service_role` only, revoked from `anon` *and* `authenticated`.
+  Copies `subject_bee_id` from the grant rather than trusting the caller, and **refuses to write a
+  receipt against a grant that is revoked, expired, or permits a different capability.**
+
+That last refusal is where revocation actually bites, and it is worth stating as a design claim:
+**revocation makes future reads unreceiptable, which makes an unreceipted read a hard error instead
+of a silent one.** The honesty line from v1.31/v1.39 still holds in product — revoking stops future
+reads, it cannot recall outputs already produced — and nothing in this schema pretends otherwise.
+
+**Append-only is enforced in the table, not only in policy.** A `BEFORE UPDATE OR DELETE` trigger on
+`consent_receipts` raises unconditionally. RLS alone would not be enough: a `SECURITY DEFINER`
+routine runs as owner and, with `FORCE` absent, would sail past policy. The trigger has no such hole.
+
+### THE CONSUMERS, and what each needs
+
+| consumer | needs | status |
+|---|---|---|
+| **The vault** (v1.31 hybrid) | `mode='transient'`, `scope_kind='file'`, `capability='process'`, `expires_at` **required** by CHECK — "open for one job, reseal". Plus `mode='standing'` folder grants | backing tables exist (`media_assets`, `media_folders`); the sealing/reseal mechanism does not |
+| **AutoPost** (v1.31 spec v0.1) | folder standing grant (`folder` + `read` + `standing`) **and** a connector grant (`connector` + `post_as`, `scope_ref_key='x.com'`) | folder half works today; **connector half is greenfield** — and note v1.31's hard line, h24 never holds passwords, so the connector row references an OAuth the user owns, it does not store one. There is no token column in this schema and that is on purpose |
+| **The Access view** | `SELECT` on both tables, subject-scoped. Served by `consent_grants_subject_live_idx` (partial, `WHERE revoked_at IS NULL`) and `consent_receipts_subject_time_idx` | ready as designed |
+| **Agents calling in** | `scope_kind='agent_in'`, `capability='call_in'`, metered per v1.39 | greenfield |
+
+**How OFF is represented, since the dispatch asked explicitly: OFF is the ABSENCE OF A ROW.** There
+is no `enabled` column, no `active` flag, no disabled state anywhere in this file. That is a design
+commitment, not an omission — a disabled row is a thing a bug can re-enable; an absent row is not.
+An agent with no grant cannot call in, and the query that would authorise it returns zero rows.
+
+### THE DRAFTS
+
+```
+supabase/migrations/_drafts/db76_consent_ledger_v1_rollback.sql   (written FIRST)
+supabase/migrations/_drafts/db76_consent_ledger_v1.sql
+```
+
+Unversioned filenames, parked in `_drafts/`, so the reconcile ledger never sees them. They become a
+migration only under a named dispatch.
+
+**The rollback.** The forward migration is purely additive — it alters nothing that already exists —
+so the rollback is a clean drop in dependency order (routines → trigger function → receipts → grants
+→ enums) with no prior state to restore. What it *does* carry is a **guard that refuses to run if
+either table is non-empty**, because the one thing a rollback here can destroy is a user's record of
+what was accessed. Dropping that has to be a second, deliberate decision with an export in front of
+it, never a side effect of undoing a schema change. It closes by asserting every object is gone.
+
+### THE ONE ASK
+
+**Are filenames content?**
+
+Not a philosophical question here — it decides a column and it exposes an existing state:
+
+- **Rule "yes, filenames are content":** this schema needs no change (it stores pointers only), but
+  `media_assets.file_name`, `.title`, `.alt_text`, `.description` and `.tags` are all plaintext in
+  production today, and that becomes a remediation pass someone has to own.
+- **Rule "no, filenames are metadata":** this schema still needs no change, and `media_assets` is
+  fine as it stands. The Access view joins for readable names.
+
+Either way DB76 is safe to apply as drafted. What the ruling changes is **whether a second pass gets
+queued for the Media Library** — and I would rather surface that now than have it found later by
+someone reading the sovereignty sentence against the vault's own columns.
+
+### Could not verify
+
+- **Neither draft was executed, not even in a rolled-back transaction.** The dispatch says apply
+  nothing, and a rehearsal that quietly commits is the DB37 breach. So **the SQL is unproven**: it
+  has never been parsed by Postgres. Expect to fix syntax on first apply. Specific spots I would
+  check first: the `CASE` inside the `CHECK` constraints, the `%ROWTYPE` fetch in
+  `consent_receipt_write`, and whether `REVOKE ... FROM PUBLIC, anon` in one statement is accepted
+  as written.
+- **`auth.uid()` returning `bees.id` is inferred**, from three existing policies that do exactly
+  `bee_id = auth.uid()` (`media_assets_owner_select`, `media_folders_owner_select`,
+  `dingleberry_devices_read`). I did not read `handle_new_bee()` to confirm the id is copied rather
+  than generated.
+- **The `astra` scope points at `astra_registry`, which DB73 proposes to reconcile in the same
+  session.** Ids are stable under that proposal (every change there is an UPDATE, never a DELETE),
+  so the pointer survives — but if shape (b) RE-POINT is ever chosen instead, this scope's reference
+  type changes with it. The two passes are coupled and whoever schedules them should know that.
+- **No index or query-plan measurement.** The two partial indexes are reasoned from the Access
+  view's expected reads, not from EXPLAIN against real volume — there is no real volume yet.
+- **I did not design the connector or agent tables**, deliberately. They are named greenfield and
+  carry slugs until someone builds them; inventing their schema inside a consent pass would be the
+  wrong place for it.
+
+---
+
 ## FRONT77 — THE h24 NAME SWEEP. User-facing AtlasOracle/Oracle → h24; code ids untouched. (2026-08-18)
 
 **Pass:** FRONT77 · lane `front` · workdir `TheMANUAL.tech` · session `f3571fb1` (fallback id)
@@ -283,7 +512,8 @@ src/pages/pulse/WatchPage.tsx
 a concurrent `db`-lane session while this pass was running, and it rides along in this commit because
 the file is shared. That is disclosed rather than worked around. The two untracked
 `supabase/migrations/_drafts/db73_*.sql` files are **not** this pass's and were **not** staged.
-**No push** — per the dispatch and per the standing rule that the push click is the human's.
+**Commit `a64bf6e`** on `main`, 22 files, +573/-58. **No push** — per the dispatch and per the
+standing rule that the push click is the human's.
 
 ---
 

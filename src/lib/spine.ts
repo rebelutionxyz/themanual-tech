@@ -1,23 +1,39 @@
-/* THE SPINE — the five chrome elements every Astra and every page shares.
+/* THE SPINE — the chrome every Astra and every page shares.
  *
  * Source: ORACLE_MF v1.23 "SPINE TRUTH", restating MMF §7.2 / §15.1 (locked
  * Apr 25, 2026) and §12 (locked Apr 26). v1.23 is the WORKING design source
  * because ORACLE_MF v1.28 records the MMF itself as UNREACHABLE in Drive; when
  * the MMF is restored, it wins on any conflict, per house precedence.
  *
- * The five elements:
+ * ─── WHAT REMAINS MOUNTED ───────────────────────────────────────────────────
  *   1. TOP BAR    always black SPINE_BLACK. No realm tinting of the bar itself.
- *   2. LEFT RAIL  closed sidebar wears the CURRENT REALM accent, and switches
- *                 as the user navigates realms.
- *   3. RIGHT RAIL rotates through the ASTRA accent ring, one step per page
- *                 change. Constellation identity, NOT taxonomy.
  *   4. TOOLBARS   realm toolbars run the L1–L4 tonal depth gradient.
- *   5. THE DROP   BLiNG! honey, right of the wordmark, hops-skips-jumps on
- *                 sidebar open. Respects prefers-reduced-motion.
+ *
+ * ─── WHAT FRONT78 RETIRED, and why the numbering keeps the gaps ─────────────
+ * FRONT74 built five elements. Three came out again four passes later, by owner
+ * word, and NONE OF THEM EVER SHIPPED — FRONT74 was committed and never pushed,
+ * so no user saw any of this.
+ *
+ *   2. LEFT RAIL  — "the line on the left of the sidebar needs to be deleted
+ *                   from all pages." The chrome died; the RESOLUTION lives on as
+ *                   `useRealmAccent()` in hooks/useSpine.ts, because realm
+ *                   identity still has to be answerable.
+ *   3. RIGHT RAIL — the always-on band went with it (lead's read of a band-less
+ *                   v0.2 approval, flagged as inference in the FRONT78 report).
+ *                   `ASTRA_ACCENT_RING` and `useConstellationAccent()` survive
+ *                   and still drive the admin-gated ConstellationRail.
+ *   5. THE DROP   — "its h24.tech not themanual we dont need the bling drop."
+ *                   The drop, its hop, the `bling-hop` event and the honey
+ *                   constant are all gone from this module.
+ *
+ * THE ORIGINAL NUMBERS ARE KEPT rather than renumbered to 1 and 2. Four passes
+ * of reports, commits and canon rows refer to "spine element 3" and "spine
+ * element 5"; renumbering would silently redirect every one of those to the
+ * wrong thing. A gap in a list is cheaper than a wrong reference.
  *
  * This module holds the VALUES and the derivations. It deliberately holds no
- * JSX: the same ring feeds the rail, the same ramp feeds more than one toolbar,
- * and a value that lives in one component cannot be reused by the next.
+ * JSX: the same ring feeds more than one consumer, the same ramp feeds three
+ * trees, and a value that lives in one component cannot be reused by the next.
  */
 
 import { ASTRA_CATALOG } from '@/lib/astra-catalog';
@@ -187,27 +203,14 @@ export function realmDepthTone(level: number): { background: string; borderColor
   return { background: REALM_DEPTH_TONE[d], borderColor: REALM_DEPTH_EDGE[d] };
 }
 
-/* ─────────────────────────── 5. THE DROP ────────────────────────────── */
+/* ───────────────── 5. THE DROP — RETIRED, FRONT78 ───────────────────── */
 
-/** BLiNG! honey. The drop is always this colour; it never wears an accent. */
-export const SPINE_HONEY = '#FAD15E';
+/* `SPINE_HONEY`, `BLING_HOP_EVENT`, `BLING_HOP_MS` and `fireBlingHop()` stood
+   here. All four are gone: they existed only to drive the spine drop, and the
+   owner retired it ("we dont need the bling drop").
 
-/**
- * The window event that makes the drop hop. Fired on SIDEBAR OPEN — the
- * design's stated trigger — and listened for by whatever is rendering the drop,
- * so the sidebar never needs a handle on the header.
- *
- * A window event rather than shared state because the two ends sit in different
- * layout trees: the black shell's header and the community shell's sidebar are
- * mounted by different routes and share no provider.
- */
-export const BLING_HOP_EVENT = 'bling-hop';
-
-/** How long the hop runs — must match `animate-bling-hop` in tailwind.config.ts. */
-export const BLING_HOP_MS = 900;
-
-/** Fire the hop. Safe to call during SSR/tests, where there is no window. */
-export function fireBlingHop(): void {
-  if (typeof window === 'undefined') return;
-  window.dispatchEvent(new Event(BLING_HOP_EVENT));
-}
+   Nothing was left behind as a stub. An exported constant with no caller is a
+   trap — it reads as a supported seam, and the next pass wires something to it
+   believing the element still exists. The honey colour itself is not lost: it is
+   `--honey` in index.css and a local constant in each surface that draws the
+   BLiNG! mark, none of which went through this module. */

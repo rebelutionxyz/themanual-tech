@@ -5,9 +5,13 @@
  * in behind it.
  */
 
-import { ASTRA_ACCENT_RING, BLING_HOP_EVENT, BLING_HOP_MS } from '@/lib/spine';
+import { useAstra } from '@/lib/astras/AstraContext';
+import { REALM_COLORS, SILVER } from '@/lib/constants';
+import { ASTRA_ACCENT_RING } from '@/lib/spine';
+import { useManualStore } from '@/stores/useManualStore';
+import type { RealmId } from '@/types/manual';
 import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 
 /**
  * True when the viewer has asked for reduced motion.
@@ -15,6 +19,11 @@ import { useLocation } from 'react-router-dom';
  * Live, not read-once: the OS setting can change while the tab is open, and a
  * viewer who turns it ON mid-session is the exact person who must not have to
  * reload to be listened to.
+ *
+ * FRONT78 removed its only consumer (`useBlingHop`, retired with the drop). Kept
+ * anyway: this is an accessibility primitive, not spine plumbing, and the next
+ * animation on this platform needs exactly this and should not have to rewrite
+ * the live-`change` subscription that the obvious read-once version gets wrong.
  */
 export function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(() => {
@@ -33,60 +42,25 @@ export function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-/**
- * True for the duration of one hop, driven by the `bling-hop` window event.
- *
- * Returns a permanent `false` when the viewer prefers reduced motion — the
- * check lives HERE rather than at the CSS layer so the drop never even enters
- * the animating class, and a future caller cannot reintroduce the motion by
- * styling around a media query it forgot about.
- *
- * Re-firing mid-hop restarts the timer rather than stacking: `hopSeq` bumps on
- * every event, and the effect that clears it is keyed to the sequence number,
- * so the previous timeout is cancelled instead of ending the new hop early.
- */
-export function useBlingHop(): boolean {
-  const reduced = usePrefersReducedMotion();
-  const [hopSeq, setHopSeq] = useState(0);
-  const [hopping, setHopping] = useState(false);
+/* `useBlingHop` LIVED HERE and is gone — FRONT78, owner: "its h24.tech not
+   themanual we dont need the bling drop". The drop, its `bling-hop` window
+   event, and the reduced-motion gate around it are retired together; a hop hook
+   with no drop to hop is not a seam worth keeping. `usePrefersReducedMotion`
+   above outlives it because it was never about the drop. */
 
-  useEffect(() => {
-    if (reduced) return;
-    const onHop = () => {
-      setHopSeq((n) => n + 1);
-      setHopping(true);
-    };
-    window.addEventListener(BLING_HOP_EVENT, onHop);
-    return () => window.removeEventListener(BLING_HOP_EVENT, onHop);
-  }, [reduced]);
-
-  // `hopSeq` is not read in the body, so the linter calls it unnecessary. It is
-  // the mechanism: re-firing mid-hop must CANCEL the running timeout and start a
-  // fresh one, and the only way to make that happen is for the dependency list
-  // to change. Drop it and a second hop lands inside the first one's timer,
-  // which then ends the new hop early.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: hopSeq restarts the timer, by design
-  useEffect(() => {
-    if (!hopping) return;
-    const t = window.setTimeout(() => setHopping(false), BLING_HOP_MS);
-    return () => window.clearTimeout(t);
-  }, [hopping, hopSeq]);
-
-  return reduced ? false : hopping;
-}
-
-/* ───────────────── SPINE 3 — the rotating constellation accent ────────────── */
+/* ───────────── THE ROTATING CONSTELLATION ACCENT ──────────────────────────── */
 
 /* Module scope, not component state: the accent must survive every remount and
    advance ONCE per page change no matter how many things are wearing it.
    `ringIndex` is the position; `lastPath` is what makes the advance idempotent.
 
-   IDEMPOTENCE IS THE WHOLE TRICK. Two components read this hook — the always-on
-   right rail and the admin-only list — and a naive "advance on pathname change"
-   effect would fire in both and step the ring twice per navigation, so the two
-   would also disagree about the colour. Keying the advance to the PATH rather
-   than to the effect firing means the second caller for a given path is a no-op
-   and both read the same value. */
+   IDEMPOTENCE IS THE WHOLE TRICK, and it still is even though FRONT78 took the
+   always-on band away and left `ConstellationRail` as the single consumer. The
+   admin list mounts and unmounts as `is_admin` settles and as the breakpoint
+   crosses lg, and a naive "advance on pathname change" effect steps the ring on
+   every one of those. Keying the advance to the PATH rather than to the effect
+   firing means a second call for the same path is a no-op — which is what keeps
+   one navigation worth one step regardless of how many consumers there are. */
 let ringIndex = 0;
 let lastPath: string | null = null;
 const ringSubscribers = new Set<(accent: string) => void>();
@@ -133,4 +107,49 @@ export function useConstellationAccent(): string {
   }, [pathname]);
 
   return accent;
+}
+
+/* ───────────────── THE REALM ACCENT — resolution without chrome ───────────── */
+
+/**
+ * The accent of the realm the user is currently in.
+ *
+ * Resolution order, and the ORDER IS THE POINT:
+ *   1. the ROUTE says which realm    → /realm/:realmId
+ *   2. selectedRealmId in the store  → REALM_COLORS[id]
+ *   3. astra host, no realm          → astra.accent
+ *   4. foundation                    → SILVER (§15.5 / 13-hex flower)
+ *
+ * The route is consulted FIRST because where you are beats what you last picked:
+ * a stale `selectedRealmId` from a previous surface must not claim the realm the
+ * URL is actually naming. FRONT74 measured that failure on a running build —
+ * navigating to /realm/justice left the answer on `foundation` silver, because
+ * `selectedRealmId` is only written when something explicitly picks a realm and
+ * walking into a realm URL never does.
+ *
+ * ─── WHY THIS IS A HOOK AND NOT A STRIP ─────────────────────────────────────
+ * FRONT74 put this resolution inside a 3px chrome rail down the left of every
+ * page. FRONT78 removed that rail by owner word — "the line on the left of the
+ * sidebar needs to be deleted from all pages" — but the RESOLUTION is not the
+ * rail. Realm identity still has to be answerable for the switcher and for
+ * whatever surface claims it next, so the logic was lifted out here rather than
+ * deleted with the chrome that happened to be its first consumer.
+ *
+ * It has no consumer today. That is deliberate and is recorded rather than
+ * hidden: this is kept as the seam the next surface reaches for, and if nothing
+ * ever does, deleting it is one edit with no callers to chase.
+ */
+export function useRealmAccent(): { realm: RealmId | null; color: string } {
+  const astra = useAstra();
+  const selectedRealmId = useManualStore((s) => s.selectedRealmId);
+  const { realmId: routeRealmId } = useParams();
+
+  // `useParams` is untyped at the route boundary, so a bad segment must not
+  // index REALM_COLORS blindly — /realm/nonsense would otherwise resolve to
+  // `undefined` and hand a caller a colour that is not a colour.
+  const routeRealm =
+    routeRealmId && routeRealmId in REALM_COLORS ? (routeRealmId as RealmId) : null;
+  const realm = routeRealm ?? selectedRealmId;
+
+  return { realm, color: realm ? REALM_COLORS[realm] : (astra?.accent ?? SILVER) };
 }
