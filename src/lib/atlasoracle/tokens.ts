@@ -81,6 +81,62 @@ export async function fetchOracleTokenBalance(beeId: string | null): Promise<Ora
 }
 
 /**
+ * The plan / purchased split — FRONT75.
+ *
+ * `plan` are tokens from an EXPIRING grant still inside its window. `purchased`
+ * are durable credits (purchases, non-expiring grants, adjustments) that do not
+ * lapse. They sum to the balance.
+ *
+ * WHY A SECOND READ RATHER THAN MORE COLUMNS FROM THE VIEW. The view computes
+ * this split and then throws two thirds of it away: it CROSS JOINs
+ * `oracle_token_available(bee_id)`, which returns
+ * `(plan_available, purchased_available, total_available)`, and selects only
+ * `total_available` as `balance_tokens`. The split exists server-side and is
+ * simply not exposed. Widening the view is a `db`-lane migration, so this pass
+ * calls the same function directly instead of inventing the split client-side.
+ *
+ * DO NOT be tempted by the view's `granted_tokens` / `purchased_tokens` columns:
+ * those are LIFETIME SUMS of grant and purchase entries, not what remains.
+ * Rendering them as "plan available" would overstate a lapsed user's balance by
+ * everything they were ever given.
+ *
+ * SECURITY — the same argument that makes the view safe from the browser.
+ * `oracle_token_available` is `STABLE` and NOT `SECURITY DEFINER`
+ * (`pg_proc.prosecdef = false`), so its reads of `oracle_token_ledger` and
+ * `oracle_token_consumption` evaluate RLS AS THE CALLER. Both tables are
+ * `select-own` on `auth.uid() = bee_id` (verified against production
+ * 2026-08-18 via `pg_policy`), so passing another user's uuid returns zeros
+ * rather than their figures. `authenticated` holds EXECUTE.
+ */
+export interface OracleTokenSplit {
+  plan: number;
+  purchased: number;
+  total: number;
+}
+
+/**
+ * Reads the split. Returns null when it cannot be read — the caller renders the
+ * total alone rather than a split it had to guess at. A user with no ledger
+ * entries gets zeros, which is true, not an error.
+ */
+export async function fetchOracleTokenSplit(beeId: string | null): Promise<OracleTokenSplit | null> {
+  if (!beeId || !supabase) return null;
+
+  const { data, error } = await supabase.rpc('oracle_token_available', { p_bee: beeId });
+  if (error || !data) return null;
+
+  // A set-returning function comes back as an array of rows; one row for one bee.
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return { plan: 0, purchased: 0, total: 0 };
+
+  return {
+    plan: Number(row.plan_available ?? 0),
+    purchased: Number(row.purchased_available ?? 0),
+    total: Number(row.total_available ?? 0),
+  };
+}
+
+/**
  * Tier → model + live rate. Mirrors `oracle_model_rates`, which is the same
  * table the router prices from, so the rate a Bee is quoted is the rate they
  * are charged. Rates are Oracle Tokens per 1,000,000 provider tokens.

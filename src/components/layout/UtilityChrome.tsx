@@ -4,6 +4,7 @@ import { Bell, MessageCircle, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { SearchModal } from './SearchModal';
 import { AtlasOracleWalletBadge } from '@/components/AtlasOracleWalletBadge';
+import { surfacedActionsFor } from '@/lib/atlasoracle/surfacedActions';
 import { cn } from '@/lib/utils';
 
 /**
@@ -102,7 +103,16 @@ export function UtilityChrome() {
         {/* 6b. AtlasOracle wallet badge — the AI Astra's spine presence. Self-
             hides for signed-out visitors. Denominated in Oracle Tokens, not
             BLiNG!, so it does not reinstate the pill removed above. */}
-        <AtlasOracleWalletBadge astraSlug={astraSlug} />
+        {/* FRONT75: surfacedActions wired. The badge has taken this prop since
+            May and rendered it as a row of one-tap directives; no callsite ever
+            passed it, so the affordance was dead in production (DOCS31 item 8).
+            `astraSlug` here is the first PATH SEGMENT, not the catalog slug —
+            `/intel` is the `forum` Astra, `/unite` is `groups` — and
+            `surfacedActionsFor` is keyed by segment for exactly that reason. */}
+        <AtlasOracleWalletBadge
+          astraSlug={astraSlug}
+          surfacedActions={surfacedActionsFor(astraSlug)}
+        />
 
 
         {/* 7. Profile-avatar: avatar on right, handle reveals on hover */}

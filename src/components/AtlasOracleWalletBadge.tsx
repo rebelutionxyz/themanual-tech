@@ -66,7 +66,7 @@ export function AtlasOracleWalletBadge({
   const { state, response, preview, failure, send, confirm, cancelConfirm, reset } =
     useOracleDirective();
 
-  const { balance: tokens, rates, applyBalanceAfter } = useOracleTokens(bee?.id ?? null);
+  const { balance: tokens, split, rates, applyBalanceAfter } = useOracleTokens(bee?.id ?? null);
 
   // The router returns the post-debit balance with the response, so the badge
   // updates from the ledger's own figure the moment a directive lands rather
@@ -215,6 +215,43 @@ export function AtlasOracleWalletBadge({
                 console
               </Link>
             </div>
+
+            {/* PLAN vs PURCHASED — FRONT75. Shown only when the split is
+                readable AND there is something in at least one bucket: a user
+                holding nothing learns nothing from "plan 0 · purchased 0", and
+                the total above already said it.
+
+                "Plan is spent first" is not a design intention stated here — it
+                is what `oracle_debit_tokens` actually does: it walks live plan
+                grants FIFO by soonest expiry, then falls through to the durable
+                pool, and records the split it took in `oracle_token_consumption`.
+                The line is safe to print because the server enforces it. */}
+            {split && (split.plan > 0 || split.purchased > 0) && (
+              <div
+                className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-border-bright bg-bg px-3 py-2 text-text-silver"
+                style={{ fontSize: '11.5px' }}
+                data-token-split=""
+              >
+                <span>
+                  plan · <span className="font-mono text-text">{formatTokens(split.plan)}</span>
+                </span>
+                {/* LABELLED "held", NOT "purchased". Two reasons, both real:
+                    `purchase` is banned platform vocabulary (CLAUDE.md language
+                    firewall) and this component already uses the approved verb
+                    everywhere else — "GET Oracle Tokens". And "held" names the
+                    property that actually matters to a reader: this bucket does
+                    not expire. The data field stays `purchased` because that is
+                    what the ledger calls it. */}
+                <span>
+                  held · <span className="font-mono text-text">{formatTokens(split.purchased)}</span>
+                </span>
+                {split.plan > 0 && (
+                  <span className="text-text-muted">
+                    plan tokens are spent first, and they expire
+                  </span>
+                )}
+              </div>
+            )}
 
             {tokenNotice && (
               <div

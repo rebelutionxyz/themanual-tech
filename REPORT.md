@@ -23,6 +23,431 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## DB75 — THE ROUTER BYPASS SWEEP. Sweep complete (2 bypasses, not 1). Reroute BLOCKED at the stated stop condition — question filed. (2026-08-18)
+
+**Pass:** DB75 · lane `db` · workdir `TheMANUAL.tech` · session `b4718c47`
+**Outcome:** Step 1 (sweep) **done and complete**. Steps 2-5 **not executed** — the dispatch's own
+stop condition fired: *"If the route lacks an internal-caller path that skips the token debit, say
+exactly what is missing and STOP - do not invent a billing exemption."* It lacks one. `DB75-Q` filed.
+**Writes made:** none. No file under `supabase/**` was modified, no function deployed, no migration,
+no commit. This section of `REPORT.md` is the only change on disk.
+
+### STEP 1 — THE SWEEP (complete)
+
+Method — two passes over `supabase/functions/**`, one for provider endpoints and one for
+per-function provider keys, then a broad case-insensitive third pass to catch anything the first
+two spelled differently:
+
+```
+pattern 1  api\.anthropic\.com|api\.groq\.com|api\.openai\.com|generativelanguage\.googleapis|
+           api\.mistral\.ai|api\.cohere|openrouter\.ai|api\.deepseek|api\.x\.ai|
+           api\.together\.xyz|api\.perplexity\.ai
+pattern 2  ANTHROPIC_API_KEY|GROQ_API_KEY|OPENAI_API_KEY|GEMINI_API_KEY|MISTRAL_API_KEY|
+           COHERE_API_KEY|DEEPSEEK_API_KEY|XAI_API_KEY|OPENROUTER_API_KEY|GEN_MODEL|VALIDATE_MODEL
+pattern 3  anthropic|groq|x-api-key|openai   (-i, files-with-matches)
+```
+
+Pattern 3 returned **exactly four files**, which bounds the answer — nothing outside this list
+mentions a provider at all:
+
+```
+supabase/functions/atlasoracle-route/index.ts     <- the route itself, legitimate
+supabase/functions/atlasoracle-route/canon.ts     <- the route itself, legitimate
+supabase/functions/generate-questions/index.ts    <- BYPASS 1 (known, DOCS31 item 95)
+supabase/functions/trivia-host/index.ts           <- BYPASS 2 (NEW - not previously named)
+```
+
+Verbatim hits, patterns 1 and 2:
+
+```
+atlasoracle-route/index.ts:161:  const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+atlasoracle-route/index.ts:182:  const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+atlasoracle-route/index.ts:539:  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+atlasoracle-route/index.ts:549:  const groqKey = Deno.env.get('GROQ_API_KEY');
+generate-questions/index.ts:9:   const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+generate-questions/index.ts:12:  const GEN_MODEL = Deno.env.get("GEN_MODEL") ?? "claude-haiku-4-5-20251001";
+generate-questions/index.ts:13:  const VALIDATE_MODEL = Deno.env.get("VALIDATE_MODEL") ?? "claude-sonnet-4-6";
+generate-questions/index.ts:43:  const res = await fetch("https://api.anthropic.com/v1/messages", {
+generate-questions/index.ts:46:    "x-api-key": ANTHROPIC_API_KEY,
+trivia-host/index.ts:9:          const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+trivia-host/index.ts:12:         const HOST_MODEL = Deno.env.get("HOST_MODEL") ?? "claude-haiku-4-5-20251001";
+trivia-host/index.ts:60:         const res = await fetch("https://api.anthropic.com/v1/messages", {
+trivia-host/index.ts:62:         headers: { "x-api-key": ANTHROPIC_API_KEY, ... }
+```
+
+**THE FULL BYPASS LIST — 2 of 27 edge functions.**
+
+| # | function | provider call | own provider key | model env | auth gate | status |
+|---|---|---|---|---|---|---|
+| 1 | `generate-questions` | `api.anthropic.com/v1/messages` (line 43) | `ANTHROPIC_API_KEY` (line 9) | `GEN_MODEL` haiku-4-5, `VALIDATE_MODEL` sonnet-4-6 | service_role only | **bypass** |
+| 2 | `trivia-host` | `api.anthropic.com/v1/messages` (line 60) | `ANTHROPIC_API_KEY` (line 9) | `HOST_MODEL` haiku-4-5 | service_role **or** Bee JWT | **bypass** |
+
+`generate-questions` was not alone, exactly as the dispatch anticipated. `trivia-host` is the same
+shape by the same hand (both headers read "Dispatch #3, Part A / Part B ... v2") and is arguably the
+worse of the two at runtime: it fires once per trivia **event** (`room_open`, `question_intro`,
+`answer_reveal`, `leaderboard_update`, `wrap`), so a single B Battles night is many unmetered calls,
+where `generate-questions` is a batch job run occasionally.
+
+The other 25 functions are clean — no provider endpoint, no provider key. `_shared/` holds no
+provider code at all (`auth.ts`, `cors.ts`, `ids.ts`, `ranks.ts`, `stripe.ts`, `supabase.ts`, plus
+`_shared/atlasoracle/{audit-log,canon-reader}.ts`).
+
+### STEP 2 — REROUTE: BLOCKED. What the route is missing, precisely.
+
+OPEN-4 governs: internal astra calls are **metered only — visibility per caller, NO billing**.
+`atlasoracle-route` has no such path. Six concrete gaps, each read off the source or the catalog:
+
+**1. No internal caller class — an internal call cannot authenticate at all.**
+`atlasoracle-route/index.ts:535` is `const auth = await verifyAuth(req)`, and
+`_shared/auth.ts` resolves the bearer token with `anonClient().auth.getUser(token)`. A service-role
+JWT is not a user, so `getUser()` returns no user and the route answers **401**. `generate-questions`
+is gated to `decodeRole(token) === 'service_role'` and carries **no Bee in the request whatsoever** —
+there is no `beeId` for it to present, not even a wrong one.
+*Missing:* a service-role/internal branch that yields a caller class rather than a Bee identity.
+
+**2. `atlasoracle_directives.bee_id` is `NOT NULL`.** Verified against `information_schema.columns`:
+`bee_id uuid NOT NULL`, `astra_id uuid NOT NULL`. So even a metered-only row demands a Bee.
+The only system Bees in `public.bees` are `@combtreasury` (`...0bee`) and `@combrewardspool`
+(`...feed`) — both **economy** accounts. Attributing AI spend to either would falsify what those
+accounts mean, which is not a call this pass may make.
+*Missing:* a nullable `bee_id` plus a `caller_kind` discriminator, or a dedicated non-economy system
+Bee minted for the purpose.
+
+**3. The debit has no skip.** `index.ts:940-975`: the debit fires whenever `finalCostTokens > 0`,
+and `finalCostTokens` is non-zero for every tier except `free` (the rate lookup at :666 is guarded
+by `if (tier !== 'free')`, so `rate === null` => `actualCostTokens = 0` on free and only on free).
+There is no flag, no caller test, no astra-scoped exemption anywhere on that path.
+`oracle_debit_tokens(p_bee uuid, p_directive uuid, p_amount_tokens numeric, p_memo text)` — signature
+read from `pg_proc` — requires a Bee and refuses an overdraft under a per-bee advisory lock.
+*Missing:* a metered-not-billed branch that still writes `input_tokens` / `output_tokens` /
+`cached_tokens` and the computed cost onto the directive row for visibility, while writing no debit.
+
+**4. The balance pre-check 402s before the provider call.** `index.ts:739-777`: when
+`estimatedCostTokens > 0` the route reads `oracle_token_available(p_bee)` and returns **402
+`Insufficient Oracle Tokens`** if the Bee is short. An internal caller has no token balance by
+definition, so a non-free reroute fails here before it ever reaches the debit.
+
+**5. Rate caps are Bee-scoped.** `atlasoracle_check_rate_caps(p_bee_id uuid, p_tier text)` runs at
+`index.ts:614` ahead of everything. A 3,246-row generation batch is not a Bee's usage shape and would
+be **429**'d. *Missing:* internal callers exempted, or capped on their own schedule.
+
+**6. The attribution target named in the dispatch does not exist.** The dispatch says
+`astra_slug = trivia/games per the catalog`. Live `astra_registry` has **no `trivia` slug and no
+`games` slug**. Nearest rows, all `off_grid`:
+
+```
+slug                display_name          status
+braindualgames      Braindual.games       off_grid
+honeycombglobal     HoneyComb.global      off_grid
+houseofcardgames    Houseofcard.games     off_grid
+thebeegames         TheBee.games          off_grid
+thehoneycombgames   TheHoneycomb.games    off_grid
+themanual           TheMANUAL.tech        active     <- the only active row
+```
+
+And the route **fails soft on an unknown slug**: `index.ts:638-668` looks up `themanual` as the
+fallback first, then overrides only `if (match)`, else `console.warn` and keeps the fallback. So
+rerouting with `astra_slug: 'trivia'` today would silently file **every** trivia directive under
+TheMANUAL — replacing "invisible" with "visible and wrong", which is worse for an audit. This is
+DB73's stale-registry problem; DB73 is queued behind FRONT76 and is not mine.
+
+### The parity problem, which stands even if 1-6 were solved
+
+`free` is the only tier that does not bill — but free is not a billing exemption, it is a **different
+model on a different provider**. Route header lines 15-17 and `TIER_PROVIDER_MODEL`:
+
+- `free` -> `llama-3.1-8b-instant` on Groq, fallback `claude-haiku-4-5`; `TIER_MAX_TOKENS.free = 800`
+- `standard` -> `claude-sonnet-5` (billed) · `frontier` -> `claude-opus-5` (billed)
+
+Against what the bypasses actually use:
+
+- `generate-questions` GEN = `claude-haiku-4-5-20251001` at **`max_tokens: 4096`** (index.ts:189)
+  and 1024 for the atom path (:205); VALIDATE = `claude-sonnet-4-6` at 256 (:114).
+- `trivia-host` HOST = `claude-haiku-4-5-20251001` at `max_tokens: 150`.
+
+So routing through `free` would (a) swap an 8B Groq model in for Sonnet on the **validation** step —
+the step whose whole job is judging question quality — and (b) truncate the 4096-token generation
+call at 800. Step 3's parity proof would fail by construction, not by accident. Reaching real parity
+means `standard` tier, which means billing, which is exactly what OPEN-4 forbids for an internal
+call. **That is the crux: there is no tier that is both non-billing and parity-preserving.**
+
+### STEPS 3, 4, 5 — not reached
+
+- **Step 3 (parity proof):** cannot run without step 2.
+- **Step 4 (name the dead credential):** deliberately **not** performed. Calling `ANTHROPIC_API_KEY`
+  dead code is only true *after* both functions are rerouted. They are not, so it is live and
+  load-bearing on both `generate-questions` and `trivia-host`. Naming it now would invite a deletion
+  that takes down the trivia pipeline — the precise outcome the dispatch's ordering exists to
+  prevent. Nothing was deleted and nothing is recommended for deletion by this pass.
+- **Step 5 (other bypasses):** `trivia-host` is reported, not fixed. Its fix is *mechanically*
+  identical to `generate-questions` and therefore blocked by the identical gate; it is not a
+  separate mechanical cleanup that could have proceeded independently.
+
+### Rollback thinking
+
+Nothing to roll back — this pass made no writes. Recorded for whoever takes the reroute: the safe
+shape is **additive and reversible per function**. Keep the direct-call code path in place behind an
+env switch (`ORACLE_ROUTE_ENABLED`), default it off, flip one function at a time, and confirm
+`atlasoracle_directives` rows appear with the right `astra_id` before flipping the second. Deleting
+the direct path in the same pass that adds the routed one leaves no rollback that does not require a
+redeploy — and `trivia-host` runs live during an event, where a redeploy is the expensive move.
+
+### Could not verify
+
+- **No live call was made** to `atlasoracle-route`, `generate-questions` or `trivia-host`. The
+  reroute is blocked, so there was nothing to prove live; the 401-for-service-role claim in gap 1 is
+  read from `_shared/auth.ts` source, not measured against the deployed function.
+- **No deployed-vs-repo diff.** Everything above is read from the repo working tree. If a deployed
+  version of any of the three functions differs from `supabase/functions/**`, the sweep reflects the
+  repo, not production.
+- **The 3,246-row `question_bank` figure** is quoted from the dispatch (ORACLE_MF v1.34 F1 /
+  DOCS31 item 95); I did not re-count it.
+- **`PAID_TIERS_ENABLED = true`** (index.ts:133) contradicts the file's own header comment at lines
+  22-24, which still says OPS11 gated paid tiers off. The const is the truth and OPS15 re-opened
+  them; the header is stale prose. Flagged, not edited — `supabase/**` edits were out of bounds once
+  the stop condition fired.
+
+---
+
+## FRONT75 — THE h24 BADGE. surfacedActions wired and proven, plan/held split live, firewall measured clean. (2026-08-18)
+
+Session `79a4fea9` (fallback id — no `MC_SESSION`). Dispatch FRONT75, lane `front`, workdir
+`TheMANUAL.tech`, effort MEDIUM, amended by the lead post-FRONT74/DOCS31. Build green, typecheck
+clean, lint clean in every file touched. **Committed, NOT pushed.**
+
+### FIRST — the badge still exists, and it has grown
+
+The dispatch required verifying the May build before touching anything. `efd9b88` is a live commit
+and `src/components/AtlasOracleWalletBadge.tsx` is present at **459 lines**, not the 318 the dispatch
+remembered — it grew through `4c4ee4b` (token ledger live) and `720c5a9` (tokens in the UI). Nothing
+died in a cleanup; no rebuild was needed. The lead's amendment is confirmed: `UtilityChrome:105`
+already mounts it, and it is the only h24 badge in the tree.
+
+### 3. surfacedActions — WIRED, and the wiring nearly went in wrong
+
+This was named the cheapest visible-value item on the map. It was dead code: the badge has taken
+`surfacedActions` since May (prop at `:43`, rendered at `:230`) and **no callsite ever passed it**.
+
+**THE TRAP, and it is the finding of this pass.** `UtilityChrome` derives what it calls `astraSlug`
+as `pathname.split('/').filter(Boolean)[0]` — the **first path segment**, which is frequently NOT the
+catalog slug:
+
+| segment | catalog slug |
+|---|---|
+| `/intel` | `forum` |
+| `/unite` | `groups` |
+| `/rule` | `events` |
+| `/fund` | `crowdfunding` |
+| `/brand` | `brandosophic` |
+| `/promotion` | `advertising` |
+| `/manual` | `themanual` |
+| `/vote` | `voting` |
+| `/legal` | `legalservices` |
+| `/chat` | `livevideo` |
+
+**Ten of seventeen.** A map keyed by catalog slug would have passed review, typechecked, built, and
+matched on seven surfaces out of seventeen at runtime — the six-hour kind of bug. So the entries are
+authored against catalog slugs (the stable identity) and `SURFACED_BY_SEGMENT` derives the segment
+index from `ASTRA_CATALOG`'s own `route` field at module load. Move a route in the catalog and this
+follows it; there is no second place to update.
+
+Measured in a running dev build by importing the real module through Vite's module graph:
+
+```
+segmentsIndexed: 17
+segments: bazaar brand chat comms dingleberry freedomblings fund intel legal
+          manual miniwaves production promotion pulse rule unite vote
+unmappedControl('nonsense-route'): 0
+
+intel  → 4 · "Summarize this thread"     unite → 4 · "Suggest groups"
+rule   → 4 · "Draft the listing"         fund  → 4 · "Draft a campaign"
+brand  → 4 · "Draft brand voice"    promotion → 4 · "Draft promotion copy"
+manual → 5 · "Explain this atom"          vote → 4 · "Explain this ballot"
+legal  → 4 · "Plain-English this"         chat → 3 · "Summarize this stream"
+```
+
+Every tricky case resolves. An unmapped route returns `[]`, and the badge then renders no action row
+at all rather than a generic prompt that would spend a user's tokens to say little.
+
+**Which Astras got actions, and what was skipped.** 17 of 40, **4–5 actions each, 134 strings**.
+Only Astras that are actually MOUNTED (`mount: 'page' | 'surface'`) carry actions — offering
+"summarize what is in view" on a `stub` placeholder is a promise the surface cannot keep.
+`atlasoracle` itself carries none: you are already inside h24 at `/h24`, and the console there is the
+fuller surface.
+
+**Skipped, cited as the dispatch required.** The v0.1 draft
+(`shared/canon/per-astra-surfaced-actions0.md`, 2026-05-20) covered 20 Astras; **12 of its 20 no
+longer exist under those names** and were dropped outright, not renamed: HoneyComb.global,
+Entertheprize, BLiNGster, atlasADs (→ `advertising`, rewritten), IndividualWRITES, AtlasLOUNGE,
+atlasnation.com, miniflows, Wave & Flow, Killswitch, SOSphone/DIEphone, AtlasADVOCATE
+(→ `legalservices`, rewritten). Carried across with rewritten copy: FreedomBLiNGs, Fountainheadcafe
+(→ `crowdfunding`), AtlasINTEL (→ `forum`), AtlasUNITED (→ `events`), Dating — *dropped, `dating` is
+a stub* — Mini Waves Motion (→ `miniwaves`), atlasVOTE (→ `voting`), DingleBERRY. **Newly written
+because no draft entry existed:** bazaar, themanual, groups, comms, pulse, livevideo, production,
+brandosophic.
+
+### 2. THE LANGUAGE FIREWALL — measured, and the v0.1 draft broke every rule
+
+The draft was unusable as copy. It said "Bee" throughout (against ORACLE_MF v1.27) and breached the
+platform firewall in nearly every economy entry: *"Estimate fair price for the **sell** offer"*,
+*"recent comparable **trades**"*, *"Summarize my **trading** week"*, *"prediction **markets**"*,
+*"Suggest **budget** allocation"*. All rewritten to approved vocabulary — GET / GIVE / OFFER / EARN /
+RECEIVE / DONATE / SEND / ESCROW.
+
+Sweep of the 134 new user-facing strings (`label` / `directive` literals only — the actual copy):
+
+```
+user-facing strings checked : 134
+platform-firewall violations:   0
+BLiNG! denomination hits    :   0
+astras covered              :  17
+```
+
+**A catch in my own copy.** The plan/held row was first labelled **"purchased"** — which is banned
+platform vocabulary, and inconsistent with this very component, which already says "GET Oracle
+Tokens". Relabelled **"held"**, which also names the property a reader actually cares about: that
+bucket does not expire. The data field stays `purchased` because that is what the ledger calls it.
+
+**The h24 surfaces were already clean, and that is a verification result rather than an edit.**
+Classifying every `Bee` / `BLiNG` occurrence across the five h24 files as comment-vs-code:
+
+```
+AtlasOracleWalletBadge.tsx   total 3 | NON-COMMENT 0
+pages/oracle/OraclePage.tsx  total 4 | NON-COMMENT 0
+lib/atlasoracle/surfacedActions.ts  total 3 | NON-COMMENT 0
+lib/atlasoracle/tokens.ts    total 8 | NON-COMMENT 0
+lib/atlasoracle/useOracleTokens.ts  total 0 | NON-COMMENT 0
+```
+
+**Zero user-facing BLiNG! or Bee strings on any h24 surface.** Every hit is a code comment recording
+*why* BLiNG! is out of scope. The dispatch anticipated the badge might "still speak BLiNG!" from its
+May origins; it does not — `720c5a9` already moved it to Oracle Tokens. Comments were left rather
+than churned.
+
+### 1. PLAN vs HELD — the split existed server-side and was being thrown away
+
+`oracle_token_balances` CROSS JOINs `oracle_token_available(bee_id)`, which returns
+`(plan_available, purchased_available, total_available)` — **and the view selects only
+`total_available`.** The split was computed on every read and discarded. Widening the view is a
+`db`-lane migration, so this pass calls the same function directly instead.
+
+**The trap I nearly walked into, now measured.** The view *does* expose `granted_tokens` and
+`purchased_tokens`, which look like the split and are not — they are **lifetime sums** of grant and
+purchase entries, not what remains. Proof, from production:
+
+| bee | lifetime granted | lifetime purchased | **plan available** | **held available** | balance |
+|---|---|---|---|---|---|
+| `c6f0c10b…` | 30,000 | 5,000 | **0** | **0** | 0 |
+| `0e6e5b41…` | 26 | 100 | **0** | **0** | 0 |
+| `88739ef8…` | 5,000 | — | 0 | 4,936.74 | 4,936.74 |
+
+Rendering the lifetime columns would have told `c6f0c10b` they hold **35,000 tokens they do not
+have**. Across all five bees with ledger rows: `plan + held = total` and `total = balance_tokens`,
+both **true for every row**.
+
+**"Plan is spent first" is printed because the server enforces it, not because the design says so.**
+`oracle_debit_tokens` walks live plan grants FIFO by soonest expiry, then falls through to the
+durable pool, and records the split it actually took into `oracle_token_consumption`. The line only
+renders when `plan > 0`. (Today no user holds a live expiring grant, so `plan_available` is 0 across
+production and that line does not currently show.)
+
+**Security, verified not assumed.** `oracle_token_available` is `STABLE` and **not**
+`SECURITY DEFINER` (`pg_proc.prosecdef = false`), so it reads `oracle_token_ledger` and
+`oracle_token_consumption` under RLS **as the caller**. Both are `select-own` on
+`auth.uid() = bee_id` (checked in `pg_policy`), and `authenticated` holds EXECUTE — so passing
+another user's uuid returns zeros, not their figures. Same posture `tokens.ts` already documents for
+the view.
+
+**Degrades to a stated non-answer, never a fake zero** — measured signed-out in the browser:
+
+```
+fetchOracleTokenSplit(null)        → null
+fetchOracleTokenSplit('…0bee')     → null     (anon lacks EXECUTE; caught, not thrown)
+fetchOracleTokenBalance(null)      → { balance: null, status: 'signed-out',
+                                       reason: 'Sign in to see your Oracle Token balance.' }
+```
+
+The UI hides the split row entirely when it is null, so "plan 0 · held 0" never renders as a
+statement about someone whose balance simply could not be read.
+
+**After a directive, the total is authoritative immediately and the split is not.** The router
+returns only the post-debit total. Rather than re-derive which bucket it came from — two definitions
+of one number is exactly the bug `oracle_debit_tokens`' own comment records as F-1 — the stale split
+is dropped and refetched. The total never flickers; the split reads as briefly unavailable, which is
+honest.
+
+### WHAT WAS NOT DONE, deliberately
+
+- **No purchase flow, no storefront.** P2.6 is PARKED behind design by owner ruling. The existing
+  "GET Oracle Tokens" control still opens a notice saying plainly there is no way to get more yet —
+  which is exactly the dispatch's instruction to say so rather than promise one. Untouched.
+- **`oracle_token_packs` and `oracle_token_plans` exist in the database** (with `active` +
+  public-read policies) and are **not** surfaced. That is the storefront, and it is parked.
+
+### FLAGGED FOR A RULING — the display name is a third name
+
+The dispatch restates R6: *"display name is h24"*. **The shipped strings say `here24`** — six of them
+in the badge, two in the console — and `OPS80` (2026-08-04) deliberately swept 15 display strings
+across 7 files **to** `here24`. The record disagrees with itself: v1.20 ratifies `h24`, v1.21 records
+both domains registered, v1.22 says *"here24 is the new AtlasOracle"*, v1.26 R6 (later, Aug 9) says
+*"AtlasORACLE is now H24 — h24.tech"*, and v1.33 writes `h24` throughout its prose while the route is
+`/h24` aliased `/oracle` and `/here24`.
+
+**I did not flip them.** Renaming on a naming question canon contradicts itself on is precisely the
+"do not silently fix toward either side" case, the name was not one of the three amended jobs, and
+OPS80's sweep was a deliberate act no pass has reversed. **This is a one-word ruling for the owner,
+in the shape of W1–W6 already queued in v1.33: W7 — is the display name `h24` or `here24`?** One
+answer, then one sweep of ~8 strings.
+
+### FILES
+
+```
+NEW  src/lib/atlasoracle/surfacedActions.ts   17 astras · 134 strings · segment index from the catalog
+MOD  src/components/layout/UtilityChrome.tsx  passes surfacedActions — the dead prop's first callsite
+MOD  src/lib/atlasoracle/tokens.ts            fetchOracleTokenSplit + the lifetime-columns warning
+MOD  src/lib/atlasoracle/useOracleTokens.ts   split in the hook; refetch-on-debit rather than re-derive
+MOD  src/components/AtlasOracleWalletBadge.tsx  plan/held row
+```
+
+### DONE-TEST
+
+```
+npx tsc -b     → exit 0
+npm run build  → ✓ built in 22.63s
+npm run lint   → Found 23 errors — all pre-existing, ZERO in any FRONT75 file
+                 (same 23 as at FRONT74 close: SecurityPage, comms/*, admin/ProfileSection)
+```
+
+Dev server on 3131: port asserted free before boot, owned by the vite child after, and **the
+grandchild leak from FRONT74 recurred exactly as expected** — `TaskStop` killed the npm wrapper,
+vite (PID 38500) kept the port, killed by PID and the release confirmed.
+
+### COULD NOT VERIFY — the honest gap in the PROVE
+
+**The badge was never observed signed-in, so the action row and the wallet panel were not seen
+rendered.** `AtlasOracleWalletBadge` returns `null` when there is no session, and the dev origin
+(`localhost:3131`) carries none. Signing in would mean either creating a throwaway production auth
+user or pasting a bearer token, both of which are forbidden — so the dispatch's "badge observed in
+the header on three astra routes, wallet panel open with real ledger reads" is **NOT met as
+written**.
+
+What *was* proven instead, and it is the load-bearing half:
+
+- the badge correctly **self-hides** signed-out (observed);
+- the **segment mapping** resolves correctly for all 17 surfaces including all 10 where segment ≠
+  slug — measured against the real module in a running build, which is the part that would actually
+  have been wrong;
+- the **data layer** is verified against production for all five bees with ledger rows, and its
+  signed-out degrade path is measured in the browser.
+
+**What remains is a look, not a question.** A signed-in pass — or Butch opening the badge himself on
+`/manual`, `/intel`, `/fund` — closes it.
+
+Also not verified: no mobile breakpoint was exercised; the action row is desktop-observed only in
+the sense that it was never rendered at all.
+
+---
+
 ## FRONT74 — THE SPINE, Phase C Component B. All five elements land and are measured in a running build. (2026-08-18)
 
 Session `79a4fea9` (fallback id — no `MC_SESSION`). Dispatch FRONT74, lane `front`, workdir
