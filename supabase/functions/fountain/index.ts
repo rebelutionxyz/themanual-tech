@@ -159,7 +159,14 @@ Deno.serve(async (req) => {
         {
           amount: amountCents,
           currency: campaign.currency ?? 'usd',
-          capture_method: 'manual',
+          // DB63 (2026-08-18): 'manual' -> 'automatic'. Money moves at pledge
+          // time. Manual capture held the card for ~7 days and then expired,
+          // which capped every campaign at a week regardless of funding model —
+          // dropping all-or-nothing did not change that (DB60), this does.
+          // REQUIRES DB62, applied 20260818020719: authorized_at now stamps on
+          // payment_intent.succeeded, because amount_capturable_updated stops
+          // being sent the moment this line changes.
+          capture_method: 'automatic',
           automatic_payment_methods: { enabled: true },
           ...(applicationFeeCents > 0 ? { application_fee_amount: applicationFeeCents } : {}),
           metadata: {

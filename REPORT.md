@@ -23,6 +23,324 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## DB66 — raised_cents COUNTS ONLY MONEY THAT MOVED. Pre-flight recorded; awaiting the apply click. (2026-08-18)
+
+Session `ee600096` (fallback id — no `MC_SESSION`). Dispatch DB66, lane `db`, workdir
+`TheMANUAL.tech`. Lead ruling on DB64 Defect A, accepted in full. **Nothing applied at the time this
+section was written** — this half is the pre-flight the MIGRATION AMENDMENT requires *before* the
+apply, and the post-apply verification is appended below it.
+
+### THE LEDGER MEASURE — taken FIRST, on the tree as it stood, before authoring anything
+
+```
+node TheMANUAL.tech/scripts/migration-reconcile/reconcile.mjs measure
+  baseline            20260801000000
+  history rows        692
+  repo .sql           324  (324 versioned, 0 unparseable)
+  version-matched     271  (239 faithful, 32 drifted)
+  re-stamped applies  14  (one orphan + one repo-only file each, same migration)
+    407 history rows with no repo file   (0 on/after baseline)
+     39 repo files with no history row   (0 on/after baseline)
+     32 version-matched pairs, file != applied   (0 on/after baseline)
+      0 repo files with an unparseable version   (all blocking — no version to date)
+  RECONCILED on/after baseline — freeze-lift criterion MET
+EXIT=0
+```
+
+**Exit 0 before authoring**, which is the order OPS86 fixed canon into. No exemption is being
+claimed, because none is needed: DB62's file was already paired when this ran.
+
+### PRE-FLIGHT — what exists, what depends on it, what is at risk
+
+**The target.** `public.fountain_counters(uuid)` — the only object whose definition changes.
+
+| property | value |
+|---|---|
+| signature | `fountain_counters(uuid)` |
+| owner | `postgres` |
+| volatility / security | `STABLE` / `SECURITY DEFINER`, `search_path = pg_catalog, public` |
+| `proacl` | `postgres=X/postgres | service_role=X/postgres` — **no anon, no authenticated** |
+| comment | none (NULL) |
+| `md5(pg_get_functiondef())` | `7dfce0fb928a800081ce809fed36a6f0` |
+| `length(pg_get_functiondef())` | 600 |
+
+`CREATE OR REPLACE FUNCTION` preserves the ACL and the owner, so no grant is issued and none is
+needed — and the proacl was read before saying so, per the standing REVOKE-FROM-NAMED-ROLES rule
+rather than assumed from the migration that created it.
+
+**Current body, verbatim from `pg_get_functiondef()`:**
+
+```sql
+CREATE OR REPLACE FUNCTION public.fountain_counters(p_campaign_id uuid)
+ RETURNS TABLE(raised_cents bigint, captured_cents bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public'
+AS $function$
+  SELECT coalesce(sum(amount_cents) FILTER (
+           WHERE status IN ('authorized','captured')
+             AND (authorized_at IS NOT NULL OR status = 'captured')), 0)::bigint,
+         coalesce(sum(amount_cents) FILTER (WHERE status = 'captured'), 0)::bigint
+    FROM public.fountain_pledges
+   WHERE campaign_id = p_campaign_id
+     AND is_fixture = false;
+$function$
+```
+
+**Dependent objects — the full set, read from the catalog, not from memory.**
+
+| depends how | object | consequence |
+|---|---|---|
+| calls it | `public.fountain_recount(uuid)` | reads both columns and writes them onto `give_campaigns` — **this is why the migration must recount, not just redefine** |
+| calls it | `public.give_campaigns_derive_counters()` | `BEFORE INSERT OR UPDATE` trigger on `give_campaigns`; overwrites `NEW.raised_cents` / `NEW.captured_cents` on every write to a campaign row |
+| calls `fountain_recount` | `public.fountain_pledges_sync_counters()` | `AFTER INSERT OR DELETE OR UPDATE` trigger on `fountain_pledges` — the DB48 path that keeps the stored counters live |
+| no dependency | views, constraints, indexes, RLS policies | **none** reference `fountain_counters`; the catalog sweep for routines containing the name returned exactly the two above |
+
+**Rows at risk: exactly one.** `give_campaigns` is 4 rows; only `fund-live-test-20260817` changes.
+
+| campaign | fixture | raised BEFORE | captured BEFORE | raised EXPECTED | captured EXPECTED |
+|---|---|---|---|---|---|
+| `fund-live-test-20260817` | no | **2500** | 1300 | **1300** | 1300 |
+| `bee-sanctuary` | yes | 0 | 0 | 0 | 0 |
+| `community-mural` | yes | 0 | 0 | 0 | 0 |
+| `fund-the-fountain` | yes | 0 | 0 | 0 | 0 |
+
+The 2500 is `1300 + 1200`. The pledge inventory behind it, measured this pass:
+
+```
+fund-live-test-20260817   captured    1 row   1300 cents   authorized_at stamped: 1
+fund-live-test-20260817   authorized  3 rows  3600 cents   authorized_at stamped: 1  <- the 1200 hold
+fund-live-test-20260817   canceled    1 row   1000 cents
+fund-the-fountain (fix)   authorized  2 rows 32000 cents   excluded by is_fixture
+```
+
+**No money moves. No pledge row is written. No column is added or dropped.** The migration replaces
+one function body, sets a comment on it, and recomputes two derived integers.
+
+### THE ROLLBACK — written FIRST, before the forward migration
+
+`supabase/migrations/_drafts/20260818031500_db66_raised_counts_captured_only_v1_rollback.sql`.
+It restores the DB58 body above and recounts every campaign, which returns
+`fund-live-test-20260817` to raised 2500 / captured 1300. It drops nothing: `authorized_at`, the
+DB58 stamp trigger and every pledge row are untouched by the forward migration, so the old
+definition has all the evidence it needs the instant it is back. The rollback statement in one
+line, as the amendment requires it be stated before the apply runs:
+
+```sql
+-- CREATE OR REPLACE fountain_counters(uuid) with the DB58 body (raised = confirmed holds + captured),
+-- then PERFORM fountain_recount(id) for every give_campaigns row.
+```
+
+**Verify a rollback by behaviour — raised back to 2500 on the live campaign — not by re-hashing.**
+The md5 above is of `pg_get_functiondef()`'s output; the rollback file is the same body in house
+formatting, so the hashes will not match even on a correct restore.
+
+### THE CHANGE
+
+One filter. Both columns computed from `status = 'captured'`:
+
+```sql
+  SELECT coalesce(sum(amount_cents) FILTER (WHERE status = 'captured'), 0)::bigint,
+         coalesce(sum(amount_cents) FILTER (WHERE status = 'captured'), 0)::bigint
+    FROM public.fountain_pledges
+   WHERE campaign_id = p_campaign_id
+     AND is_fixture = false;
+```
+
+Plus a recount loop over every campaign, and a done-test that **asserts the invariant rather than
+today's numbers** — `raised_cents = captured_cents` on every campaign, and every fixture campaign
+still at 0/0 — so the migration cannot pass by accident and cannot fail merely because another
+pledge lands between authoring and apply.
+
+### THE CONSEQUENCE, STATED PLAINLY
+
+**The legacy 1200-cent hold stops being counted.** `pi_3U5bdFAPNY1rgvEA1K64FsyO`, confirmed
+01:16:32 under manual capture. Removing it from the total is correct — the fountain now creates
+intents with `capture_method: 'automatic'` (DB63) and no close loop reaches back for an old hold, so
+that money will never reach the campaign.
+
+**It is not the same as disposing of it.** The hold still EXISTS at Stripe, still sits against a
+real giver's card, and still expires in about seven days. This migration makes it invisible to the
+ledger; it does nothing about the card. **DB67 owns that**, and the gap between "uncounted" and
+"released" is a real one that nothing in this pass closes.
+
+---
+
+## DB65 — THE 2% IS COLLECTED, NOT MERELY CONFIGURED. Expected 26 cents, collected 26 cents, and the platform received the fee alone. PASS. (2026-08-18)
+
+Session `ee600096` (fallback id — no `MC_SESSION`). Dispatch DB65, lane `db`, workdir
+`TheMANUAL.tech`. **Zero writes.** This pass observed, asked, and did arithmetic. Nothing was
+created, captured, cancelled or modified; the only database statements were SELECTs plus the rail's
+own claim / heartbeat / report writes.
+
+**Sequence, recorded so the record is honest about its own shape:** the pass verified (a) from
+`stripe_events` without needing anyone, filed `DB65-Q` asking the owner for (b) and (c), and the
+owner then supplied all three by amending the dispatch body. `DB65-Q` stands in `ops_reports` as
+filed; everything in it is carried forward here and this section supersedes it.
+
+### THE EXPECTED NUMBER, STATED BEFORE LOOKING
+
+Derived from the code path, not from the answer.
+
+**1. What `fee_resolve('give', <astra>, NULL)` returns.** Read from the live catalog with
+`pg_get_functiondef`:
+
+```sql
+SELECT fs.* FROM public.fee_schedule fs
+WHERE fs.fee_key = p_fee_key AND fs.active
+  AND (fs.astra_ref IS NULL OR fs.astra_ref = p_astra)
+  AND (fs.bee_ref   IS NULL OR fs.bee_ref   = p_bee)
+ORDER BY (CASE WHEN fs.bee_ref IS NOT NULL THEN 2 ELSE 0 END)
+       + (CASE WHEN fs.astra_ref IS NOT NULL THEN 1 ELSE 0 END) DESC
+LIMIT 1;
+```
+
+There is exactly **one** `give` row in `fee_schedule` and it is the global one
+(`f9198f1c-98ae-4b06-9205-12afd3f32833`, `astra_ref` NULL, `bee_ref` NULL, `active` true,
+`updated_at 2026-08-17 20:32:27Z` — DB50). So the specificity ORDER BY is not exercised, and the
+astra slug the fountain passes cannot change the answer. The row's relevant fields:
+
+| field | value |
+|---|---|
+| `platform_pct` | **2** |
+| `min_fee_cents` | NULL |
+| `max_fee_cents` | NULL |
+| `processing_pct` / `processing_flat_cents` | 2.9 / 30 — **not used by the fountain**, display-only |
+
+**2. What the fountain does with it** (`supabase/functions/fountain/index.ts`, pledge branch):
+
+```ts
+applicationFeeCents = Math.round((amountCents * feePct) / 100);
+if (f.min_fee_cents != null) applicationFeeCents = Math.max(applicationFeeCents, Number(f.min_fee_cents));
+if (f.max_fee_cents != null) applicationFeeCents = Math.min(applicationFeeCents, Number(f.max_fee_cents));
+if (applicationFeeCents >= amountCents) applicationFeeCents = amountCents - 1;   // clamp
+if (applicationFeeCents < 0) applicationFeeCents = 0;
+```
+
+`Math.round((1300 * 2) / 100)` = `Math.round(26)` = **26**. Both clamp bounds are NULL so neither
+branch runs; 26 < 1300 so the whole-donation clamp does not fire. `application_fee_amount` is only
+set at all when the computed fee is > 0, which it is.
+
+**On rounding, honestly: this charge does not test it.** 1300 × 2 / 100 is exactly 26, an integer,
+so `Math.round` is a no-op here. The rounding rule (`Math.round` is half-up toward +∞ — 0.5 → 1,
+and it never sees a negative here) remains **unexercised in production**. An amount like 1325 cents
+(26.5 → 27) would be the first test of it.
+
+**EXPECTED: 26 cents.**
+
+### WHAT STRIPE RECORDED — the webhook, which needed nobody
+
+The dispatch said to check `stripe_events` before asking, because the payload might carry the fee.
+**It does.** `evt_3U5crDAPNY1rgvEA0McxUcdy`, `payment_intent.succeeded`, `product_type='fund'`,
+received and processed 2026-08-18 02:34:58Z:
+
+| field read from the payload | value |
+|---|---|
+| `data.object.application_fee_amount` | **26** |
+| `data.object.amount` | 1300 |
+| `data.object.amount_received` | 1300 |
+| `data.object.capture_method` | `automatic` |
+| `data.object.latest_charge` | `ch_3U5crDAPNY1rgvEA0sVk4o55` |
+| `data.object.on_behalf_of` | null |
+| `account` (the event's account) | `acct_1TK1VIAPNY1rgvEA` — the connected account |
+| `metadata.platform_fee_cents` | 26 |
+| `metadata.platform_fee_pct` | 2 |
+
+Two independent things agree here and they are worth separating. `metadata.platform_fee_cents` is
+**the fountain's own arithmetic echoed back** — it proves the code computed 26, not that Stripe
+charged it. `application_fee_amount` is **Stripe's field on Stripe's object**, and that is the one
+that matters.
+
+The event's `account` being the connected account, with `on_behalf_of` null, is the direct-charge
+shape the design calls for: the charge lives on the manager's account, and the platform's cut is
+taken as an application fee rather than by routing the money through the platform.
+
+### WHAT THE DASHBOARD RECORDED — the owner's read, verbatim
+
+The Stripe MCP in this session cannot reach either account. Confirmed this pass rather than
+inherited from DB57-Q: `list_available_accounts_or_orgs` returns exactly one account,
+`acct_1TK1KPPNZUSRg1t2` ("Freedom Rings", testmode) — **neither** the platform
+`acct_1TK1MkAPNYB78CQX` **nor** the connected `acct_1TK1VIAPNY1rgvEA`. No route was invented
+around it; the owner read the numbers and supplied them by amending the DB65 dispatch body.
+
+Charge `pi_3U5crDAPNY1rgvEA0e2ndpCB`, $13.00 USD, Succeeded, card ···4242, direct on
+`acct_1TK1VIAPNY1rgvEA`. **Payment breakdown, verbatim as supplied:**
+
+```
+  Payment amount               $13.00 USD
+  Freedom Rings sandbox fee    -$0.26 USD
+  Net amount                   $12.74 USD
+  Application fee               $0.26 USD   (fee_1U5crcAPNY1rgvEAiQB7Jvel)
+```
+
+### THE VERDICT
+
+| | expected | actual | |
+|---|---|---|---|
+| **(a)** application fee on the charge | 26 cents (2% of 1300) | **26 cents** — webhook *and* dashboard, two independent sources, plus a fee object id `fee_1U5crcAPNY1rgvEAiQB7Jvel` | **PASS** |
+| **(b)** connected account movement | charge less the platform fee | **+$12.74**, net of the 26-cent platform fee | **PASS** |
+| **(c)** platform movement | the fee **alone** | **$0.26 and nothing else** reached Freedom Rings | **PASS** |
+
+**PASS, stated plainly.** The 2% is **collected**, not merely configured. This is the first and only
+evidence of that, and (b) and (c) together are the first evidence for the **no-custody posture**:
+the contributor's $13.00 landed on the campaign manager's own connected account, and the platform
+account received nothing but its 26-cent fee. The claim FUND's regulatory position rests on has now
+been measured once rather than asserted.
+
+That the fee exists as a distinct Stripe object (`fee_1U5crc…`) rather than only as an instruction
+on the PaymentIntent is what moves this from "Stripe accepted the parameter" to "Stripe settled it".
+
+### TWO THINGS STATED HONESTLY RATHER THAN GLOSSED
+
+**1. Stripe's own processing fee is NOT in this breakdown, and where it lands is NOT verified.**
+The four lines are internally consistent as `13.00 − 0.26 = 12.74` — that is arithmetic on the
+displayed lines, not an inference: **the $12.74 "Net amount" is the payment amount minus the
+application fee alone, with no processing fee deducted in the numbers shown.** On a direct charge
+Stripe's processing fee is borne by the connected account, so the expectation is that it is
+deducted separately at the balance-transaction level and $12.74 is *before* it. **That expectation
+is not confirmed and is not being recorded as fact.** The number to fail against next time, from
+`fee_schedule.give`'s display fields (2.9% + 30¢): `round(0.029 × 1300) + 30` = `38 + 30` = **68
+cents**, which would put the connected account's true net at **$12.06**. Confirming it needs the
+charge's balance transaction, which is on the could-not-verify list below.
+
+**2. A refund button exists natively on this charge in the Stripe dashboard.** That partly answers
+**DB61 item 4**: the admin refund *capability* already exists, with no code, through the dashboard.
+It means the owner's "keep the mechanism, drop the user-facing policy" ruling is **already
+satisfied** for now, and a built-in refund path in the app is a convenience rather than a gap. It
+does not answer the app-side questions — who may trigger a refund, what it does to
+`fountain_pledges.status` and the campaign total, and whether a dashboard-initiated refund produces
+a webhook this system handles. Those remain open.
+
+### COLLATERAL CONFIRMATIONS (not asked for, observed while here)
+
+- **DB62's stamp fired for the first time.** `fountain_pledges` row `512e8349-…`:
+  `authorized_at = 2026-08-18 02:34:58.076642Z`, identical to the `payment_intent.succeeded` event's
+  timestamp, `captured_at = 02:34:58.618137Z`, `status='captured'`, `is_fixture=false`. DB61's
+  report closed saying "that stamp has never run" — it has now.
+- **The DB63 deploy shipped.** `fountain` is version **21**, `ezbr_sha256`
+  `d98e7dfc951d9772d016e4a8754a4595bec87fecd629814edecf4eefeaadcc59`, which differs from the
+  pre-deploy `b30f6f95…` recorded in DB61. `updated_at` = 2026-08-18 02:31:46Z, **~2m46s before the
+  PaymentIntent was created at 02:34:32Z** — so the code that produced this charge is v21, and
+  `capture_method: 'automatic'` in the payload is that deploy observed rather than assumed.
+
+### COULD NOT VERIFY — explicitly, and not inferred
+
+- **Where Stripe's own processing fee lands**, and therefore the connected account's true final
+  net. Expected 68 cents / $12.06 as derived above; **not observed**. Needs the charge's balance
+  transaction on `acct_1TK1VIAPNY1rgvEA`, which this session cannot read.
+- **Whether the application fee stays collected** — i.e. that `fee_1U5crcAPNY1rgvEAiQB7Jvel` is not
+  subsequently refunded. It was read once, at one moment.
+- **Rounding behaviour**, as stated above: 26 is exact, so `Math.round` was never put under load.
+  The first non-integer fee is the first real test of it.
+- **Whether a dashboard-initiated refund emits a webhook this system handles.** No
+  `charge.refunded` / `application_fee.refunded` handling was examined this pass, and no
+  `application_fee.created` or `charge.*` row exists in `stripe_events` — the webhook subscribes to
+  PaymentIntent events only, so absence there is not evidence either way.
+- **Everything above from the dashboard is the owner's read, transcribed.** It is recorded verbatim
+  and was not independently re-read by this session, because it cannot be.
+
+---
+
 ## DB57-Q — THE CAPTURE HALF: STOPPED AT THE PRECONDITION, AND AT A SECOND GATE THE DISPATCH DID NOT ANTICIPATE. Nothing executed. (2026-08-18)
 
 Session `32c6b4f8` (fallback id — no `MC_SESSION`). Dispatch DB57, lane `db`, workdir
@@ -4464,3 +4782,1098 @@ proven, the end-to-end path is not.
 - **`fountain_begin_close` was not exercised.** The verdict is shown wrong-then-
   right by reading `raised_cents`, not by running a close. No campaign was closed
   and no capture was run — the GATES-ANY-REAL-FUNDING flag was respected.
+
+---
+
+## DB60 — DROPPING AON. Proposal only, zero writes.
+
+Session `01cb0b79`. 2026-08-18. **Nothing applied. No migration, no function edit,
+no row written.** `apply_migration` not called.
+
+### FIRST, THE THING THE DISPATCH DID NOT ASK BUT NEEDS SAYING
+
+**Dropping all-or-nothing does not fix the problem it was dropped for.**
+
+The stated reason is that manual-capture authorizations expire in about seven
+days, so an AON campaign must open and close inside a week. That is true. But the
+deployed fountain sets `capture_method: 'manual'` on **every** pledge regardless of
+model, so **`kwyr` holds exactly the same way and expires exactly the same way.** A
+keep-what-you-raise campaign that runs longer than a week still watches its
+authorizations evaporate before anything captures them.
+
+Removing AON removes the *goal gate*. **The seven-day ceiling survives it
+untouched.** If the aim is Kickstarter-length campaigns, the change that delivers
+it is `capture_method: 'automatic'` (item 3) — not this one.
+
+### 1. THE GATING QUESTION — answered from the deployed source
+
+`fountain` v20, sha `b30f6f958feb8df95cf216598b4bce7193f60bed0918537712e156f08da7e14f`.
+The PaymentIntent is created here, and there is **no branch on `funding_model`**:
+
+```js
+    let pi;
+    try {
+      pi = await stripe.paymentIntents.create(
+        {
+          amount: amountCents,
+          currency: campaign.currency ?? 'usd',
+          capture_method: 'manual',
+          automatic_payment_methods: { enabled: true },
+          ...(applicationFeeCents > 0 ? { application_fee_amount: applicationFeeCents } : {}),
+```
+
+`funding_model` is read exactly once in `/pledge`, and only as a not-null guard:
+
+```js
+    if (!campaign.funding_model || !campaign.manager_connect_account) {
+      return errorResponse('Campaign is not financially configured');
+    }
+```
+
+**So kwyr ALSO holds.** Dropping AON removes the verdict, not the capture
+machinery. **This is the large change, not the small one.**
+
+Every place `funding_model` actually decides anything today:
+
+| where | what it does |
+| --- | --- |
+| fountain `/pledge` | not-null guard only. Never reaches Stripe. |
+| `fountain_begin_close` | `IF v_c.funding_model = 'aon' THEN v_success := v_c.raised_cents >= v_c.goal_cents; ELSE v_success := true;` — **the only real behavioural use** |
+| `give_campaigns_funding_model_check` | `CHECK (funding_model = ANY (ARRAY['aon','kwyr']))` |
+| `give_campaigns_financial_complete` | ties a non-NULL model to a goal AND a Connect account |
+| the FUND app | labels, notes, charge terms, a filter facet, a sidebar count |
+
+Note the else-branch: **kwyr and NULL already always capture.** So for every model
+except AON, `/close` is already just "capture everything authorized".
+
+### 2. WHAT MODELS REMAIN
+
+Today: `'aon'` · `'kwyr'` · NULL (open collection).
+
+**Recommendation: narrow the CHECK to `'kwyr'` and keep NULL. Keep the column.**
+
+- The column still carries a real distinction — *collects toward a goal* versus
+  *open-ended* — and the completeness constraint already ties a non-NULL model to
+  a goal and a payout account. That shape survives unchanged.
+- Dropping the column entirely would touch every reader (`campaigns.ts`,
+  `Chips.tsx`, `CampaignGrid.tsx`, `Sidebar.tsx`, `AppShell.tsx`, plus three RPCs)
+  for no gain, and would foreclose reintroducing AON if the SetupIntent rebuild
+  ever happens.
+- **Do NOT delete the `aon` branch in `fountain_begin_close`.** Narrowing the
+  CHECK does not rewrite existing rows, and until they are migrated (item 3 below)
+  that branch is the only thing making them behave correctly. Leaving dead-but-
+  correct code costs nothing; removing it while an `'aon'` row exists is a bug.
+
+Sequence matters: **migrate the rows first, then narrow the CHECK.** A CHECK
+narrowed while `'aon'` rows exist will reject the migration that fixes them.
+
+### 3. THE FOUR EXISTING CAMPAIGNS
+
+| slug | model | fixture | what happens |
+| --- | --- | --- | --- |
+| `fund-the-fountain` | aon | yes | migrate to `kwyr`. It is a fixture and `fountain_begin_close` already refuses to close it (DB54), so the model is cosmetic — but it must move or it violates the narrowed CHECK. |
+| `community-mural` | kwyr | yes | unaffected. |
+| `bee-sanctuary` | NULL | yes | unaffected — open collection, no model to lose. |
+| `fund-live-test-20260817` | aon | **no** | **the one that matters.** Migrating it to `kwyr` changes its verdict from goal-gated to always-capture. It carries a live confirmed hold — see item 4. |
+
+**Measured now**, and this closes DB58's open item: `fund-live-test-20260817`
+reads `raised_cents 1200`, which is exactly the one pledge carrying
+`authorized_at = 2026-08-18 01:16:32`. The $11 unconfirmed intent and the $10
+canceled one contribute nothing. **DB58's trigger has fired on real money and the
+mechanism is proven end to end** — it had never executed when that pass closed.
+
+### 4. THE LOOSE END — the $12 hold
+
+`pi_3U5bdFAPNY1rgvEA167xTETd`, $12.00, `requires_capture`, confirmed 01:16:32 UTC.
+Alongside it `pi_3U5azMAPNY1rgvEA3ZCi7Lry` at $11, never confirmed, counting
+nothing.
+
+**Recommendation: CANCEL the hold. Do not close the campaign. The OWNER does it,
+at the Stripe dashboard.**
+
+Why not close it:
+
+- Under AON today the verdict is `capture` (1200 >= 1000), and under kwyr it would
+  also be `capture`. Either way **closing captures the card** — and capture runs
+  `fountain_pledge_captured`, which frees BLiNG! from the Well, drains the reserve
+  and writes a `bling_transactions` row. That is **real movement in the BLiNG!
+  economy for a test campaign**, and it is not undoable: there is no refund path
+  (item 6) and the reward path has no reversal.
+- It would also collect the 2% platform fee on a test give.
+
+Why cancelling is clean:
+
+- It is **self-healing**. `give-webhook` handles `payment_intent.canceled` and is
+  proven on this exact campaign — it processed the $10 cancel end to end at
+  00:33:48 UTC and returned 200. Cancelling at Stripe moves the pledge to
+  `canceled` by itself, and DB58's counters drop it out automatically.
+- Doing nothing also works — the hold lapses in about seven days and the same
+  webhook path fires — but a deliberate cancel is a decision on the record instead
+  of a timeout, and it exercises the D-2 path a second time while someone is
+  watching.
+
+**WHO: the owner.** `/close` is admin-gated and needs an admin session; the Stripe
+MCP available to this session is authenticated to a different account and cannot
+reach `acct_1TK1VIAPNY1rgvEA`. No agent can do either half.
+
+### 5. SHOULD `capture_method` BECOME `automatic`
+
+**Yes — and it is the change that actually delivers the owner's goal.** But it is
+its own dispatch, and it is not free.
+
+What it genuinely fixes, not just moves:
+
+- **The seven-day ceiling disappears.** Campaigns can run any length. This is the
+  entire stated reason AON was dropped, and only this change achieves it.
+- **`raised` and `captured` collapse into one number**, and with them most of a
+  whole failure class. DB48 (money that evaporated), DB54 (money that never
+  existed), DB58 (money that never arrived) were three faces of one defect: a
+  ledger believing in money that is not in hand. If the money is taken at pledge
+  time, **that gap stops being expressible** rather than being guarded three
+  times.
+- `authorized_at` and the `stripe_events` stamp become vestigial;
+  `payment_intent.succeeded` becomes the single confirmation signal.
+
+Where it moves the problem rather than solving it — **state this plainly before
+anyone commits**:
+
+- **Undo becomes a refund, and there is no refund path.** Holding money and
+  releasing it is free and reversible; taking money and giving it back needs a
+  mechanism that does not exist (item 6). A campaign that collects and then fails
+  to deliver currently has **no way to return anything**.
+- The BLiNG! reward would have to move from capture-time to pledge-time, so
+  `fountain_pledge_captured` and the Well drain need rethinking — a failed or
+  disputed charge would have already freed BLiNG!.
+- `/close` stops settling money and becomes bookkeeping only.
+
+**So: automatic capture is the right destination, and the refund mechanism is a
+prerequisite, not a follow-up.**
+
+### 6. REFUNDS — policy and capability are different things
+
+**No refund path exists in FUND today. None.** Measured:
+
+- `fountain_pledges_status_check` allows `'refunded'` — but **nothing anywhere
+  writes it.** It is a slot with no mechanism behind it.
+- The only refund routines in the database are `atlasoracle_credit` and
+  `oracle_refund_token_purchase`, both Oracle's and unrelated to the Fountain.
+- `give-webhook` handles four events — `amount_capturable_updated`, `succeeded`,
+  `canceled`, `payment_failed`. It handles **no** `charge.refunded` and **no**
+  `charge.dispute.created`.
+
+**Recommendation: build the mechanism regardless of the no-refunds policy.** The
+policy governs what the platform chooses to do; it does not govern what a
+cardholder's bank does. A giver disputes through their issuer whatever the terms
+say, Stripe pulls the funds back plus a dispute fee, and today **the database
+would never hear about it** — the pledge would still read `captured`, the campaign
+would still count the money, and the manager's balance would silently disagree
+with the ledger. That is the same defect class as D-2, arriving through the one
+door nobody has watched yet.
+
+Minimum honest version: handle `charge.refunded` and `charge.dispute.created` in
+`give-webhook`, write the pledge to `'refunded'`, and let the derived counters do
+the rest. **Not built here.**
+
+### 7. COPY THAT GOES FALSE
+
+Every string, its file, and what it should say. `src/` paths are in
+`REBELUTION.fund`.
+
+| file | what it says now | verdict |
+| --- | --- | --- |
+| `src/lib/campaigns.ts` `fundingModelNote` case `'aon'` | "Gives are only collected if the goal is met. If it is not, nothing is taken." | **FALSE the moment AON goes.** Unreachable once no row is `'aon'` — delete the case with the model. |
+| `src/lib/pledge.ts` `chargeTerms` case `'aon'` | "Your card is authorized now, not charged. It is only charged if the campaign reaches its goal..." | **FALSE.** Same — goes with the model. |
+| `src/lib/campaigns.ts` `fundingModelLabel` case `'aon'` | "All or nothing" | unreachable; remove with the case. |
+| `src/lib/campaigns.ts` `FUNDING_MODELS` | `['aon','kwyr']` | becomes `['kwyr']`. |
+| `src/lib/campaigns.ts` `Campaign.fundingModel` doc comment | describes the aon/kwyr pair | rewrite. |
+| `src/lib/pledge.ts` header comment (lines ~28) | "for `aon` only when the goal was met, for `kwyr` always" | rewrite. |
+| `src/lib/pledge.ts` `chargeTerms` doc block (~line 446) | the whole FRONT56 argument about why kwyr does not say "charged now" | rewrite — the reasoning survives, the aon half does not. |
+| `src/components/fund/CampaignGrid.tsx:45` | `{ key: 'aon', icon: 'target' }` filter facet | remove — a facet that can never match. |
+| `src/components/fund/Chips.tsx:26-27` | `MODEL_ICON` carries `aon: 'target'` | remove the key. |
+| `src/components/shell/Sidebar.tsx:125` | `<CountRow label={fundingModelLabel('aon')} .../>` | remove — would render "All or nothing 0" forever. |
+| `src/components/shell/AppShell.tsx:37` | `aon: countModel(result.campaigns, 'aon')` | remove with the row. |
+
+**Two that do NOT go false, and should not be touched:**
+
+- `chargeTerms` case `'kwyr'` — "Your card is authorized now, not charged. It is
+  charged when the campaign closes, whether or not the goal is reached." **Stays
+  exactly true**, because kwyr still holds. It would only go false under automatic
+  capture (item 5).
+- `AUTHORIZATION_EXPIRY_NOTE` — stays true **and becomes more load-bearing**, not
+  less: with AON gone, holds still expire in seven days and there is no longer a
+  goal deadline implying a short campaign.
+
+FRONT60 fixed this class of rot once today. The way to keep it fixed is to land
+the copy change in the **same** pass as the CHECK narrowing, not after it.
+
+### PROPOSED ORDER
+
+1. Owner cancels the $12 hold at Stripe (item 4). Webhook self-heals the row.
+2. Migration: `UPDATE give_campaigns SET funding_model='kwyr' WHERE funding_model='aon'`, **then** narrow the CHECK. Rollback written first. Leave `fountain_begin_close` alone.
+3. Front pass, same day: the copy table above.
+4. Separately, and only when ruled: the refund mechanism, then automatic capture.
+
+### Could not verify
+
+- **Nothing was applied**, so nothing was verified by execution. Every SQL and
+  copy change above is proposed, not run.
+- **Stripe's view of the $12 hold was not re-measured** — the MCP available here
+  is on a different account. The database agrees it is confirmed (`authorized_at`
+  stamped 01:16:32) and the lead measured `requires_capture` directly.
+- **I did not read every file in the FUND app**, only the ones the grep surfaced
+  for the aon/kwyr vocabulary. A copy pass should re-grep rather than trust this
+  table to be exhaustive.
+
+---
+
+## DB61 — CHARGE ON PLEDGE. Proposal only, zero writes.
+
+Session `01cb0b79`. 2026-08-18. **Nothing applied. No migration, no function edit,
+no deploy, no row written.** `apply_migration` not called.
+
+### TWO CORRECTIONS TO THE DISPATCH, BOTH LOAD-BEARING
+
+The dispatch is right that item 1 is the dangerous one. It is wrong about the
+shape of the danger, and wrong about one item in the dead list. Both matter enough
+to state before anything else.
+
+**CORRECTION 1 — the ledger will NOT silently zero every pledge.** DB58's counter
+reads:
+
+```sql
+WHERE status IN ('authorized','captured')
+  AND (authorized_at IS NOT NULL OR status = 'captured')
+```
+
+That `OR status = 'captured'` is already there — DB58 put it in so captured
+history stayed countable without depending on whether a webhook was configured at
+the time. Under automatic capture the flow is: `/pledge` writes `authorized` with
+`authorized_at` NULL → the browser confirms → Stripe charges →
+`payment_intent.succeeded` → give-webhook calls `fountain_pledge_captured` →
+status becomes `captured` → **it counts, through that OR.**
+
+So the ledger self-corrects the moment the succeeded event lands. **The real
+danger is different, and worse in one respect:**
+
+- **A window where money is gone and the total reads zero.** Between the charge
+  and the webhook, the campaign shows nothing while the giver's card has actually
+  been debited. Under the current hold model the same window exists but the money
+  is only held. **This is the first time the gap would sit over money that has
+  genuinely left someone's account.**
+- **If the succeeded event never lands, the zero is permanent** — pledge stuck at
+  `authorized`/NULL while real money sits in the manager's account. That inverts
+  every defect this project has fixed: D-2, DB54 and DB58 were all the ledger
+  OVERSTATING. This one makes it UNDERSTATE while money moved. A campaign that
+  visibly refuses to move is at least loud, but the money is already spent.
+- **`payment_intent.amount_capturable_updated` will never fire again**, so DB58's
+  trigger becomes dead code that silently stamps nothing, and `authorized_at`
+  becomes vestigial for all new rows.
+
+**THE FIX, and it belongs in the same change: broaden DB58's trigger to stamp
+`authorized_at` on `payment_intent.succeeded` as well.** It is a one-condition
+edit to `stripe_events_stamp_fund_authorization`, **DB-only, no deploy**, and it
+keeps a single meaning — "Stripe says this money is real" — under either capture
+mode. Do not rely on the `OR status = 'captured'` clause alone; that makes the
+counter correct only after the RPC succeeds, while the stamp is correct as soon as
+the event arrives.
+
+**CORRECTION 2 — `fountain_pledge_captured` is NOT dead. It becomes the main
+path.** The dispatch lists it under "what becomes dead". give-webhook calls it on
+`payment_intent.succeeded`:
+
+```js
+  const call = event.type === 'payment_intent.succeeded'
+    ? { fn: 'fountain_pledge_captured', args: { p_pledge_id: pledge.id } }
+```
+
+Under automatic capture that is how every pledge becomes `captured` and **how the
+BLiNG! reward is freed from the Well**. Retiring it later would break the entire
+new flow. It moves from being called by `/close` to being called by the webhook —
+same function, different caller.
+
+### 1. THE FOUNTAIN CHANGE
+
+One line, `functions/fountain/index.ts`, in `/pledge`:
+
+```js
+          capture_method: 'manual',      ->      capture_method: 'automatic',
+```
+
+**Confirmed from the deployed source (v20, sha `b30f6f95…`): nothing else in
+`/pledge` depends on manual capture.** The fee block computes
+`application_fee_amount` before the create and is independent of capture mode; the
+`automatic_payment_methods` flag is independent; `fountain_register_pledge` takes
+no capture argument; the orphan-cancel path on RPC failure still works (a
+succeeded PI cancel fails, which the existing catch already logs rather than
+throwing). The application fee behaves identically — Stripe splits at settlement,
+which under automatic capture is immediately.
+
+**PaymentIntent lifecycle, before and after:**
+
+| | manual (today) | automatic (proposed) |
+| --- | --- | --- |
+| on confirm | `requires_capture` | `processing` → `succeeded` |
+| event fired | `amount_capturable_updated` | **`payment_intent.succeeded`** |
+| release path | `payment_intent.canceled` (expiry or /close) | **refund** — `charge.refunded` |
+| failure | `payment_intent.payment_failed` | unchanged |
+| expiry | ~7 days | **none — money is settled** |
+
+**What give-webhook must handle:** it already handles `succeeded` and routes it
+correctly, so **no webhook code change is strictly required for the happy path**.
+What it does not handle is the new release path — `charge.refunded` and
+`charge.dispute.created` (item 4). `payment_intent.canceled` becomes near-inert:
+nothing to cancel once charged. Leave the handler in place for the legacy held
+rows.
+
+### 2. THE LEDGER COLLAPSE
+
+**Recommendation: KEEP BOTH COLUMNS. Do not retire either.**
+
+Under automatic capture `raised_cents` and `captured_cents` converge, but they do
+not become identical — they diverge legitimately in exactly the window that
+matters:
+
+- Between the charge and the succeeded webhook, a pledge is `authorized`, so
+  raised may count it (once the stamp lands) while captured does not.
+- The **legacy held rows** — the $12 and $11 on `fund-live-test-20260817` — remain
+  genuine authorizations under the old model and need the distinction to stay
+  truthful.
+
+Costs of retiring one: `fountain_counters` and both DB48 triggers change;
+`campaigns.ts` drops a field; `PledgePanel.tsx` loses its Pledged/Received
+definition list and its explanatory sentence; `LedgerStrip.tsx` loses a whole
+label; `CampaignCard.tsx` loses its collected-differs line. That is five files and
+two triggers to delete a column that costs nothing to keep — and it is
+**irreversible**, whereas keeping both leaves the door open if held pledges ever
+return.
+
+The honest change is in the **copy**, not the schema: the app should stop
+explaining the gap as a lapse risk and start explaining it as a settlement lag.
+See item 6.
+
+### 3. WHAT BECOMES DEAD — listed, not deleted
+
+**Nothing in this list is removed by this proposal.**
+
+| object | status after | safe to retire later? |
+| --- | --- | --- |
+| `fountain_begin_close` | unreachable for new campaigns | **not yet** — the only path that could settle the two legacy held rows |
+| `fountain_finalize_close` | same | not yet, same reason |
+| `/close` route | same | not yet, same reason |
+| the capture loop inside `/close` | same | not yet |
+| the `aon` branch in `fountain_begin_close` | already dead once DB60's migration lands | keep — see DB60: narrowing the CHECK does not rewrite rows |
+| `capture_failed` status | reachable only via the old path | keep — it is a CHECK value, costs nothing |
+| FRONT63's parked close control | never needed for new campaigns | keep parked until the legacy rows are gone |
+| **`fountain_pledge_captured`** | **NOT DEAD — becomes the main settlement path** | **never retire** |
+| DB58 trigger (`amount_capturable_updated` only) | stamps nothing new | **must be BROADENED, not retired** — see Correction 1 |
+
+**The rule: nothing on this list may be retired while
+`pi_3U5bdFAPNY1rgvEA167xTETd` or `pi_3U5azMAPNY1rgvEA3ZCi7Lry` still exist as
+holds.** Deal with those first (item 5), then the close machinery becomes
+genuinely orphaned and can be retired in its own pass.
+
+### 4. REFUNDS — shape only, not built
+
+**Who can refund.** Admin-gated, exactly as `/close` is today
+(`bees.is_admin`), plus the campaign manager as a later extension. Not the giver —
+a self-serve refund button on a direct charge is an abuse surface.
+
+**What it does to the ledger.** A new `/refund` route calls
+`stripe.refunds.create({ payment_intent }, { stripeAccount })`, and
+`charge.refunded` arrives at give-webhook, which moves the pledge to the
+**`'refunded'` status that already exists in the CHECK and that nothing has ever
+written**. `fountain_counters` counts neither `refunded` nor `canceled`, so both
+totals drop by themselves — the DB48 derivation handles it with no counter change
+at all. That is the one genuinely cheap part of this.
+
+**The BLiNG! problem, and it is not cheap.** `fountain_pledge_captured` freed
+BLiNG! from the Well when the money arrived. A refund does not un-free it — there
+is no reversal path, and the drain model is conservation-safe in one direction
+only. **A refunded pledge would leave the giver holding BLiNG! for money they got
+back.** This needs its own ruling before refunds ship; it is not a detail.
+
+**THE PLATFORM FEE — the item with a real economic answer.** Stripe does **not**
+return the application fee on a refund of a direct charge unless the refund
+explicitly passes `refund_application_fee: true`. If it is omitted, **FUND keeps
+its 2% of a give that was fully returned.**
+
+**Recommendation: always pass `refund_application_fee: true`.** Keeping a fee on
+refunded money is exactly the posture the platform thesis rejects — "take out the
+greed" does not survive a 2% clip on a refund. The cost is that FUND absorbs the
+Stripe processing fee on the refunded charge, which Stripe does not return either.
+That is the right side of the trade and should be stated in the terms rather than
+discovered.
+
+**Its own dispatch.** Not built here.
+
+### 5. THE LIVE HOLDS — the only item with a clock
+
+`pi_3U5bdFAPNY1rgvEA167xTETd` — **$12.00, `requires_capture`, confirmed 01:16:32
+UTC, lapses in about seven days.**
+`pi_3U5azMAPNY1rgvEA3ZCi7Lry` — $11.00, never confirmed, counting nothing.
+
+**Once the fountain charges automatically, nothing in the new flow will ever
+capture the $12.** No new code path touches a held PaymentIntent.
+
+**Recommendation, unchanged from DB60: CANCEL both. Do not close the campaign.
+The OWNER acts, at the Stripe dashboard.**
+
+Closing would capture the $12, and capture runs `fountain_pledge_captured`, which
+frees BLiNG! from the Well and writes a `bling_transactions` row — irreversible
+currency movement for a test give, on a reward path with no reversal (item 4).
+Cancelling is self-healing: give-webhook already processed a
+`payment_intent.canceled` on this exact campaign end to end at 00:33:48 UTC,
+returned 200, and DB58's counters drop the row automatically.
+
+**WHO: the owner.** `/close` is admin-gated and needs an admin session, and the
+Stripe MCP available to this session is authenticated to a different account and
+cannot reach `acct_1TK1VIAPNY1rgvEA`. No agent can perform either half.
+
+**Do this BEFORE the fountain flips**, not after — afterwards the holds are
+orphaned by a flow that has no concept of them.
+
+### 6. EVERY COPY STRING THAT GOES FALSE
+
+Third time today for this class. Paths are in `REBELUTION.fund`.
+
+| file | string | becomes | should say |
+| --- | --- | --- | --- |
+| `src/lib/pledge.ts:454` | "Your card is authorized now, not charged. It is only charged if the campaign reaches its goal..." | **FALSE** | goes with the `aon` model (DB60) |
+| `src/lib/pledge.ts:456` | "Your card is authorized now, not charged. It is charged when the campaign closes..." | **FALSE** | "Your card is charged now. The campaign receives it straight away." |
+| `src/lib/pledge.ts:473` `AUTHORIZATION_EXPIRY_NOTE` | "A card authorization generally expires after about a week... the hold simply lapses." | **FALSE** | delete. **Note this reverses DB60**, which said it stayed true — it did under holds, it does not under immediate charge. |
+| `src/components/PledgePanel.tsx:620` | "held, not charged." | **FALSE** | "charged now." |
+| `src/components/PledgePanel.tsx:477` | "Pledged counts cards authorized. Received counts money actually collected." | misleading | "Pledged and received are the same once a give settles; a give in flight shows in pledged first." |
+| `src/components/PledgePanel.tsx:548` | comment: "`requires_capture` is the status that PROVES nothing was taken" | **FALSE** | the success status becomes `succeeded`; the panel must expect it |
+| `src/components/PledgePanel.tsx:385` | comment: "A card stays on this page and comes back `requires_capture`" | **FALSE** | `succeeded` |
+| `src/components/PledgePanel.tsx:463-465` | "an authorization that lapses only..." | **FALSE** | remove the lapse framing |
+| `src/components/fund/LedgerStrip.tsx:89` | "A card authorization can lapse before it is captured." | **FALSE** | remove |
+| `src/app/page.tsx:199-203` | "Pledged counts cards currently authorized... An expired authorization reaches that state through... authorizations on record, not as money proven to still be there." | **FALSE** | the whole disclosure block is rewritten — under immediate charge the total IS money received |
+| `src/lib/campaigns.ts:44-50` | header note on the honest residue / expiry | **FALSE** | rewrite |
+| `src/lib/campaigns.ts:112` | `raisedCents` doc: "an expired authorization only leaves the total once give-webhook records the cancellation" | **FALSE** | rewrite around refunds |
+| `src/lib/campaigns.ts:406`, `:559` | authorization framing in comments | **FALSE** | rewrite |
+| `src/app/seo.ts:113-118` | D-2 / authorization caveat in the social card | **FALSE** | rewrite |
+
+**PLUS THE REFUND TERMS, which do not exist yet anywhere.** "no refunds" was
+reversed to "refunds yes", and there is currently no string in the app saying
+either. The pledge screen needs a refund sentence before it charges anyone
+immediately — that is the disclosure that justifies taking money up front.
+
+**Land the copy in the SAME pass as the fountain flip.** FRONT60 cleaned this once
+today and DB58/DB60 both had to re-flag it; a copy pass scheduled "after" is how it
+rots a fourth time.
+
+### 7. WHAT GETS WORSE
+
+**Chargeback exposure moves earlier, and it lands on the platform.** Today a
+disputed pledge is usually still an uncaptured hold — cancel it and nothing is
+lost. Under immediate charge the money is in the manager's connected account
+before anyone knows whether the project delivers, and a dispute pulls it back plus
+a fee. On **direct charges the connected account bears the dispute**, but
+sustained dispute rates on a Connect platform put the **platform's own Stripe
+account** at risk — Stripe measures the platform, not just the manager.
+
+Concretely worse:
+
+- A giver who funds a project that never delivers has one recourse: their bank.
+  Under holds, an undelivered project simply never captured.
+- BLiNG! is freed at charge time and cannot be un-freed (item 4), so a disputed
+  give leaves currency in circulation against money that went back.
+- Campaign managers can now be paid before doing anything, which is a
+  fraud surface FUND did not previously have.
+
+**What FUND should do about it — the honest minimum:**
+
+1. **Wire dispute events now**, in the same pass as refunds:
+   `charge.dispute.created` must reach the ledger. Today it would be invisible.
+2. **Disclose plainly on the pledge screen** that money is taken immediately and
+   the campaign is not held to a goal — that is what makes the earlier exposure a
+   choice the giver made rather than one made for them.
+3. **Monitor the dispute rate as a platform metric**, not per campaign.
+4. Consider, but do not build yet: a manager payout delay, or holding new managers
+   at a lower ceiling until a campaign delivers once.
+
+The one thing not to do is ship immediate charge with no refund path and no
+dispute handling — that combination is the one where the database is the last to
+know that money left.
+
+### PROPOSED SEQUENCE
+
+1. Owner cancels both holds at Stripe (item 5). **Before anything else.**
+2. DB60's migration: rows to `kwyr`, then narrow the CHECK.
+3. **DB-only:** broaden DB58's trigger to stamp on `payment_intent.succeeded`
+   (Correction 1). Must land **before or with** the fountain flip.
+4. Fountain deploy: one line, `manual` → `automatic`. Named dispatch, ask-gated.
+5. Front pass, **same day**: the copy table in item 6, including refund terms.
+6. Its own dispatch: refunds — route, webhook events, `refund_application_fee:
+   true`, and a ruling on the BLiNG! reversal problem.
+7. Only after 1–6: retire the close machinery (item 3).
+
+### Could not verify
+
+- **Nothing was applied**, so nothing was verified by execution. Every change
+  above is proposed.
+- **The automatic-capture lifecycle is from Stripe's documented behaviour**, not
+  measured on this account — no PaymentIntent has ever been created with
+  `capture_method: 'automatic'` here. The claim that `payment_intent.succeeded`
+  replaces `amount_capturable_updated` should be confirmed on the first test
+  charge rather than trusted.
+- **Stripe's view of the two holds was not re-measured** — different account on
+  the MCP. The database agrees the $12 is confirmed (`authorized_at` 01:16:32).
+- **The copy table came from one grep** over `src/`. A copy pass should re-grep
+  rather than treat it as exhaustive; FRONT61/62 added components after my earlier
+  passes and may add more before this lands.
+
+---
+
+## DB62 — APPLIED. The stamp now fires on a completed charge too.
+
+Session `01cb0b79`. 2026-08-18. Atomic 1 of 3. One migration, one ask, one human
+click. **No row in `give_campaigns` or `fountain_pledges` was written.**
+
+```
+authored file : 20260818020000_db62_stamp_on_succeeded_v1.sql
+stamped as    : 20260818020719   (apply_migration stamps its own version)
+renamed to    : 20260818020719_db62_stamp_on_succeeded_v1.sql
+rollback      : _drafts/20260818020719_db62_stamp_on_succeeded_v1_rollback.sql
+result        : {"success": true}
+```
+
+### PRE-FLIGHT
+
+| | before | after |
+| --- | --- | --- |
+| `stripe_events_stamp_fund_authorization` prosrc | md5 `db83140806abc9dea7843bfb07730fbe`, len 625 | md5 `bd6c8ed62fa7b20b3067e823b75dc2f0`, len 1364 |
+| rows with `authorized_at` set | 1 | **1** |
+| fund events in `stripe_events` | 2 | 2 |
+
+`reconcile.mjs measure` before authoring: **exit 0**. After the rename: **exit 0,
+RECONCILED**.
+
+### THE CHANGE
+
+The guard was one event type; it is now two:
+
+```sql
+  IF NEW.product_type IS DISTINCT FROM 'fund'
+     OR coalesce(NEW.event_type, '') NOT IN (
+          'payment_intent.amount_capturable_updated',  -- manual capture: a hold exists
+          'payment_intent.succeeded'                   -- automatic capture: the charge landed
+        ) THEN
+    RETURN NULL;
+  END IF;
+```
+
+Everything below the guard is untouched — same `authorized_at IS NULL` predicate,
+same `coalesce` that keeps the FIRST confirmation, so a later `succeeded` on a
+pledge that was already held does not overwrite the earlier hold timestamp.
+
+**One column, one meaning, under either capture mode: Stripe says this money is
+real.** Today that means a confirmed hold; after DB63 it means a completed charge.
+They are the same claim about the same thing, which is why one stamp carries both
+rather than needing a second concept.
+
+### AN HONEST NOTE ON THE `coalesce`
+
+The new guard uses `NOT IN`, which is **not** null-safe — `NULL NOT IN (...)`
+evaluates to NULL, and a NULL guard falls THROUGH rather than returning. The
+`coalesce(NEW.event_type, '')` exists to protect that.
+
+**It does not fix an old defect.** The DB58 body used `IS DISTINCT FROM`, which
+was already null-safe. Saying otherwise would be claiming a fix that was never
+needed, so it is recorded here and in the migration comment: the coalesce protects
+the new two-value construct, nothing more.
+
+### PROOF
+
+**1. Nothing changed today, which is the point.** The dispatch asked that the
+current hold model be unaffected. Measured after the apply:
+
+```
+slug                      fixture  raised  captured   pledge   status      authorized_at
+bee-sanctuary             yes           0         0   —        —           —
+community-mural           yes           0         0   —        —           —
+fund-the-fountain         yes           0         0   12000    authorized  null
+fund-the-fountain         yes           0         0   20000    authorized  null
+fund-live-test-20260817   no         1200         0    1000    canceled    null
+fund-live-test-20260817   no         1200         0    1100    authorized  null
+fund-live-test-20260817   no         1200         0    1200    authorized  2026-08-18 01:16:32.19784+00
+```
+
+The 1200 pledge keeps its stamp to the microsecond. `raised_cents` is still 1200.
+The unconfirmed 1100 and the canceled 1000 still count nothing. **The three
+fixture campaigns still read 0 throughout** — DB54's `is_fixture = false` filter in
+`fountain_counters` is untouched by this pass and was verified before and after.
+
+**2. The guard change, simulated read-only before the apply.** Evaluated over the
+event types that exist today and the ones that will exist after DB63:
+
+```
+product_type  event_type                                  stamps_now  stamps_after
+fund          payment_intent.amount_capturable_updated    true        true
+fund          payment_intent.succeeded                    false       TRUE   <- the change
+fund          payment_intent.canceled                     false       false
+fund          payment_intent.payment_failed               false       false
+fund          (null)                                      null*       false
+oracle        payment_intent.succeeded                    false       false
+membership    payment_intent.succeeded                    false       false
+```
+
+Exactly one cell moves. Other products stay excluded; the settlement events stay
+excluded.
+
+`*` the `null` in that cell is an artifact of the simulation, which wrote the old
+condition as `=` for brevity. The deployed DB58 body used `IS DISTINCT FROM` and
+returned NULL correctly for a null event type — it did not stamp either. Flagged
+so the table is not read as evidence of a bug that was not there.
+
+### Could not verify
+
+- **The `succeeded` branch has never fired.** No `payment_intent.succeeded` event
+  has ever reached this project — the two fund events on record are one
+  `canceled` and one `amount_capturable_updated`. The new branch is proven by the
+  predicate simulation above and by the function body, **not** by an execution.
+- **I did not fabricate a Stripe object to force it.** The dispatch offered that
+  option and asked me to say so plainly rather than invent one, so: I could not
+  construct a live proof without writing a fake event into `stripe_events`, which
+  is an audit table, and I did not. **The first real charge under DB63 is this
+  branch's first execution** — that is the moment to watch.
+- **DB63 is not done.** Until the fountain flips, this change is inert by design.
+  If DB63 does not land, nothing here is wasted, but nothing here is exercised
+  either.
+
+---
+
+## DB63 — the one-line flip, STAGED NOT DEPLOYED. Atomic 2 of 3.
+
+Session `01cb0b79`. 2026-08-18. **Not deployed.** The source edit is in the repo;
+the deploy is the owner's click. No ledger change, no trigger touched, no copy
+touched, no row written.
+
+### THE GATE — verified myself, as the dispatch requires
+
+DB62 is **APPLIED**, not merely reported:
+
+```
+schema_migrations           20260818020719 / db62_stamp_on_succeeded_v1
+stripe_events_stamp_fund_authorization
+  stamps on payment_intent.succeeded          true
+  still stamps on amount_capturable_updated   true
+  md5                                         bd6c8ed62fa7b20b3067e823b75dc2f0
+```
+
+Gate clear. Proceeding was safe.
+
+### THE CHANGE
+
+`supabase/functions/fountain/index.ts`, in `/pledge`, line 169:
+
+```js
+          capture_method: 'automatic',
+```
+
+**Functional line count is unchanged at 190** (non-comment, non-blank) before and
+after the edit — the only functional token that moved is that one value. The rest
+of the diff is the comment recording why, and the DB62 dependency.
+
+### REPO / DEPLOYED SYNC — the check the dispatch did not ask for
+
+A deploy ships the **repo** file, so "one line changes" is only true if the repo
+already matched what is running. `scripts/edge-fn-drift.mjs` cannot answer this —
+it compares slug names in both directions, not content.
+
+Compared instead element by element against the deployed v20 source read this
+session. Every functional element is present in the repo and nothing extra is:
+both routes, all nine guard/`errorResponse` paths, `fee_resolve` with its 503,
+the PaymentIntent create with the conditional `application_fee_amount`,
+`fountain_register_pledge` with the orphan-cancel fallback, the `jsonResponse`
+carrying `platform_fee_cents` / `platform_fee_pct`, and in `/close` the admin
+gate, `fountain_begin_close`, the capture/cancel loop and
+`fountain_finalize_close`.
+
+**Byte-exactness was not verifiable from this session** — the deployed artifact's
+`ezbr_sha256` hashes a bundle, not the source file, and there is no way to
+reproduce it locally. What is established is that the repo carries the v20 feature
+set and no additional code, so the deploy ships this one value and the comment
+beside it.
+
+### WHAT HAPPENS DOWNSTREAM — confirmed against give-webhook
+
+`payment_intent.succeeded` is already handled and routed correctly:
+
+```js
+  const call = event.type === 'payment_intent.succeeded'
+    ? { fn: 'fountain_pledge_captured', args: { p_pledge_id: pledge.id } }
+```
+
+So DB61's second correction holds: **`fountain_pledge_captured` is not dead, it
+becomes the main path** — it is how a pledge reaches `captured` and how the BLiNG!
+reward is freed from the Well. The pledge is written `authorized` by
+`fountain_register_pledge` at PI creation and the RPC requires exactly that status
+to capture, so the transition is valid. Ordering is safe: the PI is created in
+`requires_payment_method` and is not charged until the browser confirms, long
+after `/pledge` has returned and registered.
+
+`amount_capturable_updated` simply stops arriving. Nothing needs removing.
+
+### FINDING 1 — THE SELF-HEAL IS LOST, and it is not in the dispatch
+
+give-webhook's recovery path for a pledge that Stripe knows about and the database
+does not lives **only** inside the `amount_capturable_updated` branch:
+
+```
+180:  if (event.type === 'payment_intent.amount_capturable_updated') {
+183:    // Self-heal: /pledge created the PI but died before fountain_register_pledge.
+```
+
+`succeeded` never reaches it — it falls through to the settlement paths, where a
+missing pledge row hits:
+
+```
+217:  if (!pledge) {
+220:    await fail('unresolved', { reason: 'settlement event for an unknown PaymentIntent' });
+```
+
+**So after this flip, a charge whose `/pledge` call died between PI creation and
+`fountain_register_pledge` is money taken with no pledge row** — recorded as an
+unresolved `stripe_events` row for a human to reconcile, rather than self-healed
+into a pledge as it is today.
+
+It is a rare path and not a reason to hold the flip. It **is** a reason to open a
+follow-up: extend the self-heal to run on `succeeded` too. The metadata it needs
+(`campaign_id`, `bee_id`, amount) is already on the PaymentIntent and is set by
+the same fountain code. Flagged, not built — this pass owns one line.
+
+### FINDING 2 — THE STATED ORDER IS WRONG. FRONT64 SHOULD NOT GO LAST
+
+The dispatch fixes the order DB62 → DB63 → FRONT64, with copy last "because the
+strings go false the instant this lands". That reasoning is right about the facts
+and, I think, backwards about the sequence.
+
+Compare the two windows:
+
+- **FRONT64 last (as dispatched):** the app tells a giver *"Your card is
+  authorized now, not charged"*, *"It is only charged if the campaign reaches its
+  goal"*, *"the authorization is released and you are charged nothing"* — while
+  the card is in fact charged immediately and irreversibly. **A giver is
+  materially misled about money leaving their account**, on the screen where they
+  agree to it, with no refund mechanism behind it (DB61 item 4).
+- **FRONT64 first or together:** the app says *"charged now"* while the card is
+  still only held. The giver is told something stricter than the truth. Nobody is
+  charged anything they were not warned about; the hold either captures at close
+  or lapses.
+
+One window misdescribes a completed charge. The other over-warns about a hold.
+**Those are not symmetric**, and this is the third time today a copy pass
+scheduled "after" has produced a live false statement.
+
+**Recommendation: land FRONT64 before, or in the same window as, the deploy.** If
+they must be separated, deploy at a moment when a give is unlikely, and treat the
+gap in minutes rather than hours. The technical order DB62 → DB63 is genuinely
+non-negotiable; the copy's position in it is not.
+
+### WHAT A GIVER EXPERIENCES IF IT GOES LIVE WITH STALE COPY
+
+Concretely, on `themanual.tech/fund`, today's strings against tomorrow's
+behaviour:
+
+1. They read *"Your card is authorized now, not charged"* and *"It is charged when
+   the campaign closes"* on the give panel, and choose an amount on that basis.
+2. They confirm. **The card is charged immediately** and the money reaches the
+   manager's connected account, less the 2% platform fee.
+3. The panel's success state expects `requires_capture` and will not match —
+   Stripe returns `succeeded`, so the confirmation UI is wrong about what
+   happened even in its own success path.
+4. The campaign total lags until the webhook lands, then moves.
+5. There is **no refund path** (DB61 item 4), and the app has told them nothing
+   about refunds because the "no refunds" ruling was reversed after the copy was
+   written. A giver who wants their money back has only their bank.
+
+Point 3 is worth separating out: the panel does not merely say the wrong thing in
+prose, it **checks for the wrong status**, so its own "authorized" confirmation
+message is stale in code as well as copy. FRONT64 must fix the status expectation,
+not just the sentences.
+
+### THE DEPLOY — the owner's click, and how to verify it
+
+Run from `~/Documents/HONEYCOMB/TheMANUAL.tech`:
+
+```
+supabase functions deploy fountain
+```
+
+**Verify by the bundle hash, not the version counter.** The counter increments on
+every deploy and will read 21 whether or not the change is in it, so it proves
+nothing. What proves it:
+
+```
+ezbr_sha256 BEFORE:  b30f6f958feb8df95cf216598b4bce7193f60bed0918537712e156f08da7e14f
+ezbr_sha256 AFTER:   must be DIFFERENT from the above
+```
+
+Read it back with `list_edge_functions` or `get_edge_function` on slug `fountain`.
+If the sha is unchanged, the deploy did not ship — do not assume it did because
+the CLI printed success.
+
+Then, on the first real pledge after the deploy: confirm the PaymentIntent reaches
+`succeeded` rather than `requires_capture`, confirm a `payment_intent.succeeded`
+row appears in `stripe_events` with `product_type='fund'`, and confirm
+`fountain_pledges.authorized_at` is stamped for it — **that stamp is DB62's first
+execution and it has never run.**
+
+### Could not verify
+
+- **Not deployed, so nothing about the new behaviour is measured.** Every claim
+  about the automatic-capture lifecycle is from Stripe's documented behaviour and
+  from reading give-webhook, not from an observed charge on this account.
+- **Byte-exact repo/deployed equality**, for the reason given above. The
+  comparison is functional, not cryptographic.
+- **The `succeeded` stamp still has never fired.** DB62 is applied and inert; the
+  first charge after this deploy is its first execution.
+- **The two live holds are still outstanding** — $12 confirmed, $11 unconfirmed on
+  `fund-live-test-20260817`. DB60 and DB61 both recommended the owner cancel them
+  **before** this flip, because afterwards nothing in the new flow can ever capture
+  them. That has not happened yet.
+
+---
+
+## DB64 — ORPHANED INTENTS. Proposal only, zero writes.
+
+Session `01cb0b79`. 2026-08-18. **Nothing applied.** No migration authored into
+`supabase/migrations/`, no function edit, no row written, no cron job created.
+
+### FIRST — DB62's `succeeded` BRANCH HAS NOW FIRED, and the timings matter
+
+Both earlier passes left this on the could-not-verify list. It is closed, and the
+numbers are the evidence the threshold question below needs:
+
+```
+pi ...0e2ndpCB   created 02:34:32.090   authorized_at 02:34:58.076   captured_at 02:34:58.618
+```
+
+**26 seconds** from PaymentIntent creation to the charge landing. **0.54 seconds**
+between DB62's stamp and `fountain_pledge_captured` completing. The whole
+charge-on-pledge path — fountain → browser confirm → `payment_intent.succeeded` →
+stamp → capture → BLiNG! freed — executed end to end for the first time, and every
+piece behaved as designed.
+
+Note also `...1AWRU5WR`, created 02:34:01 — **31 seconds before** the successful
+attempt, same amount, never confirmed. That is not a hypothetical orphan. It is a
+giver clicking, abandoning, and immediately trying again, captured in the record.
+
+### THE MEASURED RECORD — `fund-live-test-20260817`
+
+```
+pi_tail     amount  status      authorized_at   captured_at   age      counts toward raised?
+0e2ndpCB      1300  captured    02:34:58        02:34:58      5.4m     YES  <- the only real money
+1AWRU5WR      1300  authorized  NULL            —             5.9m     no   <- orphan, abandoned
+167xTETd      1200  authorized  01:16:32        —             83.9m    YES  <- legacy CONFIRMED hold
+3ZCi7Lry      1100  authorized  NULL            —             125.1m   no   <- orphan, broken-button era
+2Iu3a1Sz      1000  canceled    —               —             135.5m   no   <- correctly resolved
+
+raised_cents 2500   captured_cents 1300
+```
+
+DB58's `authorized_at` requirement is doing its job: both NULL-stamped orphans are
+already excluded. **The 2500 is 1300 + 1200**, exactly as the dispatch states.
+
+---
+
+## DEFECT A — WHAT `raised_cents` NOW MEANS
+
+**Ruling recommended: under charge-on-pledge, `raised_cents` should count only
+`captured`. It becomes identical to `captured_cents`.**
+
+DB61 item 2 argued for keeping the two numbers distinct, on the grounds that they
+diverge legitimately in the window between charge and webhook. **The record now
+shows that window is 0.54 seconds**, and that the only row on which they actually
+diverge is a legacy hold from the manual-capture era that **will never capture**.
+That is not a distinction worth a column of ambiguity — it is a 1200-cent
+overstatement dressed as nuance.
+
+The dispatch puts the principle correctly: money either moved or it did not.
+Under charge-on-pledge there is no third state worth showing a giver.
+
+**The change** is one filter in `fountain_counters`:
+
+```sql
+  SELECT coalesce(sum(amount_cents) FILTER (WHERE status = 'captured'), 0)::bigint,
+         coalesce(sum(amount_cents) FILTER (WHERE status = 'captured'), 0)::bigint
+```
+
+**Effect on the record: raised 2500 → 1300**, which is exactly the one real
+charge. The legacy hold stops being counted, which is correct — it is money that
+exists at Stripe and will never reach the campaign.
+
+**Keep both COLUMNS.** They cost nothing, the FUND app renders both today
+(`LedgerStrip`, `PledgePanel`), and retiring one is front work with no ledger
+benefit. They simply carry the same number from now on, and the copy stops
+explaining a difference that no longer exists — that belongs with FRONT64's sweep,
+not here.
+
+**Consequence worth naming:** once raised counts only captured, the 1200 hold is
+no longer a *ledger* problem at all. Its disposal (Defect C) becomes purely a
+Stripe-side matter. That is a clean separation and an argument for doing A first.
+
+---
+
+## DEFECT B — REAPING ABANDONED INTENTS
+
+### How an orphan is identified
+
+```sql
+status = 'authorized' AND authorized_at IS NULL AND created_at < now() - interval '60 minutes'
+```
+
+**`authorized_at IS NULL` is the load-bearing predicate, not the age.** DB62 stamps
+that column on *either* confirmation event, so a NULL stamp means Stripe has never
+told us this intent carries money — by construction, nothing has been charged.
+That is a far stronger safety property than a timeout alone.
+
+### The threshold: 60 minutes, and why
+
+The dispatch is right that reaping a live giver mid-payment is the failure that
+matters, so here is the harm chain spelled out. If a pledge is marked `canceled`
+and the giver then completes, `payment_intent.succeeded` arrives,
+`fountain_pledge_captured` refuses (`cannot capture pledge in status canceled`),
+give-webhook classifies it terminal and files it `unresolved`. **Result: the card
+is charged and the pledge reads canceled.** Money taken, ledger says no.
+
+Against that, the measured evidence: a real completion took **26 seconds**. Sixty
+minutes is **~140× the measured time**, comfortably past a 3-D Secure detour, a
+bank-app switch, or a giver who fetches their wallet and gets interrupted. It is
+still short enough that orphans do not visibly accumulate.
+
+I would not go below 30 minutes on one measurement, and I would not go above a few
+hours — beyond that the orphans outlive their usefulness as a diagnostic. **60 is
+the recommendation; the argument, not the number, is the thing to review.**
+
+Extra safety, free: make the reaping UPDATE re-assert `authorized_at IS NULL` in
+its own `WHERE` clause so the check and the write are one atomic statement rather
+than a read followed by a write.
+
+### What reaps them: pg_cron, matching the ten jobs already here
+
+**`pg_cron` 1.6.4 is installed** and this project already runs ten scheduled jobs.
+Every one of them is **pure SQL** — either an inline `UPDATE` or a
+`SELECT public.<function>()`:
+
+```
+comms-stale-room-sweep   */30 * * * *   update public.comms_rooms set status='ended' ...
+elections-close-expired  7 * * * *      SELECT public.elections_close_expired_cron()
+press-tick               */15 * * * *   select press_cron_tick()
+economy-integrity-daily  0 1 * * *      SELECT public.run_economy_integrity_check();
+```
+
+**Recommendation: a `fountain_reap_orphans()` SECURITY DEFINER function on a
+`*/15` or hourly schedule, exactly the `elections_close_expired_cron` shape.** No
+new pattern, no new dependency, and it lands as one migration.
+
+Not an edge function: nothing here needs to leave the database, and an edge
+function would need a scheduler to call it — see below.
+
+### Whether the Stripe object is cancelled too — it cannot be, from here
+
+**No.** And the reason is structural rather than a preference: **`pg_net` is not
+installed** (checked: `pg_cron` is the only one of `pg_cron`/`pg_net`/`http`
+present), and every existing cron job is pure SQL. **There is no path from the
+database to Stripe.** A cron job can mark the row; it cannot cancel the intent.
+
+The options, with costs:
+
+1. **Leave the Stripe object.** An unconfirmed PaymentIntent carries no money and
+   no hold on the giver's card, and Stripe expires them on its own timetable. The
+   cost is untidiness in the manager's dashboard. **This is my recommendation** —
+   it is the only option with no new moving part.
+2. An edge function doing the cancel, invoked by an external scheduler. Real work,
+   a new deploy, and a scheduler that does not exist yet.
+3. Install `pg_net` so cron can call the function. **A new Postgres extension is a
+   plan-mode item in this workspace and needs its own dispatch** — it is not a
+   side effect of a reaping pass.
+
+**Who acts, if the objects are ever to be cancelled: the owner**, at the Stripe
+dashboard. Neither the lead nor a db terminal can reach `acct_1TK1VIAPNY1rgvEA` —
+confirmed again this session, the Stripe MCP here is authenticated to a different
+account.
+
+### Prevention — better than reaping, and I recommend a different shape than the dispatch suggests
+
+The dispatch asks whether `/pledge` should **reuse** an existing unconfirmed
+intent. **I recommend superseding rather than reusing.**
+
+Reuse is the more fragile of the two: a returning giver may choose a *different
+amount*, so the intent's `amount` **and** its `application_fee_amount` would both
+have to be updated in step, and a stale fee on a reused intent is exactly the
+class of silent money bug this astra has spent the day removing.
+
+Supersede is simpler and has no arithmetic: when a giver starts a pledge on a
+campaign where they already hold an unconfirmed intent, **cancel the old one and
+mint the new one**. It bounds accumulation at one live intent per (bee, campaign)
+instead of one per click, and cancelling an unconfirmed intent is safe by
+definition — there is no money attached.
+
+Both are **fountain changes and therefore a deploy**, which is its own dispatch.
+FRONT62's double-submit guard covers the in-flight case; this is the
+abandoned-then-returned case and the two do not overlap.
+
+**Is it safe? Yes, with one condition:** the cancel must be restricted to intents
+with `authorized_at IS NULL`. Cancelling a *confirmed* intent would destroy a real
+hold. The same predicate that makes reaping safe makes superseding safe.
+
+---
+
+## DEFECT C — THE 1200 CONFIRMED HOLD, the one with a clock
+
+`pi_3U5bdFAPNY1rgvEA167xTETd`, $12.00, confirmed 01:16:32 UTC, lapses in about
+seven days. Under charge-on-pledge nothing will ever capture it.
+
+**Recommendation: the OWNER cancels it at the Stripe dashboard. Do not capture,
+and do not close the campaign.**
+
+- **Do not capture.** It frees BLiNG! from the Well and writes a
+  `bling_transactions` row — irreversible currency movement for a test give, on a
+  reward path with no reversal.
+- **Do not close the campaign**, and this is sharper than it was yesterday:
+  `fountain_begin_close` collects **every** pledge in status `authorized` and hands
+  them to the capture loop. That set now includes the two unconfirmed orphans,
+  which Stripe cannot capture — each would fail and be marked `capture_failed`.
+  Closing would make a mess of three rows to settle one.
+- **Cancelling is self-healing.** give-webhook has processed a
+  `payment_intent.canceled` on this exact campaign end to end and returned 200; the
+  row moves to `canceled` by itself and the counters follow.
+- Letting it lapse reaches the same end state without a decision on the record.
+  Cancelling is preferable for the same reason it was in DB60: a deliberate act
+  beats a timeout.
+
+**If Defect A lands first, this stops being urgent** — the hold leaves the total
+immediately and only the Stripe-side tidiness remains.
+
+---
+
+## PROPOSED ORDER
+
+1. **Defect A** — one filter in `fountain_counters`. Raised 2500 → 1300. Smallest
+   change, largest honesty gain, and it defuses C.
+2. **Defect B, the reaper** — `fountain_reap_orphans()` + a pg_cron entry, on the
+   `elections_close_expired_cron` pattern. Rollback: drop the job, drop the
+   function.
+3. **Owner cancels the 1200 hold**, and optionally the two orphan intents, at the
+   Stripe dashboard.
+4. **Prevention (supersede)** — its own dispatch, because it is a fountain deploy.
+5. Only if the Stripe objects must be cleaned automatically: a `pg_net` dispatch.
+   Not recommended yet.
+
+### Could not verify
+
+- **Nothing was applied**, so nothing above is verified by execution. Every SQL
+  fragment is proposed.
+- **Stripe's own expiry behaviour for unconfirmed PaymentIntents was not
+  measured** — it is the basis for recommending option 1 under "cancel the Stripe
+  object", and it comes from Stripe's documented behaviour, not from an
+  observation on this account.
+- **The 60-minute threshold rests on ONE measured completion (26 seconds).** One
+  data point sets an order of magnitude, not a distribution. If a 3-D Secure
+  challenge ever runs on this account the real tail will be longer, and the number
+  should be revisited then rather than treated as settled.
+- **No orphan has ever been reaped**, so the harm chain described above is reasoned
+  from the RPC's status guard and give-webhook's terminal-error branch, not
+  observed.
