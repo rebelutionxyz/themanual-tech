@@ -24,6 +24,23 @@ import { cn } from '@/lib/utils';
 import { ArrowUp, Mic, Plus, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+/**
+ * THE SHARED READABLE MEASURE — FRONT84 (ORACLE_MF v1.54, owner: cap the
+ * composer width "like this chat", it runs full-bleed now).
+ *
+ * The composer self-caps to this centered measure so the cap lands ONCE and
+ * every future mount (Vote, Justice) inherits it — no /h24-only fork. A surface
+ * aligns its message column to the SAME width by wrapping that column in this
+ * exact constant, so text and input can never drift apart.
+ *
+ * `max-w-3xl` (48rem) is Tailwind's container scale, not an inline pixel value —
+ * there is no CUSTOM house max-width token (checked tailwind.config.ts; flagged
+ * in the FRONT84 report), so the standard utility is the house system's answer.
+ * `w-full` + `mx-auto` mean it fills the column on narrow viewports (no cap, no
+ * horizontal scroll) and centers once the column is wider than the measure.
+ */
+export const COMPOSER_MEASURE = 'mx-auto w-full max-w-3xl';
+
 export interface ComposerAttachment {
   id: string;
   name: string;
@@ -172,7 +189,12 @@ export function Composer({
   }
 
   return (
-    <div className="rounded-2xl border border-border-bright bg-bg-elevated p-2 focus-within:border-honey/50">
+    <div
+      className={cn(
+        COMPOSER_MEASURE,
+        'rounded-2xl border border-border-bright bg-bg-elevated p-2 focus-within:border-honey/50',
+      )}
+    >
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-1.5 px-1 pb-2">
           {attachments.map((a) => (

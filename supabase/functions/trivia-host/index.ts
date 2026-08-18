@@ -14,10 +14,10 @@ const ANTHROPIC_VERSION = "2023-06-01";
 
 // DB75 — THE METERED DOOR (see generate-questions for the full note). trivia-host
 // fires once per B Battles event, so it is the busier of the two bypasses; routing
-// it makes every emcee line visible in atlasoracle_directives (caller='trivia-host'),
+// it makes every emcee line visible in h24_directives (caller='trivia-host'),
 // metered-not-billed. Direct path retained behind the switch as the flag-flip rollback.
 const ORACLE_ROUTE_ENABLED = (Deno.env.get("ORACLE_ROUTE_ENABLED") ?? "true") !== "false";
-const ROUTE_URL = `${SUPABASE_URL}/functions/v1/atlasoracle-route`;
+const ROUTE_URL = `${SUPABASE_URL}/functions/v1/h24-route`;
 
 const EVENTS = new Set(["room_open", "question_intro", "answer_reveal", "leaderboard_update", "wrap"]);
 
@@ -82,7 +82,7 @@ async function callClaude(system: string, user: string): Promise<string> {
         tier: "standard",
       }),
     });
-    if (!res.ok) throw new Error(`atlasoracle-route ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    if (!res.ok) throw new Error(`h24-route ${res.status}: ${(await res.text()).slice(0, 300)}`);
     const data = await res.json();
     return (data?.response ?? "").trim().replace(/^["']|["']$/g, "");
   }
@@ -130,7 +130,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
   // DB75: the key is only needed on the direct path; a routed run needs none.
-  if (!ORACLE_ROUTE_ENABLED && !ANTHROPIC_API_KEY) return json({ error: "ANTHROPIC_API_KEY not set (or enable ORACLE_ROUTE_ENABLED to route through atlasoracle-route)." }, 503);
+  if (!ORACLE_ROUTE_ENABLED && !ANTHROPIC_API_KEY) return json({ error: "ANTHROPIC_API_KEY not set (or enable ORACLE_ROUTE_ENABLED to route through h24-route)." }, 503);
 
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
   const isServiceRole = decodeRole(token) === "service_role";

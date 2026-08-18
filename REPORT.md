@@ -23,429 +23,393 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
-## DBCODE1 — RENAME `atlasoracle_*`/`oracle_*` DB OBJECTS → `h24_*`. PROPOSAL produced (forward + rollback drafts + dependency proof); NOTHING APPLIED. Owner-gated, coordinated with FRONTCODE1. (2026-08-18)
+## FRONTCODE1 — THE CODE-LAYER h24 RENAME. Code half of the coordinated code+schema rename (DBCODE1 is the DB half). Built green, committed, NOT pushed — lands in the SAME push as DBCODE1's apply. (2026-08-18)
 
-Session `f8b19368` (fallback id — no `MC_SESSION`). Dispatch DBCODE1, lane `db`, workdir
-**`TheMANUAL.tech-db`**, effort L. After DB80 (`done`, gate satisfied); W-19 clear (no other db pass
-claimed — nothing else editing atlasoracle-route). ORACLE_MF v1.57 ("code too"). **Propose-first,
-nothing applied, no commit** (automation policy: produce-and-propose; owner ratifies + pushes).
+Session 79a4fea9 (fallback id). Dispatch FRONTCODE1, lane front, workdir TheMANUAL.tech, effort L.
+ORACLE_MF v1.57 ("code too" — the R6/v1.35 boundary keeping code identifiers as atlasoracle/oracle is
+LIFTED). Highest-risk pass on the board; sequenced LAST. Coordinated with DBCODE1 (DB objects) — must
+land in the same push so code and schema never disagree in production.
 
-### Deliverable (all in `TheMANUAL.tech-db`)
-- `supabase/migrations/_drafts/20260818210000_dbcode1_rename_oracle_atlasoracle_to_h24.sql` — forward.
-- `…_dbcode1_rename_oracle_atlasoracle_to_h24_rollback.sql` — reverse (written first; restores exact
-  prior names + the 6 original function bodies verbatim).
-- `docs/dbcode1-oracle-to-h24-rename-proposal-2026-08-18.md` — the full dependency graph, the
-  object-vs-data boundary, the proof, coordination flags, and THE ONE ASK.
-Generated mechanically from the live catalog defs (a Node generator + captured `pg_get_functiondef`),
-not hand-edited — money code is not hand-retyped.
+### THE RENAME RULE — deterministic prefix-swap, not invented names
 
-### What renames (enumerated LIVE from pg_class/pg_proc/pg_constraint/pg_index/pg_policies/pg_depend)
-8 tables, 1 view, 11 functions, 32 constraints, 17 standalone indexes, 7 RLS policies. Transform:
-strip `atlasoracle_`/`oracle_`, prepend `h24_`. Metadata-only, **no data movement**. No new-name
-collisions; no oracle-named sequences; no standalone enum/domain types.
+DBCODE1's exact enumerated names were not yet published (still claimed), so divergence was foreclosed the
+only sound way: the same source + the same rule. I enumerated the live objects from pg_class/pg_proc (the
+identical query DBCODE1 step 1 runs) and applied the v1.57 rule uniformly — atlasoracle_ -> h24_,
+oracle_ -> h24_, atlasoracle-/oracle- -> h24-. Every target maps to a unique name (no collisions).
+Because both passes enumerate the same catalog and apply the same swap, the two name-sets are identical
+by construction — not by guessing DBCODE1's choices.
 
-### The load-bearing findings (why this is the highest-risk pass)
-1. **PL/pgSQL bodies don't auto-update on RENAME.** Split the 11 functions:
-   - **Escrow group (5)** — `atlasoracle_credit/debit/deposit_to_escrow/get_escrow_balance/withdraw_from_escrow`:
-     bodies reference only `bling_pots`/`bling_transactions`/`lot_debit/credit` + **string-literal DATA
-     tags** (`'atlasoracle_escrow*'`, `'atlasoracle_refund'`, `'atlasoracle_directive'`) that live
-     production rows hold. → **rename object ONLY, body untouched** (rewriting those strings would split
-     escrow accounting). Verified: no cross-call to any renamed function.
-   - **Body-swap group (6)** — `atlasoracle_check_rate_caps` + the 5 `oracle_*` token functions: rename
-     + `CREATE OR REPLACE` with schema-object identifiers swapped, `entry_type`/`plan_tier 'oracle'`/
-     `pack_code` DATA values preserved verbatim. RENAME preserves OID so the view's dep survives.
-2. **`ON CONFLICT` is column-based**, not constraint/index-name based → index/constraint renames don't
-   touch bodies.
-3. **No external DB caller** references the renamed objects (only string-literal data tags exist).
-4. **DB76/DB74** have no live reference to these objects (DB76 unapplied; DB74 = media_visibility).
-   Coordination note in the proposal for when DB76 lands.
+RECONCILIATION CHECKPOINT (for the joint apply): before the coordinated apply+push, diff DBCODE1's final
+migration object-list against the code names below; they must match 1:1. The owner coordinates the joint
+apply, which is the natural gate.
 
-### Verification built into the migration
-Forward ends with a `DO` block that RAISEs if any `atlasoracle_/oracle_` relation or function remains —
-the "no half-rename" proof enforced at apply time. Generator ran a data-string guard (no
-`h24_escrow`/`h24_refund'`/`h24_directive'` produced). Rollback re-checked: 55 original `oracle_token_*`
-refs restored, 44 back-rename statements.
+### WHAT WAS RENAMED (the schema-coupling set — breaks if code != schema)
 
-### THE ONE ASK (owner)
-Approve the coordinated apply of DBCODE1 **with FRONTCODE1 in the same push** (edge functions
-`atlasoracle-route`/`oracle-checkout`/`oracle-webhook` + client TS reference these by name — a schema
-rename without the code redeploy breaks h24 + the FRONT81 storefront + billing instantly). Apply via
-`apply_migration` (ask-gated) after a recorded pre-flight + reconcile. Two calls to confirm: (a) the 5
-legacy escrow RPCs are RENAMED here — DROP them instead? (separate destructive decision); (b) confirm
-metadata-only (data tags + `plan_tier 'oracle'` stay).
+20 DB object references (.from, .rpc, query/comment references), all snake -> h24_:
+tables/views — canon_reads, directives, provider_pool, model_rates, token_balances, token_consumption,
+token_ledger, token_packs, token_plans; functions — check_rate_caps, credit, debit, deposit_to_escrow,
+get_escrow_balance, withdraw_from_escrow, credit_token_purchase, debit_tokens, grant_plan_tokens,
+refund_token_purchase, token_available.
+
+7 edge functions (directory git mv + every invoke string + own self-reference), dash -> h24-:
+atlasoracle-route -> h24-route (+ its canon.ts), atlasoracle-escrow-deposit -> h24-escrow-deposit,
+atlasoracle-escrow-withdraw -> h24-escrow-withdraw, atlasoracle-log -> h24-log,
+atlasoracle-providers -> h24-providers, oracle-checkout -> h24-checkout, oracle-webhook -> h24-webhook.
+22 files, 152/152 balanced identifier swaps; the 8 edge files show as git renames (R085–R099).
+
+### DELIBERATELY NOT RENAMED — cited exceptions (the PROVE grep's "allowed exceptions")
+
+Each is NOT schema-object coupling, so renaming it here would either break a different contract or churn
+cosmetics on the highest-risk pass. All eight remaining oracle/atlasoracle code occurrences are one of:
+
+1. atlasoracle_escrow_deposit / atlasoracle_escrow_withdraw (lib/freedomblings/ledger.ts) — these are
+   stored bling_transactions.type VALUES, not object names. Renaming the code key without migrating
+   existing rows' type data orphans every historical escrow row. Same class as the deferred type='minted'
+   enum debt. Needs a coordinated data migration + edge-write change — its own pass.
+2. Env vars — ORACLE_ROUTE_ENABLED, ORACLE_CHECKOUT_SUCCESS_URL/_CANCEL_URL, ORACLE_TOS_VERIFIED (edge
+   secrets), VITE_ATLASORACLE_MOCK (client build var, DEV-gated). Renaming the code reference without the
+   owner re-setting the secret under the new name breaks the feature at deploy. Owner secret-reset
+   required — cited, deferred.
+3. ORACLE_MF — the canon MASTER-FILE name, cited in ~40 rationale comments. A proper noun, not a code
+   identifier. Untouched (the doc is still ORACLE_MF at v1.57).
+4. feat/atlasoracle-v1 (hq/sections/AstraStatus.tsx) — a git branch name inside a display note.
+   Historical prose, untouched.
+5. atlasoracle_directives_select_own (h24-log/index.ts:12) — an RLS policy name in a rationale comment;
+   policy renames are DBCODE1's call and do not auto-follow a table rename. Left as the accurate current
+   name; \b-anchoring protected it automatically from the table sweep.
+6. oracle-tokens-refresh / ORACLE_TOKENS_REFRESH_EVENT — a client-internal custom DOM event (dispatch +
+   listen in the same bundle). No external coupling; cosmetic. Deferred with the folder set.
+7. Client CamelCase + folders — src/lib/atlasoracle/, supabase/functions/_shared/atlasoracle/,
+   AtlasOracleWalletBadge, useOracleTokens, atlasoracle-tier/-category DOM ids. None are
+   atlasoracle_/oracle_ snake identifiers (PROVE grep passes without them); the surface is already h24
+   (FRONT77). A cosmetic follow-up, out of the schema-coupling scope.
+
+### PROVE
+
+- Zero atlasoracle_/oracle_ snake DB-object or dashed edge identifiers remain in code, except the cited
+  exceptions above (grep quoted in the pass).
+- Front build GREEN — npm run build built in 39.21s. The supabase client is untyped (no
+  createClient<Database>), so the .from()/.rpc() strings are not schema-validated at compile time — the
+  build proves no syntax/type breakage, and stays green independent of DB state (exactly the "build
+  before DBCODE1 applies" case v1.57 anticipates).
+- Edge syntax GREEN — deno check --no-lock supabase/functions/h24-route/index.ts -> exit 0 (deno.lock
+  untouched).
+- PENDING the joint apply: runtime correctness against the RENAMED schema cannot be verified until
+  DBCODE1's migration is applied — the DB still has the atlasoracle_/oracle_ objects. Marked pending per
+  the dispatch. NO PUSH until the coordinated apply+push the owner sequences.
+
+### COULD NOT VERIFY
+
+- Runtime against renamed schema (above) — DBCODE1 not applied.
+- The name-set match to DBCODE1's final enumeration — DBCODE1's report not yet filed; the reconciliation
+  checkpoint above is the gate. By construction (same catalog, same rule) they should be identical.
+
+---
+
+## FRONT86 — THE /mc COCKPIT BOARD: three-colour health + tiered time + the scroll fix. Build green; logic proven on live rows; the rendered UI is admin-gated. (2026-08-18)
+
+Session `79a4fea9` (fallback id). Dispatch FRONT86, lane `front`, workdir `TheMANUAL.tech`, effort M.
+Supersedes FRONT83 (ready/blocked) + FRONT85 (estimates) — the whole cockpit built once. tsc clean,
+build green, lint clean in the file. **Committed, NOT pushed.**
+
+### TWO FINDINGS THAT SHAPED THE BUILD
+
+- **`ops_dispatches` has NO `effort` and NO `est_minutes` column** — verified against
+  `information_schema` (the columns are: after_pass, author, body, claimed_at, claimed_by,
+  created_at, heartbeat_at, id, lane, pass, priority, scope, status, terminal, title, workdir). So
+  the estimate is parsed from the **`EFFORT: X` tag in the title**, and the `est_minutes` override
+  the dispatch (and its v0.31 amendment) describes is **inapplicable — the column does not exist**,
+  and the dispatch forbids adding one ("no new column, no migration"). Every row therefore takes the
+  effort-tag bucket; there is no per-row override to prefer.
+- **No dedicated success/warning/danger token exists** in the house system (only the `kettle` ramp
+  and Tailwind `amber-*`, which the board already used ad hoc). The closest house fit is the kettle
+  ramp — `sourced` #6FCF8F (green), `emerging` #E88938 (orange), `unsourced` #C94C4C (red) — used
+  here as the health colours. **Flagged as requested**: a dedicated `success/warning/danger` token
+  trio would be the right home for this and does not exist.
+
+### THE BUILD — all computed live, no column, no write
+
+- **Three-colour health, RED WINS** (`rowHealth`):
+  - **RED** — a claimed row silent > `STALE_MIN` (10 min), OR a claimed row whose elapsed exceeds
+    `OVER_EST_MULT` (2) × its estimate. (Reports-driven red — a `-Q`/held report — is the dispatch's
+    stated optional follow-up "if joining reports is too heavy"; it is NOT built this pass and is
+    named here as the follow-up, per that clause. The heartbeat + over-est cases are covered.)
+  - **GREEN** — queued AND its `after_pass` is satisfied (null, or not in the open set).
+  - **ORANGE** — queued AND its `after_pass` is still open (queued|claimed); the "Waits on" column
+    already shows which pass.
+  - **neutral** — a healthy claimed row (running) or a done/superseded row; rendered in its normal
+    style. A claimed healthy row is deliberately neither green nor orange.
+  - The alive-pulse fires ONLY on a healthy claimed row — a RED row does not pulse, because that is
+    the loudest signal on the row and it would be lying.
+- **Tiered time** (v0.31: the estimate drives, the tier is a bucket): est from the effort tag
+  (S=15, M=30, L=60, XL=90, XXL=100; letters and the words SMALL/MEDIUM/LARGE); the tier LABEL is
+  derived from the estimate (≤15 S, ≤30 M, ≤60 L, ≤90 XL, else XXL). Rendered `"L ~60m"`, LABELLED
+  as an estimate (tilde), never as measured. No tag → nothing shown, no guess. Elapsed for claimed
+  rows was already computed and stays.
+- **Named constants** `STALE_MIN = 10`, `OVER_EST_MULT = 2` — one place each, easy to tune.
+
+### THE SCROLL FIX — diagnosed, not assumed
+
+**Cause found:** `/mc` mounts inside `PlatformLayout`, whose `<main>` is `flex-1 overflow-hidden` and
+expects each surface to own its scroll. `MissionControlPage`'s root was a plain centered block
+(`mx-auto max-w-6xl px-4 py-6`) with no scroll of its own, so a board taller than the viewport was
+**clipped and its last rows unreachable** — exactly the owner's report. **Fix:** the root now carries
+`h-full overflow-y-auto`, so it fills the main and scrolls its own content. It is structural (it
+survives FRONT82's sidebar removal), so the fix lives on the board, not on the sidebar — as the
+dispatch instructed.
+
+### PROVE — logic proven against the LIVE board; rendered UI is admin-gated
+
+The colour/time model was run in SQL over the actual `ops_dispatches` rows (same logic as
+`rowHealth`), and it classifies real rows correctly:
+
+```
+FRONTCODE1  queued  · after_pass FRONT86 (claimed=open)  → ORANGE (waiting)     ✓
+DBCODE1     claimed · L est 60m · silent 1.6m · elapsed 12.6m → neutral (running) ✓
+FRONT86     claimed · M est 30m · silent 0.6m · elapsed 12.7m → neutral (running) ✓
+```
+
+ORANGE fires correctly; effort parsing (L→60, M→30) and the neutral-when-healthy rule hold. GREEN
+(queued + dep done) and RED (silent > 10m, or elapsed > 2× est) are the remaining rules — neither has
+a live example on the board right now, but the rules are demonstrated by the same query's CASE.
+
+### COULD NOT VERIFY — the screenshots
+
+**`/mc` is admin-gated** (`bees.is_admin`, enforced by DB policy; signed-out shows the Gate). With no
+admin session and no sanctioned way to create one (no synthetic credentials), **I could not render
+the board in a browser** — so the dispatch's screenshots (green/orange/red states + the scroll
+reaching the last row) are NOT produced. The build type-checks and builds clean, the pure logic is
+proven against live data, and the scroll fix is a diagnosed structural change, but the visual
+confirmation waits on an admin viewing `/mc` — Butch, or a signed-in admin pass.
+
+- **Reports-driven RED** (a `-Q`/held pass awaiting a ruling) is the dispatch's named optional
+  follow-up and is not built.
+- No mobile breakpoint exercised.
+
+### FILES
+
+```
+MOD src/pages/MissionControlPage.tsx   health model · tiered time · scroll fix
+```
+
+### DONE-TEST
+
+```
+npx tsc -b     → exit 0
+npm run build  → ✓ built in 18.55s
+npm run lint   → clean in MissionControlPage (only the standing 1 warning remains; 0 new errors)
+```
+
+---
+
+## FRONT84 — COMPOSER MAX WIDTH. The shared bottom composer + the message column now share a centered readable measure (like the Claude chat) instead of full-bleed. Build green, committed, NOT pushed. (2026-08-18)
+
+Session `f8b19368` (fallback id). Dispatch FRONT84, lane `front`, workdir `TheMANUAL.tech`, effort SMALL.
+After FRONT83 (another worker's pass; same tree, W-19). Committed on green, no push (dispatch: "COMMIT ON
+GREEN. NO PUSH"); sha in the FRONT84 rail report. ORACLE_MF v1.54 (owner, seeing shell v1 live: cap the
+composer width "like this chat" — it runs full-bleed now).
+
+### What shipped
+The cap lands in the SHARED composer so every future mount (Vote, Justice) inherits it — no /h24-only fork.
+- `src/components/composer/Composer.tsx` — exports `COMPOSER_MEASURE = 'mx-auto w-full max-w-3xl'` and the
+  composer root now self-caps to it (centered, readable ~48rem). One constant = one source of truth for
+  the measure, so the input and the column can't drift apart.
+- `src/pages/oracle/OraclePage.tsx` — wraps the message column (header + preview/failure/response +
+  RoutingLog) and the composer-dock notes in the SAME `COMPOSER_MEASURE`. Both the conversation content and
+  the composer are now `max-w-3xl mx-auto` inside the identically-padded center column, so text and input
+  align edge-to-edge. Right panel + sidebar keep their own widths (only the center column is capped).
+
+### The measure, and the token flag (dispatch item 4)
+`max-w-3xl` (48rem) is Tailwind's container scale utility, NOT an inline pixel value. FLAGGED as the
+dispatch asked: there is no CUSTOM house max-width token — `grep -nE "maxWidth|max-w|measure|container"
+tailwind.config.ts` returns nothing — so the house system's answer is the standard Tailwind scale. If a
+canonical "reading measure" token is wanted later, `COMPOSER_MEASURE` is the one line to change.
+`w-full` + `mx-auto` mean the column fills the width on narrow viewports (no cap, no horizontal scroll) and
+centers once the column exceeds the measure.
+
+### Done-tests + PROVE (verbatim)
+- `npm run build` (tsc -b && vite build) → `✓ built in 18.71s` (green; also 18.66s pre-format).
+- `npx biome lint` on the 2 touched files → `Checked 2 files. No fixes applied.` (clean; `biome check
+  --write` reflowed OraclePage indentation for the new wrapper nesting, nothing else).
+- Running-build check (dev localhost:3011, isolated automation profile), /h24, BOTH cases screenshotted:
+  - WIDE — center column wider than the measure (sidebar collapsed, center ≈ 889px): the composer AND the
+    message column (header, routing-log table) are capped to ≈ 768px, centered, sharing identical left/right
+    edges. Text and input align.
+  - NARROW — center column narrower than the measure (sidebar expanded, center ≈ 697px): full width, no side
+    gaps, no horizontal scroll — the cap yields, exactly per item 3.
+
+### Notes
+- Verified on a signed-in surface (real routing-log rows + balance present), so the cap was confirmed
+  against real content, not just the empty state.
+- No copy touched, so the "users not Bees" firewall rule has nothing to catch here.
+
+---
+
+## FRONT82 — CONSTELLATION DE-SCATTER + /hq RELOCATE. The scattered ConstellationRail is deleted; a live-astras-only quick-access list lands in /hq. Build green, committed, NOT pushed. (2026-08-18)
+
+Session `f8b19368` (fallback id). Dispatch FRONT82, lane `front`, workdir `TheMANUAL.tech`, effort
+MEDIUM. After FRONT80/81 (same tree, commit-clean). Committed on green, no push (dispatch:
+"COMMIT ON GREEN. NO PUSH"); the sha is recorded in the FRONT82 rail report. ORACLE_MF v1.52 + v1.53.
+
+### What the dispatch asked, and what shipped
+Owner (v1.52): "mission control of the rail not the constellation. I never have understood why it was
+added all over themanual." The constellation was scattered as navigation nobody asked for; remove it as
+nav everywhere, keep it only where sanctioned; relocate the admin list to /hq (v1.53).
+
+REMOVED:
+- `src/components/shell/ConstellationRail.tsx` — DELETED. This was the §15.1 rotating link-list rail that
+  `PlatformLayout` mounted on EVERY platform surface (incl. /mc) — the scattered nav. Its sole consumer
+  was PlatformLayout (grep-confirmed), so deletion is clean.
+- `src/components/layout/PlatformLayout.tsx` — dropped the `ConstellationRail` mount, the `useIsAdmin`
+  gate that guarded it, and both imports. `main` reclaims the width (the rail was a `flex-shrink-0`
+  sibling); no placeholder left behind. Comment block rewritten to record the FRONT82 removal.
+
+ADDED (v1.53 relocation):
+- `src/components/hq/sections/AstraQuickAccess.tsx` — NEW /hq section "Quick Access". A live-astras-only
+  jump list: reads `ASTRA_ROOMS` (the same `mount !== 'stub'` derivation FRONT80's rooms overlay uses),
+  renders name + accent tick + route as `Link`s to each surface. NO stub rows, NO build-state badges —
+  exactly v1.53's "never list the unbuilt." Admin-gated by HQControlRoom's `bees.is_admin` gate.
+- `src/components/hq/HQControlRoom.tsx` — registered the section (slug `quick-access`, LayoutGrid icon)
+  after "Astra Status".
+
+KEPT / NOT BROKEN (per dispatch):
+- /mc's admin board (MissionControlPage) — untouched; only the PlatformLayout rail that rode above it
+  is gone.
+- The shared ROOMS button (FRONT80) — the sanctioned user navigation, untouched.
+- `astra-catalog` data + `useConstellationAccent`/`useRealmAccent` hooks — kept. The rail was
+  `useConstellationAccent`'s last consumer, so it is now an exported-but-unused shared hook (kept
+  deliberately per the dispatch — the switcher/future surfaces read it; an exported symbol is not a
+  lint error).
+- FRONT31 admin gating — preserved (the /hq list inherits HQControlRoom's gate).
+
+### Left as-is, FLAGGED for the owner (not in the dispatch's explicit scope)
+Two ADMIN-ONLY surfaces still show the FULL catalog WITH build-states / stubs:
+- `/hq` "Astra Status" (`AstraStatus.tsx`) — the INFRA STATUS SLIDER monitoring panel (live/scaffolded/
+  deferred/post-Swarm counts + per-astra status). This is a status board, a different thing from the new
+  Quick Access nav list; the dispatch added the list, it did not ask to strip the monitor.
+- `/constellation` (`ConstellationPage.tsx`) — a standalone admin-gated (FRONT31) full-catalog page with
+  Surface/Landing/Stub labels.
+Both are admin-gated, so neither is a "user-facing" link-list (the PROVE clause is satisfied). But v1.52's
+"the constellation survives in exactly two places" arguably makes them redundant now that the rooms button
++ /hq quick-access are the sanctioned two. I did NOT remove them — deleting a whole page/panel absent an
+explicit instruction is over-reach on a MEDIUM pass. Flag for a ruling: should v1.53's "never list the
+unbuilt" extend to these admin monitors, or do they stay as the operator's full-catalog view?
+
+### Done-tests + PROVE (verbatim)
+- `npm run build` (tsc -b && vite build) → `✓ built in 17.13s` (green; the deleted component left no
+  dangling reference — tsc would have failed otherwise).
+- `npx biome lint` on the 3 touched/new files → `Checked 3 files. No fixes applied.` (clean).
+- PROVE grep — no remaining `ConstellationRail` CODE references (`grep -rn ConstellationRail src/` returns
+  only historical COMMENTS in useSpine/spine/useIsAdmin/ConstellationPage/PlatformLayout/AstraQuickAccess;
+  zero imports, zero mounts). The only surfaces rendering an astra list are now: RoomsButton (user nav),
+  AstraQuickAccess (/hq), AstraStatus (admin monitor), ConstellationPage (admin page). No link-list mount
+  on any user-facing surface.
+- Running-build check (dev localhost:3010, isolated automation profile): three routes observed CLEAN with
+  no layout regression from the rail removal — `/manual`, `/freedomblings`, `/h24` (screenshots). The
+  ROOMS button still opens and lists the 19 live astras ("The Manual" marked current) and navigates.
+- Copy: "users not Bees" — AstraQuickAccess says "live astras", "jump to any surface"; no "Bee(s)".
 
 ### Could not verify (this pass)
-Nothing applied (propose-first) — the forward/rollback are unexecuted drafts. Correctness is established
-by the live enumeration + the generation guards + the in-migration verification block, not by a test
-apply. A rehearsal on a branch/local is the natural pre-apply step at coordination time.
+- Visual render of the /hq Quick Access section and the /mc board sans-rail: both are admin-gated
+  (`bees.is_admin`) and I hold no admin session (no synthetic credentials). Proven structurally instead:
+  build green + lint clean + the list uses the identical `ASTRA_ROOMS` derivation the rooms overlay just
+  rendered (19 live astras). The rail removal is definitive (component deleted; it cannot render for
+  anyone, admin included).
 
 ---
 
-## DB80 — THE CACHE-WRITE SPLIT. FINDING: it is already live (DB27, deployed 2026-08-03). The "ongoing leak" is stale; absorption was one bounded day. No code, no rate rows. (2026-08-18)
-
-Session `79a4fea9` (fallback id). Dispatch DB80, lane `db`, workdir **`TheMANUAL.tech-db`**, effort
-MEDIUM. **MEASURE-first, as instructed — and the measurement overturns the premise.** No route change
-and no rate rows were needed; the report is the deliverable.
-
-### THE PREMISE, AND WHY IT IS STALE
-
-The dispatch states: *"the platform has absorbed the 12.5x cache-write spread since 2026-07-27 …
-this pass fixes the path already live."* Measured against production, that is no longer true. **DB27
-(2026-08-03) split the two cache legs, priced them separately, and IS DEPLOYED.** The live Anthropic
-path already bills four legs correctly.
-
-### EVIDENCE — the DEPLOYED route, not the repo
-
-Fetched the deployed `atlasoracle-route` (`get_edge_function`) and read the money math out of it:
-
-```
-deployed calculateCostTokens(rate, input, output, cacheReadTokens, cacheWriteTokens):
-  cacheWriteRate = rate.cache_write_per_m ?? rate.input_tokens_per_m
-  cost = input*input_rate + cacheReadTokens*cacheReadRate
-       + cacheWriteTokens*cacheWriteRate + output*output_rate        ← FOUR legs, priced apart
-
-deployed callAnthropic:
-  cacheWrite = usage.cache_creation_input_tokens   cacheRead = usage.cache_read_input_tokens  ← split
-deployed finalize:
-  cache_write_tokens: cacheWriteTokens                                ← the split is recorded
-```
-
-The deployed route has every four-leg marker (`cache_creation_input_tokens`, `cache_read_input_tokens`,
-`cache_write_tokens`, `cache_write_per_m`, `cacheWrite`). It does NOT have DB75/DB77/DB78
-(`isServiceRolePrincipal`, `openai_compat`, `gemini` all absent) — those are committed-not-deployed
-and do not touch the Anthropic four-leg path. So the live path is exactly the DB27 four-leg route.
-
-**Rate card (item 2) — already correct:** every active model carries `cache_write_per_m` = 1.25×
-input (sonnet 11250, opus 15625, free 0), one active row per model (P4.1 holds — no duplicates). No
-rows to propose.
-
-**Route (item 3) — already four-leg and deployed.** Anthropic reports `cache_creation_input_tokens`
-and `cache_read_input_tokens` as DISJOINT counts, so the path needs no DB77 `cacheSemantics` inference
-— it has the true split from the API. Nothing to change.
-
-### THE MEASUREMENT (item 1) — the absorption was one bounded day, and it is a fraction of a cent
-
-The absorbed under-billing exists ONLY on rows that predate DB27's deploy. Measured from
-`atlasoracle_directives`: **cached traffic has occurred exactly five times, all on 2026-07-27**
-(19:11–19:49, the OPS15 live battery); there has been NO cached directive since. All five have
-`cache_write_tokens = NULL` because the pre-DB27 route stored only the summed `cached_tokens` and
-billed it at the READ rate.
-
-| model | rows | cached tokens | write−read spread (h24/MTok) |
-|---|---|---|---|
-| claude-sonnet-5 | 3 | 6,771 | 11250 − 900 = 10,350 |
-| claude-opus-5 | 2 | 4,512 | 15625 − 1250 = 14,375 |
-
-The exact read/write split of those 11,283 cached tokens is **unrecoverable** (the old route did not
-store it), so the absorption is bounded, not exact:
-
-- **Upper bound** (every cached token a write billed at read): `6771×10350/1e6 + 4512×14375/1e6`
-  = **0.135 h24 tokens ≈ $0.000135**.
-- **Likely** (cache TTL is 5 min; the timestamps imply ~3 cold creations and ~2 reads): **≈ 0.08 h24
-  tokens ≈ $0.00008**.
-
-Either way it is a fraction of a cent, and it is a USER UNDERCHARGE — the platform ate it. **The
-lead's read holds: no retroactive action; eating it is the honest shape.** The number is stated here
-as instructed; there is nothing to reverse that would not cost more than $0.0001 to compute.
-
-### PROVE (item 4)
-
-The live path's four-leg correctness is proven by reading the DEPLOYED code (above) + the correct
-rate rows + the P4.1 single-active-row check — which is stronger than one sampled ledger row. A fresh
-live cached directive to produce a new split ledger row would need a warm cache AND a real
-authenticated session (no synthetic credentials), and would only re-demonstrate what the deployed
-code already guarantees. Not run.
-
-### WHAT I DID NOT DO, and why
-
-- **No route change** — the four-leg Anthropic math is already in the repo (DB27) and deployed.
-  Adding it again would be a no-op claiming to fix a fixed thing.
-- **No rate rows** — `cache_write_per_m` already exists and is correct for every model.
-- **No retroactive billing** — a fraction-of-a-cent user undercharge, lead-ruled to eat.
-- **Nothing committed** — there is no code or SQL to commit. This REPORT.md finding is the only change.
-
-### COULD NOT VERIFY / FLAGGED
-
-- **The exact historical read/write split** of the 2026-07-27 cached tokens is gone — the pre-DB27
-  route stored only the sum. Hence a bounded measurement, not an exact one.
-- **DB75/DB77/DB78 are still undeployed** (the internal-caller path + the new adapters). They do not
-  affect the Anthropic four-leg path, but the day's coming deploy of `atlasoracle-route` will carry
-  them — worth noting so the deploy is understood to change more than nothing.
-- **If the lead intended DB80 to be the pass that DEPLOYS the four-leg path**, that is already done
-  (DB27); if it intended DB80 to deploy DB75/77/78, that is those passes' gated deploy, not a
-  cache-write fix.
-
----
-
-## DB79 — THE PROVIDER CATALOG. Schema + the single margin anchor + a seed band-map, rehearsed forward→rollback; NOTHING APPLIED. One ask. (2026-08-18)
-
-Session `79a4fea9` (fallback id). Dispatch DB79, lane `db`, workdir **`TheMANUAL.tech-db`**, effort
-MEDIUM, propose-first. Both migration files rehearsed against production inside a self-rolling-back
-transaction; **nothing applied**, only `supabase/**` reads + the two draft files. One ask at the end.
-
-### WHAT THIS PROPOSES
-
-Pricing moves OUT of code and INTO a catalog — a price change becomes a row update with a date, not
-a deploy (ORACLE_MF v1.47).
-
-- **`providers`** — id, name, base_url, `auth_secret_name` (the NAME of the secret, never the key —
-  the route reads it by name, DB77/DB78), `dialect` (openai_compat | anthropic | gemini |
-  groq_compat), active.
-- **`models`** — id, provider_id (FK), model_string, `band` (free|standard|frontier, **NULLABLE**
-  until the owner rules), `price_in` / `price_out` / `price_cached` (provider USD per MTok),
-  `checked_at` (the drift-honesty column — the date the price was last verified; NULL = never),
-  active.
-- **`h24_tokens_per_mtok(usd, band)`** — THE ANCHOR, in exactly one place. `1000 h24 = $1`; margin
-  `3x` standard, `2.5x` frontier, free = 0. The ledger and the composer picker both read this
-  function, so the anchor lives nowhere else. **Verified**: `h24(3,'standard')=9000`,
-  `h24(5,'frontier')=12500`, `h24(1,'free')=0` — reproducing the live `oracle_model_rates` exactly.
-- **RLS from birth** — active rows publicly readable (the picker is product surface); writes
-  service-role only (no write policy → anon/auth denied, service role bypasses).
-
-### THE SEED — verified where I could verify, PROPOSED where I could not
-
-**ACTIVE, verified USD prices** (reproduce the live rate card through the anchor):
-
-| provider | model | band | $in/$out/$cached (MTok) | checked_at |
-|---|---|---|---|---|
-| anthropic | claude-opus-5 | frontier | 5 / 25 / 0.50 | 2026-07-27 |
-| anthropic | claude-sonnet-5 | standard | 3 / 15 / 0.30 | 2026-07-27 |
-| anthropic | claude-haiku-4-5 | free | 1 / 5 / 0.10 | 2026-07-27 |
-| groq | llama-3.1-8b-instant | free | 0.05 / 0.08 / — | 2026-07-28 |
-
-**PROPOSED, prices NULL / `active=false`** — the default band map for your single-word rulings. The
-model ids AND prices are **unverified proposals** (I cannot browse live rate cards); they sit inactive
-and unpriced so the public picker never shows an unpriced model. One-line reasoning each:
-
-| provider | model | proposed band | why |
-|---|---|---|---|
-| openai | gpt-5 | frontier | the flagship — top-end reasoning, priced with opus |
-| openai | gpt-5-mini | standard | the value workhorse — sonnet-class cost/quality |
-| deepseek | deepseek-reasoner | frontier | its reasoning model, frontier-adjacent quality at low cost |
-| deepseek | deepseek-chat | standard | the cheap general workhorse |
-| mistral | mistral-large-latest | frontier | Mistral's flagship |
-| mistral | mistral-small-latest | standard | the value tier |
-| xai | grok-4 | frontier | xAI's flagship; no clear value model wired yet |
-| gemini | gemini-2.5-pro | frontier | Google's flagship |
-| gemini | gemini-2.5-flash | standard | the fast value model |
-
-**Bands are your taste** — this map is a proposal, not a decision. Correct any band with a word.
-
-### REHEARSAL — proven, production untouched
-
-```
-FORWARD  :: h24(3,std)=9000 · h24(5,fr)=12500 · h24(1,free)=0 · providers=7 · models=13 · active=4
-ROLLBACK :: tables_remaining=0 · function_remaining=0
-```
-
-Both ran inside one self-rolling-back transaction, so the catalog tables never landed in production —
-the rehearsal proves the forward applies and the rollback fully reverses it.
-
-### THE ONE ASK (nothing is applied until you click)
-
-Apply `supabase/migrations/_drafts/db79_provider_catalog_v1.sql` (rollback
-`..._v1_rollback.sql`). It creates the catalog with the four verified Anthropic/Groq rows live and
-the nine proposals inactive. Then, at your pace: rule the bands (single words) and supply verified
-prices + a `checked_at` for the providers you want live — a follow-up flips those rows active. Until
-then the catalog changes nothing: the route still reads its existing rate path (repointing the route
-at this catalog is a later, separate pass).
-
-### FILES
-
-```
-supabase/migrations/_drafts/db79_provider_catalog_v1.sql            (forward, proposal)
-supabase/migrations/_drafts/db79_provider_catalog_v1_rollback.sql   (rollback, authored first)
-```
-
-### COULD NOT VERIFY
-
-- **Non-Anthropic prices and model ids are UNVERIFIED** — I cannot browse live rate cards, so those
-  nine rows carry NULL prices, NULL `checked_at`, and `active=false`. That is the honest state, and
-  the `checked_at` column exists precisely so a price is never live without a verification date.
-- **The route is NOT repointed at this catalog** — out of scope. Today's billing still runs off
-  `oracle_model_rates`; this catalog is inert until a later pass wires the route to read it.
-
----
-
-## DB78 — THE GEMINI ADAPTER. Third dialect in the metered door, deno-checked; live proof BLOCKED-ON-KEY (GEMINI_API_KEY absent). (2026-08-18)
-
-Session `79a4fea9` (fallback id). Dispatch DB78, lane `db`, workdir **`TheMANUAL.tech-db`**, effort
-MEDIUM. `deno check` clean; committed on top of DB77 (`7e35864`). Nothing deployed, no key touched.
-
-### THE BUILD — Google's own shape, DB77's rules inherited unchanged
-
-Gemini does not speak the OpenAI wire, so it gets its own adapter (`callGemini`), not a registry row.
-Everything else is inherited from DB77 verbatim — not a weaker restatement:
-
-- **generateContent mapping.** Request: `contents[]` + `systemInstruction`; response:
-  `candidates[0].content.parts[].text`. The model rides the URL path
-  (`/models/{model}:generateContent`); the key is the **`x-goog-api-key` header**, never the query
-  string (a key in a URL leaks into logs and referrers).
-- **Usage normalized to the four legs.** `usageMetadata`: `promptTokenCount` INCLUDES
-  `cachedContentTokenCount` (nested, like OpenAI), so the adapter subtracts to the disjoint
-  convention `calculateCostTokens` expects. output = `candidatesTokenCount`, cached =
-  `cachedContentTokenCount`.
-- **FAIL CLOSED.** If `usageMetadata` is absent, or carries neither a prompt nor a candidate count,
-  the response is refused (`provider_usage_missing`) — not returned uncounted.
-- **Worse-leg (v1.49).** Gemini's cached figure is a documented context-cache READ, but is **not
-  verified live this pass**, so it takes the conservative `'combined'` → cache_write treatment. A
-  wrong guess overcharges the platform's own internal spend, never a user, never in the leak
-  direction.
-- **Sovereignty / one attempt / no retry / key-by-name** — identical to DB77; every log on every
-  path (success, HTTP error, parse error, usage-missing) is metadata only.
-- **Selection.** An internal caller (DB75's service-principal path) may name `provider:'gemini'`;
-  it requires a model and fails closed (503 `provider_key_absent`) if `GEMINI_API_KEY` is absent —
-  never a silent Anthropic fall-through. Users cannot reach it; the billing path is byte-unchanged.
-  `callProvider` now dispatches `anthropic` / `gemini` / `openai-compatible`.
-
-### PROVE — BLOCKED-ON-KEY, verified honestly
-
-`supabase secrets list --project-ref … ` (names + digests, no values): **`GEMINI_API_KEY` is
-ABSENT.** No provider to route to, so the end-to-end proof cannot run. Per the dispatch, the build
-stands and this reports BLOCKED-ON-KEY by name.
-
-### THE OWNER'S GO SEQUENCE (the key is yours)
-
-1. Add `GEMINI_API_KEY` to Edge Function secrets.
-2. Deploy `atlasoracle-route` (ask-gated; carries DB75 + DB77 + DB78 together).
-3. Verify live: one internal directive `{ internal:true, caller:'db78-proof', provider:'gemini',
-   model:'gemini-2.5-flash' (or another), system:'…', max_tokens:… }` → an `atlasoracle_directives`
-   row with counts from `usageMetadata`, four legs correct.
-
-### FILES
-
-```
-MOD supabase/functions/atlasoracle-route/index.ts   gemini types · config · resolver · callGemini · dispatch · selection
-```
-
-Additive: only new branches, all gated on the service principal naming `provider:'gemini'`.
-
-### DONE-TEST
-
-```
-deno check atlasoracle-route/index.ts   → EXIT 0
-```
-
-### COULD NOT VERIFY
-
-- **No live Gemini call** — `GEMINI_API_KEY` absent, deploy gated. Request/response mapping proven by
-  type-check and the generateContent spec, not a live round-trip.
-- **Gemini's cached-token semantics** taken as `'combined'` (worse leg) until verified live — a
-  deliberate safety posture, flagged, not an assumption.
-- **The model id** in the go-sequence example is illustrative; the caller supplies the model, and a
-  bad id would surface only at the proof call.
-
----
-
-## DB77 — THE OPENAI-COMPATIBLE ADAPTER. Built inside DB75's metered door, deno-checked; live proof BLOCKED-ON-KEY (none of the four provider keys exist). (2026-08-18)
-
-Session `79a4fea9` (fallback id — no `MC_SESSION`). Dispatch DB77, lane `db`, workdir
-**`TheMANUAL.tech-db`** (the separate db worktree, per the lead's WORKDIR UPDATE). Effort LARGE.
-`deno check` clean; committed. **Nothing deployed, no key created/printed/deleted.**
-
-### THE GATE THAT BLOCKED DB77 EARLIER — resolved
-
-DB77 depends on DB75's reroute ("the adapter goes INSIDE the single metered door"). DB75 was
-committed-but-unpushed in the sibling front tree; this db worktree (a separate clone) could not see
-it. Filed DB77-Q; the owner ruled **(a) push DB75**. Executed: fetched, and because a now-gone DB74
-session (`8a1bc505`) had left its **already-applied** migration + report uncommitted here, that had
-to be committed first (`7012ff7` `[DB74] media visibility v1`, pushed — verified `media_visibility`
-enum + `media_assets.visibility` live in prod, in `schema_migrations`) before the db tree could
-fast-forward. Then fast-forwarded to `origin/main` (5b087e7 → 7012ff7); DB75's internal-caller path
-is now present (`isServiceRolePrincipal` grep = 3). DB77 built on top.
-
-### THE BUILD — one adapter, providers as CONFIG not code
-
-The route ALREADY had a generic `callOpenAICompatible` written to the OpenAI chat-completions WIRE
-FORMAT (used for Groq's free tier). DB77 generalizes it into the metered door:
-
-1. **THE PROVIDER REGISTRY** (`OPENAI_COMPAT_REGISTRY`) — OpenAI, DeepSeek, Mistral, xAI and Groq
-   are each a row of `{ baseUrl, secretName, cacheSemantics }`. Adding a provider is a row, never a
-   code path. `resolveOpenAICompatSpec(provider, model)` reads the key BY NAME from the environment
-   and returns a `ProviderSpec`, or **null when the key is absent** — the caller decides if that is a
-   hard failure or "not available here". The key value is never logged or returned; only its
-   presence.
-
-2. **FAIL CLOSED — the money rule.** `callOpenAICompatible` now REFUSES a response it cannot count:
-   if the provider omitted `usage`, or reported neither `prompt_tokens` nor `completion_tokens`, it
-   returns `provider_usage_missing` and the response does not reach anyone. Before, missing usage
-   defaulted to 0/0 and the answer was returned uncounted — that was the leak the dispatch named.
-
-3. **FOUR LEGS (v1.49).** `{input, output, cache_read, cache_write}`. `cacheSemantics` per provider:
-   `'read'` where the cached figure is a documented cache-READ count (OpenAI's wire — priced at the
-   cheap cache_read leg); `'combined'` where the cached figure is a single ambiguous number — priced
-   at the **WORSE cache_write leg** (1.25x input) until that provider's API distinguishes, so the
-   platform never absorbs the 12.5x spread. DeepSeek/Mistral/xAI take `'combined'` because their
-   cached wire format is NOT verified this pass; a wrong guess overcharges the platform's own
-   internal spend, never a user, and never in the leak direction.
-
-4. **SOVEREIGNTY.** Every log on every path — success, HTTP error, parse error, usage-missing — is
-   metadata only (`provider`, `status`, token counts). No directive text, no response text, anywhere.
-
-5. **NO DOUBLE-CHARGE.** One attempt per rung, honest failure — the existing route posture, unchanged.
-   No retry was added.
-
-6. **SELECTION — service-principal only.** An internal caller (DB75's path) may name a `provider`
-   from the registry; the route builds the spec from the registry and **fails closed** if that
-   provider's key is absent (503 `provider_key_absent` with the secret name — never a silent
-   fall-through to Anthropic, which would mis-attribute the spend). Requires `model`. Users cannot
-   reach this — it is gated on the service principal exactly as DB75's overrides are. The user
-   billing path is byte-unchanged.
-
-### PROVE — BLOCKED-ON-KEY, verified honestly, never mocked
-
-Key existence was verified **via env presence only**, without deploying, using
-`supabase secrets list --project-ref anxmqiehpyznifqgskzc` (prints NAMES + digests, never values):
-
-```
-present:  ANTHROPIC_API_KEY, GROQ_API_KEY  (+ Stripe / LiveKit / Supabase infra)
-ABSENT:   OPENAI_API_KEY · DEEPSEEK_API_KEY · MISTRAL_API_KEY · XAI_API_KEY
-```
-
-**None of the four provider keys exists**, so there is no OpenAI-compatible provider to route a real
-directive to — the end-to-end proof cannot be run, and the dispatch is explicit: *"If NO key exists
-at verification time, build stands, report BLOCKED-ON-KEY with the exact secret names — never mock
-the proof."* The build stands; the proof waits on a key.
-
-### THE OWNER'S GO SEQUENCE (keys are yours — I never create, print, or delete one)
-
-1. Add **at least one** of `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `MISTRAL_API_KEY`, `XAI_API_KEY` to
-   Edge Function secrets.
-2. Deploy `atlasoracle-route` (ask-gated; the bundle `deno check`s clean). This same deploy also
-   carries DB75's internal-caller path — DB77 sits on it, so they deploy together.
-3. Verify live: one internal directive naming that provider (e.g.
-   `{ internal:true, caller:'db77-proof', provider:'<the one you added>', model:'<a model>',
-   system:'…', max_tokens:… }`) → an `atlasoracle_directives` row with the counts, priced against
-   the provider's own usage numbers, four legs correct.
-
-### FILES
-
-```
-MOD supabase/functions/atlasoracle-route/index.ts   registry · resolver · fail-closed usage · four-leg/worse-leg · internal provider selector
-```
-
-Additive: the user path and the Anthropic/Groq paths are unchanged; every new branch is gated on the
-service principal or on a registry provider being named.
-
-### DONE-TEST
-
-```
-deno check atlasoracle-route/index.ts   → EXIT 0
-```
-
-Build type-checks clean. The live proof is the owner's go sequence above; nothing was deployed and
-no provider call was made, because there was no provider key to make one with.
-
-### COULD NOT VERIFY
-
-- **No live provider call** — none of the four keys exist, and deploy is gated regardless. The
-  adapter's request/response mapping and fail-closed logic are proven by type-check and by reading
-  the OpenAI wire spec, not by a live round-trip.
-- **DeepSeek / Mistral / xAI cached-token wire formats are NOT verified** — they take the
-  conservative `'combined'` → worse-leg treatment until a later pass confirms each against its live
-  API. Flagged so it is a deliberate safety posture, not an assumption.
-- **`base_url` paths** for the four providers are the standard OpenAI-compatible chat-completions
-  endpoints; not one was hit live (no keys), so a path typo would only surface at the proof call.
+## FRONT81 — THE h24 TOKEN STOREFRONT. Board P2.6 revenue path wired to the checkout that has waited since 08-01. Build complete + green + committed; Stripe test-mode e2e proof DEFERRED by owner (worker-2 ruling). NOT pushed. (2026-08-18)
+
+Session `f8b19368` (fallback id). Dispatch FRONT81, lane `front`, workdir `TheMANUAL.tech`, effort
+LARGE. After FRONT80 (same tree). Commit `8b1b8ce` (amended to include this report), no push (dispatch:
+"COMMIT ON GREEN. NO PUSH").
+
+### Owner ruling mid-pass (recorded)
+On the e2e-proof fork the owner chose **"defer the test-mode proof, mark build-complete, record what's
+left to verify."** So this pass ships the BUILD complete and green; the Stripe TEST MODE end-to-end
+proof is deferred to a real-browser pass with a real signed-in user (see "What's left"). The build was
+not gated on that proof — it is a verification step, and the owner closed the pass as build-complete.
+
+### What the dispatch asked, and what shipped
+Board P2.6: "Bees can see Tokens, cannot buy them; revenue is unreachable until this exists." The whole
+server side (checkout function, webhook, rate-card tables, ledger) has been live and idempotent-safe
+since 2026-08-01 with **nothing calling it**. This pass is the CLIENT half. **No money code changed**
+(dispatch item 2: "do not redesign money code"); the contract served the view as-is, so nothing was
+touched or a question filed.
+
+Files (3 new + 6 edited):
+- `src/lib/atlasoracle/storefront.ts` — NEW. Reads `oracle_token_packs` / `oracle_token_plans`
+  (public-read, active-only — prices NEVER hardcoded) for display; `startCheckout(pack_code XOR
+  plan_tier, attempt?)` calls `oracle-checkout` and returns the Stripe URL. Parses 401/409 exactly the
+  way `client.ts` `unwrapError` does (FunctionsHttpError `.context` Response → `.json()`).
+- `src/components/h24/H24Storefront.tsx` — NEW. On-demand modal: **4 packs + 3 plans** from the rate
+  card with what-you-get in h24 tokens; the **ledger truth said on the surface** (plan tokens reset each
+  cycle + spent first; held tokens never expire + spent after); GET → `window.location = url` (Stripe);
+  honest states for 409 "plan already live" (with renew date), load-failure, and generic errors.
+  Signed-out visitors may BROWSE the card; GET flips an inline sign-in prompt (no synthetic session).
+- `src/stores/useH24Storefront.ts` — NEW. zustand open/close; the modal is mounted ONCE (UtilityChrome)
+  so the badge and the sidebar both drive the one modal.
+- `src/components/layout/UtilityChrome.tsx` — mounts `<H24Storefront />` globally.
+- `src/components/AtlasOracleWalletBadge.tsx` — both "GET h24 tokens" controls now open the storefront;
+  the stale `tokenNotice` stub ("no way to GET more yet — has not been ruled on") is REMOVED (it was
+  contradictory — packs/plans are ruled and seeded).
+- `src/components/h24/H24Sidebar.tsx` — Wallet section gains a "GET h24 tokens" button (signed-in only).
+- `src/lib/atlasoracle/tokens.ts` — added `ORACLE_TOKENS_REFRESH_EVENT` (the return-refresh signal).
+- `src/lib/atlasoracle/useOracleTokens.ts` — listens for that event and re-reads from the ledger
+  (additive; the hook's own doc already anticipated "a future GET-tokens purchase completing").
+- `src/pages/oracle/OraclePage.tsx` — `/h24?tokens=1` return handler: fires the ledger re-read at
+  0/2/5s (webhook credits async — NEVER optimistic math, a token shows only once the webhook wrote it),
+  shows an honest "top-up received, balance updates as it clears" banner, strips the flag.
+
+### The rate card (verified against the live DB, not hardcoded)
+- Packs (`oracle_token_packs`, one-time, never expire): Starter $5 / 5,000 · Regular $10 / 11,000 ·
+  Plus $25 / 30,000 · Pro $60 / 78,000.
+- Plans (`oracle_token_plans`, monthly): Scout $9 / 10,000 · Oracle $29 / 40,000 · Sovereign $99 /
+  150,000 per cycle.
+- Both tables carry `..._public_read` RLS (`active=true`, role `public`) + `GRANT SELECT` to
+  `anon`/`authenticated`, so the client read is safe and works for signed-out visitors too.
+
+### Done-tests (verbatim)
+- `npm run build` (tsc -b && vite build) → `✓ built in 21.57s` (green; also green at 34.78s and 14.85s
+  across iterations).
+- `npx biome lint` on all 9 touched files → `Checked 9 files. No fixes applied.` (clean). Fixed two of
+  my own findings pre-commit: `noArrayIndexKey` in the skeleton (stable keys) and `useSemanticElements`
+  on the status banner (biome-ignore — a polite live region is not an `<output>`). `biome check --write`
+  normalized import order on the touched files; nothing else.
+- Firewall: user copy uses GET / held / "you"; no buy/sell/purchase/price. USD amounts are shown because
+  h24 tokens are a real paid product (Stripe), which the existing checkout + badge already do.
+
+### Language-firewall note (judgement call, flagged)
+Plan tier `oracle` displays as "Oracle" next to "h24" branding — the middle plan literally carries the
+old product name. That is the DB `display_name`, canon-seeded; renaming is a `db`-lane call, not a
+front pass. Recorded, not touched.
+
+### What's left to verify (the deferred Stripe TEST MODE e2e proof)
+The dispatch's PROVE clause — "checkout opens, test card pays, webhook credits, ledger row exists,
+balance renders" — is NOT yet demonstrated. It needs a **real signed-in session**, which I did not
+fabricate (standing rule: no throwaway auth user / no pasted bearer token for an auth-gated flow). The
+exact remaining steps, for a real-browser pass with a real user (or once deployed to prod where real
+users exist):
+1. Signed in on the h24 surface, open the storefront from the wallet badge or the sidebar Wallet GET
+   button. **Verify the render**: 4 packs + 3 plans with the prices above, the ledger-truth note.
+2. Click GET on a pack (e.g. Starter) → confirm it **redirects to a Stripe TEST MODE Checkout Session**
+   (`oracle-checkout` returns `{ url }`). This proves "checkout opens".
+3. Pay with test card `4242 4242 4242 4242` → Stripe returns to the function's success URL
+   (`ORACLE_CHECKOUT_SUCCESS_URL` ?? `https://themanual.tech/oracle?tokens=1`, which 301s to
+   `/h24?tokens=1`). **NOTE:** that return URL is PROD, so a localhost checkout lands on prod, not the
+   dev server — the return-handler leg is best proven on prod or with the env pointed at the dev origin.
+4. Confirm `oracle-webhook` fired `checkout.session.completed` → `oracle_credit_token_purchase` wrote a
+   `oracle_token_ledger` row (`entry_type='purchase'`, `payment_ref=cs_...`, `expires_at=NULL`), and the
+   `/h24?tokens=1` handler's ledger re-read renders the new balance.
+5. State the evidence (Stripe test event ids + the ledger row) — that is the report line this pass could
+   not fill.
+Pre-req to confirm before that run: `oracle-checkout` / `oracle-webhook` carry Stripe **test-mode** keys
+(`STRIPE_SECRET_KEY` test + `STRIPE_WEBHOOK_SECRET_ORACLE` for the test endpoint). Not visible from here.
+
+### Could not verify (this pass)
+- Runtime render of the storefront modal (entry points gate on sign-in; signed-out on localhost the
+  badge does not mount). Deferred with the e2e proof above.
+- Any live Stripe interaction (no session; NO PUSH; local dev).
 
 ---
 
@@ -10309,118 +10273,3 @@ enforcement). Post-apply verification recorded below.
   storage path + bucket routing (Step 1, front lane); backfill decision (still the
   grandfather-the-5 recommendation, unchanged — nothing needed migrating, all 5
   are correctly `public`).
-
----
-
-# DB79 — provider catalog — APPLY (owner ask-click, 2026-08-18)
-
-Owner: "apply DB79 then DB80 — run the drafted migrations." DB79 has a real,
-rehearsed migration; applying per instruction.
-
-**Files:** `_drafts/db79_provider_catalog_v1.sql` (+ `_rollback.sql`, authored first).
-**Rollback statement (stated before apply):**
-`DROP FUNCTION IF EXISTS public.h24_tokens_per_mtok(numeric, text); DROP TABLE IF EXISTS public.models CASCADE; DROP TABLE IF EXISTS public.providers CASCADE;`
-
-## Freeze-lift measure (BEFORE apply): reconcile.mjs → EXIT 0, criterion MET.
-## Pre-flight (production, read-only)
-- **Name collisions:** none — `to_regclass('public.providers')`, `public.models`,
-  and `to_regprocedure('public.h24_tokens_per_mtok(numeric,text)')` all null. Clean create.
-- **Classification:** purely additive — two new tables, one IMMUTABLE function, two
-  RLS read policies, seed rows. No existing object touched, no data reshaped, 0 rows at risk.
-- **RLS:** created from birth — `active=true` rows publicly readable (product surface);
-  no write policy → anon/authenticated denied, service role bypasses.
-- **Anchor to verify post-apply:** h24(3,'standard')=9000, h24(5,'frontier')=12500,
-  h24(1,'free')=0; counts providers=7, models=13, active=4.
-
-## DB79 — APPLIED + VERIFIED (2026-08-18)
-- **apply_migration** `db79_provider_catalog_v1` → **success**, stamped `20260818215307`.
-- **Post-apply verify:** `h24_tokens_per_mtok(3,'standard')=9000`, `(5,'frontier')=12500`,
-  `(1,'free')=0` — reproduces the live rate card exactly. providers=7, models=13,
-  active=4 (anthropic opus/sonnet/haiku + groq llama), 2 RLS read policies
-  (`active=true` public read; no write policy → writes service-role only).
-- **Files** moved draft→versioned: `supabase/migrations/20260818215307_db79_provider_catalog_v1.sql`
-  + `_drafts/20260818215307_db79_provider_catalog_v1_rollback.sql`. Cross-refs updated.
-- **Closing re-measure:** reconcile.mjs → EXIT 0, criterion MET, no drift.
-- **Correction logged:** I moved the forward file with `git mv`, which staged the rename —
-  an unauthorized git write outside a cleared manifest. Undone with a bare `git reset`
-  (no --hard); git is back to read-only state, worktree/history untouched. Files remain
-  moved on disk (plain rename), which is the intended state for the owner's commit.
-- **STILL OPEN (owner, at your pace):** rule the 9 inactive band proposals (single words)
-  and supply verified prices + `checked_at` to flip any live; repoint the route at this
-  catalog is a separate later pass. Catalog is inert until then — billing still runs off
-  `oracle_model_rates`.
-
-## DB80 — NOTHING TO APPLY (verified, not a refusal)
-Owner said "apply DB80." There is **no DB80 migration** — none drafted, none in the repo.
-DB80 was a measure-first pass whose measurement overturned its premise: the cache-write
-split is **already live** (DB27, deployed 2026-08-03; the deployed `atlasoracle-route`
-bills four legs apart, rate card carries `cache_write_per_m` on every active model). The
-only historical absorption was 5 cached directives on 2026-07-27, bounded ≤0.135 h24
-tokens (~$0.00014), a user undercharge the lead ruled to eat. DB80 report (status done):
-"no code, no rate rows... no SQL to commit." Applying the four-leg path again would be a
-no-op claiming to fix a fixed thing. **No action taken.**
-
-## REPORT.md ROTATION FLAG
-This file is now >512 KB. Per R6 the next SWEEP must rotate it to
-`docs/reports/REPORT-archive-NNN.md` before staging. Flagging for the lead/sweep.
-
----
-
-# DBPRICE1 — VERIFIED PROVIDER PRICES: 9 models priced + activated (2026-08-18)
-
-Pass DBPRICE1, lane db, workdir TheMANUAL.tech-db, effort M. Web-verified every
-number against the provider's official pricing page (no memory guessing — 5
-parallel research agents, one per provider). Propose-first; owner OK'd all five
-providers with explicit tier rulings. Data UPDATE on `public.models` (not a
-migration — pricing is data by DB79 design). Read-back verified.
-
-## UNIT CONVENTION (locked against live Anthropic rows before writing)
-`models.price_in/out/cached` store the **provider USD per MTok**. The h24 charged
-rate is DERIVED at read time by `h24_tokens_per_mtok(usd, band)` = usd × margin ×
-1000 (margin 3× standard / 2.5× frontier / free=0). Confirmed: sonnet 3.0 = live $3.
-
-## VERIFIED PRICES (provider USD in/out/cached) + derived h24 in/out
-| provider | model | band | USD in/out/cached | h24 in/out | source | tier ruling |
-|---|---|---|---|---|---|---|
-| openai | gpt-5 | frontier | 1.25 / 10.00 / 0.125 | 3125 / 25000 | developers.openai.com/api/docs/pricing | standard tier |
-| openai | gpt-5-mini | standard | 0.25 / 2.00 / 0.025 | 750 / 6000 | " | standard tier |
-| gemini | gemini-2.5-pro | frontier | 1.25 / 10.00 / 0.125 | 3125 / 25000 | ai.google.dev/gemini-api/docs/pricing | base ≤200k (see caveat) |
-| gemini | gemini-2.5-flash | standard | 0.30 / 2.50 / 0.03 | 900 / 7500 | " | text input |
-| mistral | mistral-large-latest | frontier | 0.50 / 1.50 / — | 1250 / 3750 | mistral.ai/pricing/api | no published cache rate → null |
-| mistral | mistral-small-latest | standard | 0.15 / 0.60 / — | 450 / 1800 | " | no published cache rate → null |
-| deepseek | deepseek-v4-flash | standard | 0.44 / 1.32 / 0.014 | 1320 / 3960 | api-docs.deepseek.com/quick_start/pricing | PEAK (owner ruling) |
-| deepseek | deepseek-v4-pro | frontier | 1.32 / 3.96 / 0.044 | 3300 / 9900 | " | PEAK (owner ruling) |
-| xai | grok-4.6 | frontier | 2.00 / 6.00 / 0.50 | 5000 / 15000 | docs.x.ai/docs/models | base <200k (owner ruling) |
-
-## TWO MODEL-IDENTITY REPOINTS (owner-approved — seeded strings were deprecated)
-- **deepseek-chat → `deepseek-v4-flash`** and **deepseek-reasoner → `deepseek-v4-pro`**:
-  the DB79 seed strings were retired ~2026-07-24; the official page now lists only
-  the v4 line. Bands preserved (flash=standard, pro=frontier). DeepSeek is
-  peak/off-peak time-tiered; **peak** stored per owner (avoids undercharge; off-peak
-  is ~half). price_cached = cache-HIT input; price_in = cache-MISS input.
-- **grok-4 → `grok-4.6`**: grok-4 gone from the official page; grok-4.6 is the
-  flagship (released 2026-08-12). **Base <200k** tier stored per owner; ≥200k
-  doubles.
-
-## APPLIED (single atomic UPDATE, read-back verified)
-9 rows updated: model_string (2 repoints) + price_in/out/cached + checked_at
-2026-08-18 + active=true. Post-state: **13/13 models active, 0 active-but-unpriced.**
-Anchor re-derivation verified for all rows (free=0; margins correct).
-
-## CAVEATS / COULD NOT VERIFY / OPEN
-- **Catalog is still inert for billing.** Per DB79, the route has NOT been repointed
-  at this catalog — production billing still runs off `oracle_model_rates`. So step 5
-  "spot directive bills at written rate" is NOT testable through the catalog yet; the
-  active rows are verified in the catalog/picker surface (active=true, public-read
-  RLS) but do not bill until a later route-repoint pass.
-- **DB79 migration file not edited.** The historical seed file keeps the original
-  strings (deepseek-chat/reasoner, grok-4); the repoint is a data update on top,
-  recorded here. Migrations are not re-run, so no drift — but a from-scratch rebuild
-  from migrations would need this data step re-applied (pricing is data, not schema).
-- **Gemini 2.5-pro >200k tier (2.50/15.00/0.25) not stored** — catalog has no
-  context-tier column; base tier stored. Flag if the high tier should govern.
-- **Mistral cached = null** — no fixed published cache rate ("up to 90%", variable).
-- **DeepSeek off-peak (~half) not stored** — single price slot; peak chosen.
-- **Third-party price aggregators disregarded** — only official pages trusted; where
-  aggregators conflicted (deepseek, grok-4 legacy), the official page won or the row
-  was repointed rather than guessed.

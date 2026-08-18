@@ -9,6 +9,7 @@ import { useOracleDirective } from '@/lib/atlasoracle/useOracleDirective';
 import { useOracleTokens } from '@/lib/atlasoracle/useOracleTokens';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
+import { useH24Storefront } from '@/stores/useH24Storefront';
 import { X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -61,7 +62,14 @@ export function AtlasOracleWalletBadge({
   const [directive, setDirective] = useState('');
   const [tier, setTier] = useState<Tier>(defaultTier);
   const [category, setCategory] = useState<DirectiveCategory>(DEFAULT_CATEGORY);
-  const [tokenNotice, setTokenNotice] = useState(false);
+  const openStore = useH24Storefront((s) => s.openStore);
+
+  // Opens the token storefront (FRONT81) and steps out of the directive surface
+  // so the modal is not stacked behind it. Used by every GET control here.
+  const openGetTokens = useCallback(() => {
+    setOpen(false);
+    openStore();
+  }, [openStore]);
 
   const { state, response, preview, failure, send, confirm, cancelConfirm, reset } =
     useOracleDirective();
@@ -94,7 +102,6 @@ export function AtlasOracleWalletBadge({
 
   const close = useCallback(() => {
     setOpen(false);
-    setTokenNotice(false);
     if (state === 'response-ready') {
       reset();
       setDirective('');
@@ -116,9 +123,7 @@ export function AtlasOracleWalletBadge({
   const tierRate = rates.find((r) => r.tier === tier);
   const balanceLabel = tokens.balance === null ? '—' : formatTokens(tokens.balance);
   const badgeTitle =
-    tokens.status === 'live'
-      ? `h24 · ${balanceLabel} tokens`
-      : `h24 · ${tokens.reason}`;
+    tokens.status === 'live' ? `h24 · ${balanceLabel} tokens` : `h24 · ${tokens.reason}`;
 
   return (
     <>
@@ -206,8 +211,7 @@ export function AtlasOracleWalletBadge({
               </span>
               <button
                 type="button"
-                onClick={() => setTokenNotice((v) => !v)}
-                aria-expanded={tokenNotice}
+                onClick={openGetTokens}
                 className="rounded-md border border-border-bright px-2 py-0.5 text-text-silver transition-colors hover:border-honey/70 hover:text-text"
               >
                 GET h24 tokens
@@ -227,9 +231,9 @@ export function AtlasOracleWalletBadge({
                 the total above already said it.
 
                 "Plan is spent first" is not a design intention stated here — it
-                is what `oracle_debit_tokens` actually does: it walks live plan
+                is what `h24_debit_tokens` actually does: it walks live plan
                 grants FIFO by soonest expiry, then falls through to the durable
-                pool, and records the split it took in `oracle_token_consumption`.
+                pool, and records the split it took in `h24_token_consumption`.
                 The line is safe to print because the server enforces it. */}
             {split && (split.plan > 0 || split.purchased > 0) && (
               <div
@@ -248,24 +252,14 @@ export function AtlasOracleWalletBadge({
                     not expire. The data field stays `purchased` because that is
                     what the ledger calls it. */}
                 <span>
-                  held · <span className="font-mono text-text">{formatTokens(split.purchased)}</span>
+                  held ·{' '}
+                  <span className="font-mono text-text">{formatTokens(split.purchased)}</span>
                 </span>
                 {split.plan > 0 && (
                   <span className="text-text-muted">
                     plan tokens are spent first, and they expire
                   </span>
                 )}
-              </div>
-            )}
-
-            {tokenNotice && (
-              <div
-                className="rounded-md border border-border-bright bg-bg p-3 text-text-silver"
-                style={{ fontSize: '12px' }}
-              >
-                Your balance is live, but there is no way to GET more yet — how h24 tokens are
-                offered has not been ruled on, so this control has nothing to hand you. The free
-                tier routes today at no token cost.
               </div>
             )}
 
@@ -433,10 +427,7 @@ export function AtlasOracleWalletBadge({
                       )}
                     <button
                       type="button"
-                      onClick={() => {
-                        setOpen(true);
-                        setTokenNotice(true);
-                      }}
+                      onClick={openGetTokens}
                       className="self-start rounded-md border border-border-bright px-2 py-0.5 text-text-silver transition-colors hover:border-honey/70 hover:text-text"
                       style={{ fontSize: '11.5px' }}
                     >

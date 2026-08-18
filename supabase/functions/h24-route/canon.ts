@@ -1,4 +1,4 @@
-// Cross-Astra canon bundled into the atlasoracle-route Edge Function.
+// Cross-Astra canon bundled into the h24-route Edge Function.
 //
 // Why bundled, not storage-fetched (for v1):
 //   - The themanual-canonical sync pipeline (v1 final scope §2.7) hasn't

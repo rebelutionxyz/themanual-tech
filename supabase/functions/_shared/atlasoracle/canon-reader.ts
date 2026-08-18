@@ -1,7 +1,7 @@
 // AtlasOracle canon reader — server-side only (service_role required).
 //
 // Reads master_plan/* canon files from the canonical Supabase storage
-// bucket and caches them in atlasoracle_canon_reads. Returns a single
+// bucket and caches them in h24_canon_reads. Returns a single
 // concatenated string with section headers — directly usable as Claude
 // `system` content or as `context` for a routed directive.
 //
@@ -69,7 +69,7 @@ async function readOne(sb: SupabaseClient, path: string): Promise<string> {
 
   // Cache check by (path, hash) pair.
   const { data: existing } = await sb
-    .from('atlasoracle_canon_reads')
+    .from('h24_canon_reads')
     .select('id')
     .eq('canon_path', path)
     .eq('canon_hash', hash)
@@ -78,13 +78,13 @@ async function readOne(sb: SupabaseClient, path: string): Promise<string> {
   if (existing) {
     // Touch last_read_at for cache-hit analytics.
     await sb
-      .from('atlasoracle_canon_reads')
+      .from('h24_canon_reads')
       .update({ last_read_at: new Date().toISOString() })
       .eq('id', existing.id);
   } else {
     // Insert. Errors here are non-fatal — caching is best-effort.
     await sb
-      .from('atlasoracle_canon_reads')
+      .from('h24_canon_reads')
       .insert({ canon_path: path, canon_hash: hash, content });
   }
 

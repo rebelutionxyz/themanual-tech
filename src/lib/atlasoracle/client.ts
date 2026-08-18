@@ -4,7 +4,7 @@
 // talk to the edge function. One module owns the request shape, the response
 // union, and the dev mock.
 //
-// REQUEST SHAPE is pinned to the DEPLOYED atlasoracle-route contract, verified
+// REQUEST SHAPE is pinned to the DEPLOYED h24-route contract, verified
 // live against production on 2026-07-27 (pass OPS10):
 //
 //   { directive, tier?, astra_slug?, category?, confirm_cost? }
@@ -269,7 +269,7 @@ export async function invokeDirective(args: InvokeArgs): Promise<RouteResult> {
   if (args.astraSlug) body.astra_slug = args.astraSlug;
   if (args.confirmCost) body.confirm_cost = true;
 
-  const { data, error } = await supabase.functions.invoke('atlasoracle-route', { body });
+  const { data, error } = await supabase.functions.invoke('h24-route', { body });
 
   if (error) return unwrapError(error);
   if (!data) {
