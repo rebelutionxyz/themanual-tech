@@ -23,6 +23,141 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## DB57-Q — THE CAPTURE HALF: STOPPED AT THE PRECONDITION, AND AT A SECOND GATE THE DISPATCH DID NOT ANTICIPATE. Nothing executed. (2026-08-18)
+
+Session `32c6b4f8` (fallback id — no `MC_SESSION`). Dispatch DB57, lane `db`, workdir
+`TheMANUAL.tech`. **Nothing was closed, captured, cancelled or invoked. No campaign was touched. No
+key was read or printed. The three fixture campaigns were not queried for anything but their
+counters, and were not modified.** The dispatch remains `claimed` per R4.
+
+**TWO BLOCKERS. The first is the one the dispatch predicted; the second is structural and needs a
+ruling, because it means DB57 cannot be closed by a db-lane terminal at all in its current form.**
+
+### BLOCKER 1 — the confirmed hold does not exist, on the best evidence available
+
+The dispatch said: verify, do not assume; if no confirmed hold exists, file DB57-Q and stop.
+
+**What the database says.** Campaign `fund-live-test-20260817` (`c4d34666-…`, aon, goal 1000,
+`manager_connect_account = acct_1TK1VIAPNY1rgvEA`, `is_fixture = false`) carries two pledges:
+
+| pledge | amount | status | PaymentIntent | created |
+|---|---|---|---|---|
+| `6e20e1e4-…` | 1000 | `canceled` | `pi_3U5apLAPNY1rgvEA2Iu3a1Sz` | 00:24:28 |
+| `d502711d-…` | 1100 | `authorized` | `pi_3U5azMAPNY1rgvEA3ZCi7Lry` | 00:34:49 |
+
+`raised_cents = 1100`, `captured_cents = 0`. **That is exactly the shape the dispatch's proof 1
+wants — and it is not evidence of a hold.** `fountain_pledges.status = 'authorized'` is written by
+`fountain_register_pledge` at PI *creation*, before the contributor ever confirms. It asserts a row
+was registered, not that a card was held.
+
+**What the webhook says, and this is the finding.** `give-webhook` is deployed (`v5`, ACTIVE,
+`verify_jwt=false`) and is **demonstrably receiving Connect events for this connected account** — it
+processed `evt_3U5apLAPNY1rgvEA26hlvh66` (`payment_intent.canceled`, `product_type='fund'`) at
+00:33:48, `status='processed'`. So the event path is live and proven, not theoretical.
+
+**Since the 1100 PI was created at 00:34:49, `stripe_events` has received nothing at all.** In
+particular no `payment_intent.amount_capturable_updated` — which is precisely the event Stripe fires
+when a manual-capture PI is confirmed and the hold is placed, and which `give-webhook` handles
+explicitly. A confirmed hold that produced no event on a webhook proven to be receiving events
+would be a contradiction.
+
+**Conclusion: the hold is NOT confirmed**, consistent with the dispatch's own 00:42 UTC observation
+(both intents Incomplete, `payment_method` NONE). FRONT62's confirm fix plus an owner-completed
+pledge in the browser is still the gating step.
+
+**Stated honestly: this is inference, not the direct check the dispatch asked for** — see blocker 2
+for why the direct check was impossible.
+
+### BLOCKER 2 — I cannot read the connected account, and I cannot invoke /close. Neither is fixable from this lane.
+
+**2a. The Stripe MCP in this session cannot see the money.** `list_available_accounts_or_orgs`
+returns exactly one account — `acct_1TK1KPPNZUSRg1t2` (Freedom Rings, test mode). The Fountain
+charges **DIRECT on the manager's Connect account** (`{ stripeAccount: … }`, fountain v15 lines
+162–173), so every object DB57 asks me to measure lives on `acct_1TK1VIAPNY1rgvEA`:
+
+- targeting that account directly → `No account found for the provided stripe_context and livemode`
+- reading it from the platform → `The connected Stripe account does not have the required
+  permissions for this tool` (`GetAccountsAccount`)
+- `GetApplicationFees` → `Operation not available`
+
+**So proofs 2, 3 and 6 — PI `requires_capture → succeeded`, the fee in cents on the charge, and the
+connected/platform balance split — are not obtainable by me in this session by any route.** They
+need either Connect permissions granted to the Stripe MCP, or the owner reading them off the Stripe
+dashboard. This is not a workaround I should invent; it is the ruling I need.
+
+**2b. `/close` is gated on an ADMIN USER JWT, not service_role.** fountain v15's `/close` runs
+`verifyAuth(req)` and then `sb.from('bees').select('is_admin')` → `Admin only, 403`. It is not
+callable with a service key and there is no DB-side path to the capture: `fountain_begin_close` only
+computes the verdict and lists the work; **the Stripe capture itself is the edge function's loop**,
+and I have no Stripe access to that account anyway (2a).
+
+Minting or borrowing an admin JWT to drive it is exactly the thing standing practice forbids — no
+synthetic credentials, no throwaway auth user for a smoke test. **So the capture is an owner action
+in the browser, or it is a dispatch that names how else it should be driven.**
+
+### THE QUESTION, precisely
+
+1. **Who drives the capture?** Owner clicks the admin close in the browser while this terminal
+   watches the DB and the event feed — or something else the lead names? I can prove proofs 1, 4 and
+   5 from the database and `stripe_events` the moment it fires; I cannot fire it.
+2. **How do proofs 2, 3 and 6 get taken?** Grant the Stripe MCP Connect permissions (owner action at
+   the dashboard), or the owner pastes the charge's `application_fee_amount` and the two balances
+   and this terminal does the arithmetic against `platform_pct`? Either is fine; both are owner
+   actions, and DB57 cannot be honestly closed without one of them.
+3. Re-queue DB57 behind FRONT62 + a confirmed browser pledge (`after_pass`), or leave it claimed
+   here pending the answers?
+
+### WORK COMPLETED WHILE STOPPED — the reading DB57 asked for, and the question nobody had answered
+
+**`fountain_begin_close` — what it actually does, in order.** `service_role` only. Locks the campaign
+`FOR UPDATE`; **refuses if `is_fixture` (DB54, applied tonight)**; accepts `closing` as re-entrant
+and rejects any status but `active`; computes `v_success := raised_cents >= goal_cents` for `aon`
+(and unconditionally `true` for `kwyr`); sets `status='closing'`; returns the verdict plus the list
+of every still-`authorized` pledge with its PaymentIntent id. **It writes one column and it captures
+nothing** — the money never moves inside the RPC. The verdict here would be `capture`: 1100 ≥ 1000.
+
+**The capture loop is the edge function.** For each returned pledge: `stripe.paymentIntents.capture`
+on the connected account, then `fountain_pledge_captured` — which frees the BLiNG! reward from the
+Well (drain-model, `bling_system_state.reserve`), writes the `bling_transactions` row and stamps
+`status='captured'`, `captured_at`, `reward_lot_id`. Then `fountain_finalize_close` refuses while any
+pledge is still `authorized`, and sets `closed_success` / `closed_failed` by captured count.
+
+**Partial failure, as written.** Any throw inside the loop is caught per pledge; on a `capture`
+verdict the pledge is marked `capture_failed` and the loop continues, so one bad card cannot strand
+the rest. **The sharp edge:** if Stripe captures successfully but `fountain_pledge_captured` then
+throws, the catch marks the pledge `capture_failed` — a real charge recorded in the DB as failed.
+The code names this case in its own error string (`captured on Stripe but settle RPC failed`) but
+still takes the cancel branch. Worth a ruling of its own; not this pass.
+
+**THE FAILED-VERDICT ANSWER (dispatch asked, nobody had checked).** **The holds are CANCELLED
+DELIBERATELY, not left to expire.** On a `cancel` verdict the same loop calls
+`stripe.paymentIntents.cancel(…)` on each authorized PI and then
+`fountain_pledge_canceled(p_failed => false)`, which moves the row to `canceled`. Under DB48's
+derivation that also takes the money straight back out of `raised_cents`. **This is already proven
+in production, not merely read:** pledge `6e20e1e4-…` went to `canceled` at 00:33 and the webhook
+processed the matching `payment_intent.canceled` event. A giver on a failed campaign is released the
+same minute the campaign closes, not by a lapsing authorization a week later.
+
+**The fee arithmetic, and what is and is not proven about it.** `fee_resolve('give')` returns
+`platform_pct = 2`, `active = true` (DB50, activated 2026-08-17 20:32 UTC). fountain v15 computes
+`Math.round(amount_cents × pct / 100)` at call time, clamped by `min_fee_cents`/`max_fee_cents`
+(both NULL here) and hard-capped below the charge amount. **Expected on the 1100 pledge: 22 cents**
+to the platform, 1078 to the manager's balance before Stripe's own processing fee.
+
+**Already measured — the fee is CONFIGURED correctly on a real PaymentIntent.** The canceled
+1000-cent PI's webhook payload carries `application_fee_amount = 20`, i.e. exactly 2% of 1000,
+computed by the live deployed function on a real Stripe object. **That is not proof 3.** A fee set
+on an authorization that was cancelled collects nothing — as the function's own header says, no
+capture, no charge, no fee. **The dispatch's framing is exactly right and stands: a fee that is
+configured is not a fee that is collected, and nothing has ever tested the collection.**
+
+**What is provable right now, without the capture:** proof 1's second half — `raised_cents = 1100`
+counts only real money. The canceled 1000 pledge is excluded by DB48's status filter, and all three
+fixture campaigns read 0/0 and are excluded from every total by DB54's `is_fixture` filter, applied
+earlier tonight. The verdict input is clean; only the verdict itself is untested.
+
+---
+
 ## DB54 — FLAG THE TEST SEED: `is_fixture` on `give_campaigns` and `fountain_pledges`. APPLIED. (2026-08-17)
 
 Session `32c6b4f8` (fallback id — no `MC_SESSION`). Dispatch: DB54, lane `db`, workdir
@@ -3649,3 +3784,683 @@ this pass is for.
 - **Whether any OTHER astra's seed data has the same untagged problem** — out of
   scope here, but `bazaar_listings`, `chat_rooms` and `message_threads` are empty
   and will need the same convention the day they are seeded.
+
+---
+
+## OPS104 — the rail penalises its own best behaviour. Proposal only, nothing applied.
+
+Session `01cb0b79`. 2026-08-17. **Nothing applied.** No `CREATE OR REPLACE`, no
+`apply_migration`, no write of any kind. Both defects confirmed; one of them is
+worse than the dispatch estimated and the other has a wrinkle the dispatch did not
+expect.
+
+### PRE-FLIGHT — the three objects, as found
+
+| object | md5 of definition | length |
+| --- | --- | --- |
+| view `public.ops_pass_durations` | `4c5599b63731e084e79e853b833a5e39` | 882 |
+| view `public.ops_effort_stats` | `4bede61e92282268c46012bbb453244b` | 589 |
+| function `public.ops_rail_readme` (prosrc) | `a37f9665ae7f4ed2a512622c0b0e294b` | 14279 |
+
+`ops_effort_stats` reads `effort`, `minutes` and `suspect` off
+`ops_pass_durations`, so it is a dependent of the change and is listed here even
+though the proposal does not alter it. A `CREATE OR REPLACE VIEW` that keeps the
+existing columns in the existing order and appends any new one at the end does not
+disturb it.
+
+---
+
+## DEFECT 1 — the metric is a question-detector wearing a quality label
+
+**Confirmed, and the scale is worse than the dispatch's five.** Measured across
+the whole history, not just today:
+
+```
+passes measured                                    256
+suspect under the CURRENT expression                41
+  ...of which flagged ONLY for filing a question    40
+  ...of which genuinely under 120 seconds            1
+suspect under the PROPOSED expression                1
+```
+
+**40 of 41 flags are false positives — 97.6%.** The one true positive in 256
+passes is `TRIV5`, first report **85 seconds** after claim, no question filed.
+
+The duration half is exactly as the dispatch says and I confirm it independently:
+the expression compares `EXTRACT(epoch ...)` — **seconds** — against 120, while
+the displayed `minutes` column divides by 60 separately. Two minutes, not two
+hours. The evidence that it is not over-firing is on today's own board: **DB49 is
+the fastest pass of the day at 3.8 minutes (228 seconds) and is not suspect.**
+Nothing about the duration half needs touching.
+
+**Today's five, all flagged solely for asking** — and their times show none was
+anywhere near the duration threshold:
+
+| pass | minutes | seconds | question | suspect now | suspect proposed |
+| --- | --- | --- | --- | --- | --- |
+| OPS98 | 6.3 | 378 | yes | **true** | false |
+| DB53 | 7.1 | 426 | yes | **true** | false |
+| FRONT59 | 7.6 | 456 | yes | **true** | false |
+| FRONT56 | 10.5 | 630 | yes | **true** | false |
+| FRONT58 | 16.0 | 960 | yes | **true** | false |
+
+And the same clearing across history — `DB9` (155s), `FRONT37` (169s), `FRONT22`
+(194s), `OPS42` (298s) and 32 others, every one flagged for the question alone.
+
+**The proof the dispatch asked for, in one row: `TRIV5` stays caught.**
+
+| pass | seconds | question | suspect now | suspect proposed |
+| --- | --- | --- | --- | --- |
+| TRIV5 | **85** | no | true | **true** |
+
+A terminal that reports without working is still caught; a terminal that asks is
+no longer punished for it.
+
+**Why this matters beyond tidiness.** `RAIL_BOOTSTRAP` says "ASK RATHER THAN
+GUESS. A question costs one round trip. A guess written into a ledger costs a
+cleanup pass and sometimes a production incident." A metric that marks every
+question suspect teaches the opposite, and it teaches it to the terminals whose
+judgement the rail most depends on. Two of the five flagged today — DB53 refusing
+to apply until it had proved what the fountain wrote, FRONT56 stopping rather than
+inventing a Connect account — are cases where guessing would have touched money.
+
+---
+
+## DEFECT 2 — the tag is undocumented, but the dispatch's premise needs correcting
+
+The dispatch says the convention "appears NOWHERE" and that "nothing is tagged."
+**The first half is right; the second is true only of the last eight days.**
+
+`ops_rail_readme()` does not contain the string "effort" anywhere — confirmed. But
+the tag is not unused:
+
+```
+dispatches total                281
+carrying EFFORT: in the title   186   (66%)
+```
+
+**It was near-universal, then it died on 2026-08-09:**
+
+| day | dispatches | tagged |
+| --- | --- | --- |
+| 2026-07-28 | 9 | 9 |
+| 2026-07-29 | 33 | 33 |
+| 2026-07-30 | 10 | 10 |
+| 2026-07-31 | 16 | 16 |
+| 2026-08-01 | 13 | 9 |
+| 2026-08-02 | 24 | 24 |
+| 2026-08-03 | 27 | 27 |
+| 2026-08-04 | 11 | 11 |
+| 2026-08-08 | 25 | 25 |
+| **2026-08-09** | **11** | **5** |
+| 2026-08-13 | 3 | **0** |
+| 2026-08-14 | 17 | **0** |
+| 2026-08-16 | 4 | **0** |
+| 2026-08-17 | 27 | **2** |
+
+So this is not an unknown convention — it is a **lapsed** one. It ran at ~100%
+for two weeks, decayed on 2026-08-09, and stopped. Documenting it in the readme is
+still exactly the right fix; the framing is "restore a lapsed convention", not
+"introduce one", and that is worth knowing because it means the historical rows
+are usable data rather than noise.
+
+### The established vocabulary — measured, as the dispatch instructed
+
+```
+standard   101   2026-07-27 .. 2026-08-09
+light       42   2026-07-29 .. 2026-08-09
+deep        30   2026-07-29 .. 2026-08-04
+high         8   2026-07-27 .. 2026-07-28    (early, abandoned)
+focused      3   2026-08-01 .. 2026-08-02    (brief)
+medium       1   2026-08-17 .. 2026-08-17    (minted today)
+small        1   2026-08-17 .. 2026-08-17    (minted today)
+```
+
+**`standard` + `light` + `deep` = 173 of 186, or 93%.** That is the convention.
+
+**Therefore I recommend documenting `LIGHT | STANDARD | DEEP` and NOT
+`SMALL | MEDIUM | LARGE`.** The dispatch proposed the latter and also told me to
+check first and match the established one rather than mint new words — so I am
+following the instruction rather than the example. Adopting SMALL/MEDIUM/LARGE
+would mint three words (`LARGE` has never been used once), orphan 173 tagged rows
+from every future comparison, and give one idea a fourth spelling.
+
+**Worth saying plainly: this dispatch's own title is tagged `EFFORT: SMALL`** —
+one of the two words minted today. That is how a vocabulary drifts: not by
+decision, but by the next writer reaching for a reasonable word without a place to
+look it up. Which is the defect.
+
+### Proposed wording for the readme
+
+The tag is written by the LEAD in the dispatch title, so it belongs beside the
+other lead-facing guidance. **Insertion point: after line 252** (the blank line
+closing `STANDING RULES THAT BITE HARDEST`) and **before line 253**
+(`ONBOARDING A NEW PROJECT`). No existing line is edited.
+
+```sql
+|| E'QUEUEING WORK -- THE EFFORT TAG\n'
+|| E'\n'
+|| E'  Put EFFORT: LIGHT | STANDARD | DEEP in the dispatch TITLE. It is read by\n'
+|| E'  ops_pass_durations and bucketed by ops_effort_stats; an untagged pass\n'
+|| E'  lands in "untagged" and makes the percentiles meaningless.\n'
+|| E'\n'
+|| E'    LIGHT     one object, one file, an obvious change. Minutes.\n'
+|| E'    STANDARD  the default. A pass with a done-test and a report.\n'
+|| E'    DEEP      discovery, a migration, or work spanning several files.\n'
+|| E'\n'
+|| E'  These three are the MEASURED convention -- 173 of 186 tagged dispatches\n'
+|| E'  used them. The tag ran near 100%% from 2026-07-28 and lapsed on\n'
+|| E'  2026-08-09. Do not mint new words: a fourth spelling for one idea is how\n'
+|| E'  the vocabulary rotted the first time.\n'
+|| E'\n'
+```
+
+Note the escaped `%%` — the block sits inside a string that is not a `format()`
+call today, so a single `%` is literal and safe; it is doubled here only if the
+lead moves this text into a `format()`. **State which, before applying.** I have
+flagged it rather than guessed.
+
+Also proposed: bump `v_version` on line 3 from `'RAIL_README v1.1'` to
+`'RAIL_README v1.2'`, since the readme's content changes and the canon doc slug
+tracks it.
+
+---
+
+## THE ROLLBACK — written first, verbatim current definitions
+
+```sql
+-- ROLLBACK for OPS104. Restores ops_pass_durations exactly as it stood at
+-- md5 4c5599b63731e084e79e853b833a5e39, length 882 -- question_filed back inside
+-- the suspect expression. WHAT IT RESTORES: a metric that marks 40 of 41 passes
+-- suspect for having asked a question. It touches no data; the view is derived.
+CREATE OR REPLACE VIEW public.ops_pass_durations AS
+ WITH first_report AS (
+         SELECT regexp_replace(ops_reports.pass, '-Q$'::text, ''::text) AS base_pass,
+            min(ops_reports.created_at) AS first_report_at,
+            bool_or(ops_reports.pass ~~ '%-Q'::text) AS question_filed
+           FROM ops_reports
+          GROUP BY (regexp_replace(ops_reports.pass, '-Q$'::text, ''::text))
+        )
+ SELECT d.pass,
+    d.lane,
+    lower(COALESCE("substring"(d.title, 'EFFORT:\s*([A-Za-z]+)'::text), 'untagged'::text)) AS effort,
+    d.claimed_at,
+    f.first_report_at,
+    round(EXTRACT(epoch FROM f.first_report_at - d.claimed_at) / 60.0, 1) AS minutes,
+    f.question_filed,
+    f.question_filed OR EXTRACT(epoch FROM f.first_report_at - d.claimed_at) < 120::numeric AS suspect
+   FROM ops_dispatches d
+     JOIN first_report f ON f.base_pass = d.pass
+  WHERE d.claimed_at IS NOT NULL AND f.first_report_at > d.claimed_at;
+
+-- The readme rollback is the current prosrc at md5 a37f9665ae7f4ed2a512622c0b0e294b,
+-- length 14279 -- i.e. delete the inserted block and restore v_version to v1.1.
+```
+
+## THE FORWARD CHANGE — object 1 of 2, proposed, NOT applied
+
+```sql
+-- OPS104 object 1: drop question_filed from the suspect expression.
+-- question_filed IS KEPT as its own column -- it is signal, just not a smell.
+-- The duration half is unchanged and still 120 SECONDS.
+CREATE OR REPLACE VIEW public.ops_pass_durations AS
+ WITH first_report AS (
+         SELECT regexp_replace(ops_reports.pass, '-Q$'::text, ''::text) AS base_pass,
+            min(ops_reports.created_at) AS first_report_at,
+            bool_or(ops_reports.pass ~~ '%-Q'::text) AS question_filed
+           FROM ops_reports
+          GROUP BY (regexp_replace(ops_reports.pass, '-Q$'::text, ''::text))
+        )
+ SELECT d.pass,
+    d.lane,
+    lower(COALESCE("substring"(d.title, 'EFFORT:\s*([A-Za-z]+)'::text), 'untagged'::text)) AS effort,
+    d.claimed_at,
+    f.first_report_at,
+    round(EXTRACT(epoch FROM f.first_report_at - d.claimed_at) / 60.0, 1) AS minutes,
+    f.question_filed,
+    EXTRACT(epoch FROM f.first_report_at - d.claimed_at) < 120::numeric AS suspect
+   FROM ops_dispatches d
+     JOIN first_report f ON f.base_pass = d.pass
+  WHERE d.claimed_at IS NOT NULL AND f.first_report_at > d.claimed_at;
+```
+
+**Object 2 is the readme** (`ops_rail_readme`, insertion block above, version
+bump). One ask each, not batched.
+
+---
+
+## PROPOSED, NOT ADDED — the narrow `bounced` flag
+
+The dispatch asks for "a separate narrow flag for a pass whose FIRST report is a
+-Q filed inside 120 seconds — a terminal bouncing without reading", and says
+propose it, do not add it silently. Here it is:
+
+```sql
+    -- appended as the LAST column so ops_effort_stats is undisturbed
+    (array_agg(pass ORDER BY created_at))[1] LIKE '%-Q'
+      AND EXTRACT(epoch FROM f.first_report_at - d.claimed_at) < 120::numeric AS bounced
+```
+
+**I ran it over all 256 passes and it fires ZERO times.** No terminal in the
+rail's entire history has filed a question as its first report inside two minutes.
+
+So it is prophylactic, not diagnostic. I would still take it — it costs one
+column, it is the honest version of what the current expression was reaching for,
+and a metric that has never fired is exactly the kind you want in place before the
+behaviour appears rather than after. But it should go in knowing it currently
+detects nothing, rather than being mistaken for a check that is doing work.
+
+Note it needs `first_was_q` computed in the CTE (`(array_agg(pass ORDER BY
+created_at))[1] LIKE '%-Q'`), which is a second aggregate over the same group —
+no extra scan.
+
+---
+
+## Could not verify
+
+- **Nothing was applied, so nothing was verified by execution.** Every proof above
+  is the proposed expression run as a `SELECT` against live data, which is exactly
+  what the view would compute — but the view itself is unchanged and still carries
+  the old definition.
+- **The readme block was not compiled.** I located the insertion point by line
+  number and matched the surrounding quoting style; I did not rebuild the 14,279
+  character function body to prove it parses. Whoever applies it should compile
+  once before the ask.
+- **The `%` / `%%` question in the readme block is flagged, not resolved** — it
+  depends on whether that text ever moves inside a `format()`. Guessing either way
+  would be inventing an answer.
+- **I did not check who reads `ops_effort_stats`** beyond confirming its
+  definition depends on the three columns the change preserves.
+
+---
+
+## DB56-Q — cannot reach the fountain: an agent may not sign in. NO WRITES MADE.
+
+Session `01cb0b79`. 2026-08-17. **Neither authorised write was made.** No campaign
+inserted, no pledge, no Stripe object created, no `fee_schedule` change, no
+fixture row touched.
+
+### The blocker, stated exactly
+
+**Step 1 cannot be settled and Step 2 cannot be run, because calling the deployed
+fountain requires a signed-in user and this session has no sanctioned way to
+become one.**
+
+The chain is short and every link is measured:
+
+1. `fountain` has `verify_jwt: true` at the gateway, and its own `verifyAuth`
+   resolves the bearer token through `anonClient().auth.getUser(token)`.
+2. The anon key is itself a project-signed JWT, so it passes the *gateway* — but
+   `getUser()` returns no user for it, so the function answers `401 Invalid
+   token` before it ever reaches the `paymentIntents.create` call. The Stripe
+   account is never touched, so nothing about the sandbox is learned.
+3. Therefore a real user session is required. The two routes to one are:
+   - **sign in as an existing account** — needs a password this session does not
+     have and must never print; or
+   - **`admin.createUser`** — needs the service-role key, which lives in
+     `TheMANUAL.tech/.env`.
+
+**The secrets guard fired twice during this pass**, once on a recursive `grep`
+that never named the file — it refused because a recursive read would descend
+onto `.env`. That is the mechanism working, and I did not route around it. I
+could have had a script load the key without printing it; I did not, because
+that is an indirection around a guard rather than a permission, and this is a
+pass that writes to production and moves money.
+
+**Canon settles it independently.** DEPLOY_AMENDMENT v2: *"An agent never creates
+the account, never signs in."* The established pattern in this workspace matches —
+FRONT35's live-mode checks were done by the owner at the browser, not by the
+terminal.
+
+### Why I did NOT make the authorised campaign insert
+
+The dispatch authorises it, and I still held it back — flagging that as a
+judgement call for the lead to overrule if wanted.
+
+Step 1 says settle the sandbox **before anything else** and *"do not proceed"* if
+it is unsettled. It is unsettled. Inserting the campaign would put a **non-fixture,
+active, $10-goal campaign on the FUND grid, which is public as of today**, with no
+way to complete the test behind it and no authorisation to delete it afterwards.
+DB49 and DB54 exist precisely because unmarked test rows on a live surface are the
+hazard; adding a fresh one that cannot be finished or removed would be undoing
+that work in the same afternoon.
+
+If the lead wants the row pre-created so the owner can finish the test by hand,
+say so and it is one statement.
+
+### What this pass DID settle, and it is not nothing
+
+- **`give-webhook` IS NOW DEPLOYED** — v5, ACTIVE, `verify_jwt: false`, sha
+  `84afe1fee300c5e7aec41b4c6c0fbaa51890215c8d35b5a0df6190a6ef8f0c8d`. This closes
+  the gap DOCS30 and DB53 both flagged (written in the repo, absent from the
+  deployed list). D-2's other half now has its mechanism in place.
+- **`fountain` has been redeployed to v20**, sha
+  `b30f6f958feb8df95cf216598b4bce7193f60bed0918537712e156f08da7e14f` — it was v15
+  / `7d071fac…` when DB53 read it this afternoon. The 2% fee may therefore now be
+  charged in code; **that is inference from the redeploy, not measurement**, and
+  it is exactly what proof (b) exists to settle.
+- **DB54 landed** — all three seed campaigns now read `is_fixture = true`, and
+  `fund-live-test-20260817` does not exist. The record is as the dispatch
+  describes.
+- **The Stripe MCP cannot settle the sandbox either.** It is authenticated to
+  `acct_1TK1KPPNZUSRg1t2` ("Freedom Rings", test mode) — a **third** account,
+  neither the platform sandbox `acct_1TK1MkAPNYB78CQX` nor the connected account
+  `acct_1TK1VIAPNY1rgvEA` the dispatch names. A read of the connected account
+  through it returned *"The connected Stripe account does not have the required
+  permissions for this tool."* Even had it answered, it would have answered a
+  different question: whether the MCP's credential can see the account, not
+  whether **the fountain's `STRIPE_SECRET_KEY`** can. Only the fountain can settle
+  that.
+- **No edge function has been invoked in the last 24 hours** — the log stream
+  carries no `function_edge_logs` source at all and `edge_logs` holds no
+  `functions/v1` request. So there is no prior Stripe error to mine, and the
+  fountain has not been exercised since its redeploy.
+
+### What unblocks this
+
+One of these, and the first is cleanest:
+
+1. **The owner runs the authorisation in a browser.** FUND is live at
+   `themanual.tech/fund`; FRONT56's panel does the whole flow — amount, the fee
+   disclosure read from `fee_schedule`, Payment Element, confirm — and prints the
+   PaymentIntent id and status verbatim on success. It needs the campaign to exist
+   and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` set on the Railway service. The status
+   that proves money is held and not taken is **`requires_capture`**.
+2. **Or: a named dispatch authorising this session to mint a test session** via
+   `admin.createUser`, stating that the service-role key may be loaded from env by
+   a script that never prints it. I will not assume that authorisation; it needs
+   to be written, because the guard and DEPLOY_AMENDMENT v2 both currently say no.
+
+Either way the sandbox question is answered by the first `paymentIntents.create`:
+if the key and `acct_1TK1VIAPNY1rgvEA` are in different sandboxes, Stripe returns
+*"No such account"* and the fountain answers `502 Payment initialization failed`
+with the real message in its own console log — which `query_logs` can then read.
+
+### Could not verify
+
+- **Everything the dispatch asked to be proven** — (a) a real PaymentIntent, (b)
+  `application_fee_amount` at 2%, (c) the direct charge on the connected account,
+  (d) the derived counter moving, (e) the `give-webhook` delivery count. **None
+  was measured.** No authorization exists on Stripe at the end of this pass.
+- **Whether fountain v20 actually sets `application_fee_amount`.** I did not read
+  the v20 source this pass; the redeploy is evidence of intent, not of behaviour.
+  Worth reading before the next attempt so proof (b) has a prediction to test.
+
+---
+
+## OPS106 — APPLIED. The rail no longer punishes a terminal for asking.
+
+Session `01cb0b79`. 2026-08-18. Owner ruled "104"; this applies exactly what
+OPS104 authored. One migration, one ask, one human click.
+
+```
+authored file : 20260818005500_ops106_pass_durations_effort_v1.sql
+stamped as    : 20260818005821   (apply_migration stamps its own version)
+renamed to    : 20260818005821_ops106_pass_durations_effort_v1.sql
+rollback      : _drafts/20260818005821_ops106_pass_durations_effort_v1_rollback.sql
+result        : {"success": true}
+```
+
+### THE BUG THIS PASS ALMOST SHIPPED — read this part first
+
+While reviewing the generated migration before applying it, line 30 read:
+
+```
+lower(COALESCE("substring"(d.title, 'EFFORT:s*([A-Za-z]+)'::text), 'untagged'::text)) AS effort,
+```
+
+**The backslash was gone.** It should be `EFFORT:` backslash `s*`. A heredoc layer
+between the generator and the file had eaten one level of escaping.
+
+That version would have applied cleanly, returned success, and **silently broken
+the effort extraction forever** — the pattern would have matched a literal "s",
+nothing would ever match, and every pass in the system would have read `untagged`.
+It would have looked exactly like the defect OPS104 was sent to fix, in the
+migration that claimed to fix it, and the only symptom would have been a
+statistic quietly reading zero.
+
+It was caught by reading the generated file before applying rather than trusting
+the generator. Both files were then checked and repaired programmatically — the
+rollback draft turned out to be correct already, which is itself evidence the
+corruption was a per-heredoc accident rather than a systematic one.
+
+**The proof it is fixed is in the verification below: `efforts_parsed` returns
+seven distinct values. Had the broken version applied, that column would be
+empty.**
+
+### How the readme was rewritten, and why not by retyping it
+
+`ops_rail_readme` is a 14,279-character function body. Pasting it into a tool call
+to add fifteen lines would put a silent transcription error into canon with
+nothing to catch it — the same class of failure as the backslash above, but
+undetectable.
+
+So the migration **rewrites it by assertion**: it reads the current `prosrc`,
+refuses unless `md5` is exactly the `a37f9665...` OPS104 recorded, applies the
+insertion and the version bump in the database, refuses again unless the result is
+exactly the `15f3add3...` this pass built and reviewed offline, and only then
+installs it. Any drift at either end aborts with the function untouched.
+
+The block itself was built with the backslash-n sequence constructed from a
+character code rather than typed, after the first attempt was mangled by the same
+escaping problem; the insertion anchor was read out of the dumped file rather than
+retyped, and asserted unique.
+
+### PRE-FLIGHT
+
+| object | md5 before | length |
+| --- | --- | --- |
+| `ops_pass_durations` viewdef | `4c5599b63731e084e79e853b833a5e39` | 882 |
+| `ops_rail_readme` prosrc | `a37f9665ae7f4ed2a512622c0b0e294b` | 14279 |
+
+`reconcile.mjs measure` on a clean tree before authoring: **exit 0**.
+
+### VERIFICATION — before and after, measured
+
+Before the apply, across **259** passes:
+
+```
+suspect                     42
+  ...flagged on question    41
+  ...flagged on duration     1
+```
+
+After:
+
+```
+passes measured            260
+suspect                      1     <- TRIV5, 85 seconds, the one true positive
+bounced                      0     <- as predicted; fires nowhere in the history
+question_filed recorded     41     <- KEPT as its own column, just not a smell
+```
+
+**The five passes the dispatch named, every one of them among the best work of
+2026-08-17:**
+
+```
+DB53=false   FRONT56=false   FRONT58=false   FRONT59=false   OPS98=false
+TRIV5=true
+```
+
+`TRIV5` still flags. The 120-second duration check was not touched and does
+exactly what it was always doing.
+
+**The readme:**
+
+```
+md5      15f3add3ac8a7dccccd74d31fb61b0d7   (matches the body built offline: true)
+length   15125
+version  RAIL_README v1.2
+block    QUEUEING WORK -- THE EFFORT TAG present
+```
+
+**Effort parsing, the check that would have caught the backslash bug:**
+
+```
+deep, focused, high, light, medium, small, standard
+```
+
+Seven distinct values parsed out of live dispatch titles.
+
+**Closing check — `reconcile.mjs measure` after the rename: exit 0, RECONCILED.**
+
+### What the readme now says
+
+The EFFORT tag is documented where the lead queues work, as `LIGHT | STANDARD |
+DEEP` — the measured convention, 173 of 186 tagged dispatches — with a line
+recording that it lapsed on 2026-08-09 and an instruction not to mint new words.
+The block deliberately contains no percent sign and no apostrophe, which retires
+the `%%`-versus-`%` question OPS104 flagged rather than answering it.
+
+### Could not verify
+
+- **The readme was not rendered.** `ops_rail_readme()` was not called after the
+  change; the function compiled and its body hashes to the reviewed value, but
+  nobody has read the output text. The next terminal that reads the rail is the
+  first to see it. Cheap for the lead to confirm.
+- **`bounced` has never fired**, so its expression is untested against a real
+  positive — only against 260 true negatives.
+- **The rollback was not run.** Nothing failed.
+
+---
+
+## DB58 — APPLIED. The ledger now counts only holds Stripe has confirmed.
+
+Session `01cb0b79`. 2026-08-18. One migration, one ask, one human click.
+
+```
+authored file : 20260818011500_db58_confirmed_holds_only_v1.sql
+stamped as    : 20260818010852   (apply_migration stamps its own version)
+renamed to    : 20260818010852_db58_confirmed_holds_only_v1.sql
+rollback      : _drafts/20260818010852_db58_confirmed_holds_only_v1_rollback.sql
+result        : {"success": true}
+```
+
+### THE HEADLINE
+
+`fund-live-test-20260817` read **raised_cents 1100 against a 1000 goal — GOAL
+MET** on a PaymentIntent that never had a payment method attached. It now reads
+**0, goal met false.** The live page no longer claims a funded campaign, and
+`fountain_begin_close` can no longer pass its all-or-nothing verdict on money that
+never arrived.
+
+### PRE-FLIGHT
+
+| object | before | after |
+| --- | --- | --- |
+| `fountain_counters` prosrc | md5 `afcc5b9191b297f5b6fe96e291f41f31`, len 283 | md5 `ede0c8a6301a8f5c2863dbd54b182271`, len 363 |
+| `fountain_pledges.authorized_at` | did not exist | `timestamp with time zone` |
+| triggers on `stripe_events` | **none** | `stripe_events_stamp_fund_authorization` |
+
+`reconcile.mjs measure` before authoring: **exit 0**. After the rename: **exit 0,
+RECONCILED**.
+
+### FIXTURES ARE IMMUNE — PROVEN, NOT ASSUMED
+
+The dispatch asked for proof rather than assumption. `fund-the-fountain` holds
+**two `authorized` pledges totalling 32,000** and reads **raised_cents 0**. DB54's
+`AND is_fixture = false` in `fountain_counters` is doing exactly that work, and it
+was already doing it before this pass touched anything. All three fixture
+campaigns read 0 before and after.
+
+### THE DIAGNOSIS, AND WHY THIS SHAPE
+
+The dispatch offered two options and told me to check whether a column already
+existed before proposing one. **I checked: none does.** `fountain_pledges` carried
+id, campaign_id, bee_id, amount_cents, currency, stripe_payment_intent_id, status,
+source_ref, reward_lot_id, created_at, captured_at, is_fixture. `captured_at` is
+capture, not authorization. So option (b) as written — decide it from data already
+in the row — was **not available**.
+
+But the evidence exists one table over, and that is the finding this pass turns
+on. **give-webhook writes every verified fund event into `stripe_events` BEFORE it
+branches on type** — signature already checked, payload stored whole. What it does
+NOT do is record the confirmation against the pledge: on
+`payment_intent.amount_capturable_updated` it returns early when the row already
+exists. The fact arrives and lands nowhere.
+
+So the fix reads the evidence the webhook already stores:
+
+- **`fountain_pledges.authorized_at timestamptz`**, NULL by default. NULL means
+  "Stripe has not told us a hold exists."
+- **A trigger on `stripe_events`** stamps it when a fund
+  `amount_capturable_updated` row lands. It trusts nothing the webhook did not
+  already authenticate — the HMAC is verified before any row reaches that table.
+- **`fountain_counters` requires positive evidence**: raised counts only
+  `status IN (authorized, captured) AND (authorized_at IS NOT NULL OR status =
+  captured)`. Fixture exclusion and the captured figure are unchanged from DB54.
+
+**NO DEPLOY IS NEEDED, and that is why this shape was chosen.** Renaming the
+status to `created` / `pending` (the dispatch's option (a)) has cleaner semantics —
+`authorized` would stop carrying two claims in one word — but it needs a fountain
+change AND a webhook change: two deploys, two dispatches, on the pass carrying the
+GATES-ANY-REAL-FUNDING flag. **That rename remains open as a follow-up and nothing
+here forecloses it**; the column and the trigger stay correct under it.
+
+A captured pledge is backfilled as self-evidently held — Stripe cannot capture
+what was never authorized — so history stays countable regardless of whether a
+webhook was configured at the time.
+
+### THE TWO EXISTING ROWS, as the dispatch requires
+
+| pledge | amount | status | effect |
+| --- | --- | --- | --- |
+| `pi_3U5apLAPNY1rgvEA2Iu3a1Sz` | 1000 | `canceled` | **unchanged** — already excluded by status. Its cancel is the one fund event ever received, processed 200 at 00:33:48 UTC. |
+| `pi_3U5azMAPNY1rgvEA3ZCi7Lry` | 1100 | `authorized` | `authorized_at` stays NULL, so it **stops counting**. The row is not deleted and not altered; it simply no longer claims money. |
+
+Neither row was written by this pass. The counters moved because they are derived.
+
+### THE GAP A GIVER SEES, as the dispatch requires
+
+Between confirming a card and the webhook arriving — a second or two — the pledge
+exists with `authorized_at` NULL and does not count, so the campaign total lags.
+
+**This is the right trade, and the panel already covers the worst of it.**
+FRONT56's give panel reports the giver's OWN result directly from Stripe's confirm
+response — the PaymentIntent id and `requires_capture` — so a giver is told their
+card was authorized immediately and does not depend on the shared total to know it
+worked. What lags is the figure on the grid. A total that is late by seconds is a
+far smaller problem than one that overstates: the overstating version is what put
+a false GOAL MET on a live page today.
+
+The failure mode worth naming: if the webhook were misconfigured or down, a real
+hold would never be stamped and would never count — the ledger would UNDERSTATE.
+That is the safe direction for a funding verdict, and it fails loudly (a campaign
+that visibly refuses to move) rather than quietly.
+
+### PROOF
+
+Simulated read-only before applying, then measured after. Both agree.
+
+```
+slug                      goal   raised_before  raised_after   goal_met before -> after
+bee-sanctuary             null       0              0          null  -> null   (fixture)
+community-mural         100000       0              0          false -> false  (fixture)
+fund-the-fountain        50000       0              0          false -> false  (fixture, 32000 authorized)
+fund-live-test-20260817   1000    1100              0          TRUE  -> FALSE
+```
+
+**A CONFIRMED HOLD STILL COUNTS** — the dispatch's second proof. It could not be
+demonstrated live without fabricating a Stripe object, which the dispatch forbids
+and which would have put a fake confirmation into an audit table. It was instead
+computed hypothetically in the same query, read-only: with the confirmation
+present, `fund-live-test-20260817` returns to **1100 and goal met TRUE**. So the
+mechanism excludes the unconfirmed and keeps the confirmed — the arithmetic is
+proven, the end-to-end path is not.
+
+### Could not verify
+
+- **The trigger has never fired.** No `amount_capturable_updated` event has ever
+  reached this project — the only fund event on record is the cancel. The stamp
+  path is proven by construction and by the backfill running clean, not by a live
+  confirmation. **The first real confirmed pledge is its first execution**, and
+  that is the thing to watch when DB56's authorization is finally run.
+- **Stripe's side was not independently re-measured.** That
+  `pi_3U5azMAPNY1rgvEA3ZCi7Lry` is Incomplete with payment_method NONE is the
+  lead's measurement, carried forward; the Stripe MCP available to this session is
+  authenticated to a different account and cannot read the connected account. The
+  database-side evidence is independent and agrees: no confirmation event ever
+  arrived for that intent.
+- **`fountain_begin_close` was not exercised.** The verdict is shown wrong-then-
+  right by reading `raised_cents`, not by running a close. No campaign was closed
+  and no capture was run — the GATES-ANY-REAL-FUNDING flag was respected.
