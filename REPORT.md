@@ -10076,3 +10076,200 @@ the Next.js app and any future client can create campaigns too.
   to make; the absence of a guard is read from the source regex.
 - **I did not enumerate every internal link to `/fund`** beyond the five files the
   grep surfaced — option 1's true cost should be re-grepped by whoever takes it.
+
+---
+
+# DB74 — THE PUBLIC-BUCKET PLAINTEXT (Library attachments) — MEASURE + PROPOSE
+
+**Pass:** DB74 · lane db · workdir TheMANUAL.tech-db (db worktree) · 2026-08-18
+**Dispatch:** ORACLE_MF v1.34 F3. DOCS31 found `comms.ts` stores Library
+attachments plaintext in a public bucket while voice notes seal file bytes.
+MEASURE the exposure, PROPOSE the HYBRID-governed migration, apply nothing.
+**Scope obeyed:** read-only measurement + supabase/** proposal only. No `src/`
+writes, no migration applied, no ACL change. One ask at the end.
+
+## VERDICT UP FRONT
+
+**This is a P3 — "public if you hold the pointer" — NOT a browsable P1.**
+The bucket serves any object by full path to anyone unauthenticated, but it is
+**not enumerable/listable**, even with the anon key every browser carries. The
+pointer that grants access lives sealed inside the E2EE message body. The gap
+versus voice notes is real but it is **defense-in-depth**, not an open door.
+
+## MEASUREMENT — numbers, not adjectives
+
+### Bucket ACL (proven)
+- `creator-media` bucket: `public = true` (storage.buckets).
+- **Unauthenticated GET by full path → HTTP 200**, `content_type=image/png`,
+  209018 bytes served. Plaintext delivered to anyone holding the URL. PROVEN with
+  `curl` against `/storage/v1/object/public/creator-media/library/{beeId}/{file}`.
+- Unauthenticated GET via `/object/authenticated/...` → HTTP 400 (no anon read).
+
+### Browsability / enumeration (proven — this is the P3-vs-P1 hinge)
+- Unauthenticated LIST (`POST /object/list/creator-media`) → HTTP 400,
+  "headers must have required property 'authorization'".
+- **LIST with the anon key** (the key shipped in the browser client) for both
+  `library/` and `library/{beeId}/` prefixes → **HTTP 200 `[]` (empty)**.
+- RLS proof: the only SELECT policy on `storage.objects` for this bucket is
+  `creator_media_read` = `bucket_id='creator-media' AND foldername[2]=auth.uid()`,
+  role **authenticated**. The `anon` role matches nothing, so the bucket is not
+  browsable. There is no anon SELECT policy.
+- Path shape: `library/{bee_uuid}/{random_uuidv4}.{ext}`. Both segments are
+  v4 UUIDs (~122 bits of entropy each). Guessing a valid object path blind is
+  computationally infeasible; the only practical way to the bytes is to already
+  hold the pointer.
+
+### The exposed objects (whose content, how much)
+- **5 objects, 16 MB total**, all under `library/`, oldest 2026-07-19, newest
+  2026-07-25.
+- **Zero sealed `.bin` blobs** — every one is plaintext. (Voice notes, which
+  seal, upload as `vm-*.bin`; none present, so no voice notes have shipped here.)
+- All 5 belong to a **single bee** `ab696a36-e3aa-4c78-8137-eb46d3b4e9c6`
+  (owner_id matches folder segment on every row): 2 PNG (289 kB, 204 kB),
+  1 mp4 (9.4 MB), 2 webm video (2.3 MB, 4.1 MB). Consistent with a single
+  creator/test account, not broad member content. **Backfill blast radius today
+  is 5 files, one owner.**
+
+## WHERE THE PLAINTEXT ENTERS (code, for the front follow-on)
+
+- **`src/lib/media.ts`** is the Creator Studio Media Library data layer
+  (`creator_studio_media_v1`). It uploads **plaintext** to `creator-media`:
+  - `media.ts:259-264` (`uploadAsset`) — `library/{beeId}/{uuid}.{ext}`, raw `file`.
+  - `media.ts:312-318` (editor-export save) — same path shape, raw `blob`.
+  - `media.ts:159-162` `assetUrl()` returns `getPublicUrl(...)` — permanent,
+    unauthenticated, non-expiring.
+- **`src/lib/comms.ts:414-437`** `sendMediaMessage()` merely wraps that public
+  URL in an encrypted `media` body (`CommsMediaPayload.url`). The pointer is
+  sealed; **the bytes were never sealed** — they were already public when the
+  Library uploaded them.
+- Contrast — the pattern to generalize: **`comms.ts:487-516`** `sendVoiceMessage()`
+  seals bytes under the conversation key *before* upload, then stores only
+  ciphertext; `CommsMediaPayload.enc=true` signals decrypt-on-fetch
+  (`decryptMediaToObjectUrl`, `comms.ts:522-537`).
+
+## THE CMF CONFLICT — FLAGGED, NOT SILENTLY RESOLVED
+
+Per CMF precedence I flag rather than fix toward either doc:
+
+**The Library is a CROSS-ASTRA shelf, not a comms surface.** `media.ts` header:
+"The per-Bee shelf every Astra pulls from." The same asset can be a **public**
+creator video (Pulse, Creator page, groups) *or* a **private** comms attachment.
+Voice notes seal safely because they are comms-only and always fetched+decrypted
+by a conversation member. **A blanket "seal all Library uploads" rule would break
+every public rendering path** — a sealed blob cannot back a public `<img>`/
+`<video>` tag, and is decryptable only by a holder of one specific conversation
+key. So CMF's "E2EE at the file level" cannot be applied universally to the
+Library without contradicting Creator Studio's public-URL model. **This is
+exactly why v1.31 ruled HYBRID governs** — the conflict is structural, and the
+fix must be conditional on intended visibility, not global.
+
+**Blocking structural gap:** `media_assets` has **no visibility / scope /
+encryption discriminator column** today (bucket defaults to `creator-media`,
+everything assumed public-addressable). The HYBRID model has nowhere to record
+"this asset is sealed/private" without new schema. Named this as proposal step 0.
+
+## PROPOSAL — HYBRID, apply nothing (human clicks)
+
+**Step 0 — schema discriminator (new migration, rollback-first).**
+Add `media_assets.visibility text NOT NULL DEFAULT 'public'
+CHECK (visibility IN ('public','sealed'))` (or an enum), plus optional
+`sealed_bucket`/`enc` marker. Rollback: `DROP COLUMN`. Enables the hybrid without
+touching existing rows (all default `public`, matching today's reality).
+
+**Step 1 — new uploads (front follow-on, NOT this pass).**
+When an asset is created for a private destination (a comms attachment), route it
+through the voice-note pattern: seal bytes under the conversation key before
+upload, store as `.bin`, set `enc=true` / `visibility='sealed'`. Public-intent
+uploads stay as-is. **Named for the front lane; I did not write `src/`.**
+
+**Step 2 — backfill (only 5 objects, one owner today).**
+Three options, real costs:
+- **Grandfather-with-notice (recommended given scale):** leave the 5 existing
+  public objects, mark them `visibility='public'`, apply sealing only to new
+  private uploads. Zero breakage; the historical 5 are a known, bounded, single-
+  owner set. Cheapest, and the exposure is already P3.
+- **Seal-in-place:** cannot be done server-side — sealing needs the conversation
+  key, which is client-only (E2EE). Would require the owning client to re-encrypt
+  each asset. Breaks any device holding the old public pointer. High cost for 5
+  files.
+- **Re-upload:** owner re-adds assets through the new sealed path; delete old
+  objects. Same client-key constraint; breaks old pointers. Overkill at N=5.
+
+**Step 3 — bucket ACL.** Do **not** flip `creator-media` to private wholesale —
+it legitimately serves public creator media. Instead the sealed lane can use a
+private sub-path or a separate private bucket (mirroring `justice-exhibits`,
+already `public=false`). Flipping the whole bucket private would break every
+public `getPublicUrl` render across Astras — measured breakage, not hypothetical.
+
+## COULD NOT VERIFY / OUT OF SCOPE
+- Did **not** read the current CMF body from the rail to quote its exact E2EE
+  clause; relied on the dispatch's statement that CMF governs comms E2EE and
+  v1.31 ruled HYBRID. If the lead wants the CMF clause cited verbatim, flag it.
+- Did **not** author the Step 0 migration file — dispatch says PROPOSE, apply
+  nothing; the migration is written only after the human picks a backfill path.
+- Did **not** enumerate every Astra render path that consumes `assetUrl()` — the
+  point stands from the `media.ts` header ("every Astra pulls from") without a
+  full callsite sweep.
+- Object bytes not opened/inspected — ownership and type read from metadata only.
+
+**ONE ASK:** approve the HYBRID direction (Step 0 discriminator +
+grandfather-the-5 backfill + sealed sub-path for new private uploads), and I
+queue the rollback-first migration for a follow-on db pass and hand Step 1 to the
+front lane. Nothing is applied until you click.
+
+---
+
+# DB74 Step 0 — media_assets.visibility — PRE-FLIGHT + APPLY (owner-approved 2026-08-18)
+
+**Owner ruling (2026-08-18):** approve Step 0 as a **three-state ENUM**, not a
+boolean: `public` / `consented` / `private`. `sealed` is **not** a visibility
+value — sealing is the encryption applied to `private`/`consented` files and is
+tracked **separately**, aligned with the DB76 consent ledger's five scopes.
+
+**Migration file:** `supabase/migrations/20260818185449_db74_media_visibility_v1.sql`
+**Rollback (authored first):**
+`supabase/migrations/_drafts/20260818185449_db74_media_visibility_v1_rollback.sql`
+**Rollback statement (stated before apply):**
+`ALTER TABLE public.media_assets DROP COLUMN IF EXISTS visibility; DROP TYPE IF EXISTS public.media_visibility;`
+
+## Freeze-lift measure (clean tree, BEFORE authoring)
+`node scripts/migration-reconcile/reconcile.mjs measure` → **EXIT 0**,
+"RECONCILED on/after baseline — freeze-lift criterion MET" (0 discrepancies
+on/after baseline 20260801000000). Order per OPS86: measure → author → apply → re-measure.
+
+## Pre-flight (production, read-only)
+- **media_assets rows:** 5 — every row backfills to default `'public'`, which is
+  today's actual state. **0 rows at risk of loss.** (Matches the 5 storage objects,
+  one owner, measured in the DB74 report.)
+- **Name collision:** `to_regtype('public.media_visibility')` = null (enum absent);
+  `media_assets.visibility` column absent. Clean create, idempotent.
+- **Dependent objects:** 0 views/matviews depend on `media_assets` (pg_depend via
+  pg_rewrite). Nothing to break. Additive column cannot break a `SELECT *` consumer.
+- **RLS:** unchanged. This migration adds no policy and touches no existing policy;
+  it records owner intent only. Enforcement of consented/private is later steps.
+- **Classification:** purely additive DDL (new enum type + NOT NULL column with
+  default). Not destructive; not a table holding real content being reshaped.
+
+## Apply
+Applied via `apply_migration` (ask-gated — owner click is the mechanical
+enforcement). Post-apply verification recorded below.
+
+## APPLIED — 2026-08-18 (owner ask-click)
+- **apply_migration** `db74_media_visibility_v1` → **success** (one prior attempt
+  failed on a verify-block type bug — `enumlabel` is `name` not `text`; caught by
+  the DO block, rolled back atomically, nothing partial landed; cast fixed with
+  `::text` and re-applied).
+- **Stamped version:** `20260818185755` (apply_migration stamps its own, not the
+  authored `...185449`). Repo files renamed to the stamped version, both ends of
+  the cross-reference updated. Forward in `supabase/migrations/`, rollback in `_drafts/`.
+- **Post-apply verify (information_schema + pg_enum):**
+  `media_assets.visibility` = USER-DEFINED `media_visibility`, `nullable=NO`,
+  `default='public'::media_visibility`; enum values exactly `public,consented,private`;
+  all 5 existing rows = `public`.
+- **Closing re-measure:** `reconcile.mjs measure` → **EXIT 0**, "freeze-lift
+  criterion MET", 0 discrepancies on/after baseline. No drift manufactured.
+- **NOT done (by design, later steps):** sealing/encryption marker (separate
+  concern, DB76-aligned); wiring `consented`→consent_grants enforcement; sealed
+  storage path + bucket routing (Step 1, front lane); backfill decision (still the
+  grandfather-the-5 recommendation, unchanged — nothing needed migrating, all 5
+  are correctly `public`).
