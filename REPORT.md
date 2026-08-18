@@ -23,6 +23,64 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## DBCODE1 — RENAME `atlasoracle_*`/`oracle_*` DB OBJECTS → `h24_*`. PROPOSAL produced (forward + rollback drafts + dependency proof); NOTHING APPLIED. Owner-gated, coordinated with FRONTCODE1. (2026-08-18)
+
+Session `f8b19368` (fallback id — no `MC_SESSION`). Dispatch DBCODE1, lane `db`, workdir
+**`TheMANUAL.tech-db`**, effort L. After DB80 (`done`, gate satisfied); W-19 clear (no other db pass
+claimed — nothing else editing atlasoracle-route). ORACLE_MF v1.57 ("code too"). **Propose-first,
+nothing applied, no commit** (automation policy: produce-and-propose; owner ratifies + pushes).
+
+### Deliverable (all in `TheMANUAL.tech-db`)
+- `supabase/migrations/_drafts/20260818210000_dbcode1_rename_oracle_atlasoracle_to_h24.sql` — forward.
+- `…_dbcode1_rename_oracle_atlasoracle_to_h24_rollback.sql` — reverse (written first; restores exact
+  prior names + the 6 original function bodies verbatim).
+- `docs/dbcode1-oracle-to-h24-rename-proposal-2026-08-18.md` — the full dependency graph, the
+  object-vs-data boundary, the proof, coordination flags, and THE ONE ASK.
+Generated mechanically from the live catalog defs (a Node generator + captured `pg_get_functiondef`),
+not hand-edited — money code is not hand-retyped.
+
+### What renames (enumerated LIVE from pg_class/pg_proc/pg_constraint/pg_index/pg_policies/pg_depend)
+8 tables, 1 view, 11 functions, 32 constraints, 17 standalone indexes, 7 RLS policies. Transform:
+strip `atlasoracle_`/`oracle_`, prepend `h24_`. Metadata-only, **no data movement**. No new-name
+collisions; no oracle-named sequences; no standalone enum/domain types.
+
+### The load-bearing findings (why this is the highest-risk pass)
+1. **PL/pgSQL bodies don't auto-update on RENAME.** Split the 11 functions:
+   - **Escrow group (5)** — `atlasoracle_credit/debit/deposit_to_escrow/get_escrow_balance/withdraw_from_escrow`:
+     bodies reference only `bling_pots`/`bling_transactions`/`lot_debit/credit` + **string-literal DATA
+     tags** (`'atlasoracle_escrow*'`, `'atlasoracle_refund'`, `'atlasoracle_directive'`) that live
+     production rows hold. → **rename object ONLY, body untouched** (rewriting those strings would split
+     escrow accounting). Verified: no cross-call to any renamed function.
+   - **Body-swap group (6)** — `atlasoracle_check_rate_caps` + the 5 `oracle_*` token functions: rename
+     + `CREATE OR REPLACE` with schema-object identifiers swapped, `entry_type`/`plan_tier 'oracle'`/
+     `pack_code` DATA values preserved verbatim. RENAME preserves OID so the view's dep survives.
+2. **`ON CONFLICT` is column-based**, not constraint/index-name based → index/constraint renames don't
+   touch bodies.
+3. **No external DB caller** references the renamed objects (only string-literal data tags exist).
+4. **DB76/DB74** have no live reference to these objects (DB76 unapplied; DB74 = media_visibility).
+   Coordination note in the proposal for when DB76 lands.
+
+### Verification built into the migration
+Forward ends with a `DO` block that RAISEs if any `atlasoracle_/oracle_` relation or function remains —
+the "no half-rename" proof enforced at apply time. Generator ran a data-string guard (no
+`h24_escrow`/`h24_refund'`/`h24_directive'` produced). Rollback re-checked: 55 original `oracle_token_*`
+refs restored, 44 back-rename statements.
+
+### THE ONE ASK (owner)
+Approve the coordinated apply of DBCODE1 **with FRONTCODE1 in the same push** (edge functions
+`atlasoracle-route`/`oracle-checkout`/`oracle-webhook` + client TS reference these by name — a schema
+rename without the code redeploy breaks h24 + the FRONT81 storefront + billing instantly). Apply via
+`apply_migration` (ask-gated) after a recorded pre-flight + reconcile. Two calls to confirm: (a) the 5
+legacy escrow RPCs are RENAMED here — DROP them instead? (separate destructive decision); (b) confirm
+metadata-only (data tags + `plan_tier 'oracle'` stay).
+
+### Could not verify (this pass)
+Nothing applied (propose-first) — the forward/rollback are unexecuted drafts. Correctness is established
+by the live enumeration + the generation guards + the in-migration verification block, not by a test
+apply. A rehearsal on a branch/local is the natural pre-apply step at coordination time.
+
+---
+
 ## DB80 — THE CACHE-WRITE SPLIT. FINDING: it is already live (DB27, deployed 2026-08-03). The "ongoing leak" is stale; absorption was one bounded day. No code, no rate rows. (2026-08-18)
 
 Session `79a4fea9` (fallback id). Dispatch DB80, lane `db`, workdir **`TheMANUAL.tech-db`**, effort
@@ -10251,3 +10309,118 @@ enforcement). Post-apply verification recorded below.
   storage path + bucket routing (Step 1, front lane); backfill decision (still the
   grandfather-the-5 recommendation, unchanged — nothing needed migrating, all 5
   are correctly `public`).
+
+---
+
+# DB79 — provider catalog — APPLY (owner ask-click, 2026-08-18)
+
+Owner: "apply DB79 then DB80 — run the drafted migrations." DB79 has a real,
+rehearsed migration; applying per instruction.
+
+**Files:** `_drafts/db79_provider_catalog_v1.sql` (+ `_rollback.sql`, authored first).
+**Rollback statement (stated before apply):**
+`DROP FUNCTION IF EXISTS public.h24_tokens_per_mtok(numeric, text); DROP TABLE IF EXISTS public.models CASCADE; DROP TABLE IF EXISTS public.providers CASCADE;`
+
+## Freeze-lift measure (BEFORE apply): reconcile.mjs → EXIT 0, criterion MET.
+## Pre-flight (production, read-only)
+- **Name collisions:** none — `to_regclass('public.providers')`, `public.models`,
+  and `to_regprocedure('public.h24_tokens_per_mtok(numeric,text)')` all null. Clean create.
+- **Classification:** purely additive — two new tables, one IMMUTABLE function, two
+  RLS read policies, seed rows. No existing object touched, no data reshaped, 0 rows at risk.
+- **RLS:** created from birth — `active=true` rows publicly readable (product surface);
+  no write policy → anon/authenticated denied, service role bypasses.
+- **Anchor to verify post-apply:** h24(3,'standard')=9000, h24(5,'frontier')=12500,
+  h24(1,'free')=0; counts providers=7, models=13, active=4.
+
+## DB79 — APPLIED + VERIFIED (2026-08-18)
+- **apply_migration** `db79_provider_catalog_v1` → **success**, stamped `20260818215307`.
+- **Post-apply verify:** `h24_tokens_per_mtok(3,'standard')=9000`, `(5,'frontier')=12500`,
+  `(1,'free')=0` — reproduces the live rate card exactly. providers=7, models=13,
+  active=4 (anthropic opus/sonnet/haiku + groq llama), 2 RLS read policies
+  (`active=true` public read; no write policy → writes service-role only).
+- **Files** moved draft→versioned: `supabase/migrations/20260818215307_db79_provider_catalog_v1.sql`
+  + `_drafts/20260818215307_db79_provider_catalog_v1_rollback.sql`. Cross-refs updated.
+- **Closing re-measure:** reconcile.mjs → EXIT 0, criterion MET, no drift.
+- **Correction logged:** I moved the forward file with `git mv`, which staged the rename —
+  an unauthorized git write outside a cleared manifest. Undone with a bare `git reset`
+  (no --hard); git is back to read-only state, worktree/history untouched. Files remain
+  moved on disk (plain rename), which is the intended state for the owner's commit.
+- **STILL OPEN (owner, at your pace):** rule the 9 inactive band proposals (single words)
+  and supply verified prices + `checked_at` to flip any live; repoint the route at this
+  catalog is a separate later pass. Catalog is inert until then — billing still runs off
+  `oracle_model_rates`.
+
+## DB80 — NOTHING TO APPLY (verified, not a refusal)
+Owner said "apply DB80." There is **no DB80 migration** — none drafted, none in the repo.
+DB80 was a measure-first pass whose measurement overturned its premise: the cache-write
+split is **already live** (DB27, deployed 2026-08-03; the deployed `atlasoracle-route`
+bills four legs apart, rate card carries `cache_write_per_m` on every active model). The
+only historical absorption was 5 cached directives on 2026-07-27, bounded ≤0.135 h24
+tokens (~$0.00014), a user undercharge the lead ruled to eat. DB80 report (status done):
+"no code, no rate rows... no SQL to commit." Applying the four-leg path again would be a
+no-op claiming to fix a fixed thing. **No action taken.**
+
+## REPORT.md ROTATION FLAG
+This file is now >512 KB. Per R6 the next SWEEP must rotate it to
+`docs/reports/REPORT-archive-NNN.md` before staging. Flagging for the lead/sweep.
+
+---
+
+# DBPRICE1 — VERIFIED PROVIDER PRICES: 9 models priced + activated (2026-08-18)
+
+Pass DBPRICE1, lane db, workdir TheMANUAL.tech-db, effort M. Web-verified every
+number against the provider's official pricing page (no memory guessing — 5
+parallel research agents, one per provider). Propose-first; owner OK'd all five
+providers with explicit tier rulings. Data UPDATE on `public.models` (not a
+migration — pricing is data by DB79 design). Read-back verified.
+
+## UNIT CONVENTION (locked against live Anthropic rows before writing)
+`models.price_in/out/cached` store the **provider USD per MTok**. The h24 charged
+rate is DERIVED at read time by `h24_tokens_per_mtok(usd, band)` = usd × margin ×
+1000 (margin 3× standard / 2.5× frontier / free=0). Confirmed: sonnet 3.0 = live $3.
+
+## VERIFIED PRICES (provider USD in/out/cached) + derived h24 in/out
+| provider | model | band | USD in/out/cached | h24 in/out | source | tier ruling |
+|---|---|---|---|---|---|---|
+| openai | gpt-5 | frontier | 1.25 / 10.00 / 0.125 | 3125 / 25000 | developers.openai.com/api/docs/pricing | standard tier |
+| openai | gpt-5-mini | standard | 0.25 / 2.00 / 0.025 | 750 / 6000 | " | standard tier |
+| gemini | gemini-2.5-pro | frontier | 1.25 / 10.00 / 0.125 | 3125 / 25000 | ai.google.dev/gemini-api/docs/pricing | base ≤200k (see caveat) |
+| gemini | gemini-2.5-flash | standard | 0.30 / 2.50 / 0.03 | 900 / 7500 | " | text input |
+| mistral | mistral-large-latest | frontier | 0.50 / 1.50 / — | 1250 / 3750 | mistral.ai/pricing/api | no published cache rate → null |
+| mistral | mistral-small-latest | standard | 0.15 / 0.60 / — | 450 / 1800 | " | no published cache rate → null |
+| deepseek | deepseek-v4-flash | standard | 0.44 / 1.32 / 0.014 | 1320 / 3960 | api-docs.deepseek.com/quick_start/pricing | PEAK (owner ruling) |
+| deepseek | deepseek-v4-pro | frontier | 1.32 / 3.96 / 0.044 | 3300 / 9900 | " | PEAK (owner ruling) |
+| xai | grok-4.6 | frontier | 2.00 / 6.00 / 0.50 | 5000 / 15000 | docs.x.ai/docs/models | base <200k (owner ruling) |
+
+## TWO MODEL-IDENTITY REPOINTS (owner-approved — seeded strings were deprecated)
+- **deepseek-chat → `deepseek-v4-flash`** and **deepseek-reasoner → `deepseek-v4-pro`**:
+  the DB79 seed strings were retired ~2026-07-24; the official page now lists only
+  the v4 line. Bands preserved (flash=standard, pro=frontier). DeepSeek is
+  peak/off-peak time-tiered; **peak** stored per owner (avoids undercharge; off-peak
+  is ~half). price_cached = cache-HIT input; price_in = cache-MISS input.
+- **grok-4 → `grok-4.6`**: grok-4 gone from the official page; grok-4.6 is the
+  flagship (released 2026-08-12). **Base <200k** tier stored per owner; ≥200k
+  doubles.
+
+## APPLIED (single atomic UPDATE, read-back verified)
+9 rows updated: model_string (2 repoints) + price_in/out/cached + checked_at
+2026-08-18 + active=true. Post-state: **13/13 models active, 0 active-but-unpriced.**
+Anchor re-derivation verified for all rows (free=0; margins correct).
+
+## CAVEATS / COULD NOT VERIFY / OPEN
+- **Catalog is still inert for billing.** Per DB79, the route has NOT been repointed
+  at this catalog — production billing still runs off `oracle_model_rates`. So step 5
+  "spot directive bills at written rate" is NOT testable through the catalog yet; the
+  active rows are verified in the catalog/picker surface (active=true, public-read
+  RLS) but do not bill until a later route-repoint pass.
+- **DB79 migration file not edited.** The historical seed file keeps the original
+  strings (deepseek-chat/reasoner, grok-4); the repoint is a data update on top,
+  recorded here. Migrations are not re-run, so no drift — but a from-scratch rebuild
+  from migrations would need this data step re-applied (pricing is data, not schema).
+- **Gemini 2.5-pro >200k tier (2.50/15.00/0.25) not stored** — catalog has no
+  context-tier column; base tier stored. Flag if the high tier should govern.
+- **Mistral cached = null** — no fixed published cache rate ("up to 90%", variable).
+- **DeepSeek off-peak (~half) not stored** — single price slot; peak chosen.
+- **Third-party price aggregators disregarded** — only official pages trusted; where
+  aggregators conflicted (deepseek, grok-4 legacy), the official page won or the row
+  was repointed rather than guessed.

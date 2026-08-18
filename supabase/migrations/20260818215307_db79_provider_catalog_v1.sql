@@ -1,5 +1,6 @@
 -- DB79 — THE PROVIDER CATALOG. PROPOSAL — NOT APPLIED.
--- ROLLBACK: _drafts/db79_provider_catalog_v1_rollback.sql (authored first).
+-- ROLLBACK: _drafts/20260818215307_db79_provider_catalog_v1_rollback.sql (authored first).
+-- (Filename stamped 20260818215307 by apply_migration; drafted unversioned as db79_provider_catalog_v1.)
 --
 -- ORACLE_MF v1.47: pricing lives in a CATALOG, never in code — a price change
 -- must be a row update with a date, not a deploy. This migration is the catalog:

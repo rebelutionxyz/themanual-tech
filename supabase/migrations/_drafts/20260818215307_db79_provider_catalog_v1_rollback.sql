@@ -1,4 +1,4 @@
--- ROLLBACK for db79_provider_catalog_v1.sql
+-- ROLLBACK for 20260818215307_db79_provider_catalog_v1.sql
 -- DB79, 2026-08-18. WRITTEN BEFORE THE FORWARD MIGRATION per the MIGRATION AMENDMENT.
 -- PROPOSAL — the forward migration is NOT applied; this is its recovery script.
 --
