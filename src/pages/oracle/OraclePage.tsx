@@ -1,6 +1,7 @@
 import { COMPOSER_MEASURE, Composer, type ComposerBand } from '@/components/composer/Composer';
 import { H24CostPanel } from '@/components/h24/H24CostPanel';
 import { H24Sidebar } from '@/components/h24/H24Sidebar';
+import { RoomsButton } from '@/components/layout/RoomsButton';
 import {
   DIRECTIVE_CATEGORIES,
   type DirectiveCategory,
@@ -245,9 +246,12 @@ export function OraclePage() {
           <ArrowRight size={17} />
         </ToolbarButton>
 
-        {/* ROOMS SLOT — reserved and intentionally EMPTY. FRONT80 owns the
-            shared platform rooms button; building it here would build it twice.
-            The gap holds its position in the toolbar order. */}
+        {/* ROOMS — now the h24 shell's own transport (FRONTHDR1). The shared
+            SiteHeader that used to carry the Rooms button no longer renders on
+            /h24 (the pre-h24 Manual header was removed per ORACLE_MF v1.61 R2),
+            so the reserved slot is filled here — the one Rooms control on this
+            surface, still the FRONT80 component. */}
+        <RoomsButton />
 
         {/* Breadcrumb. With no session store yet (sessions-are-content is an
             OPEN ruling — no chat persistence), the title is the static surface

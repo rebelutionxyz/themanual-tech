@@ -146,9 +146,12 @@ const COMMUNITY_PREFIXES = [
   '/settings',
 ];
 
-// Chrome-free paths — the front door (login / coming-soon) and MiniWaves,
-// which owns its own shell (V77). No SiteHeader / ticker / toolbar.
-const CHROME_FREE_PATHS = new Set(['/', '/waves', '/miniwaves']);
+// Chrome-free paths — the front door (login / coming-soon), MiniWaves (V77),
+// and /h24, which wear their OWN shell. No shared Manual SiteHeader / ticker.
+// FRONTHDR1 (ORACLE_MF v1.61 R2): the pre-h24 Manual SiteHeader was rendering on
+// /h24 in addition to the h24 chrome; /h24 now shows only its own toolbar +
+// sidebar + console (the Rooms button moved into the h24 toolbar).
+const CHROME_FREE_PATHS = new Set(['/', '/waves', '/miniwaves', '/h24']);
 
 // Management allowlist — OG HUMAN only, until the role registries (Lock 8 /
 // 9.6) deploy and real tier checks replace this. Landing gate 2026-07-10.
@@ -247,6 +250,12 @@ function AppContent() {
             popup in the community bottom toolbar. */}
           <Route path="/waves" element={<WavesPage />} />
           <Route path="/miniwaves" element={<WavesPage />} />
+
+          {/* h24 — chrome-free, owns its own shell (FRONTHDR1, ORACLE_MF v1.61 R2).
+            Moved OUT of PlatformLayout so no shared Manual SiteHeader/ticker/promo
+            rail renders over it; OraclePage carries the h24 toolbar + sidebar +
+            console. /oracle and /here24 still redirect here (below). */}
+          <Route path="/h24" element={<OraclePage />} />
 
           {/* Auth */}
           <Route path="/login" element={<LoginPage />} />
@@ -437,8 +446,10 @@ function AppContent() {
               is what the header badge points at. /here24 and /oracle both
               REDIRECT here rather than render as peers (FRONT77); one room,
               one address. The domains here24.tech / h24.tech stay registered and DARK
-              (v1.21 / v1.24) — this route is the only way in. */}
-            <Route path="/h24" element={<OraclePage />} />
+              (v1.21 / v1.24) — this route is the only way in.
+              FRONTHDR1: the /h24 RENDER route moved OUT of PlatformLayout to a
+              top-level chrome-free route (above) so no Manual SiteHeader renders
+              over it; these two remain as redirects into it. */}
             <Route path="/here24" element={<Navigate to="/h24" replace />} />
 
             {/* The constellation index — the full derived Astra set. */}

@@ -202,6 +202,57 @@ npm run lint   → clean in MissionControlPage (only the standing 1 warning rema
 
 ---
 
+## FRONTHDR1 — REMOVE LEFTOVER MANUAL HEADER ON /h24. The shared Manual SiteHeader no longer renders on /h24; the surface wears only its own h24 shell. Build green, committed, NOT pushed. (2026-08-18)
+
+Session `f8b19368` (fallback id). Dispatch FRONTHDR1, lane `front`, workdir `TheMANUAL.tech`, effort S.
+ORACLE_MF v1.61 Ruling 2. Committed on green, no push (dispatch: "COMMIT ON GREEN. NO PUSH").
+
+### The leftover, identified precisely
+Live /h24 rendered TWO top bars: (1) the shared **black SiteHeader** — Manual logo + "h24.tech"
+wordmark + Rooms + notifications + the `h24 <balance>` wallet badge + avatar/sign-in, Home→"/"; and (2)
+the h24-native toolbar (`h24.tech / Console` + collapse/back/forward/export) over the Vault/Activity/
+Wallet sidebar + console. Bar (1) is the pre-h24 Manual chrome (it uses the Manual logo and links to the
+Manual home); the dispatch itself flagged the header as "shared … scope the removal to h24," confirming
+the target is the shared SiteHeader removed from /h24 only.
+
+### Owner ruling mid-pass
+The SiteHeader also carried Rooms, notifications, the wallet badge, and sign-in/avatar. On the fork
+"minimal h24 shell vs keep a compact sign-in/avatar," the owner chose **minimal h24 shell**: drop
+notifications/sign-in/avatar from /h24; only the h24 toolbar + sidebar + console render. Rooms is
+preserved (moved into the h24 toolbar's reserved slot, FRONT80 canon — rooms on all sites); wallet stays
+in the sidebar (balance + GET). Signed-out users sign in via the console's own prompts.
+
+### What shipped (2 files)
+- `src/App.tsx` — added `/h24` to `CHROME_FREE_PATHS` (no shared SiteHeader / ticker) AND moved the
+  `/h24` render route OUT of the `PlatformLayout` group to a top-level chrome-free route (like
+  `/miniwaves`), so no PlatformLayout promo rail renders over it either. `/oracle` and `/here24` still
+  redirect into `/h24`.
+- `src/pages/oracle/OraclePage.tsx` — filled the toolbar's reserved ROOMS slot with `<RoomsButton />`
+  (the FRONT80 component), so /h24 keeps its one Rooms control now that SiteHeader is gone.
+
+Scope discipline: the SiteHeader component is untouched and still renders on every other platform surface
+(the removal is via chrome-free routing for /h24 only — verified /manual keeps its header).
+
+### Done-tests + PROVE (dev localhost:3012, isolated automation profile)
+- `npm run build` (tsc -b && vite build) → `✓ built in 31.02s` (green). `biome lint` on the 2 files →
+  `Checked 2 files. No fixes applied.` (clean).
+- `/h24` observed: the black Manual SiteHeader is GONE; only the h24 toolbar (`h24.tech / Console` +
+  Rooms + nav + export), the Vault/Activity/Wallet sidebar, and the console render. Rooms button opened
+  the overlay (19 live astras, "h24" current) and is fully functional. Wallet shows balance + GET.
+  (screenshots)
+- Regression: `/manual` still renders its SiteHeader (TheMANUAL.tech wordmark + Rooms) — removal correctly
+  scoped to /h24. (screenshot)
+
+### Notes
+- The SiteHeader's `H24_PATHS` wordmark branch is now dead for `/h24` (SiteHeader no longer mounts there;
+  `/oracle` and `/here24` redirect away before rendering). Left in place — harmless, and out of this
+  pass's scope to prune.
+- Per the owner's minimal choice, notifications + top-bar sign-in/avatar are intentionally absent from
+  /h24; a signed-out visitor relies on the console's "Sign in to send a directive" prompts (no top-bar
+  sign-in button by design).
+
+---
+
 ## FRONT84 — COMPOSER MAX WIDTH. The shared bottom composer + the message column now share a centered readable measure (like the Claude chat) instead of full-bleed. Build green, committed, NOT pushed. (2026-08-18)
 
 Session `f8b19368` (fallback id). Dispatch FRONT84, lane `front`, workdir `TheMANUAL.tech`, effort SMALL.
