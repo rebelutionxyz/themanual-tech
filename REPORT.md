@@ -23,6 +23,327 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## DB70 — DELETE ALL FUND CAMPAIGNS. APPLIED. give_campaigns and fountain_pledges are empty. (2026-08-18)
+
+Session `79a4fea9` (fallback id — no `MC_SESSION`). Dispatch DB70, lane `db`, workdir
+`TheMANUAL.tech`, priority 10. **Applied at 2026-08-18 13:18 UTC, stamped version
+`20260818131800`.** `give_campaigns` and `fountain_pledges` are both empty. Production writes this
+pass: two INSERTs into `ops_docs` (the archive, v0.1 then v0.2 correcting one doubled percent sign
+in the prose), the DELETEs below, and the `ops_dispatches` claim/heartbeat rows.
+
+### Owner ruling and what it overrides
+
+OWNER RULING 2026-08-18: *"we were supposed to delete all fund campaigns."* This overrides the
+DB68/DB69 ruling that deliberately KEPT `fund-live-test-20260817` as the local record of the first
+real charge and flagged it out of the totals instead. `give_campaigns` and `fountain_pledges` end
+this pass empty.
+
+### WHAT IS BEING DESTROYED — plainly
+
+`fund-live-test-20260817` (`c4d34666-842f-4f95-be7a-5368c90de480`, "Pledge rail test") holds the
+platform's **FIRST REAL CHARGE**: payment intent `pi_3U5crDAPNY1rgvEA0e2ndpCB`, **$13.00 captured**
+on connected account `acct_1TK1VIAPNY1rgvEA` at 2026-08-18 02:34:58 UTC, **26 cents of application
+fee** collected (DB65 measured it). Deleting these rows deletes the **local** trace of that event.
+Stripe's own record is durable and is untouched by anything in this migration.
+
+Five pledge rows go, in `created_at` order:
+
+| pledge id | amount | status | payment intent | note |
+|---|---|---|---|---|
+| `6e20e1e4…` | $10.00 | canceled | `pi_3U5apLAPNY1rgvEA2Iu3a1Sz` | test-mode |
+| `d502711d…` | $11.00 | authorized | `pi_3U5azMAPNY1rgvEA3ZCi7Lry` | test-mode |
+| `d057b2bf…` | $12.00 | canceled | `pi_3U5bdFAPNY1rgvEA167xTETd` | test-mode, `authorized_at` stamped |
+| `4adc2597…` | $13.00 | authorized | `pi_3U5cqiAPNY1rgvEA1AWRU5WR` | test-mode |
+| `512e8349…` | **$13.00** | **captured** | **`pi_3U5crDAPNY1rgvEA0e2ndpCB`** | **the first real charge; `reward_lot_id` 51** |
+
+### The archive — written FIRST, read back, before anything was touched
+
+`ops_docs` doc `FUND_CAMPAIGN_ARCHIVE`, author `DB70`:
+
+| version | id | bytes | md5 |
+|---|---|---|---|
+| v0.1 | `2263ad0f-818c-455b-9237-528d16c766a0` | 7,752 | `a70d388f466fb339da2aca2e6319363d` |
+| v0.2 | *(current — newest-row-wins)* | 7,876 | `bd5b52287b221bea224591a8c6041668` |
+
+v0.2 exists only because v0.1's prose rendered `2% platform` as `2%% platform` — a doubled percent
+that survived the E-string. The JSON payload is carried through byte-identical by `replace()` on the
+stored body rather than re-generated, so no value was retyped. Both rows stay; `ops_docs` is
+append-only and newest-per-slug wins on read.
+
+The body is `to_jsonb()` taken **straight from the live tables**, never transcribed by hand. Read-back
+verification, run as a separate statement against the stored row:
+
+```
+bytes 7752 | md5 a70d388f466fb339da2aca2e6319363d   (matches the INSERT's RETURNING)
+has_first_charge_pi     true
+has_campaign_uuid       true
+has_captured_pledge     true
+has_other_four_pledges  true
+has_bling_lot           true
+has_ledger_txn          true
+tail: tricted": false,\n        "counterparty_bee_id": null\n    }\n]
+```
+
+The tail is checked with `right(body, 60)` rather than a `LIKE` on the last words, per the standing
+transport note.
+
+### THE FINDING OF THIS PASS — the sweep did NOT come back clean, and DB69's did
+
+The dispatch was explicit that DB69's clean sweep does not cover a row it did not delete. Re-running
+the whole-database sweep — every `text` / `varchar` / `char` / `uuid` / `json` / `jsonb` / `ARRAY`
+column of every base table in `public`, against the slug, the campaign uuid, and all five pledge
+uuids — returned hits **outside** the two target tables:
+
+| table | column | needle | hits |
+|---|---|---|---|
+| `bling_lots` | `dna` | slug, campaign uuid, pledge uuid | 1 |
+| `bling_transactions` | `memo` | slug | 1 |
+| `stripe_events` | `payload` | slug, campaign uuid | 4 |
+| `ops_dispatches` | `body` / `title` | slug | 11 / 2 |
+| `ops_reports` | `body` / `title` | slug | 16 / 2 |
+
+The two that matter:
+
+- **`bling_lots` #51** — **1157 BLiNG!** FREEd by the captured pledge at the ×89 fountain
+  multiplier, `origin` `fountain`, `vintage` 2026, **`status` `active`, `amount_remaining` 1157**.
+  Its `dna` is `{"pledge_id": "512e8349…", "campaign_id": "c4d34666…", "campaign_slug":
+  "fund-live-test-20260817"}`.
+- **`bling_transactions` #92** — `"Fountain reward ×89 for campaign fund-live-test-20260817"`,
+  amount 1157, `balance_after` 1296.282344.
+
+**Neither is deleted and neither may be.** `bling_transactions` is an append-only ledger by canon,
+and the 1157 BLiNG! is **live currency in a Bee's balance** — deleting the lot would destroy real
+value, deleting the transaction would rewrite the audit trail. `fountain_pledges.reward_lot_id` is a
+plain `bigint` with **no FK**, so nothing in the database would have stopped a careless delete from
+orphaning it silently.
+
+**Therefore, stated so it is not discovered later: DB70 ORPHANS THE PROVENANCE OF LIVE BLiNG!.**
+After the apply, lot #51's `dna` names a pledge and a campaign that exist **only in the archive**.
+That is the price of the ruling, not a defect in the migration. `stripe_events` is likewise
+append-only idempotency state and is left alone. The `ops_*` hits are rail bookkeeping, not data
+references.
+
+### FK and policy shape, re-measured for THIS row
+
+- Exactly **one** FK points at `give_campaigns`: `fountain_pledges_campaign_id_fkey`, `confdeltype`
+  `a` (**NO ACTION**). Nothing cascades by construction — the parent DELETE simply fails while a
+  child remains, which is why pledges go first.
+- **Zero** FKs point at `fountain_pledges`. Nothing downstream is torn out.
+- Policies on both tables: `give_insert_own` (a), `give_public_read` (r), `give_update_own` (w),
+  `fountain_pledges_own_read` (r). **No DELETE policy on either table** — owner-channel work by
+  construction, not by convention.
+- No routine body and no view definition anywhere in `public` mentions the slug.
+- Triggers that fire: `fountain_pledges_sync_counters` (AFTER INSERT/DELETE/UPDATE) recounts the
+  parent while it still exists; `give_campaigns_derive_counters` (BEFORE INSERT/UPDATE) is what makes
+  the rollback's counter literals advisory rather than authoritative.
+
+### The rollback — written BEFORE the forward migration, and REHEARSED
+
+`supabase/migrations/_drafts/20260818131800_db70_delete_all_fund_campaigns_v1_rollback.sql`, 93 lines.
+Every column of every deleted row, written out explicitly (positional lists are impossible here:
+`give_campaigns` already has two dropped ordinals, 5 and 6).
+
+**The rehearsal is structural, not textual** — the standing lesson from the pass where a generated
+`\echo` lost its backslash and a "rehearsal" committed DDL. A Node script concatenates a pre-state
+capture, the forward file verbatim, the rollback file verbatim, and a comparison block whose last
+statement **raises deliberately**; psql is invoked with `--single-transaction -v ON_ERROR_STOP=1`, so
+the exception rolls the whole transaction back. Nothing depends on a `BEGIN` surviving an edit.
+
+Run output, verbatim:
+
+```
+SELECT 4
+DO
+DELETE 5
+DELETE 1
+DO
+INSERT 0 1
+INSERT 0 5
+DO
+psql:…/db70-rehearsal.sql:291: ERROR:  DB70 REHEARSAL VERDICT :: bling_lots_51=IDENTICAL | bling_transactions_92=IDENTICAL | fountain_pledges=IDENTICAL | give_campaigns=IDENTICAL |
+CONTEXT:  PL/pgSQL function inline_code_block line 17 at RAISE
+```
+
+`IDENTICAL` is whole-table `jsonb_agg(to_jsonb(row) ORDER BY id)` compared before and after
+forward-then-rollback — byte equality on every column of every row, not a row count. The forward
+migration's own pre-guard and done-test both ran clean inside that transaction (`DO` before
+`DELETE 5`, `DO` after `DELETE 1`).
+
+Production re-measured immediately after the rehearsal: `give_campaigns` 1, `fountain_pledges` 5,
+lot #51 present, txn #92 present. **The rollback left nothing behind.**
+
+### Migration-amendment sequence
+
+1. **MEASURE FIRST, clean tree** — `node scripts/migration-reconcile/reconcile.mjs measure` on a
+   clean `git status`, before authoring anything:
+   ```
+   baseline            20260801000000
+   history rows        694
+   repo .sql           326  (326 versioned, 0 unparseable)
+   version-matched     273  (241 faithful, 32 drifted)
+     407 history rows with no repo file   (0 on/after baseline)
+      39 repo files with no history row   (0 on/after baseline)
+      32 version-matched pairs, file != applied   (0 on/after baseline)
+   RECONCILED on/after baseline — freeze-lift criterion MET
+   EXIT=0
+   ```
+   No exemption invoked: the measure was taken **before** either file was authored.
+2. **AUTHOR** — rollback first, then forward. Both on disk, both listed below.
+3. **APPLY** — done, on one human click. `apply_migration` stamped its own version
+   **`20260818131800`**, not the `20260818131500` the files were authored under, so both files were
+   renamed to the stamped version and their internal cross-references updated with them.
+4. **RE-MEASURE to exit 0** — done, after the rename:
+   ```
+   history rows        695   (was 694)
+   repo .sql           327   (was 326)
+   version-matched     274  (242 faithful, 32 drifted)   (was 273 / 241)
+     407 history rows with no repo file   (0 on/after baseline)
+      39 repo files with no history row   (0 on/after baseline)
+      32 version-matched pairs, file != applied   (0 on/after baseline)
+   RECONCILED on/after baseline — freeze-lift criterion MET
+   EXIT=0
+   ```
+   One new history row, one new repo file, one new faithful pair. The apply manufactured no drift.
+
+### THE APPLY — measured before and after
+
+`apply_migration` returned `{"success": true}`; the migration's own done-test would have aborted the
+statement otherwise. Independently re-measured afterwards:
+
+| measure | before | after | expected |
+|---|---|---|---|
+| `give_campaigns` | 1 | **0** | 0 |
+| `fountain_pledges` | 5 | **0** | 0 |
+| `bling_lots` #51 intact (active, remaining 1157) | 1 | **1** | 1 — must survive |
+| `bling_transactions` #92 intact (amount 1157) | 1 | **1** | 1 — must survive |
+| `ops_docs` FUND_CAMPAIGN_ARCHIVE rows | 2 | **2** | 2 |
+
+The six control tables, unchanged:
+
+| table | before | after |
+|---|---|---|
+| `stripe_events` | 4 | 4 |
+| `bees` | 18 | 18 |
+| `astra_registry` | 30 | 30 |
+| `nova_registry` | 1 | 1 |
+| `bling_lots` | 21 | 21 |
+| `bling_transactions` | 22 | 22 |
+
+`bling_lots` and `bling_transactions` are in that list deliberately: they are the two tables a
+careless delete could have damaged, and their totals are unchanged, not merely their two named rows.
+
+### What the front does TODAY, measured, not assumed
+
+`/fund` is served by the Next.js app in `REBELUTION.fund`, proxied at `themanual.tech/fund`.
+
+- **The empty state already exists.** `src/app/page.tsx` renders a `Campaigns` component whose
+  `campaigns.length === 0` branch returns a section headed **"No campaigns yet"** with the body
+  *"Nothing is listed because nothing is there. When a campaign opens it appears here — this page
+  never shows an example one."* FRONT71 does not need to build it; the surface degrades correctly at
+  zero campaigns on its own. The `LedgerStrip` aggregate strip still renders above it.
+- **The branded 404 already exists** at `src/app/[slug]/not-found.tsx` (its own segment, so Next
+  titles it correctly — FRONT50's finding). `src/app/[slug]/page.tsx` calls `notFound()` when the
+  campaign is absent, so the route returns a branded 404, not a 500.
+- **ISR is 300s** on both the home page (`page.tsx`) and the campaign page, so nothing on the front
+  changes for up to five minutes after the apply.
+- **The sitemap drops it automatically** — `src/app/sitemap.ts` iterates `listCampaigns()`; a failed
+  read logs and omits campaigns rather than 500ing the route.
+
+### The front, before and after, measured across the ISR window
+
+Every fetch below is WebFetch with a distinct cache-busting query string, because WebFetch caches
+15 minutes per URL and that cache would otherwise mask the very change being checked.
+
+| URL | before (13:15 UTC) | after (13:26 UTC) |
+|---|---|---|
+| `/fund/sitemap.xml` | **2** `<loc>`: `/fund`, `/fund/fund-live-test-20260817` | **1** `<loc>`: `/fund` |
+| `/fund` | one card, "Pledge rail test", $0 of $10 | **empty state** |
+| `/fund/fund-live-test-20260817` | 200, live campaign page | **HTTP 404** |
+
+The empty state renders verbatim as promised by the source:
+
+> **No campaigns yet**
+> Nothing is listed because nothing is there. When a campaign opens it appears here — this page
+> never shows an example one.
+
+**The window had to be waited out twice, and that is worth recording.** Each route has its own ISR
+entry with its own 300s clock, and Next serves stale-while-revalidate: the first request past the
+window returns the OLD page and only *triggers* regeneration. So at 13:21 the sitemap had already
+dropped to 1 URL (an earlier fetch had warmed it) while `/fund` still showed the card and the
+campaign page still returned 200. A single post-apply fetch would have read as "the front did not
+update" and been wrong. The 13:26 column is the second fetch of each route.
+
+### Files authored
+
+```
+supabase/migrations/20260818131800_db70_delete_all_fund_campaigns_v1.sql              (forward, 161 lines)
+supabase/migrations/_drafts/20260818131800_db70_delete_all_fund_campaigns_v1_rollback.sql  (93 lines)
+```
+
+The forward migration's pre-guard **refuses to run** if: the archive is absent from `ops_docs`;
+`give_campaigns` does not hold exactly one row and that row is not `fund-live-test-20260817`;
+`fountain_pledges` does not hold exactly the five named ids; or lot #51 / txn #92 are missing or
+altered. A sixth pledge arriving between now and the apply — a real give — **halts the pass** rather
+than being swept up in it. Rows are deleted by explicit id, never by a bare `DELETE FROM`.
+
+### Deviations and judgement calls
+
+- **The archive carries eight rows, not six.** The dispatch asked for the campaign row and the five
+  pledge rows. I added `bling_lots` #51 and `bling_transactions` #92 — the two rows whose provenance
+  the deletion orphans. Without them the archive would record what was destroyed but not what was
+  left dangling, which is the half a future reader will actually need.
+- **`ops_docs` v0.2.** One doubled percent sign is cosmetic, but this document is the permanent
+  record of the platform's first charge and it costs almost nothing to make it clean. v0.1 is left
+  in place; append-only, newest wins.
+- **No front change, no commit, no push.** DB70 is a `db`-lane pass. The front already handles zero
+  campaigns.
+
+### Could not verify
+
+- **The 404 is confirmed as a status code but NOT as a branded page.** `curl` is denied at this root
+  (logged again to `logs/permission-needed.md`; an earlier pass logged the identical gap with the same
+  reasoning), so WebFetch is the fallback — and on a 404 it reports the status and returns no body.
+  `/fund/fund-live-test-20260817` is measured at **HTTP 404, not 500**, which is the substantive half
+  of the claim. That it is the *branded* not-found rather than a bare framework page is read from the
+  source — `src/app/[slug]/not-found.tsx` exists as its own segment and `page.tsx` calls
+  `notFound()` — and was **not** measured over the wire. A `curl` of that URL would close it in one
+  command.
+- **Stripe was not queried.** The claim that Stripe's record of `pi_3U5crDAPNY1rgvEA0e2ndpCB` is
+  durable and unaffected is a property of Stripe, not something this pass measured.
+- **Nothing was checked beyond the three URLs above.** `/fund/manage` and any internal link to a
+  campaign page were not exercised.
+
+### TREE STATE AT CLOSE — read this before the next SWEEP
+
+```
+ M REPORT.md
+ D supabase/migrations/_drafts/20260818131500_db70_delete_all_fund_campaigns_v1_rollback.sql
+?? supabase/migrations/20260818131800_db70_delete_all_fund_campaigns_v1.sql
+?? supabase/migrations/_drafts/20260818131800_db70_delete_all_fund_campaigns_v1_rollback.sql
+```
+
+**That `D` is not a deletion and a sweeper must not treat it as one.** Commit `2782322`, *"Create
+20260818131500_db70_delete_all_fund_campaigns_v1_rollback.sql"* — authored by `rebelutionxyz` at
+2026-08-18 13:10:59 UTC, a GitHub-web-UI default message — committed the rollback file **mid-pass,
+about a minute after I wrote it**, under its pre-stamp name. `apply_migration` then stamped
+`20260818131800` rather than the `20260818131500` the file was authored under, so the file had to
+move. Git sees the old path as tracked-and-now-missing and the new path as untracked; the pair is a
+**rename**, not a delete plus an add.
+
+This is the **sanctioned A1a reconciliation class** — both ends sit under `supabase/migrations/`, and
+the whole reason the class exists is that the management API stamps its own apply-time version. It
+passes the sweep's gate 2c. But the raw `git status --porcelain` manifest shows `D` + `??`, and gate
+2c reads the manifest: **stage both paths together (`git add -A` over the two `_drafts` paths) so the
+staged manifest resolves to `R`,** rather than reading the bare `D` and escalating. I did not stage or
+commit anything — no SWEEP was dispatched to this pass.
+
+Worth stating for its own sake: **a file committed by hand while the pass that authored it is still
+running is a race.** Nothing was lost here, and the outcome is a sanctioned rename rather than a
+conflict, but the same timing against a file the pass was still editing would have produced a commit
+of a half-written migration.
+
+---
+
 ## DB67 — REAP ABANDONED INTENTS. Proposal only, zero writes. (2026-08-18)
 
 Session `16a78b56` (fallback id — no `MC_SESSION`). Dispatch DB67, lane `db`, workdir

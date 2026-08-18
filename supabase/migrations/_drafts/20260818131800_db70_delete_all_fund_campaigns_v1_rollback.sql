@@ -1,4 +1,4 @@
--- ROLLBACK for 20260818131500_db70_delete_all_fund_campaigns_v1.sql
+-- ROLLBACK for 20260818131800_db70_delete_all_fund_campaigns_v1.sql
 -- DB70, 2026-08-18. WRITTEN BEFORE THE FORWARD MIGRATION per the MIGRATION AMENDMENT.
 --
 -- WHAT RUNNING THIS RESTORES: fund-live-test-20260817 and all five of its
