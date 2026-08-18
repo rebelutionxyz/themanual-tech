@@ -318,7 +318,7 @@ export function InfraHealthPage() {
                   </ActionButton>
                   <div className="flex gap-2">
                     <ActionButton variant="secondary" icon="sparkle">
-                      Ask Atlas Oracle
+                      Ask h24
                     </ActionButton>
                     <ActionButton variant="ghost">Runbook</ActionButton>
                   </div>

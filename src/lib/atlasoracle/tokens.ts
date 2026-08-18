@@ -38,7 +38,7 @@ export interface OracleTokenBalance {
 const SIGNED_OUT: OracleTokenBalance = {
   balance: null,
   status: 'signed-out',
-  reason: 'Sign in to see your Oracle Token balance.',
+  reason: 'Sign in to see your h24 token balance.',
 };
 
 /**

@@ -23,6 +23,518 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONT77 — THE h24 NAME SWEEP. User-facing AtlasOracle/Oracle → h24; code ids untouched. (2026-08-18)
+
+**Pass:** FRONT77 · lane `front` · workdir `TheMANUAL.tech` · session `f3571fb1` (fallback id)
+**Canon:** ORACLE_MF v1.35. Owner word: "remove all atlasoracle and oracle and replace with h24."
+**Outcome:** 21 source files changed, build green, `/oracle` and `/here24` observed redirecting to
+`/h24`, `/h24` observed rendering h24 language end to end. Committed, not pushed.
+
+### THE CASE CONVENTION CHOSEN — state it plainly
+
+**`h24`, lowercase, in every position — including the `<h1>` and sentence-initial.**
+
+This is not a style preference invented here. The wordmark it replaces was `here24`, and that string
+was already lowercase in every position it occupied, the page `<h1>` included
+(`src/pages/oracle/OraclePage.tsx:111` before this pass). The dispatch says to match the surrounding
+copy's case convention; the surrounding convention was all-lowercase, so `h24` is all-lowercase.
+`H24` appears nowhere in copy after this pass. (`H24Badge.tsx` is a FILE name — code, untouched.)
+
+### THE ONE JUDGEMENT CALL — `here24` was swept too. Read this before anything else.
+
+**The dispatch's sweep list names `AtlasOracle` / `AtlasORACLE` / `atlasORACLE` / `Oracle`. It does
+not name `here24`. I swept `here24` anyway on rendered surfaces, and that is the one thing in this
+pass a reader might not have asked for.**
+
+The reasoning, so it can be overruled cheaply:
+
+1. On the two surfaces the dispatch explicitly names — the badge and the console — the rendered
+   wordform was **not** "AtlasOracle" at all. It was already `here24`. A literal sweep of only
+   "Oracle" would have produced `here24 · 12.4 h24 tokens`: a badge naming one brand and its currency
+   another.
+2. The dispatch's own PROVE clause asks for "the badge and wallet panel screenshotted with **h24
+   language**." Mixed here24/h24 is not h24 language.
+3. The dispatch demotes `/here24` from a peer render to a redirect. Demoting the route while keeping
+   the word as the console's `<h1>` contradicts "/h24 is CANONICAL."
+
+`h24` is not an invented name — it is the canonical route the dispatch itself calls primary, so this
+is not the "do not invent a tier name" case. **It is still a brand call, and brand calls are the
+owner's.** Every site is listed under "here24 → h24, exact locations" below; reverting is a
+seven-line change.
+
+### WHAT CHANGED — every edit, by category
+
+**1. Currency display: "Oracle Token(s)" → "h24 token(s)" (v1.35).**
+
+| file | lines | before → after |
+|---|---|---|
+| `src/pages/oracle/OraclePage.tsx` | 143, 159, 168, 215, 313, 372, 415, 584 | `Oracle Tokens` → `h24 tokens`; `GET Oracle Tokens` → `GET h24 tokens` |
+| `src/components/AtlasOracleWalletBadge.tsx` | 200, 208, 261, 377, 438, 473 | same |
+| `src/lib/atlasoracle/tokens.ts` | 41 | `'Sign in to see your Oracle Token balance.'` → `'…your h24 token balance.'` |
+
+**2. Error / notification copy.**
+
+| file | line | before → after |
+|---|---|---|
+| `src/lib/atlasoracle/client.ts` | 154 | `'Insufficient Oracle Tokens.'` → `'Insufficient h24 tokens.'` |
+| `src/lib/atlasoracle/client.ts` | 258 | `'AtlasOracle is unavailable — Supabase client not configured.'` → `'h24 is unavailable — …'` |
+
+**3. Ledger row labels** (`src/lib/freedomblings/ledger.ts` 93, 97) — `'AtlasOracle escrow withdrawn'`
+→ `'h24 escrow withdrawn'`, `'AtlasOracle escrow deposit'` → `'h24 escrow deposit'`. **The map KEYS
+`atlasoracle_escrow_withdraw` / `atlasoracle_escrow_deposit` are untouched** — they are DB
+transaction-type values, and renaming a key breaks every row that answers to it (FRONT74's lesson).
+
+**4. DingleBERRY copilot surfaces — rendered "Atlas Oracle" → "h24".**
+
+| file | lines |
+|---|---|
+| `src/pages/dingleberry/AtlasOraclePage.tsx` | 60, 131 (`Loading h24…`), 154, 232 (placeholder `Ask h24 about…`), 272 (`h24 · last 30 days`) |
+| `src/pages/dingleberry/DispatchAuthPage.tsx` | 374 (`h24 · note`) |
+| `src/pages/dingleberry/InfraHealthPage.tsx` | 321 (`Ask h24`) |
+| `src/pages/dingleberry/MemberMeshPage.tsx` | 338 (`Ask h24`) |
+| `src/pages/dingleberry/ShillDetectionPage.tsx` | 308 (`h24 · read`) |
+| `src/pages/dingleberry/SourceVerificationPage.tsx` | 384 (`Ask h24 to trace it`) |
+| `src/pages/dingleberry/ThreatInterceptionPage.tsx` | 295 (`h24 · what it is`), 316 (`Apply with h24`) |
+| `src/pages/dingleberry/TransactionSecurityPage.tsx` | 41 (`'h24 credit'`), 601 (`h24 · assessment`) |
+| `src/lib/dingleberry/mock-data.ts` | 62 (`kind: 'h24 credit'`), 102 (body text `h24 credit or HoneyPOT`) |
+
+`'AtlasOracle credit'` is a **sanctioned-freeing-path label rendered in the transaction-security
+table**, so it is copy, not a key — it is compared against the string in `mock-data.ts:62`, and both
+sides moved together. Verified by grep that no third site holds the old literal.
+
+**5. Wordmark / display-name sites (the `here24` → `h24` call).**
+
+| file | line | site |
+|---|---|---|
+| `src/pages/oracle/OraclePage.tsx` | 111, 113 | console `<h1>` and its lede sentence |
+| `src/components/AtlasOracleWalletBadge.tsx` | 120, 121 | badge `title=` tooltip, both states |
+| `src/components/AtlasOracleWalletBadge.tsx` | 129, 156, 161 | `aria-label` ×3 — `Open h24`, `Close h24`, `h24 directive` |
+| `src/components/AtlasOracleWalletBadge.tsx` | 171 | wallet panel header `h24 · {astraSlug}` |
+| `src/lib/astra-catalog.ts` | 113 | `wordmark: 'h24'` and the catalog `description` |
+| `src/pages/MissionControlPage.tsx` | 108 | `ASTRA_LABEL` display map, `oracle: 'h24'` |
+| `src/components/shell/BottomToolbar.tsx` | 30, 32 | launcher `label` + popup `title` |
+| `src/components/hq/sections/AstraStatus.tsx` | 57 | `'h24 provider · Sonnet 4.6 / Opus 4.7 / Haiku 4.5'` |
+| `src/pages/pulse/WatchPage.tsx` | 432 | `title="Surfaced by h24"` |
+
+One deliberate de-duplication, called out because it is not a mechanical substitution: the badge
+tooltip was `` `here24 · ${balanceLabel} Oracle Tokens` ``. Applying both rules literally yields
+`h24 · 12.4 h24 tokens`. It reads `` `h24 · ${balanceLabel} tokens` `` — the brand is already the
+first word of that string.
+
+**6. Brandosophic seam copy** (`src/pages/brandosophic/BrandosophicStudioPage.tsx:129`) —
+"Describe your brand, the Oracle drafts your kit — arrives with AtlasORACLE." → "Describe your brand,
+h24 drafts your kit — arrives with h24."
+
+**7. Routes** (`src/App.tsx`). `/here24` already redirected. `/oracle` rendered `OraclePage` as a
+peer; it is now `<Route path="/oracle" element={<Navigate to="/h24" replace />} />`. One home, one
+address. Two route comments were updated because this pass **changed the behaviour they describe** —
+they asserted "/oracle stays live as the legacy path," which is now false. Comment edits limited to
+that.
+
+`src/components/AtlasOracleWalletBadge.tsx:211` — the wallet panel's `console` link retargeted
+`to="/oracle"` → `to="/h24"`, so the canonical link does not bounce through a redirect.
+
+### WHAT WAS DELIBERATELY NOT TOUCHED — the R6 boundary, held
+
+- **Every code identifier**: file names (`AtlasOracleWalletBadge.tsx`, `OraclePage.tsx`,
+  `pages/oracle/`, `lib/atlasoracle/`), imports, exported types (`OracleTokenBalance`,
+  `AtlasOracleData`, `OracleQueueItem`), hooks (`useOracleTokens`, `useOracleDirective`), the
+  `LauncherId` union member `'oracle'`, the `ASTRA_LABEL`/`ASTRA_ORDER` **keys**.
+- **Every DB object**: `oracle_token_ledger`, `oracle_token_balances`, `oracle_token_consumption`,
+  `oracle_model_rates`, `oracle_token_available`, `oracle_debit_tokens`, `atlasoracle_directives`,
+  edge function `atlasoracle-route`, env flag `VITE_ATLASORACLE_MOCK`.
+- **Catalog `slug: 'atlasoracle'`, `route`/`aliases` strings, and `hosts: ['AtlasOracle.to', …]`** —
+  slug is a key, routes are code (the dispatch's own rule: the redirect is the fix, not a rename),
+  and the hosts are registered domains, which are facts about the world rather than copy.
+- **Non-rendering attributes**: `htmlFor` / `id` pairs `oracle-tier`, `oracle-category`,
+  `atlasoracle-tier`, `atlasoracle-category`.
+- **All code comments**, including `ORACLE_MF` canon-doc references throughout. Four comment lines in
+  the badge and three in the console were caught by the first mechanical pass and **reverted line by
+  line** — three of them record a Butch ruling verbatim ("Economics (Butch ruling 2026-07-27):
+  denominated in Oracle Tokens"), and rewriting a recorded ruling is not a copy sweep.
+- **`src/components/hq/sections/AstraStatus.tsx:46`** — `feat/atlasoracle-v1` is a git branch name.
+- **`src/pages/ProfilePage.tsx:35`** — `'Oracle'` here is a **rank in the standing ladder**
+  (…Sage, Wizard, Mystic, **Oracle**, Prophet, Luminary…), not the Astra. Unrelated word, untouched.
+
+### TWO THINGS FLAGGED FOR THE OWNER, NOT DECIDED HERE
+
+1. **The `A⊕O` glyph still renders** — `AtlasOracleWalletBadge.tsx:142` (badge face) and `:169`
+   (wallet panel header). It is literally the Atlas-Oracle monogram, so it is the last user-facing
+   trace of the old name. **I did not change it**: it is a MARK, not one of the copy categories the
+   dispatch enumerates, and picking its replacement is a design decision — exactly the "do not
+   invent" case. Say the word and it becomes `h24` in two lines.
+2. **The `scout` / `oracle` / `sovereign` plan-tier band does not render anywhere in `src/`.** The
+   dispatch asked for its location if it surfaced. The console and badge tier picker offers
+   `free` / `standard` / `frontier` only (`src/lib/atlasoracle/tokens.ts:145`, observed live in the
+   `/h24` screenshot). Plan grants exist server-side; the UI says "plan" and "purchased", never
+   "oracle". **Nothing to rename, so no tier name was invented.**
+
+Also recorded, minor: `AtlasOracleWalletBadge.tsx:241` is a comment that **quotes** the button copy
+— it still says `"GET Oracle Tokens"` while the button now says `GET h24 tokens`. Left stale
+deliberately rather than breaching the do-not-touch-comments rule on my own judgement. One-line fix
+whenever comments come into scope.
+
+### PROOF
+
+**Grep, case-insensitive, whole tree** — `oracle` across `src/**` after the sweep. Every surviving
+hit was read and categorized; the full remaining set is: code comments and `ORACLE_MF` doc
+references, import paths, exported type/function/hook identifiers, DB object names, the
+`atlasoracle-route` function name, `htmlFor`/`id` attributes, route path literals, the catalog slug
+and hosts, the git branch name at `AstraStatus.tsx:46`, and the ProfilePage rank ladder. **Zero
+rendered strings remain** in any of the categories the dispatch names.
+
+`here24` after the sweep survives at exactly five sites, all non-copy: three App.tsx comments, the
+`/here24` route literal, the catalog `aliases` and `hosts` entries, and one comment in
+`H24Badge.tsx`.
+
+**users, not Bees (v1.27)** — grepped `\bBee\b|\bBees\b` across every touched surface. Five hits,
+**all in comments** (`AtlasOracleWalletBadge.tsx` 145/369, `OraclePage.tsx` 26/57/402). No rendered
+"Bee" on any surface this pass touched.
+
+**Build** — `npm run build`, clean:
+
+```
+✓ built in 25.65s
+```
+
+(Vite's standing >500 kB chunk advisory for `libsodium-wrappers`, `CallView`, `registry` is
+pre-existing and unrelated.)
+
+**Lint** — `npm run lint` reports 23 errors + 1 warning, **all pre-existing and none in a file this
+pass touched**: `src/admin/sections/ProfileSection.tsx`, `src/components/comms/RouletteView.tsx`,
+`src/components/comms/CallProvider.tsx`, `src/pages/SecurityPage.tsx`. Not fixed — out of scope, and
+silently repairing unrelated files inside a copy sweep hides them.
+
+**Routes observed** in a real browser against a local dev server on **port 5199**. Port 3000 was
+already held by another session's listener (PID 21792); rather than race it, this probe took its own
+port and confirmed ownership (`netstat` → 5199 held by PID 15284, this pass's child) before any
+navigation. A stale listener answering instead of yours is how a probe lies.
+
+| URL entered | URL after load | result |
+|---|---|---|
+| `/h24` | `/h24` | renders the console |
+| `/oracle` | **`/h24`** | redirects |
+| `/here24` | **`/h24`** | redirects |
+
+Page text pulled from the live `/h24` DOM, verbatim, showing the swept copy in place:
+
+```
+h24
+Send a directive. h24 routes it to a provider against this platform's canon and hands the
+answer straight back to you — the directive and the response are never stored.
+Sign in to send directives and see your routing log.
+h24 tokens
+—
+Sign in to see your h24 token balance.
+GET h24 tokens
+Tiers
+Tier Provider In / 1M Out / 1M Note
+Rate card unavailable right now.
+h24 tokens per 1,000,000 provider tokens, read live from the same rate card the router
+charges against.
+…
+Tier: free / standard / frontier
+```
+
+### COULD NOT VERIFY — stated plainly
+
+- **The badge and wallet panel were NOT screenshotted.** `AtlasOracleWalletBadge` returns `null`
+  when there is no signed-in bee (`:114`), so it does not render for a signed-out visitor. The
+  dispatch asks for that screenshot and I did not produce it. **I will not create a throwaway
+  production auth user or paste a bearer token to get one** — a synthetic credential in a transcript
+  is a leak, and the round-trip belongs in a pass run against a real signed-in browser. The badge and
+  panel copy is grep-proven in source (sites tabled above) and typechecks, but it has not been
+  observed rendered.
+- **`/constellation` is admin-gated** ("The constellation is an admin tool"), so the catalog
+  `wordmark: 'h24'` was not observed rendering either.
+- **`/dingleberry/*` is operator-gated** ("Operator access required"), so none of the nine DingleBERRY
+  copy changes were observed rendering. Source-proven only.
+- **`/hq` Mission Control and its `ASTRA_LABEL` are admin-gated** — same status.
+- **Nothing was checked in production.** This is a local dev-server observation; the change is
+  committed and unpushed, so production still serves the old copy until an owner push.
+
+### Files changed (21)
+
+```
+src/App.tsx
+src/components/AtlasOracleWalletBadge.tsx
+src/components/hq/sections/AstraStatus.tsx
+src/components/shell/BottomToolbar.tsx
+src/lib/astra-catalog.ts
+src/lib/atlasoracle/client.ts
+src/lib/atlasoracle/tokens.ts
+src/lib/dingleberry/mock-data.ts
+src/lib/freedomblings/ledger.ts
+src/pages/MissionControlPage.tsx
+src/pages/brandosophic/BrandosophicStudioPage.tsx
+src/pages/dingleberry/AtlasOraclePage.tsx
+src/pages/dingleberry/DispatchAuthPage.tsx
+src/pages/dingleberry/InfraHealthPage.tsx
+src/pages/dingleberry/MemberMeshPage.tsx
+src/pages/dingleberry/ShillDetectionPage.tsx
+src/pages/dingleberry/SourceVerificationPage.tsx
+src/pages/dingleberry/ThreatInterceptionPage.tsx
+src/pages/dingleberry/TransactionSecurityPage.tsx
+src/pages/oracle/OraclePage.tsx
+src/pages/pulse/WatchPage.tsx
+```
+
+**Note on the commit.** `REPORT.md` also carries the **DB73** section, written into this same tree by
+a concurrent `db`-lane session while this pass was running, and it rides along in this commit because
+the file is shared. That is disclosed rather than worked around. The two untracked
+`supabase/migrations/_drafts/db73_*.sql` files are **not** this pass's and were **not** staged.
+**No push** — per the dispatch and per the standing rule that the push click is the human's.
+
+---
+
+## DB73 — THE STALE REGISTRY. Reconcile proposed, SYNC recommended. Nothing applied. (2026-08-18)
+
+**Pass:** DB73 · lane `db` · workdir `TheMANUAL.tech` · session `b4718c47`
+**Outcome:** proposal delivered. **Zero writes to any project table.** Two draft SQL files authored
+under `supabase/migrations/_drafts/` (rollback first, per the MIGRATION AMENDMENT) and neither was
+executed. One ask at the bottom.
+
+### THE MEASUREMENT — and it changes the answer
+
+The dispatch framed option (b)'s cost as "the FK and the 19 existing directive rows." Both halves
+are understated, and the correction runs in opposite directions:
+
+**There are 21 FK constraints on `astra_registry`, not one.**
+
+```
+astra_director_history   atlasoracle_directives   atom_contributions   atom_surfaces
+bazaar_listings          chat_rooms               entity_atom_links    entity_reactions
+entity_shares            event_rsvps              events               forum_posts
+forum_threads            give_campaigns           group_memberships    groups
+manual_groups            notifications            nova_registry        pillars
+promotions
+```
+
+`atom_surfaces` is `ON DELETE RESTRICT`; the other 20 are plain. Seven routines also reference the
+table (`bazaar_listing_get`, `bazaar_browse`, `bazaar_search`, `bazaar_my_listings`,
+`bazaar_create_listing`, `nova_create`, `nova_resolve`).
+
+**But only 52 rows in the whole database carry a non-null `astra_id`, across 10 of those 21 tables:**
+
+```
+table                    rows_total   rows_with_astra
+atlasoracle_directives           19                19
+forum_threads                     8                 8
+forum_posts                       7                 7
+pillars                           5                 5
+group_memberships                 4                 4
+events                            3                 3
+groups                            3                 3
+entity_shares                     1                 1
+event_rsvps                       1                 1
+nova_registry                     1                 1
+--- the other 11 tables: zero. Note atom_contributions has 4,209 rows and
+--- notifications has 231, and EVERY ONE has astra_id NULL.
+```
+
+**And those 52 rows point at exactly two registry rows:**
+
+```
+slug          status     refs   tables
+themanual     active       51   atlasoracle_directives, entity_shares, event_rsvps, events,
+                                forum_posts, forum_threads, group_memberships, groups, pillars
+atlasnation   off_grid      1   nova_registry
+```
+
+**28 of the 30 registry rows are referenced by nothing at all.** That is the fact the whole
+proposal turns on, and it was not knowable from the dispatch.
+
+### THE REAL SHAPE OF THE DIVERGENCE
+
+It is not "30 rows vs 41 rows, insert the missing 11." The two lists disagree about **naming
+scheme**, not just membership. `astra_registry` is a **domain-named** taxonomy from 2026-06-09;
+`src/lib/astra-catalog.ts` is a **function-named** taxonomy. Most of the apparent gap is the same
+Astra under two names:
+
+| registry slug | default_name | catalog slug | basis for the match |
+|---|---|---|---|
+| `atlasads` | Promotions | `advertising` | catalog host `atlasADs.biz`, wordmark `atlasADs` |
+| `atlasadvocate` | Legal | `legalservices` | catalog host `AtlasADVOCATE.com` |
+| `atlascomms` | Comms | `comms` | catalog host `atlasCOMMS.live` |
+| `atlasenlightened` | Education | `learning` | catalog host `atlasENLIGHTENED.com` |
+| `atlasindustry` | Pro Services | `proservices` | catalog host `AtlasINDUSTRY.com` |
+| `atlasintel` | Forum | `forum` | catalog host `atlasINTEL.fyi` |
+| `atlaslounge` | Lounge | `livevideo` | catalog host `atlasLOUNGE.com` |
+| `atlasnation` | Groups | `groups` | catalog host `atlasnation.com` |
+| `atlasresidential` | Residential | `realestatetrust` | catalog host `atlasRESIDENTIAL.com` |
+| `atlasunited` | Events | `events` | catalog host `atlasUNITED.fyi` |
+| `atlasvote` | Voting | `voting` | catalog host `atlasVOTE.org` |
+| `freedomrings` | Freedom Rings | `aitours` | catalog host `FredomRINGs.online` (catalog's own typo) |
+| `network` | Freedom Network | `freedomnetwork` | catalog host `freedomnetwork.app` |
+| `thehoneycombgames` | Games | `gaming` | catalog host `TheHoneycomb.games` |
+| `blingster` | Wagering | `gaming` | **merge** — catalog host `Blingster.org` |
+| `braindualgames` | Trivia | `gaming` | **merge** — games house |
+| `houseofcardgames` | Cards | `gaming` | **merge** — games house |
+| `thebeegames` | Spelling Bee | `gaming` | **merge** — games house |
+| `entertheprize` | Prizes | `bazaar` | **merge** — catalog host `Entertheprize.com` |
+| `fund` | Funding | `crowdfunding` | catalog route `/fund` — **see the open question below** |
+| `atlasoracle` `bazaar` `brandosophic` `dingleberry` `freedomblings` `pulse` `themanual` | — | same | slug identical, 7 rows |
+| `honeycombglobal` | HoneyComb | **not an Astra** | catalog header: constellation hubs are not Astras |
+| `marketplace` | Marketplace | **not an Astra** | UI alias row, `link_redirect_slug='bazaar'` |
+| `media` | Media | **not an Astra** | UI alias row, `link_redirect_slug='pulse'` |
+
+Arithmetic: 30 registry rows = 27 Astras + 3 non-Astra rows. Those 27 collapse to 22 distinct
+catalog Astras (5 games houses → `gaming`, 2 → `bazaar`). 41 − 22 = **19 catalog Astras with no
+registry row at all**: `exchange` `fnulnu` `waggles` `honeypot` `beehold` `memories` `press` `feed`
+`dating` `vr` `genealogy` `theranking` `workshop` `miniwaves` `production` `safetycheck` `therank`
+`willtestament` `justice`.
+
+**A naive SYNC that just inserted the 19 "missing" rows would be wrong** — it would land 64 rows in
+which ~17 are the same Astra twice under two names. That is the trap in this pass.
+
+### THE DECIDING CONSTRAINT: the table is a live UI surface
+
+`astra_registry` is not merely an FK target. `src/lib/astras/useAstraRegistry.ts` reads it at runtime
+to build **the INTEL Astras grid** and the **realm → Astra jump**. 18 of the 30 rows have
+`show_in_grid = true`. Any shape that retires the table has to give that grid a new source first.
+
+Two related findings while I was in there, neither mine to fix:
+
+- The hook's own doc comment says *"`astra_registry` SELECT is authenticated-only, so anon Bees get
+  an empty registry."* **That is stale.** Both policies are `USING (true)`:
+  `astra_registry_select_anon` and `astra_registry_select_authenticated`. Anon reads fine.
+- **`realms.astra_slug` is NULL on every row.** The realm → Astra jump the hook builds is dead data
+  in production today. It is also a *soft* slug reference with no FK, so it is the one thing a
+  slug rename could silently break — and it cannot, because it is empty.
+
+### SHAPE (a) SYNC — costed
+
+Insert what's missing, rename what's misnamed, archive what merged, keep the FK.
+
+**Cost of the change itself: near zero, and this is the surprise.** Every rename is an `UPDATE ...
+SET slug`, and **ids never move**, so all 21 FKs and all 52 referencing rows are untouched by
+construction. `atlasnation` carries the single `nova_registry` reference and survives its rename to
+`groups` for exactly that reason. No `DELETE` anywhere: merged-away rows go `status='archived'`,
+`show_in_grid=false`, so no id is ever destroyed.
+
+- 14 renames · 5 archives (merges) · 19 inserts · 1 stranded-redirect fix
+- End state: 30 + 19 = **49 rows** = 41 Astras + 5 archived merges + 3 non-Astra rows
+- **Standing cost: two registries forever, one derived.** This is the real price and it must be
+  named, not waved at.
+
+**The sync mechanism, and who owns drift.** The honest answer is that "keep them in sync by hand"
+is what produced this pass — the catalog file's own header records that it read 40 against canon's
+41 **for nine days**. So the proposal is not "sync and be careful", it is:
+
+1. **The slug set is the contract. Nothing else.** The DB owns grid fields (`astra_grid_group`,
+   `show_in_grid`, `link_redirect_slug`, `status`, `domain`); the catalog owns front-end fields
+   (`route`, `mount`, `category`, `hosts`, `wordmark`). They share exactly one thing: the set of
+   slugs. Reconciling identity only is what makes the contract checkable.
+2. **The database is the runtime truth; the code catalog derives from it.** The DB is what the FKs
+   point at and what the grid renders.
+3. **The drift gate is a build-time check that the slug sets are equal, and it fails the build.**
+   Not a doc, not a convention — the same reason `reconcile.mjs measure` exists for migrations.
+   Owner of drift = whoever breaks the check, at the moment they break it.
+
+Without step 3, shape (a) is just this pass again in six months.
+
+### SHAPE (b) RE-POINT — costed
+
+Attribution moves to catalog slugs; the table retires.
+
+- Drop 21 FK constraints; convert `astra_id uuid` → a text slug column on **21 tables**; rewrite
+  7 routines; migrate 52 rows of real data.
+- **Give the INTEL grid a new source.** The 18 `show_in_grid` rows and their grouping have no home
+  in the catalog — `astra_grid_group` / `show_in_grid` / `link_redirect_slug` are DB-only fields.
+  They would have to be added to `astra-catalog.ts`, which means product/grid state lives in a
+  TypeScript file that only ships on a front-end deploy.
+- **Referential integrity is gone.** A typo'd slug becomes a silent orphan instead of a `23503`.
+- The 52 rows are genuinely cheap to move — 51 of them are one slug, `themanual`, whose spelling is
+  identical on both sides. So the *data* cost is trivial; the *schema and integrity* cost is not.
+
+**The argument against (b) is not its size — it is its direction.** (b) moves the truth out of the
+database and into a code file. The file that just drifted for nine days without anyone noticing is
+the code file. Handing it the authoritative copy, and removing the FK that would have caught a bad
+reference, treats the symptom as the cure.
+
+### RECOMMENDATION — (a) SYNC, with the drift gate as a condition of taking it
+
+I recommend **(a)**, and I would not recommend it without step 3 above. Three reasons, in order:
+
+1. **The FK is doing real work and costs nothing to keep.** Renames are id-stable; 28 of 30 rows
+   have no references at all. The migration is genuinely small — the fear that made (b) attractive
+   does not survive measurement.
+2. **The table is a live surface.** (b) has to solve the grid before it can start, and solving the
+   grid means moving product state into code.
+3. **(b) removes the enforcement and keeps the drift-prone half.** Wrong direction.
+
+Today's renames are already carried: `dingleberry` (wordmark **Security**, hosts include
+`REBELUTION.icu`) and `miniwaves` (wordmark **Tasks**, host `tasks.ing`) are both in the 41-entry
+catalog, so `miniwaves` arrives with the 19 inserts and `dingleberry` is one of the 7 slug-identical
+rows. Neither needs special handling in either shape.
+
+### THE DRAFTS — authored, not applied
+
+```
+supabase/migrations/_drafts/db73_registry_reconcile_sync_rollback.sql   12,505 bytes  (written FIRST)
+supabase/migrations/_drafts/db73_registry_reconcile_sync.sql             9,120 bytes
+```
+
+Deliberately **unversioned filenames** and parked in `_drafts/`, so the reconcile ledger never sees
+them. They become a real migration only under a named dispatch, at which point they get the stamped
+version.
+
+**The rollback carries full row data** as the dispatch required: all 30 rows with their real ids,
+all 13 data columns (`slug`, `display_name`, `domain`, `status`, `default_name`, `astra_grid_group`,
+`show_in_grid`, `link_redirect_slug`, `notes`, `created_by`, `director_bee_id`, `board_bee_id`,
+`created_at`), captured live from production today via `format('%L')` so nothing was hand-typed. It
+is a `DELETE` of the 19 inserted slugs plus an `UPDATE ... FROM (VALUES ...)` keyed on id — which
+works precisely because the forward migration never moves an id. It opens with a **guard that
+refuses to run** if any inserted row has acquired a reference in the meantime, and closes by
+asserting 30 rows / 2 active / `themanual` and `atlasnation` both present.
+
+Two things the forward draft does that are worth calling out:
+
+- **It does not rename `fund`.** See the ask.
+- **It nulls a redirect the merge would strand.** `thehoneycombgames` (becoming `gaming`) points
+  `link_redirect_slug` at `braindualgames`, which the same migration archives and hides. Left alone,
+  that grid item would link to a hidden row.
+
+Also recorded: the enum is `astra_or_nova_status = (active, archived, off_grid)`. **There is no
+`retired` label**, so the dispatch's "mark retired rows retired" is spelled `archived` here. Adding
+a label would be the worse choice — Postgres cannot drop an enum label without recreating the type,
+so it is a rollback hazard for no gain.
+
+### THE ONE ASK
+
+**`fund` or `crowdfunding`?**
+
+The database says `fund` — `status='active'`, the live funding surface at `themanual.tech/fund`,
+renamed GIVE → FUND by the owner on **2026-08-17**. The catalog still says `crowdfunding`. They are
+the same Astra.
+
+The draft does **not** rename `fund`, because renaming the slug of the one live funding surface to
+match a catalog entry that predates the owner's own rename is backwards. My recommendation is that
+**the catalog moves to `fund`** — which makes it a FRONT change, not a db one, and is the only part
+of this reconcile that cannot be done in the db lane.
+
+Confirm that and shape (a) is complete as drafted. Rule the other way and the forward draft needs
+one more `UPDATE` line and a front-end check for `fund` slug lookups before it is safe.
+
+### Could not verify
+
+- **Neither draft was executed, not even in a rolled-back transaction.** The dispatch says apply
+  nothing, and a "rehearsal" that commits is the DB37 breach. So the SQL is **unproven** — it has
+  not been parsed by Postgres, and the row-count assertions in its verify blocks are arithmetic I
+  did on paper, not output I read. Anyone applying it should expect to fix a syntax error.
+- **The registry → catalog mapping is my inference**, derived from `hosts`, `wordmark` and
+  `default_name` matches, each recorded in the table above. It is not owner-ratified. The five-way
+  `gaming` merge and `atlaslounge → livevideo` are the two I would want a second opinion on.
+- **I did not grep the front end for hard-coded slug lookups.** `src/` belongs to the front lane
+  this session and I did not touch it beyond reading `astra-catalog.ts` and `useAstraRegistry.ts`.
+  Before (a) is applied, someone should confirm no component looks up `bySlug.get('atlasintel')` or
+  similar by an old slug. `realms.astra_slug` is empty, so that particular soft reference is safe.
+- **`honeycombglobal`, `marketplace` and `media` are left exactly as they are.** I classified them
+  as non-Astras but changing their grid behaviour (`media` currently has `show_in_grid=true`) is a
+  product call, not a reconcile.
+
+---
+
 ## FRONT76 — CATALOG TRUTH. Registry 40 → 41, R1 flags flipped, renames completed. Finding A closed; a FRONT74 miscount corrected. (2026-08-18)
 
 Session `79a4fea9` (fallback id — no `MC_SESSION`). Dispatch FRONT76, lane `front`, workdir

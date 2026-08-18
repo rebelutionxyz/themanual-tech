@@ -110,7 +110,7 @@ export const ASTRA_STATUS_COLOR: Record<AstraStatus, { bg: string; text: string 
 // cross-reference with ASTRA_REGISTRY upgrades to 'live' when hosts intersect.
 export const ASTRA_CATALOG: AstraCatalogEntry[] = [
   // ─── Core (3) ───────────────────────────────────────────────────────
-  { slug: 'atlasoracle',   wordmark: 'here24',          category: 'core', hosts: ['AtlasOracle.to', 'here24.tech', 'h24.tech'], status: 'scaffolded', director: 'Ryan Matta', description: 'AI router/dispatcher — every Astra calls here24 for AI features.', route: '/h24', aliases: ['/here24', '/oracle'], mount: 'page', accent: '#8B7FD4' },
+  { slug: 'atlasoracle',   wordmark: 'h24',          category: 'core', hosts: ['AtlasOracle.to', 'here24.tech', 'h24.tech'], status: 'scaffolded', director: 'Ryan Matta', description: 'AI router/dispatcher — every Astra calls h24 for AI features.', route: '/h24', aliases: ['/here24', '/oracle'], mount: 'page', accent: '#8B7FD4' },
   { slug: 'exchange',      wordmark: 'The Exchange',    category: 'core', hosts: ['freedomplatform.app'],                status: 'deferred',                              description: 'Cross-spine timeslot coordination — OFFER and GET time.', route: '/exchange', mount: 'stub', accent: '#4A6E96' },
   { slug: 'fnulnu',        wordmark: 'fnulnu',          category: 'core', hosts: ['fnulnu.store'],                       status: 'deferred',  director: 'FNU LNU (Butch)',description: 'Identity / Bee atomic substrate.', route: '/fnulnu', mount: 'stub', accent: '#E8B86E' },
 

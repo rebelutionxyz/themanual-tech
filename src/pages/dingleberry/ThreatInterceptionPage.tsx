@@ -292,7 +292,7 @@ export function ThreatInterceptionPage() {
                 </div>
                 <div>
                   <div className="mb-[3px] font-mono uppercase" style={{ fontSize: 9, letterSpacing: '0.1em', color: DATA_BLUE }}>
-                    Atlas Oracle · what it is
+                    h24 · what it is
                   </div>
                   <div className="text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
                     {x.plain}
@@ -313,7 +313,7 @@ export function ThreatInterceptionPage() {
                 </div>
                 <div style={{ maxWidth: 220 }}>
                   <ActionButton variant="primary" icon="sparkle">
-                    Apply with Atlas Oracle
+                    Apply with h24
                   </ActionButton>
                 </div>
               </div>

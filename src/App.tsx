@@ -422,18 +422,21 @@ function AppContent() {
               wrapper contradicted it (fnulnu hardcoded vs is_admin on the
               actual admin Bee) and made /hq unreachable. Removed 2026-07-16. */}
             <Route path="/hq" element={<HQControlRoom />} />
-            {/* AtlasOracle console (AI Astra). MUST stay ahead of /:slug or the
-              catch-all SurfacePage swallows it. Not to be confused with
-              /dingleberry/oracle, which is the DingleBERRY copilot demo. */}
-            <Route path="/oracle" element={<OraclePage />} />
+            {/* Legacy path for the AI Astra console. MUST stay ahead of /:slug
+              or the catch-all SurfacePage swallows it. Not to be confused with
+              /dingleberry/oracle, which is the DingleBERRY copilot demo.
+              FRONT77 (ORACLE_MF v1.35): demoted from a peer render to a
+              redirect — /h24 is the one home, so an old link lands there and
+              the address bar says so. */}
+            <Route path="/oracle" element={<Navigate to="/h24" replace />} />
             {/* h24 / here24 — the SAME Astra as /oracle (ORACLE_MF v1.22:
               "here24 = AtlasOracle rebranded — the engine, not the successor
               universe"), so it renders the same console rather than a second
               one. FRONT21 choice, recorded: /h24 is CANONICAL — it is the form
               the owner used when the Astra was named ("we created h24") and it
-              is what the header badge points at. /here24 answers as an alias
-              and /oracle stays live as the legacy path; all three are the same
-              room. The domains here24.tech / h24.tech stay registered and DARK
+              is what the header badge points at. /here24 and /oracle both
+              REDIRECT here rather than render as peers (FRONT77); one room,
+              one address. The domains here24.tech / h24.tech stay registered and DARK
               (v1.21 / v1.24) — this route is the only way in. */}
             <Route path="/h24" element={<OraclePage />} />
             <Route path="/here24" element={<Navigate to="/h24" replace />} />

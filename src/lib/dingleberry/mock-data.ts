@@ -59,7 +59,7 @@ export const STREAM_S2 = [
   {
     hash: '0x4b71…12cc',
     amt: '+3,200',
-    kind: 'AtlasOracle credit',
+    kind: 'h24 credit',
     tag: 'freed',
     from: 'Well',
     to: 'e302',
@@ -99,7 +99,7 @@ export const ANOMALIES_S2 = [
     status: 'held',
     check: 'Freeing-path attestation',
     oracle:
-      'New BLiNG! appeared without a sanctioned freeing path attached. Every increase in total_supply must trace to Drops/Drips, affiliate_distribute, AtlasOracle credit or HoneyPOT. This one does not — held pending trace.',
+      'New BLiNG! appeared without a sanctioned freeing path attached. Every increase in total_supply must trace to Drops/Drips, affiliate_distribute, h24 credit or HoneyPOT. This one does not — held pending trace.',
   },
   {
     id: 'LDG-3387',

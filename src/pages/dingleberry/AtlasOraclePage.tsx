@@ -57,7 +57,7 @@ function OracleMsg({ children }: { children: ReactNode }) {
       <AO size={36} />
       <div className="border border-border bg-bg-panel" style={{ borderRadius: '4px 14px 14px 14px', padding: '13px 15px' }}>
         <div className="mb-[5px] font-mono uppercase" style={{ fontSize: 9.5, letterSpacing: '0.1em', color: STATUS_BLUE }}>
-          Atlas Oracle
+          h24
         </div>
         <div className="text-text-silver" style={{ fontSize: 14, lineHeight: 1.5 }}>
           {children}
@@ -128,7 +128,7 @@ export function AtlasOraclePage() {
   if (!data) {
     return (
       <div className="mx-auto" style={{ maxWidth: 1320, padding: '22px 26px 40px' }}>
-        <DbCard className="p-6 text-text-muted">Loading Atlas Oracle…</DbCard>
+        <DbCard className="p-6 text-text-muted">Loading h24…</DbCard>
       </div>
     );
   }
@@ -151,7 +151,7 @@ export function AtlasOraclePage() {
           <AO size={54} />
           <div className="min-w-[240px] flex-1">
             <h1 className="font-serif font-bold text-text" style={{ fontSize: 30, lineHeight: 1, margin: '0 0 5px' }}>
-              Atlas Oracle
+              h24
             </h1>
             <div className="text-text-silver" style={{ fontSize: 14, maxWidth: 540 }}>
               The platform’s security copilot — explains every finding in plain language, ships the fix it can, and automates
@@ -229,7 +229,7 @@ export function AtlasOraclePage() {
             >
               <Message size={17} className="text-text-muted" />
               <span className="flex-1 text-text-muted" style={{ fontSize: 14 }}>
-                Ask Atlas Oracle about any surface, finding, or fix…
+                Ask h24 about any surface, finding, or fix…
               </span>
               <div style={{ width: 92 }}>
                 <ActionButton variant="primary" icon="arrowUp">
@@ -269,7 +269,7 @@ export function AtlasOraclePage() {
 
           <DbCard className="p-5" style={{ background: 'var(--bg-elevated, #0C0E12)' }}>
             <Eyebrow className="mb-3" >
-              <span style={{ color: STATUS_BLUE }}>Oracle · last 30 days</span>
+              <span style={{ color: STATUS_BLUE }}>h24 · last 30 days</span>
             </Eyebrow>
             {scorecard.map(([capLabel, n, col], idx) => (
               <div

@@ -429,7 +429,7 @@ function ClaimRow({
         </p>
         <div className="flex flex-shrink-0 items-center gap-1">
           {claim.isAiSurfaced && (
-            <span title="Surfaced by here24">
+            <span title="Surfaced by h24">
               <Sparkles size={12} className="text-zinc-400" />
             </span>
           )}

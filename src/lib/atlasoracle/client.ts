@@ -151,7 +151,7 @@ function mockResult(args: InvokeArgs): RouteResult {
   if (probe.startsWith('!fund')) {
     return {
       kind: 'error',
-      message: 'Insufficient Oracle Tokens.',
+      message: 'Insufficient h24 tokens.',
       status: 402,
       action: 'get-tokens',
       requiredTokens: 580.51,
@@ -255,7 +255,7 @@ export async function invokeDirective(args: InvokeArgs): Promise<RouteResult> {
   if (!supabase) {
     return {
       kind: 'error',
-      message: 'AtlasOracle is unavailable — Supabase client not configured.',
+      message: 'h24 is unavailable — Supabase client not configured.',
       status: null,
       action: 'none',
     };

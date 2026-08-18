@@ -54,7 +54,7 @@ const INFRA_LAYERS: InfraLayer[] = [
   },
   {
     name: 'Anthropic API',
-    identifier: 'here24 provider · Sonnet 4.6 / Opus 4.7 / Haiku 4.5',
+    identifier: 'h24 provider · Sonnet 4.6 / Opus 4.7 / Haiku 4.5',
     status: 'operational',
     last_verified: '2026-05-27',
     note: 'Monthly cap usage tracking pending FE instrumentation.',

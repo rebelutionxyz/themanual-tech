@@ -38,7 +38,7 @@ const STATUS_BADGE: Record<string, { tone: Tone; label: string }> = {
 const SANCTIONED_PATHS = [
   'Drops / Drips',
   'Affiliate distribution',
-  'AtlasOracle credit',
+  'h24 credit',
   'HoneyPOT',
 ];
 
@@ -598,7 +598,7 @@ export function TransactionSecurityPage() {
                     className="mb-[3px] font-mono uppercase"
                     style={{ fontSize: 9, letterSpacing: '0.1em', color: STATUS_BLUE }}
                   >
-                    Atlas Oracle · assessment
+                    h24 · assessment
                   </div>
                   <div className="text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
                     {sel.oracle}

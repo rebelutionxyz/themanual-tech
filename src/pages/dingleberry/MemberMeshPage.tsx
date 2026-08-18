@@ -335,7 +335,7 @@ export function MemberMeshPage() {
                   <div className="flex gap-2">
                     <ActionButton variant="secondary">View attestations</ActionButton>
                     <ActionButton variant="ghost" icon="sparkle">
-                      Ask Atlas Oracle
+                      Ask h24
                     </ActionButton>
                   </div>
                   <ActionCaption />

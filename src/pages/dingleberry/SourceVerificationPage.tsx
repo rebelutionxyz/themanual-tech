@@ -381,7 +381,7 @@ export function SourceVerificationPage() {
                   </ActionButton>
                 )}
                 <ActionButton variant="ghost" icon="sparkle">
-                  Ask Atlas Oracle to trace it
+                  Ask h24 to trace it
                 </ActionButton>
                 <ActionCaption />
               </div>

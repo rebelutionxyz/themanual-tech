@@ -126,7 +126,7 @@ export function BrandosophicStudioPage() {
           GENERATE WITH AI
         </button>
         <span className="text-xs text-zinc-500">
-          Describe your brand, the Oracle drafts your kit — arrives with AtlasORACLE.
+          Describe your brand, h24 drafts your kit — arrives with h24.
         </span>
       </div>
     </div>

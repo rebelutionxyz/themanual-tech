@@ -117,8 +117,8 @@ export function AtlasOracleWalletBadge({
   const balanceLabel = tokens.balance === null ? '—' : formatTokens(tokens.balance);
   const badgeTitle =
     tokens.status === 'live'
-      ? `here24 · ${balanceLabel} Oracle Tokens`
-      : `here24 · ${tokens.reason}`;
+      ? `h24 · ${balanceLabel} tokens`
+      : `h24 · ${tokens.reason}`;
 
   return (
     <>
@@ -126,7 +126,7 @@ export function AtlasOracleWalletBadge({
         type="button"
         onClick={() => setOpen(true)}
         title={badgeTitle}
-        aria-label="Open here24"
+        aria-label="Open h24"
         className={cn(
           'flex items-center gap-2 rounded-full border bg-bg-elevated px-2.5 py-1 transition-colors',
           badgeState === 'idle' && 'border-honey/40 hover:border-honey/70',
@@ -153,12 +153,12 @@ export function AtlasOracleWalletBadge({
           <button
             type="button"
             onClick={close}
-            aria-label="Close here24"
+            aria-label="Close h24"
             className="fixed inset-0 z-40 cursor-default bg-black/60"
           />
           <dialog
             open
-            aria-label="here24 directive"
+            aria-label="h24 directive"
             className={cn(
               'fixed inset-x-0 bottom-0 z-50 m-0 flex w-full flex-col gap-4 border border-border-bright bg-bg-elevated p-5 text-text',
               'rounded-t-2xl sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl',
@@ -168,7 +168,7 @@ export function AtlasOracleWalletBadge({
               <div className="flex items-center gap-2">
                 <span className="font-mono font-semibold text-honey">A⊕O</span>
                 <span className="text-text-silver" style={{ fontSize: '12.5px' }}>
-                  here24 · {astraSlug}
+                  h24 · {astraSlug}
                   {novaSlug ? ` / ${novaSlug}` : ''}
                 </span>
               </div>
@@ -197,7 +197,7 @@ export function AtlasOracleWalletBadge({
               style={{ fontSize: '11.5px' }}
             >
               <span className="text-text-silver">
-                Oracle Tokens · <span className="font-mono text-text">{balanceLabel}</span>
+                h24 tokens · <span className="font-mono text-text">{balanceLabel}</span>
               </span>
               <button
                 type="button"
@@ -205,10 +205,10 @@ export function AtlasOracleWalletBadge({
                 aria-expanded={tokenNotice}
                 className="rounded-md border border-border-bright px-2 py-0.5 text-text-silver transition-colors hover:border-honey/70 hover:text-text"
               >
-                GET Oracle Tokens
+                GET h24 tokens
               </button>
               <Link
-                to="/oracle"
+                to="/h24"
                 onClick={close}
                 className="ml-auto text-text-silver underline decoration-dotted underline-offset-2 transition-colors hover:text-honey"
               >
@@ -258,7 +258,7 @@ export function AtlasOracleWalletBadge({
                 className="rounded-md border border-border-bright bg-bg p-3 text-text-silver"
                 style={{ fontSize: '12px' }}
               >
-                Your balance is live, but there is no way to GET more yet — how Oracle Tokens are
+                Your balance is live, but there is no way to GET more yet — how h24 tokens are
                 offered has not been ruled on, so this control has nothing to hand you. The free
                 tier routes today at no token cost.
               </div>
@@ -374,7 +374,7 @@ export function AtlasOracleWalletBadge({
                   <span className="font-mono font-semibold">
                     {formatTokens(preview.estimatedCostTokens)}
                   </span>{' '}
-                  Oracle Tokens on {preview.provider}. Confirm to route it.
+                  h24 tokens on {preview.provider}. Confirm to route it.
                 </p>
                 {tokens.balance !== null && (
                   <p className="text-text-silver" style={{ fontSize: '11px' }}>
@@ -435,7 +435,7 @@ export function AtlasOracleWalletBadge({
                       className="self-start rounded-md border border-border-bright px-2 py-0.5 text-text-silver transition-colors hover:border-honey/70 hover:text-text"
                       style={{ fontSize: '11.5px' }}
                     >
-                      GET Oracle Tokens
+                      GET h24 tokens
                     </button>
                   </>
                 )}
@@ -470,7 +470,7 @@ export function AtlasOracleWalletBadge({
                     cost ·{' '}
                     {response.costTokens === 0
                       ? 'FREE'
-                      : `${formatTokens(response.costTokens)} Oracle Tokens`}
+                      : `${formatTokens(response.costTokens)} h24 tokens`}
                   </span>
                   {response.balanceAfterTokens !== null && (
                     <span>balance · {formatTokens(response.balanceAfterTokens)}</span>

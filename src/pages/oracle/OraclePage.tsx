@@ -108,9 +108,9 @@ export function OraclePage() {
             <Sparkles size={30} className="text-honey" />
           </div>
           <div>
-            <h1 className="font-display text-2xl font-semibold text-text">here24</h1>
+            <h1 className="font-display text-2xl font-semibold text-text">h24</h1>
             <p className="mt-1 text-text-silver" style={{ fontSize: '13px' }}>
-              Send a directive. here24 routes it to a provider against this platform's canon
+              Send a directive. h24 routes it to a provider against this platform's canon
               and hands the answer straight back to you — the directive and the response are never
               stored.
             </p>
@@ -140,7 +140,7 @@ export function OraclePage() {
         {/* Oracle Tokens */}
         <section className="flex flex-col gap-3">
           <h2 className="font-display font-semibold text-text" style={{ fontSize: '15px' }}>
-            Oracle Tokens
+            h24 tokens
           </h2>
           <div className="flex flex-wrap items-center gap-4 rounded-lg border border-border-bright bg-bg-elevated p-4">
             <div>
@@ -156,7 +156,7 @@ export function OraclePage() {
               className="ml-auto rounded-md border border-honey/60 bg-honey/10 px-3 py-1.5 font-semibold text-honey transition-colors hover:border-honey/90 hover:bg-honey/20"
               style={{ fontSize: '12.5px' }}
             >
-              GET Oracle Tokens
+              GET h24 tokens
             </button>
           </div>
           {tokenNotice && (
@@ -165,7 +165,7 @@ export function OraclePage() {
               style={{ fontSize: '12.5px' }}
             >
               Your balance above is live and directives are charged against it. What there is not
-              yet is a way to GET more — how Oracle Tokens are offered has not been ruled on, so
+              yet is a way to GET more — how h24 tokens are offered has not been ruled on, so
               this control has nothing to hand you. The free tier routes today at no token cost.
             </p>
           )}
@@ -212,7 +212,7 @@ export function OraclePage() {
             </table>
           </div>
           <p className="text-text-silver" style={{ fontSize: '11px' }}>
-            Oracle Tokens per 1,000,000 provider tokens, read live from the same rate card the
+            h24 tokens per 1,000,000 provider tokens, read live from the same rate card the
             router charges against. Cached input, where a provider reports it, bills at a lower rate
             again.
           </p>
@@ -310,7 +310,7 @@ export function OraclePage() {
                 <span className="font-mono font-semibold">
                   {formatTokens(preview.estimatedCostTokens)}
                 </span>{' '}
-                Oracle Tokens on {preview.provider}. Nothing has been spent yet — confirm to route
+                h24 tokens on {preview.provider}. Nothing has been spent yet — confirm to route
                 it.
               </p>
               <p className="text-text-silver" style={{ fontSize: '11.5px' }}>
@@ -369,7 +369,7 @@ export function OraclePage() {
                     className="self-start rounded-md border border-border-bright px-2 py-0.5 text-text-silver transition-colors hover:border-honey/70 hover:text-text"
                     style={{ fontSize: '11.5px' }}
                   >
-                    GET Oracle Tokens
+                    GET h24 tokens
                   </button>
                 </>
               )}
@@ -412,7 +412,7 @@ export function OraclePage() {
                   cost ·{' '}
                   {response.costTokens === 0
                     ? 'FREE'
-                    : `${formatTokens(response.costTokens)} Oracle Tokens`}
+                    : `${formatTokens(response.costTokens)} h24 tokens`}
                 </span>
                 {response.balanceAfterTokens !== null && (
                   <span>balance · {formatTokens(response.balanceAfterTokens)}</span>
@@ -581,7 +581,7 @@ export function OraclePage() {
                           <td colSpan={8} className="px-3 py-3">
                             {breakdown === null ? (
                               <p className="text-text-silver" style={{ fontSize: '11.5px' }}>
-                                Charged {formatTokensExact(e.costTokens ?? 0)} Oracle Tokens. The
+                                Charged {formatTokensExact(e.costTokens ?? 0)} h24 tokens. The
                                 rate that was live for {e.provider ?? 'this provider'} at that
                                 moment is not on the current rate card, so the legs cannot be shown
                                 — the debit above is the ledger's own figure and stands.

@@ -371,7 +371,7 @@ export function DispatchAuthPage() {
                 </div>
                 <div>
                   <div className="mb-[3px] font-mono uppercase" style={{ fontSize: 9, letterSpacing: '0.1em', color: DATA_BLUE }}>
-                    Atlas Oracle · note
+                    h24 · note
                   </div>
                   <div className="text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
                     {d.oracle}

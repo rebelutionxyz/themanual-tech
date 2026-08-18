@@ -305,7 +305,7 @@ export function ShillDetectionPage() {
                 </div>
                 <div>
                   <div className="mb-[3px] font-mono uppercase" style={{ fontSize: 9, letterSpacing: '0.1em', color: STATUS_BLUE }}>
-                    Atlas Oracle · read
+                    h24 · read
                   </div>
                   <div className="text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
                     {r.oracle}

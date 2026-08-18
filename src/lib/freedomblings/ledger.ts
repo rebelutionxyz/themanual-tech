@@ -90,11 +90,11 @@ const TYPE_META: Record<string, TypeMeta> = {
   escrow_release: { kind: 'got', dir: 'pos', label: 'Released to you from escrow' },
   escrow_unlock: { kind: 'got', dir: 'pos', label: 'Escrow unlocked to you' },
   escrow_cancel: { kind: 'got', dir: 'pos', label: 'Escrow returned' },
-  atlasoracle_escrow_withdraw: { kind: 'got', dir: 'pos', label: 'AtlasOracle escrow withdrawn' },
+  atlasoracle_escrow_withdraw: { kind: 'got', dir: 'pos', label: 'h24 escrow withdrawn' },
   escrow_hold: { kind: 'given', dir: 'neg', label: 'Placed into escrow' },
   competition_stake_escrow: { kind: 'given', dir: 'neg', label: 'Staked into a competition' },
   affiliate_clawback: { kind: 'given', dir: 'neg', label: 'Lineage clawback' },
-  atlasoracle_escrow_deposit: { kind: 'given', dir: 'neg', label: 'AtlasOracle escrow deposit' },
+  atlasoracle_escrow_deposit: { kind: 'given', dir: 'neg', label: 'h24 escrow deposit' },
 };
 function metaFor(type: string): TypeMeta {
   return TYPE_META[type] ?? { kind: 'got', dir: 'pos', label: type };
