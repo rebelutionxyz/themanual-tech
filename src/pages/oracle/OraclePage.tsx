@@ -1,4 +1,4 @@
-import { Composer, type ComposerBand } from '@/components/composer/Composer';
+import { COMPOSER_MEASURE, Composer, type ComposerBand } from '@/components/composer/Composer';
 import { H24CostPanel } from '@/components/h24/H24CostPanel';
 import { H24Sidebar } from '@/components/h24/H24Sidebar';
 import {
@@ -283,169 +283,179 @@ export function OraclePage() {
           signedIn={Boolean(bee)}
         />
 
-        {/* CENTER — conversation scrolls above, composer docked at the bottom. */}
+        {/* CENTER — conversation scrolls above, composer docked at the bottom.
+            FRONT84: the message column and the composer share COMPOSER_MEASURE, a
+            centered readable cap (like the Claude chat) instead of full-bleed. */}
         <section className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-5 py-6 md:px-8">
-            <header>
-              <h1 className="font-display text-xl font-semibold text-text">h24</h1>
-              <p className="mt-1 text-text-silver" style={{ fontSize: '13px' }}>
-                Send a directive. h24 routes it to a provider against this platform's canon and
-                hands the answer back — the directive and the response are never stored.
-              </p>
-            </header>
-
-            {isMocked() && (
-              <div
-                className="rounded-md border border-honey/50 bg-honey/10 px-3 py-2 text-honey"
-                style={{ fontSize: '12px' }}
-              >
-                MOCK MODE — no provider is called and nothing is spent. Directives beginning{' '}
-                <code>!preview</code>, <code>!fund</code>, <code>!cap</code> or <code>!fail</code>{' '}
-                exercise the other response shapes.
-              </div>
-            )}
-
-            {!bee && (
-              <div
-                className="rounded-md border border-border-bright bg-panel-2 p-4 text-text-silver"
-                style={{ fontSize: '13px' }}
-              >
-                Sign in to send directives and see your routing log.
-              </div>
-            )}
-
-            {state === 'awaiting-confirm' && preview && (
-              <div className="flex flex-col gap-3 rounded-md border border-honey/60 bg-honey/10 p-4">
-                <p className="text-text" style={{ fontSize: '13px' }}>
-                  This directive is estimated at{' '}
-                  <span className="font-mono font-semibold">
-                    {formatTokens(preview.estimatedCostTokens)}
-                  </span>{' '}
-                  h24 tokens on {preview.provider}. Nothing has been spent yet — confirm to route
-                  it.
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-6 md:px-8">
+            <div className={cn(COMPOSER_MEASURE, 'flex flex-1 flex-col gap-6')}>
+              <header>
+                <h1 className="font-display text-xl font-semibold text-text">h24</h1>
+                <p className="mt-1 text-text-silver" style={{ fontSize: '13px' }}>
+                  Send a directive. h24 routes it to a provider against this platform's canon and
+                  hands the answer back — the directive and the response are never stored.
                 </p>
-                <p className="text-text-silver" style={{ fontSize: '11.5px' }}>
-                  est. {preview.estimatedInputTokens.toLocaleString()} in ·{' '}
-                  {preview.estimatedOutputTokens.toLocaleString()} out
-                  {tokens.balance !== null && (
-                    <>
-                      {' · '}balance {formatTokens(tokens.balance)} → about{' '}
-                      {formatTokens(Math.max(0, tokens.balance - preview.estimatedCostTokens))}{' '}
-                      after
-                    </>
-                  )}
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void confirm()}
-                    className="rounded-md border border-honey/60 bg-honey/20 px-3 py-1 font-semibold text-honey transition-colors hover:border-honey/90"
-                    style={{ fontSize: '12.5px' }}
-                  >
-                    CONFIRM
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cancelConfirm}
-                    className="rounded-md border border-border-bright px-3 py-1 text-text-silver transition-colors hover:text-text"
-                    style={{ fontSize: '12.5px' }}
-                  >
-                    cancel
-                  </button>
+              </header>
+
+              {isMocked() && (
+                <div
+                  className="rounded-md border border-honey/50 bg-honey/10 px-3 py-2 text-honey"
+                  style={{ fontSize: '12px' }}
+                >
+                  MOCK MODE — no provider is called and nothing is spent. Directives beginning{' '}
+                  <code>!preview</code>, <code>!fund</code>, <code>!cap</code> or <code>!fail</code>{' '}
+                  exercise the other response shapes.
                 </div>
-              </div>
-            )}
+              )}
 
-            {failure && (
-              <div
-                className="flex flex-col gap-2 rounded-md border border-kettle-unsourced/60 bg-kettle-unsourced/10 p-3 text-text"
-                style={{ fontSize: '12.5px' }}
-                role="alert"
-              >
-                <span>{failure.message}</span>
-                {failure.action === 'get-tokens' &&
-                  failure.requiredTokens !== undefined &&
-                  failure.availableTokens !== undefined && (
+              {!bee && (
+                <div
+                  className="rounded-md border border-border-bright bg-panel-2 p-4 text-text-silver"
+                  style={{ fontSize: '13px' }}
+                >
+                  Sign in to send directives and see your routing log.
+                </div>
+              )}
+
+              {state === 'awaiting-confirm' && preview && (
+                <div className="flex flex-col gap-3 rounded-md border border-honey/60 bg-honey/10 p-4">
+                  <p className="text-text" style={{ fontSize: '13px' }}>
+                    This directive is estimated at{' '}
+                    <span className="font-mono font-semibold">
+                      {formatTokens(preview.estimatedCostTokens)}
+                    </span>{' '}
+                    h24 tokens on {preview.provider}. Nothing has been spent yet — confirm to route
+                    it.
+                  </p>
+                  <p className="text-text-silver" style={{ fontSize: '11.5px' }}>
+                    est. {preview.estimatedInputTokens.toLocaleString()} in ·{' '}
+                    {preview.estimatedOutputTokens.toLocaleString()} out
+                    {tokens.balance !== null && (
+                      <>
+                        {' · '}balance {formatTokens(tokens.balance)} → about{' '}
+                        {formatTokens(Math.max(0, tokens.balance - preview.estimatedCostTokens))}{' '}
+                        after
+                      </>
+                    )}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void confirm()}
+                      className="rounded-md border border-honey/60 bg-honey/20 px-3 py-1 font-semibold text-honey transition-colors hover:border-honey/90"
+                      style={{ fontSize: '12.5px' }}
+                    >
+                      CONFIRM
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelConfirm}
+                      className="rounded-md border border-border-bright px-3 py-1 text-text-silver transition-colors hover:text-text"
+                      style={{ fontSize: '12.5px' }}
+                    >
+                      cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {failure && (
+                <div
+                  className="flex flex-col gap-2 rounded-md border border-kettle-unsourced/60 bg-kettle-unsourced/10 p-3 text-text"
+                  style={{ fontSize: '12.5px' }}
+                  role="alert"
+                >
+                  <span>{failure.message}</span>
+                  {failure.action === 'get-tokens' &&
+                    failure.requiredTokens !== undefined &&
+                    failure.availableTokens !== undefined && (
+                      <span className="text-text-silver" style={{ fontSize: '11.5px' }}>
+                        needs {formatTokens(failure.requiredTokens)} · you hold{' '}
+                        {formatTokens(failure.availableTokens)} · short by{' '}
+                        {formatTokens(
+                          Math.max(0, failure.requiredTokens - failure.availableTokens),
+                        )}
+                      </span>
+                    )}
+                  {failure.action === 'retry-later' && failure.retryAfterSeconds && (
                     <span className="text-text-silver" style={{ fontSize: '11.5px' }}>
-                      needs {formatTokens(failure.requiredTokens)} · you hold{' '}
-                      {formatTokens(failure.availableTokens)} · short by{' '}
-                      {formatTokens(Math.max(0, failure.requiredTokens - failure.availableTokens))}
+                      Try again in about {failure.retryAfterSeconds}s.
                     </span>
                   )}
-                {failure.action === 'retry-later' && failure.retryAfterSeconds && (
-                  <span className="text-text-silver" style={{ fontSize: '11.5px' }}>
-                    Try again in about {failure.retryAfterSeconds}s.
-                  </span>
-                )}
-              </div>
-            )}
-
-            {state === 'response-ready' && response && (
-              <div className="flex flex-col gap-2">
-                <div
-                  className="rounded-md border border-border-bright bg-bg-elevated p-4 font-mono text-text"
-                  style={{ fontSize: '13px', whiteSpace: 'pre-wrap' }}
-                >
-                  {response.response}
                 </div>
-                <div
-                  className="flex flex-wrap items-center gap-3 text-text-silver"
-                  style={{ fontSize: '11.5px' }}
-                >
-                  <span>provider · {response.provider}</span>
-                  <span>
-                    tokens · {response.tokens.input.toLocaleString()} in /{' '}
-                    {response.tokens.output.toLocaleString()} out /{' '}
-                    {response.tokens.cached.toLocaleString()} cached
-                  </span>
-                  <span className={response.costTokens > 0 ? 'text-honey' : undefined}>
-                    cost ·{' '}
-                    {response.costTokens === 0
-                      ? 'FREE'
-                      : `${formatTokens(response.costTokens)} h24 tokens`}
-                  </span>
-                  {response.balanceAfterTokens !== null && (
-                    <span>balance · {formatTokens(response.balanceAfterTokens)}</span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      reset();
-                      setDirective('');
-                    }}
-                    className="ml-auto rounded-md border border-border-bright px-2 py-0.5 text-text-silver transition-colors hover:border-honey/70 hover:text-text"
+              )}
+
+              {state === 'response-ready' && response && (
+                <div className="flex flex-col gap-2">
+                  <div
+                    className="rounded-md border border-border-bright bg-bg-elevated p-4 font-mono text-text"
+                    style={{ fontSize: '13px', whiteSpace: 'pre-wrap' }}
                   >
-                    new directive
-                  </button>
+                    {response.response}
+                  </div>
+                  <div
+                    className="flex flex-wrap items-center gap-3 text-text-silver"
+                    style={{ fontSize: '11.5px' }}
+                  >
+                    <span>provider · {response.provider}</span>
+                    <span>
+                      tokens · {response.tokens.input.toLocaleString()} in /{' '}
+                      {response.tokens.output.toLocaleString()} out /{' '}
+                      {response.tokens.cached.toLocaleString()} cached
+                    </span>
+                    <span className={response.costTokens > 0 ? 'text-honey' : undefined}>
+                      cost ·{' '}
+                      {response.costTokens === 0
+                        ? 'FREE'
+                        : `${formatTokens(response.costTokens)} h24 tokens`}
+                    </span>
+                    {response.balanceAfterTokens !== null && (
+                      <span>balance · {formatTokens(response.balanceAfterTokens)}</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        reset();
+                        setDirective('');
+                      }}
+                      className="ml-auto rounded-md border border-border-bright px-2 py-0.5 text-text-silver transition-colors hover:border-honey/70 hover:text-text"
+                    >
+                      new directive
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* ROUTING LOG — the conversation history. The cost is the panel's
+              {/* ROUTING LOG — the conversation history. The cost is the panel's
                 trigger: clicking it opens the build panel rather than expanding
                 the row in place. */}
-            <RoutingLog
-              log={log}
-              signedIn={Boolean(bee)}
-              selectedCostId={selectedCostId}
-              onSelectCost={setSelectedCostId}
-              onRefresh={() => void loadLog()}
-            />
+              <RoutingLog
+                log={log}
+                signedIn={Boolean(bee)}
+                selectedCostId={selectedCostId}
+                onSelectCost={setSelectedCostId}
+                onRefresh={() => void loadLog()}
+              />
+            </div>
           </div>
 
-          {/* COMPOSER DOCK — pinned to the bottom of the conversation column. */}
+          {/* COMPOSER DOCK — pinned to the bottom of the conversation column. The
+              Composer self-caps to COMPOSER_MEASURE; the notes above it use the
+              same measure so they align with the input, not the dock edge. */}
           <div className="flex-shrink-0 border-t border-border px-5 py-3 md:px-8">
-            {attachStatus && (
-              <p className="mb-2 text-text-muted" style={{ fontSize: '11.5px' }}>
-                {attachStatus}
-              </p>
-            )}
-            {currentModel && tier !== 'free' && (
-              <p className="mb-2 text-text-muted" style={{ fontSize: '11px' }}>
-                {currentModel.model} · {formatTokens(currentModel.inputPerM)} in /{' '}
-                {formatTokens(currentModel.outputPerM)} out per 1M tokens
-              </p>
-            )}
+            <div className={COMPOSER_MEASURE}>
+              {attachStatus && (
+                <p className="mb-2 text-text-muted" style={{ fontSize: '11.5px' }}>
+                  {attachStatus}
+                </p>
+              )}
+              {currentModel && tier !== 'free' && (
+                <p className="mb-2 text-text-muted" style={{ fontSize: '11px' }}>
+                  {currentModel.model} · {formatTokens(currentModel.inputPerM)} in /{' '}
+                  {formatTokens(currentModel.outputPerM)} out per 1M tokens
+                </p>
+              )}
+            </div>
             <input
               ref={attachInputRef}
               type="file"

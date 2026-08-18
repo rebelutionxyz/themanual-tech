@@ -23,6 +23,49 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONT84 — COMPOSER MAX WIDTH. The shared bottom composer + the message column now share a centered readable measure (like the Claude chat) instead of full-bleed. Build green, committed, NOT pushed. (2026-08-18)
+
+Session `f8b19368` (fallback id). Dispatch FRONT84, lane `front`, workdir `TheMANUAL.tech`, effort SMALL.
+After FRONT83 (another worker's pass; same tree, W-19). Committed on green, no push (dispatch: "COMMIT ON
+GREEN. NO PUSH"); sha in the FRONT84 rail report. ORACLE_MF v1.54 (owner, seeing shell v1 live: cap the
+composer width "like this chat" — it runs full-bleed now).
+
+### What shipped
+The cap lands in the SHARED composer so every future mount (Vote, Justice) inherits it — no /h24-only fork.
+- `src/components/composer/Composer.tsx` — exports `COMPOSER_MEASURE = 'mx-auto w-full max-w-3xl'` and the
+  composer root now self-caps to it (centered, readable ~48rem). One constant = one source of truth for
+  the measure, so the input and the column can't drift apart.
+- `src/pages/oracle/OraclePage.tsx` — wraps the message column (header + preview/failure/response +
+  RoutingLog) and the composer-dock notes in the SAME `COMPOSER_MEASURE`. Both the conversation content and
+  the composer are now `max-w-3xl mx-auto` inside the identically-padded center column, so text and input
+  align edge-to-edge. Right panel + sidebar keep their own widths (only the center column is capped).
+
+### The measure, and the token flag (dispatch item 4)
+`max-w-3xl` (48rem) is Tailwind's container scale utility, NOT an inline pixel value. FLAGGED as the
+dispatch asked: there is no CUSTOM house max-width token — `grep -nE "maxWidth|max-w|measure|container"
+tailwind.config.ts` returns nothing — so the house system's answer is the standard Tailwind scale. If a
+canonical "reading measure" token is wanted later, `COMPOSER_MEASURE` is the one line to change.
+`w-full` + `mx-auto` mean the column fills the width on narrow viewports (no cap, no horizontal scroll) and
+centers once the column exceeds the measure.
+
+### Done-tests + PROVE (verbatim)
+- `npm run build` (tsc -b && vite build) → `✓ built in 18.71s` (green; also 18.66s pre-format).
+- `npx biome lint` on the 2 touched files → `Checked 2 files. No fixes applied.` (clean; `biome check
+  --write` reflowed OraclePage indentation for the new wrapper nesting, nothing else).
+- Running-build check (dev localhost:3011, isolated automation profile), /h24, BOTH cases screenshotted:
+  - WIDE — center column wider than the measure (sidebar collapsed, center ≈ 889px): the composer AND the
+    message column (header, routing-log table) are capped to ≈ 768px, centered, sharing identical left/right
+    edges. Text and input align.
+  - NARROW — center column narrower than the measure (sidebar expanded, center ≈ 697px): full width, no side
+    gaps, no horizontal scroll — the cap yields, exactly per item 3.
+
+### Notes
+- Verified on a signed-in surface (real routing-log rows + balance present), so the cap was confirmed
+  against real content, not just the empty state.
+- No copy touched, so the "users not Bees" firewall rule has nothing to catch here.
+
+---
+
 ## FRONT82 — CONSTELLATION DE-SCATTER + /hq RELOCATE. The scattered ConstellationRail is deleted; a live-astras-only quick-access list lands in /hq. Build green, committed, NOT pushed. (2026-08-18)
 
 Session `f8b19368` (fallback id). Dispatch FRONT82, lane `front`, workdir `TheMANUAL.tech`, effort
