@@ -1,8 +1,9 @@
-import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '@/lib/auth';
-import { useAstra, useCopy } from '@/lib/astras/AstraContext';
 import { ManualLogo } from '@/components/ui/ManualLogo';
+import { useAstra, useCopy } from '@/lib/astras/AstraContext';
+import { useAuth } from '@/lib/auth';
 import { SPINE_BLACK } from '@/lib/spine';
+import { Link, useLocation } from 'react-router-dom';
+import { RoomsButton } from './RoomsButton';
 import { UtilityChrome } from './UtilityChrome';
 
 /* THE h24 SURFACE WEARS ITS OWN WORDMARK — FRONT78, owner: "its h24.tech not
@@ -65,11 +66,7 @@ export function SiteHeader() {
           it survives spine rule 1; flagged in the FRONT74 report as the one
           place a reader could reasonably argue the rule is being bent. */}
       {accentColor && (
-        <span
-          aria-hidden
-          className="block h-0.5 w-full"
-          style={{ background: accentColor }}
-        />
+        <span aria-hidden className="block h-0.5 w-full" style={{ background: accentColor }} />
       )}
       <div className="safe-pad-x flex h-14 items-center gap-3 px-4 md:px-6">
         {/* Logo + wordmark (clickable, goes home) */}
@@ -94,6 +91,11 @@ export function SiteHeader() {
             shipped. `HoneyDrop` itself lives on: it is still the BLiNG! mark in
             LensRow, Bookmarks, Studio and elsewhere. What went is the SPINE
             drop, its hop, and the `bling-hop` event that drove it. */}
+
+        {/* THE ROOMS BUTTON — FRONT80. Platform chrome in the left cluster
+            (H24 DESIGN SPEC v0.7). On-demand names-only transport between the
+            live astras; it appears wherever SiteHeader does, /h24 included. */}
+        <RoomsButton />
 
         <div className="flex-1" />
 

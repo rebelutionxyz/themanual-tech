@@ -225,6 +225,32 @@ export const ASTRA_STUB_ENTRIES: AstraCatalogEntry[] = ASTRA_CATALOG.filter(
   (a) => a.mount === 'stub',
 );
 
+/**
+ * ROOMS — the astra set the platform "Rooms" button overlay lists (FRONT80).
+ * Transport only: names + accent ticks, no statuses, closes on pick
+ * (ORACLE_MF v1.42 / H24 DESIGN SPEC v0.7).
+ *
+ * DERIVATION (stated here because the dispatch requires it, and v1.53 fixes the
+ * exact test): an astra appears IFF it actually mounts a LIVE surface today.
+ * That maps to `mount !== 'stub'`:
+ *   - 'page'    — a dedicated ported surface (App.tsx route). Live.
+ *   - 'surface' — SurfacePage, which is a live landing surface by its own
+ *                 definition ("No 'coming soon' — the surface is live, just
+ *                 doesn't have content yet"). Live.
+ *   - 'stub'    — EXCLUDED. Renders AstraStubPage, the honest "coming to the
+ *                 Manual" placeholder that shows build-state badges (Scaffolded
+ *                 / Deferred / …). That is exactly the unbuilt-world listing and
+ *                 the FRONT31 status-leak that ORACLE_MF v1.53 says never to
+ *                 publish: "An astra appears iff it actually mounts and routes
+ *                 today. NO stub rows."
+ * Keying off `mount` — the same field the router uses to decide page vs stub vs
+ * catch-all — means this list can never drift from what the router serves, so a
+ * listed name can never 404 or dead-end (a name that 404s is worse than absence).
+ */
+export const ASTRA_ROOMS: AstraCatalogEntry[] = ASTRA_CATALOG.filter(
+  (a) => a.mount !== 'stub',
+);
+
 // ─── Runtime effective status ────────────────────────────────────────
 // Cross-references the canon-stated status with ASTRA_REGISTRY: if any
 // host in ASTRA_REGISTRY's configs matches any host on this Astra, mark

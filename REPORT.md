@@ -23,6 +23,97 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONT80 — THE ROOMS BUTTON. Platform chrome in the shared header; on-demand names-only transport between the live astras. Build green, committed, NOT pushed. (2026-08-18)
+
+Session `f8b19368` (fallback id — no `MC_SESSION`). Dispatch FRONT80, lane `front`, workdir
+`TheMANUAL.tech`, effort MEDIUM. After FRONT79 (same tree). Commit `1b5d9ef`, no push (dispatch:
+"COMMIT ON GREEN. NO PUSH").
+
+### What shipped
+One grid-icon button (`lucide` `LayoutGrid`, `aria-label="Rooms"`) in the shared **SiteHeader**
+left cluster, immediately after the logo/wordmark. Tapping it opens a centered overlay listing the
+**live astras by name + accent tick only**; picking one navigates and closes. Esc, outside-click,
+and a close-X all dismiss. Keyboard-reachable: the first room auto-focuses on open, every room is a
+native `<button>`, and the current surface carries `aria-current="page"` (not a visible status).
+
+Files (3):
+- `src/components/layout/RoomsButton.tsx` — NEW. The button + `RoomsOverlay`. Overlay idiom mirrors
+  `SearchModal` (fixed inset-0 z-[60], `bg-black/60` backdrop, Esc handler, delayed outside-click
+  mousedown). Renders `entry.wordmark` + a `entry.accent` tick per room, sorted case-insensitively.
+- `src/lib/astra-catalog.ts` — added `export const ASTRA_ROOMS = ASTRA_CATALOG.filter(a => a.mount !== 'stub')`
+  with a full derivation comment. This is the single source of truth for the list.
+- `src/components/layout/SiteHeader.tsx` — import + mount `<RoomsButton />` in the left cluster.
+
+### The list derivation (dispatch required it stated; v1.53 fixed the exact test)
+The dispatch: *"Include ONLY astras with a live route today; a name that 404s is worse than absence —
+derive the list from what actually mounts."* Two later rulings postdating the dispatch **confirm and
+sharpen** this rather than contradict it — I read them before building:
+- **ORACLE_MF v1.52** — "THE ROOMS BUTTON … the ONE sanctioned way to move between astras." Still wanted.
+- **ORACLE_MF v1.53** — "LIVE ASTRAS ONLY. An astra appears iff it actually mounts and routes today.
+  NO stub rows … never list the unbuilt at all." (Stated for /hq's admin list, but as the root-level
+  resolution of FRONT31.)
+
+The router keys every astra's `mount` field to one of three renderers, and the code's own semantics
+draw the live/unbuilt line exactly there:
+- `mount: 'page'` (15) — a dedicated ported surface in App.tsx. **Live.**
+- `mount: 'surface'` (4) — `SurfacePage`, whose own doc says *"No 'coming soon' — the surface is
+  live, just doesn't have content yet."* **Live** (empty landing, no build-state shown).
+- `mount: 'stub'` (22) — `AstraStubPage`, the honest *"Stub · coming to the Manual"* placeholder that
+  renders build-state badges (Scaffolded/Deferred/…). **Excluded** — this is precisely the unbuilt
+  world + the FRONT31 status leak v1.53 forbids.
+
+So **ASTRA_ROOMS = mount !== 'stub' = 15 + 4 = 19 astras.** Keying off `mount` (the same field the
+router already uses) means the list can never drift from what the router serves — a listed name can
+never 404 or dead-end.
+
+- **19 shown:** atlasADs, Bazaar, BRANDoSOPHIC, Comms, Crowdfunding, Events, Forum, FreedomBLiNGs,
+  Groups, h24, Legal Services, Live Video Chat, Production, Pulse, Security, Tasks, The Manual,
+  The Workshop, Voting.
+- **22 excluded (stubs):** The Exchange, fnulnu, Waggles, Pro Services, Real Estate Trust, HoneyPOT,
+  BeeHold, Learning, Memories, AI Tours, Freedom of the Press, Feed, Dating, VR / Metaverse, Gaming,
+  Freedom Network, Genealogy, TheRanking, Safety Check, TheRANK, Will & Testament, Justice.
+
+### Done-tests (verbatim)
+- `npm run build` → `✓ built in 17.52s` (green, after the biome import-sort format pass).
+- `npx biome lint` on the 3 touched files → `Checked 3 files. No fixes applied.` (clean). NOTE: the
+  repo-wide `npm run lint` has a **pre-existing** backlog (23 errors across 298 files) unrelated to
+  this pass; my files add zero. `biome check` (format/import-org) flags `astra-catalog.ts` alignment
+  — also **pre-existing** (2 findings at HEAD before my edit, verified by stashing); its column table
+  is intentional and I did not reformat it. My two new/edited component files were `biome check
+  --write`-cleaned so they add no new check nits.
+- Status-leak grep on `RoomsButton.tsx`: only 3 matches, all in comments; nothing renders a status,
+  badge, or effectiveStatus. Overlay renders wordmark + accent tick only.
+
+### Browser proof (dev server localhost:3002; 3000/3001 held by other sessions)
+- **Button on 3 SiteHeader surfaces including /h24:** `/manual` (wordmark "TheMANUAL.tech"), `/h24`
+  (wordmark "h24.tech"), `/freedomblings` (wordmark "TheMANUAL.tech"). Grid icon present in the left
+  cluster on all three (screenshots taken).
+- **Overlay opened** on `/manual` and `/h24` — 19 names in a 3-col grid with accent ticks, no
+  statuses. Current surface highlighted: "The Manual" on `/manual`, "h24" on `/h24` (aria-current).
+- **Picked:** clicked "Bazaar" on `/manual` → navigated to `/bazaar`, overlay closed.
+- **Keyboard:** Esc closed the overlay on `/h24`; first item auto-focused on open.
+
+### Deviations / judgement calls (stated per R6)
+1. **Scope = SiteHeader only, as dispatched** ("SiteHeader - the one place"). SiteHeader does NOT
+   render on **community** surfaces (`/intel`, `/bazaar`, `/unite`, `/rule`, `/comms`, `/pulse`,
+   `/security`, `/brand`, `/fund`) or **chrome-free** surfaces (`/`, `/miniwaves`) — those wear their
+   own chrome (verified: `/bazaar` shows the red community shell with no Rooms button). So the button
+   currently rides platform surfaces only, not literally "every site." If the owner means the button
+   on community surfaces too, that is a separate follow-up (the community shell is FRONT79/FRONT82
+   territory; W-19 one-writer-per-tree). **Flagged, not assumed.**
+2. **Derivation `mount !== 'stub'` (19) rather than page-only (15).** The 4 `surface` entries render
+   a live (if empty) landing per SurfacePage's own definition, so they are "live routes today." If
+   the owner wants the stricter page-only set, it is a one-line change to the `ASTRA_ROOMS` filter.
+3. **Flat alphabetical grid, no category headers.** "Names and accent ticks ONLY" — I read category
+   labels as structure that edges toward "a control," so I kept it a flat scannable list.
+
+### Could not verify
+- Live/production behavior (this was a local dev-server pass; no deploy — dispatch says NO PUSH).
+- Astra accents are provisional per the catalog's own note (BRANDoSOPHIC/§15.1 not canonized); the
+  ticks render whatever `entry.accent` holds today.
+
+---
+
 ## DB75 — THE ROUTER BYPASS SWEEP. Internal-caller path BUILT (rollback-first proposal); apply + deploy + live-verify are the owner's gated clicks. (2026-08-18)
 
 Session `79a4fea9` (fallback id — no `MC_SESSION`). Dispatch DB75, lane `db`, workdir
