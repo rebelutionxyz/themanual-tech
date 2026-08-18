@@ -135,14 +135,17 @@ export function AtlasOracleWalletBadge({
           className,
         )}
       >
+        {/* FRONT79 — THE A⊕O GLYPH IS RETIRED (owner, ORACLE_MF v1.45). The
+            badge reads "h24" + balance, nothing else. The old mark stood here
+            and at the panel header; both are gone. */}
         <span
           className="font-mono font-semibold tracking-tight text-honey"
           style={{ fontSize: '12px' }}
         >
-          A⊕O
+          h24
         </span>
-        {/* Live Oracle Token balance (FRONT17). An em dash still means "could
-            not read", never "zero" — a Bee with an empty wallet sees 0. */}
+        {/* Live token balance (FRONT17). An em dash still means "could not
+            read", never "zero" — a user with an empty wallet sees 0. */}
         <span className="font-mono tracking-wide text-text-silver" style={{ fontSize: '11.5px' }}>
           {balanceLabel}
         </span>
@@ -166,9 +169,11 @@ export function AtlasOracleWalletBadge({
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="font-mono font-semibold text-honey">A⊕O</span>
+                {/* A⊕O glyph retired (FRONT79 / v1.45) — "h24 · astra" carries
+                    the identity without it. */}
+                <span className="font-mono font-semibold text-honey">h24</span>
                 <span className="text-text-silver" style={{ fontSize: '12.5px' }}>
-                  h24 · {astraSlug}
+                  · {astraSlug}
                   {novaSlug ? ` / ${novaSlug}` : ''}
                 </span>
               </div>

@@ -23,6 +23,183 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONT79 — h24 SHELL v1. The Claude pattern, built to the LOCKED spec, real data only. (2026-08-18)
+
+Session `79a4fea9` (fallback id — no `MC_SESSION`). Dispatch FRONT79, lane `front`, workdir
+`TheMANUAL.tech`, effort LARGE, plus amendments v1.44 (composer) and v1.45 (glyph). Build green,
+typecheck clean, lint clean in every file touched, the shell observed in a running dev build.
+**Committed, NOT pushed.**
+
+Built from **H24_DESIGN_SPEC v1.0 (LOCKED, ORACLE_MF v1.46)** — the v0.1–v0.8 chain plus v1.44/v1.45
+amendments were read; v1.0 is the shape. The FUND discipline governed throughout: **every control on
+this surface does a real thing today or it is not here.**
+
+### THE SHAPE — sidebar / conversation / build-panel, composer docked bottom
+
+The 678-line console was raw material. Its balance, rate card, directive box and routing log are all
+here, recomposed. Observed live on `/h24` (screenshot below):
+
+```
+global SiteHeader:  [logo] h24.tech ............................ [Sign in / badge · avatar]
+h24 toolbar strip:  [⊟ sidebar] [←] [→]  h24.tech / Console ............... [⬇ export]
+sidebar | conversation .......................................... | (build panel)
+  Vault    h24 intro
+  ·Images  routing log (click a cost → panel)
+  ·Videos
+  ·Audio   ┌───────────────────────────────────────────────┐
+  ·Docs    │ [+]  [free · no token cost ▾] [suggest ▾]  🎤 ↑ │  ← composer
+  Activity └───────────────────────────────────────────────┘
+  Wallet
+```
+
+### THE TOOLBAR — split across two bars, deliberately
+
+The spec's one toolbar is realised across the existing global `SiteHeader` and a new h24-surface
+strip, because the global header **already** carries three of its items (FRONT78): the `h24.tech`
+wordmark, the badge, the avatar. Rebuilding those here would be two of each. The h24 strip adds only
+what the global header lacks:
+
+| control | disposition |
+|---|---|
+| sidebar toggle | built — collapses the sidebar to an icon rail |
+| back / forward | built — `navigate(-1)` / `navigate(1)`, browser history |
+| **rooms** | **reserved and EMPTY** — FRONT80 owns the shared platform button; a comment holds its slot |
+| breadcrumb | `h24.tech / Console` — **static**, because sessions-are-content is OPEN (no chat persistence), so there is no live session title yet; stated |
+| export | built — downloads the routing log as **real CSV**, disabled when the log is empty (observed) |
+| **search** | **OMITTED** — no session store to search, and site-wide search is platform navigation, out of h24 scope per spec v0.6 |
+| **share** | **OMITTED** — sharing a session is not a real action today |
+
+### THE SIDEBAR — three real sections, and the honest silence where six would be
+
+REAL-DATA-ONLY. Rendered:
+
+- **VAULT** — Images / Videos / Audio / Docs, counts and bytes from `media_library_usage()`
+  (`creator_studio_media_v1`). Verified against production: the RPC returns `(kind, asset_count,
+  total_bytes)`, holds `authenticated` EXECUTE, and is **not** `SECURITY DEFINER` — so it reads under
+  the caller's own RLS. Real counts, real bytes.
+- **ACTIVITY** — total routed, count in the last 7 days, and a by-kind tally. **Derived from the
+  routing-log metadata the page already holds** — no second read, and nothing touches content because
+  the columns that would hold it do not exist.
+- **WALLET** — the live token balance the page already holds.
+
+**ABSENT, each named in the dispatch as backendless at v1.46:** Projects, Automations, Scheduled,
+Pinned, Access, Recent chats. Rendering an empty "Projects" is a promise the platform cannot keep, so
+none renders. **CONSENT CHIPS are likewise absent:** the vault is HYBRID and a file's state chip
+renders only when a consent grant exists — none can, because no consent ledger is live (DB76 is a
+proposal). A faked chip would misstate the sovereignty state, the one thing this surface must never
+do.
+
+### THE RIGHT PANEL — real on day one
+
+Its first tenant is the cost breakdown. Clicking a cost in the routing log opens the panel with that
+charge's legs, rate and subtotals; close returns the conversation to full width. **The arithmetic is
+not re-implemented** — `buildCostBreakdown` / `rateLiveAt` are the exact functions the old inline
+row-expansion used, pricing each directive at the rate that was LIVE WHEN IT RAN, never today's card.
+Verified against production that real charges exist to open on: e.g. `claude-opus-5` frontier,
+1984/727/2256 tokens, debit **58.446**; `claude-sonnet-5` standard, 31/261/2257, debit **6.2468**.
+
+### THE COMPOSER — the Anthropic shape, a SHARED component from birth
+
+`src/components/composer/Composer.tsx` knows **nothing** about h24. It is a controlled input with
+optional attach, band picker, secondary selector, feature-detected mic, and an up-arrow submit —
+every slot wired by the mounting surface. This is the component law: "built once; h24 mounts it
+first; Vote, Justice, and the rest mount it later." Lifting it here on day one, rather than growing it
+out of OraclePage, is the whole point.
+
+Controls, and where each real/dead call landed:
+
+- **[+] attach** — REAL PATH: uploads the chosen file **into the Creator Studio Library**
+  (`uploadToLibrary`, the file is persisted and the Vault count reflects it). It does **not** attach
+  the file to the directive: the router accepts `{ directive, tier, astra_slug, category,
+  confirm_cost }` and **no file parameter**, so a directive-attachment would be a control that submits
+  nothing. The honest action today is "add to your library", and the confirmation line says exactly
+  that — it does not imply the file rides the directive.
+- **MODEL PICKER = band + model.** Tiers-are-bands, surfaced to the user for the first time:
+  free / standard / frontier, each showing the model it routes to, read from the live rate card. Free
+  reads `no token cost`. Observed: `free · no token cost`, `standard`, `frontier` (the latter two show
+  bare signed-out, because the rate card is `authenticated`-gated — honest, not a bug).
+- **WHERE "KIND" LANDED:** it folds into the composer as the secondary selector (`suggest`, etc.). It
+  stays because `category` is a REAL router parameter — that is the entire test for whether a control
+  belongs here.
+- **EFFORT — OMITTED, and there is no prop for it.** The router carries no effort parameter, so an
+  effort select would change nothing. Per "render only if it changes a real request parameter", it is
+  omitted; adding it to the shared component would spread a dead control to every future mount. When a
+  real effort parameter exists, the composer is where it lands.
+- **MIC** — Web Speech API, feature-detected (`SpeechRecognition ?? webkitSpeechRecognition`). Renders
+  only where supported; a dead mic never mounts. Observed present in Chrome.
+- **SEND** — the up-arrow, `aria-label="Send"`, never the word on the button. Enter submits,
+  Shift+Enter newlines.
+
+### THE GLYPH — retired (v1.45)
+
+`A⊕O` is gone from both the badge and its panel header. The badge reads **`h24` + balance**, nothing
+else. Verified live: `A⊕O` appears nowhere in the DOM.
+
+### DESIGN TOKENS
+
+Mapped to the house token system throughout (`bg`, `bg-elevated`, `panel-2`, `border`,
+`border-bright`, `text`, `text-silver`, `text-muted`, `honey`, `kettle-*`). **No color was
+hardcoded** and none had to be — the spec's mockup hexes are direction, and the token system covered
+every surface the shell needed. No ninth gray invented, nothing to flag.
+
+### PROVE — observed in a running dev build (`localhost:3131/h24`)
+
+```
+breadcrumb          "h24.tech / Console"          wordmark   "h24.tech"
+sidebar sections    Vault · Activity · Wallet     glyph A⊕O  gone from DOM
+toolbar             Collapse sidebar · Back · Forward · Export routing log (CSV)
+composer            textarea · [+] attach · band(free/standard/frontier) · kind · mic · Send(↑)
+band options        "free · no token cost" · "standard" · "frontier"
+sidebar collapse    full → icon rail → full        export     disabled when log empty
+```
+
+### COULD NOT VERIFY — the signed-in gap, same boundary as the prior passes
+
+The dev origin carries no session and synthesising a credential is forbidden, so **three PROVE items
+could not be observed rendered**, only proven at the data layer:
+
+- **Vault counts populated** — `media_library_usage()` verified real and caller-scoped in production;
+  not seen rendering non-zero.
+- **The cost panel opened on a real cost** — real charges verified to exist; the panel reuses the
+  proven breakdown functions; not seen opened, because the routing log is empty signed-out.
+- **Band model sublabels for standard/frontier** — the rate card is `authenticated`-gated, so they
+  read bare signed-out; the wiring reads `TierRate.model` and is correct, just unfed.
+
+What a signed-in pass — or Butch opening `/h24` himself — would close: the vault counts, a cost-panel
+open, and the mic actually dictating. Everything structural (layout, collapse, composer controls,
+glyph removal, export-disabled state, band options) is observed.
+
+Also not verified: no mobile breakpoint exercised; the mic's live dictation was not spoken to.
+
+### FILES
+
+```
+NEW src/components/composer/Composer.tsx     the shared Anthropic-shape composer (no h24 knowledge)
+NEW src/components/h24/H24Sidebar.tsx        Vault / Activity / Wallet, minimizable
+NEW src/components/h24/H24CostPanel.tsx      right build panel — cost breakdown, reuses the proven math
+MOD src/pages/oracle/OraclePage.tsx          recomposed into the shell (toolbar/sidebar/center/panel)
+MOD src/components/AtlasOracleWalletBadge.tsx A⊕O glyph retired at badge + panel header
+```
+
+### DONE-TEST
+
+```
+npx tsc -b     → exit 0
+npm run build  → ✓ built in 17.47s
+npm run lint   → Found 23 errors — all pre-existing, ZERO in any FRONT79 file
+```
+
+The one lint finding in this pass's files was mine (a `useExhaustiveDependencies` on the composer's
+auto-grow effect, where `value` is the trigger not an input) and now carries a `biome-ignore` with
+the reason; count is back to the standing 23.
+
+Dev server on 3131: port asserted free before boot, owned by the vite child after. **The grandchild
+leak recurred for the fifth pass running** (PID 32132) — killed by PID, release confirmed. Five for
+five: `TaskStop` reaches the npm wrapper, never the vite process it spawned. This is now a standing
+fact of the workflow, not a surprise.
+
+---
+
 ## FRONT78 — SPINE REDUCTION. Left rail, band and drop all retired; /h24 wears its own wordmark. (2026-08-18)
 
 Session `79a4fea9` (fallback id — no `MC_SESSION`). Dispatch FRONT78, lane `front`, workdir
