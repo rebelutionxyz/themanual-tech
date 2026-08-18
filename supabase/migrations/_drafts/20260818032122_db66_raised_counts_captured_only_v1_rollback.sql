@@ -1,4 +1,4 @@
--- ROLLBACK for 20260818031500_db66_raised_counts_captured_only_v1.sql
+-- ROLLBACK for 20260818032122_db66_raised_counts_captured_only_v1.sql
 -- DB66, 2026-08-18. WRITTEN BEFORE THE FORWARD MIGRATION per the MIGRATION AMENDMENT.
 --
 -- WHAT RUNNING THIS RESTORES: the DB58 definition, in which raised_cents counts

@@ -23,11 +23,429 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
-## DB66 — raised_cents COUNTS ONLY MONEY THAT MOVED. Pre-flight recorded; awaiting the apply click. (2026-08-18)
+## DB67 — REAP ABANDONED INTENTS. Proposal only, zero writes. (2026-08-18)
+
+Session `16a78b56` (fallback id — no `MC_SESSION`). Dispatch DB67, lane `db`, workdir
+`TheMANUAL.tech`. **Nothing applied.** No migration authored into `supabase/migrations/`, no
+function created or edited, no cron job created, no row written. The only database statements were
+SELECTs plus the rail's own claim / heartbeat / report writes.
+
+Builds on DB64, which did the diagnosis. **It reaches a different recommendation on the reaper's
+target state, and it catches a defect in DB64's predicate that would have destroyed seed data on
+first run.** Both are argued below from rows and function bodies read this session.
+
+---
+
+### THE FINDING THAT CHANGES DB64's PROPOSAL FIRST: ITS PREDICATE REAPS THE FIXTURES
+
+DB64 proposed identifying an orphan as:
+
+```sql
+status = 'authorized' AND authorized_at IS NULL AND created_at < now() - interval '60 minutes'
+```
+
+**That predicate matches four rows, not two.** The full table, read this session:
+
+```
+pi_tail     amount  status      authorized_at  captured_at  age_min    is_fixture  DB64 predicate
+0e2ndpCB      1300  captured    02:34:58       02:34:58        38.2    false       no  (status)
+1AWRU5WR      1300  authorized  NULL           -               38.7    false       YES <- real orphan
+167xTETd      1200  authorized  01:16:32       -              116.7    false       no  (stamped)
+3ZCi7Lry      1100  authorized  NULL           -              157.9    false       YES <- real orphan
+2Iu3a1Sz      1000  canceled    -              -              168.3    false       no  (status)
+i_seed_1     20000  authorized  NULL           -          78,317.7    TRUE        YES <- FIXTURE
+i_seed_2     12000  authorized  NULL           -          78,317.7    TRUE        YES <- FIXTURE
+```
+
+`i_seed_1` and `i_seed_2` are DB54's seed rows on the fixture campaign `fa40c585`. They are
+`authorized`, they will never carry an `authorized_at` because **their `stripe_payment_intent_id`
+values are not Stripe objects at all** (`..._seed_1`, `..._seed_2` — no `pi_` PaymentIntent exists
+behind either), and at 78,317 minutes they are older than any threshold anyone would pick. DB64's
+predicate reaps them on its first run.
+
+**The predicate must carry `is_fixture = false`.** It is a one-clause fix, and DB54 put the column
+there precisely so that live logic can tell seed rows from real ones. Naming the failure plainly
+because it is the kind that passes review: nothing about the shape looks wrong, the reaper would
+have run green, and the demo campaign's pledges would have quietly changed state.
+
+Note the counters would *not* have moved — `fountain_counters` already filters `is_fixture = false`
+— so nothing would have alerted anyone. That is what makes it worth catching before it runs rather
+than after.
+
+---
+
+### ITEM 1 — IDENTIFICATION, AND THE PROOF IT CANNOT CATCH A CONFIRMED HOLD
+
+**Proposed, with the fixture clause:**
+
+```sql
+status           = 'authorized'
+AND authorized_at IS NULL
+AND is_fixture   = false
+AND created_at   < now() - interval '<threshold>'
+```
+
+Against the seven live rows this selects **exactly `1AWRU5WR` and `3ZCi7Lry`** — the two real
+orphans, and nothing else.
+
+**`authorized_at IS NULL` is the load-bearing clause; the age is only hygiene.** DB62 (applied
+`20260818020719`) stamps `authorized_at` on *either* confirmation event, so a NULL stamp means
+Stripe has never told this platform the intent carries money. That is a structural property, not a
+timeout.
+
+**The dispatch asks specifically whether `pi ...167xTETd` — the confirmed 1200 hold — can be caught
+by this. It cannot, and here is the reason rather than the assertion:** its `authorized_at` reads
+`2026-08-18 01:16:32.19784+00`. The second clause excludes it on a NOT NULL test, which is not a
+comparison and has no boundary to be wrong about. There is no threshold value, and no clock skew,
+that brings a stamped row back into this set. Age is the *only* clause with a tunable number in it,
+and it can only ever make the set smaller.
+
+**Free extra safety:** the reaping UPDATE should re-assert all four clauses in its own `WHERE`, so
+selection and write are one atomic statement rather than a read followed by a write.
+
+---
+
+### THE ASYMMETRY DB64 UNDER-WEIGHTED, AND THE DESIGN CHANGE IT FORCES
+
+DB64 proposed reaping the row to `canceled`. **I recommend against that, on the strength of two
+facts it names separately but does not combine.**
+
+Fact one, confirmed again this session: `pg_net` is **not installed** (`pg_cron`, `pgcrypto`,
+`pg_trgm`, `ltree`, `uuid-ossp`, `pg_stat_statements`, `supabase_vault`, `plpgsql` — that is the
+whole list) and every cron job in this project is pure SQL. **The database cannot reach Stripe.**
+
+Fact two, `fountain_pledge_captured`, read from the catalog:
+
+```sql
+IF v_p.status = 'captured' THEN RETURN jsonb_build_object('ok',true,'duplicate',true); END IF;
+IF v_p.status <> 'authorized' THEN RAISE EXCEPTION 'cannot capture pledge in status %', v_p.status; END IF;
+```
+
+**Combine them.** The reaper marks a row `canceled`; the PaymentIntent behind it is still alive at
+Stripe because nothing here can cancel it; the giver returns to their still-open tab and confirms;
+`payment_intent.succeeded` arrives; `fountain_pledge_captured` raises `cannot capture pledge in
+status canceled`; `give-webhook`'s `isTerminalStateError` matches it, acks 200 and files the event
+`unresolved`.
+
+**The card is charged, the ledger reads canceled, and nobody is told.** That is the FRONT62 defect —
+a silent failure on the give path — reintroduced at the database layer, and it is strictly worse
+than the orphans it was meant to clean up.
+
+**Recommendation: reap to a new, RESURRECTABLE state — `abandoned` — not to `canceled`.**
+
+Three small changes, all additive:
+
+1. `fountain_pledges_status_check` gains `'abandoned'`. Current definition:
+   `CHECK (status = ANY (ARRAY['authorized','captured','canceled','capture_failed','refunded']))`.
+2. `fountain_pledge_captured` accepts `'abandoned'` alongside `'authorized'`, i.e. the guard becomes
+   `IF v_p.status NOT IN ('authorized','abandoned') THEN RAISE ...`.
+3. `fountain_pledge_canceled` likewise, so Stripe's own expiry (`payment_intent.canceled`, the D-2
+   path give-webhook was built for) settles an abandoned row properly instead of raising.
+
+**What that buys, and it is the whole argument:** a wrongly-reaped pledge *heals*. Stripe says the
+money moved, the row moves to `captured`, the reward is freed, the counters follow, and the giver
+sees a normal success. The cost of reaping too early collapses from "money taken, ledger says no"
+to "a row read `abandoned` for a few minutes."
+
+**Two things fall out for free:**
+
+- `fountain_counters` filters `status IN ('authorized','captured')`, so `abandoned` leaves the
+  totals with no counter change required.
+- `fountain_begin_close` collects `WHERE campaign_id=$1 AND status='authorized'`. Abandoned rows
+  drop out of the capture loop automatically — which removes exactly the hazard DB64 gave as its
+  reason not to close the campaign ("`begin_close` would hand the two unconfirmed orphans to the
+  capture loop too"). **Landing this reaper makes closing safe again**, which DB64 could not say of
+  its own proposal.
+
+---
+
+### ITEM 2 — THE REAPER: pg_cron, matching the ten jobs already here
+
+`pg_cron` **1.6.4 is installed** and ten jobs already run. Every one is pure SQL — an inline
+statement or `SELECT public.<fn>()`:
+
+```
+jobid  schedule       jobname                    command
+1      0 9 * * *      affiliate-release-matured  SELECT public.affiliate_release_matured();
+3      0 1 * * *      economy-integrity-daily    SELECT public.run_economy_integrity_check();
+4      */15 * * * *   press-tick                 select press_cron_tick()
+6      */5 * * * *    comms-disappear-sweep      select public.comms_sweep_expired()
+7      */30 * * * *   comms-stale-room-sweep     update public.comms_rooms set status='ended' ...
+8      7 * * * *      elections-close-expired    SELECT public.elections_close_expired_cron()
+10     20 8 * * *     dingleberry_posture_daily  SELECT public.dingleberry_posture_scan_cron();
+```
+
+**Recommendation: a `fountain_reap_orphans()` SECURITY DEFINER function on `*/15`, exactly the
+`elections_close_expired_cron` shape.** No new pattern, no new dependency, one migration.
+
+**Not an edge function.** Nothing here needs to leave the database (see Item 3 — the Stripe half
+does, and is handled elsewhere), and an edge function would need a scheduler that does not exist.
+
+**Not a sweep-on-next-pledge.** A campaign that stops receiving pledges stops being swept, which is
+precisely when its orphans sit longest. The sweep-on-pledge idea does have a place, but for the
+Stripe object rather than the row — Item 3.
+
+**Proposed body, not applied:**
+
+```sql
+CREATE OR REPLACE FUNCTION public.fountain_reap_orphans()
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'pg_catalog','public'
+AS $fn$
+DECLARE v_n integer;
+BEGIN
+  UPDATE public.fountain_pledges
+     SET status = 'abandoned'
+   WHERE status = 'authorized'
+     AND authorized_at IS NULL
+     AND is_fixture = false
+     AND created_at < now() - interval '60 minutes';
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  RETURN v_n;
+END; $fn$;
+```
+
+**What it does to the row:** status only. `created_at` and `stripe_payment_intent_id` are left
+intact so the row stays a record of what happened and the Stripe object remains identifiable by
+anyone cleaning up on that side.
+
+**One mechanical note worth recording:** `fountain_pledges_sync_counters` is an UPDATE trigger that
+calls `fountain_recount(OLD.campaign_id)` **per row**. A batch reap of N rows on one campaign
+performs N recounts. At this volume that is nothing; it is stated so nobody discovers it at scale.
+
+**And the honest framing of urgency: this reaper moves no money and changes no counter today.**
+DB58's `authorized_at IS NOT NULL` requirement already excludes both orphans from `raised_cents`.
+The reaper is hygiene — it stops rows reading `authorized` forever, and it clears the capture loop.
+It is not a ledger fix, and it should not be sold as one.
+
+---
+
+### THE THRESHOLD, ARGUED AGAINST THE 26-SECOND MEASUREMENT
+
+**Recommendation: 60 minutes.** The margin argument, in the order it actually holds:
+
+**The 26 seconds does not bound what it looks like it bounds.** `pi ...0e2ndpCB` went from creation
+(02:34:32.090) to `authorized_at` (02:34:58.076) in 26.0 seconds — but that interval is *one giver
+typing one card with no 3-D Secure challenge*. The machine half of it is milliseconds. The
+distribution the threshold has to survive is **human**: reading the fee disclosure, fetching a
+wallet from another room, a bank-app 3-D Secure round trip, a phone that locks mid-flow. A threshold
+justified only against 26 seconds is justified against the wrong variable.
+
+**So the honest margin is not 138x.** Against the measured number it is ~138x; against a realistic
+human tail of a few minutes it is more like 10-20x, and that is the figure to hold in mind.
+
+**The floor is 30 minutes and the reason is 3-D Secure**, which can involve a bank app, an SMS that
+arrives late, and a retry. **The ceiling is a few hours**, past which orphans stop being useful as a
+diagnostic and start being clutter. 60 sits with room on both sides.
+
+**But the strongest safety argument is not the number at all — it is that under the `abandoned`
+design the threshold stops being a knife edge.** DB64 was right that reaping a live giver mid-payment
+is the failure that matters, and right that it is worse than the orphans. The correct response is to
+make the failure survivable rather than to pick a number carefully enough to never hit it. With a
+resurrectable state, being wrong costs a transient row state; without one, being wrong costs a
+charged card and a canceled ledger row. **Take the reversibility, then the number is a preference.**
+
+If the ruling is to reap to `canceled` after all, then the threshold becomes genuinely load-bearing
+and I would not go below **6 hours**, because at that point every minute of margin is buying real
+protection against an unrecoverable outcome.
+
+---
+
+### ITEM 3 — THE STRIPE OBJECT: WHO ACTS, AND WHAT NOBODY CAN DO
+
+**The database cannot cancel a PaymentIntent.** No `pg_net`, no `http`, every cron job pure SQL.
+This is structural, not a preference, and it means the reaper is inherently one-sided: it can mark
+the row, never the object.
+
+**Neither the lead nor a db terminal can reach `acct_1TK1VIAPNY1rgvEA`.** The Stripe MCP available
+here is authenticated to a different account — DB64 confirmed it, and nothing this session changes
+it. Naming that plainly because the dispatch asks who acts and the answer is not "an agent."
+
+The options, with costs:
+
+1. **Leave the unconfirmed objects.** An unconfirmed PaymentIntent holds no money and places no hold
+   on a card; Stripe expires them on its own schedule. The cost is untidiness in the manager's
+   dashboard, where a stale intent reads like a failed payment. **Recommended as the default.**
+2. **Cancel the common case in the fountain, at supersede time** — see Item 4. `/pledge` already
+   holds a Stripe client scoped to `campaign.manager_connect_account` and already cancels an
+   orphaned PI on the register-failure path (`fountain pledge register failed — canceling PI`), so
+   the capability exists and is proven on that account. **This is the only automatic Stripe-side
+   cleanup I recommend**, and it covers exactly the returning-giver case the dispatch is about.
+3. **An edge function plus an external scheduler** for the rest. Real work, a deploy, a scheduler
+   that does not exist. Not recommended.
+4. **Install `pg_net`** so cron can call Stripe. A new Postgres extension is a plan-mode item in this
+   workspace and needs its own dispatch. Not recommended yet, and explicitly not a side effect of
+   this pass.
+
+**Who acts for anything requiring a deliberate cancel: the OWNER, at the Stripe dashboard.** That
+includes the two existing orphan objects and DB64's Defect C hold. It is an owner action because
+account access is an owner thing, and no dispatch delegates it.
+
+**On the manager's trust problem the dispatch raises:** it is real but it is not this pass's to
+solve, and option 2 shrinks it to the tail — from "one stale intent per abandoned click" to "one
+stale intent per giver who abandoned and never came back."
+
+---
+
+### ITEM 4 — PREVENTION: SUPERSEDE, NOT REUSE
+
+**Recommendation: supersede. Cancel the old unconfirmed intent and mint a new one. Do not reuse.**
+
+The dispatch asks whether reuse is safe given the amount can differ. **It is not, and the amount is
+only the visible half of the reason.**
+
+`/pledge` resolves the platform fee **from the database on every single pledge** — `fee_resolve` with
+`p_fee_key='give'` and the campaign's astra slug — then derives `application_fee_amount` from it
+with a min/max clamp and a whole-donation guard. So reusing an intent means updating **at least
+`amount` and `application_fee_amount` in step**, and:
+
+- **The fee is not a function of the amount alone.** Between the first attempt and the return, a
+  `fee_schedule` row can be edited, activated or deactivated, or an astra rate added. The correct fee
+  for attempt two is not derivable from attempt one; it has to be re-resolved anyway, which removes
+  most of reuse's supposed saving.
+- **A partial update is a silent money bug.** Amount updated, fee update fails, and the intent now
+  carries the wrong split — money quietly routed wrong. That is the exact class this astra spent the
+  day removing (DB50, DB65).
+- **There is no round-trip saving.** Reuse is retrieve + update; supersede is cancel + create. Two
+  Stripe calls either way.
+
+**Supersede's failure mode is benign, and that is the deciding property.** Cancelling an unconfirmed
+PaymentIntent destroys nothing — there is no money attached, by definition of unconfirmed. And if
+the cancel *fails* because the intent has already succeeded or is processing, Stripe says so: treat
+that error as **"the old attempt won"**, do not mint a new intent, and let the webhook settle the
+existing pledge. Reuse has no equivalent natural guard.
+
+**The guard that makes it safe** is the same predicate that makes reaping safe: only supersede where
+the pledge row reads `status='authorized' AND authorized_at IS NULL`. Cancelling a *confirmed*
+intent would destroy a real hold, and `pi ...167xTETd` is the row that proves such a thing exists
+here.
+
+**Effect:** accumulation is bounded at one live intent per (bee, campaign) instead of one per click.
+
+**A correction to the dispatch's framing, offered as fact.** The 31-second retry
+(`...1AWRU5WR` 02:34:01 → `...0e2ndpCB` 02:34:32) is **not evidence that FRONT62's guard failed**,
+because FRONT62 was never deployed — its own report states "Staged only; nothing committed, nothing
+pushed, nothing deployed." Both attempts were the same amount (1300), which is precisely the case
+FRONT62's same-amount reuse latch handles, so the live evidence does not distinguish
+"FRONT62 insufficient" from "FRONT62 absent." **What FRONT62 admits it cannot cover is the case
+after a page RELOAD**, and that is the gap supersede closes. Recording this because building
+server-side prevention on a mis-read of the client-side guard would be building on sand.
+
+**This is a fountain change and therefore a deploy — its own dispatch under the DEPLOY AMENDMENT.**
+
+---
+
+### ITEM 5 — WHAT THE GIVER SEES
+
+**First, the blast radius, measured:** the SPA never reads `fountain_pledges` and never mentions a
+pledge status string. A grep of `src/` for `fountain_pledges`, `capture_failed` and `'authorized'`
+returns exactly one hit, a comment in `src/components/shell/sidebarNav.ts:113`. The panel reads the
+**PaymentIntent's** status from Stripe (`requires_capture`, etc.), not the row. RLS on the table is a
+single own-read SELECT policy (`bee_id = auth.uid()`), with no write policy at all.
+
+**So adding `abandoned` is invisible to the front end.** That is a fact worth having before the
+ruling, because it removes the usual objection to a new status value.
+
+The three cases:
+
+**(A) Row reaped, Stripe object still alive, giver returns to a stale page and completes.**
+- Under DB64's `canceled`: the card is charged, `fountain_pledge_captured` raises, the event files
+  `unresolved`, and **the giver is told nothing is wrong while the ledger says the pledge was
+  canceled**. No reward freed. Silent, and only discoverable by someone reading `stripe_events`.
+- Under `abandoned`: `fountain_pledge_captured` accepts the row, it moves to `captured`, the reward
+  is freed from the Well, `fountain_recount` fires, and **the giver sees an ordinary success.** The
+  reap is invisible to them, which is the correct outcome for a reap that was wrong.
+
+**(B) Intent superseded (cancelled at Stripe), giver returns to a stale page and confirms.**
+Stripe rejects the confirm on a canceled intent. FRONT62's new catch means this is no longer a dead
+button — it renders the message and re-enables the control — but **the message is Stripe's, and it
+will read like jargon.** Recommended FRONT work, named rather than smuggled in here: map a
+canceled/unknown-intent error to plain copy ("This card form expired — start again") plus a
+**Start over** control that clears the stored intent and returns the panel to `amount`. FRONT62
+already built `onChangeAmount`, so the control exists and needs a second entry point.
+
+**(C) The campaign page.** No visible change in any case. Both orphans are already outside
+`raised_cents` via DB58's stamp requirement, and `abandoned` is outside the filter too.
+
+**The principle, stated because it is the one that should drive the ruling:** the giver must never
+be able to pay into a row this platform has already written off. Either the row can heal (option A
+under `abandoned`) or the object must be dead before the row is (which the database cannot arrange).
+**Those are the only two safe designs, and only one of them is reachable from here.**
+
+---
+
+### INTERACTION WITH DB66, WHICH LANDED IN `REPORT.md` WHILE THIS PASS WAS WRITING
+
+Another window filed **DB66 — `raised_cents` COUNTS ONLY MONEY THAT MOVED**, pre-flight recorded and
+**awaiting the apply click**. That is DB64's Defect A: `fountain_counters` narrowed to
+`FILTER (WHERE status = 'captured')` on both columns.
+
+**Every statement in this report was measured against the CURRENT definition**, which still reads
+`status IN ('authorized','captured') AND (authorized_at IS NOT NULL OR status = 'captured')` — I
+read it from the catalog this session and quoted it above. **Nothing here breaks if DB66 lands**, and
+the direction of travel helps:
+
+- `abandoned` is outside a captured-only filter *a fortiori*. No counter change is required by this
+  proposal under either definition.
+- The "this reaper moves no money and changes no counter today" claim holds under both — DB58's stamp
+  requirement excludes the orphans now, and captured-only excludes them after.
+- The one sentence to re-read after DB66 applies is the bullet under "Two things fall out for free",
+  which names the current filter text. The conclusion is unchanged; only the quoted predicate ages.
+
+**Order note:** DB66 and this proposal are independent and can land in either order. DB66 does not
+make the reaper unnecessary — it removes money from a total, it does not stop a row reading
+`authorized` forever, and it does not touch `fountain_begin_close`'s capture loop.
+
+---
+
+### PROPOSED ORDER
+
+1. **Rule on the target state** — `abandoned` (recommended) vs `canceled`. Everything else depends
+   on it, including how much the threshold matters.
+2. **One migration**: `'abandoned'` into the status CHECK, the two RPC guards widened,
+   `fountain_reap_orphans()` created, the cron entry added. It is one coherent unit; splitting it
+   leaves a window where a reaped row cannot heal.
+3. **Owner cancels the two orphan objects** (and DB64's Defect C hold) at the Stripe dashboard,
+   whenever convenient — no clock on the unconfirmed pair.
+4. **Supersede in `/pledge`** — its own dispatch, because it is a fountain deploy.
+5. **FRONT: the expired-form copy and Start over** — its own dispatch.
+6. `pg_net` — not recommended, and not required by anything above.
+
+**Rollback for step 2**, stated before any apply as the MIGRATION AMENDMENT requires: unschedule the
+cron job; `DROP FUNCTION public.fountain_reap_orphans()`; restore both RPC bodies from the
+definitions quoted in this report; and restore the CHECK constraint. **The CHECK restore requires
+that no row reads `abandoned`** — so the rollback statement must move any such rows back to
+`authorized` first, and that ordering has to be written into the rollback file rather than assumed.
+
+---
+
+### Could not verify
+
+- **Nothing was applied.** Every SQL fragment above is proposed. None has been executed, not even in
+  a rehearsal — the pass was instructed to write zero.
+- **The `abandoned` heal path is reasoned from function bodies, not observed.** It follows directly
+  from the `fountain_pledge_captured` guard quoted above, but no row has ever been reaped, so no
+  resurrection has ever occurred.
+- **Stripe's expiry behaviour for *unconfirmed* PaymentIntents was not measured on this account.**
+  It underpins the "leave them" recommendation in Item 3 and comes from documented behaviour.
+- **The behaviour of `paymentIntents.cancel` against an already-succeeded intent was not tested
+  here.** The supersede guard in Item 4 depends on Stripe erroring rather than succeeding, which is
+  documented but unobserved on `acct_1TK1VIAPNY1rgvEA`.
+- **The threshold still rests on one measured completion.** Widening it to a distribution needs more
+  than one give, and no amount of reasoning substitutes.
+- **Whether FRONT62 is deployed was not checked against Railway.** The claim above rests on
+  FRONT62's own report text ("Staged only ... nothing deployed"), which was true when written; if a
+  later pass shipped it, the note in Item 4 should be re-read rather than trusted.
+- **DB64's section sits at the END of `REPORT.md` (line ~5496), not the top**, against the
+  newest-first convention this file states. Recorded, not moved — reordering another pass's section
+  is outside this pass's scope and would rewrite the report of record.
+
+---
+## DB66 — raised_cents COUNTS ONLY MONEY THAT MOVED. APPLIED 20260818032122, ledger re-measured 0. The 2500 was already 1300 six minutes before the apply — proven by counterfactual instead. (2026-08-18)
 
 Session `ee600096` (fallback id — no `MC_SESSION`). Dispatch DB66, lane `db`, workdir
-`TheMANUAL.tech`. Lead ruling on DB64 Defect A, accepted in full. **Nothing applied at the time this
-section was written** — this half is the pre-flight the MIGRATION AMENDMENT requires *before* the
+`TheMANUAL.tech`. Lead ruling on DB64 Defect A, accepted in full. **Nothing was applied at the time this half
+was written** — this half is the pre-flight the MIGRATION AMENDMENT requires *before* the
 apply, and the post-apply verification is appended below it.
 
 ### THE LEDGER MEASURE — taken FIRST, on the tree as it stood, before authoring anything
@@ -163,6 +581,126 @@ that money will never reach the campaign.
 real giver's card, and still expires in about seven days. This migration makes it invisible to the
 ledger; it does nothing about the card. **DB67 owns that**, and the gap between "uncounted" and
 "released" is a real one that nothing in this pass closes.
+
+---
+
+### APPLIED — 2026-08-18 03:21:22 UTC, one human click
+
+`apply_migration` stamped its own version **`20260818032122`**, not the `20260818031500` the files
+were authored under. Both files were renamed to the stamped version immediately, and the two
+cross-references inside them updated:
+
+| | authored as | renamed to |
+|---|---|---|
+| migration | `supabase/migrations/20260818031500_db66_raised_counts_captured_only_v1.sql` | `supabase/migrations/20260818032122_db66_raised_counts_captured_only_v1.sql` |
+| rollback | `_drafts/20260818031500_..._rollback.sql` | `_drafts/20260818032122_..._rollback.sql` |
+
+**Ledger re-measured after the rename: EXIT 0.** 693 history rows, 325 repo files, and **0 / 0 / 0**
+discrepancies on or after the baseline — the apply manufactured no drift.
+
+### VERIFIED BY STRUCTURE, read back from the catalog
+
+```sql
+CREATE OR REPLACE FUNCTION public.fountain_counters(p_campaign_id uuid)
+ RETURNS TABLE(raised_cents bigint, captured_cents bigint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public'
+AS $function$
+  SELECT coalesce(sum(amount_cents) FILTER (WHERE status = 'captured'), 0)::bigint,
+         coalesce(sum(amount_cents) FILTER (WHERE status = 'captured'), 0)::bigint
+    FROM public.fountain_pledges
+   WHERE campaign_id = p_campaign_id
+     AND is_fixture = false;
+$function$
+```
+
+`md5(pg_get_functiondef())` `7dfce0fb…` → **`dacc116fc7e87be00bd62495b129f60c`**. Comment set.
+**`proacl` unchanged: `postgres=X/postgres | service_role=X/postgres`** — no anon, no authenticated,
+exactly as before, confirming `CREATE OR REPLACE` preserved the ACL rather than resetting it.
+
+The migration's own done-test passed inside the apply (it would have aborted the whole migration
+otherwise): every campaign has `raised_cents = captured_cents`, and every fixture campaign is still
+0/0.
+
+**Counters after:**
+
+| campaign | fixture | raised | captured |
+|---|---|---|---|
+| `fund-live-test-20260817` | no | **1300** | 1300 |
+| `bee-sanctuary` · `community-mural` · `fund-the-fountain` | yes | 0 | 0 |
+
+### THE DEVIATION THAT MATTERS — the 2500 was already gone before the apply ran
+
+**The dispatch's headline proof — "raised 2500 → 1300" — is NOT what this migration did to the
+stored record, and reporting it as such would be a lie of sequence.**
+
+At **03:15:23.686 UTC** a `payment_intent.canceled` event for `pi_3U5bdFAPNY1rgvEA167xTETd` — the
+1200-cent legacy hold — landed in `stripe_events` and give-webhook set that pledge to `canceled`.
+The owner cancelled the hold at Stripe. That is **six minutes after** this pass measured raised at
+2500, and **six minutes before** the apply.
+
+A canceled pledge fails the DB58 filter as surely as it fails the DB66 one, so the DB48 trigger
+recount dropped raised to 1300 **at 03:15:23, under the old definition**. By 03:21:22 the migration
+had nothing left to move: it was a **no-op on today's numbers**, and 1300 is the correct answer
+under either definition.
+
+**So the migration was verified by counterfactual instead**, on the real rows, in a
+self-rolling-back block (structurally so — the block always ends in `RAISE EXCEPTION`, there is no
+commit path through it):
+
+```
+now                        stored 1300/1300     DB58 expression over the same rows: 1300
+1200 hold restored to
+  status='authorized'      stored 1300/1300  <- DB66      DB58 expression: 2500  <- the old answer
+```
+
+**That is the change, isolated: 1300 where the old definition says 2500**, on a confirmed hold with
+its `authorized_at` intact. Same rows, same instant, two definitions, a 1200-cent difference.
+
+### THE DB48 TRIGGERS STILL RECOMPUTE — both directions, measured
+
+Same rolled-back block, continuing from the restored state:
+
+```
+hold authorized -> captured    counters 1300/1300 -> 2500/2500   (rise)
+real charge captured -> canceled        2500/2500 -> 1200/1200   (fall)
+```
+
+`fountain_pledges_sync_counters` → `fountain_recount` → `fountain_counters` fires on a plain status
+UPDATE and moves the stored columns in both directions, with both columns always equal under the new
+definition. **Everything above rolled back**; the counters were re-read afterwards and are
+1300/1300 with the fixtures at 0/0, unchanged.
+
+An earlier, less instrumented run of this test reported `afterCapture=0/0` and looked like a
+trigger failure. It was not: the hold it tried to capture had already been cancelled at 03:15:23, so
+the `UPDATE` matched zero rows. The instrumented re-run (`hold=NULL updrows=1/0`) is what exposed
+the cancel, and is how the deviation above was found at all. Recorded because the first result was
+alarming and wrong, and a report that only shows the clean second run hides how the real finding
+surfaced.
+
+### CONSEQUENCES, STATED PLAINLY
+
+- **The legacy 1200 hold is now gone from the ledger twice over** — cancelled at Stripe by the owner
+  *and* excluded by definition. Defect C is resolved by the owner's action, not by this migration.
+- **`raised_cents` and `captured_cents` now always carry the same number.** Any copy that explains a
+  difference between them is wrong from this moment. That is FRONT64's sweep, not this pass.
+- **The next confirmed-but-uncaptured hold will not inflate `raised`.** That is the whole prospective
+  value of this migration, since it moved nothing today.
+- **`authorized_at` is still stamped and still on the table.** Nothing here forecloses splitting the
+  two figures again; the rollback is one `CREATE OR REPLACE` plus a recount.
+
+### COULD NOT VERIFY
+
+- **That the 1200 hold's cancellation actually released the card at Stripe.** The database saw
+  `payment_intent.canceled` and acted on it; this session cannot read the connected account
+  (`list_available_accounts_or_orgs` returns only `acct_1TK1KPPNZUSRg1t2`, per DB65). The webhook
+  event is Stripe's own statement, which is good evidence and is not the same as reading the balance.
+- **Anything about the FUND front-end.** No page was loaded and no component read; the claim that
+  `LedgerStrip` and `PledgePanel` render both columns is carried from DB64's report, not re-verified.
+- **The orphan pledges** (`3ZCi7Lry` 1100, `1AWRU5WR` 1300, both `authorized` with `authorized_at`
+  NULL) are untouched and still sit in the table. They count toward nothing under either definition.
+  DB64 Defect B owns them.
 
 ---
 

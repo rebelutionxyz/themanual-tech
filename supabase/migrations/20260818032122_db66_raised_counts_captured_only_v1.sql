@@ -1,5 +1,5 @@
 -- DB66 — raised_cents COUNTS ONLY MONEY THAT MOVED (2026-08-18)
--- ROLLBACK: _drafts/20260818031500_db66_raised_counts_captured_only_v1_rollback.sql
+-- ROLLBACK: _drafts/20260818032122_db66_raised_counts_captured_only_v1_rollback.sql
 --
 -- LEAD RULING on DB64 Defect A, accepted in full: under charge-on-pledge,
 -- raised_cents counts only `captured`. It becomes identical to captured_cents.
