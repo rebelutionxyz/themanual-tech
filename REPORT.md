@@ -23,6 +23,172 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONT76 — CATALOG TRUTH. Registry 40 → 41, R1 flags flipped, renames completed. Finding A closed; a FRONT74 miscount corrected. (2026-08-18)
+
+Session `79a4fea9` (fallback id — no `MC_SESSION`). Dispatch FRONT76, lane `front`, workdir
+`TheMANUAL.tech`, effort SMALL. Build green, typecheck clean, lint clean in every file touched, all
+three PROVE items observed in a running dev build. **Committed, NOT pushed.**
+
+Three owner rulings existed that code never received. All three now applied.
+
+### 1. R9 — WORKSHOP REGISTERED (ORACLE_MF v1.26, owner 2026-08-09)
+
+*"WORKSHOP is the Astra; STUDIO is a menu under it."* The ruling reached canon on 2026-08-09 and
+never reached `astra-catalog.ts`, which is why the registry read **40 in code against 41 in canon for
+nine days** (DOCS31 F2 measured it three ways: code 40, canon 41, database 30).
+
+**This registered something already built, not something planned.** `pages/StudioPage.tsx` opens
+*"CREATORS STUDIO — a Workshop section (/studio)"* and renders a "The Workshop" context strip. The
+surface has existed the whole time; only its registry row was missing.
+
+```
+{ slug: 'workshop', wordmark: 'The Workshop', category: 'do',
+  hosts: ['TheWORKSHOP.to'], status: 'live', route: '/studio',
+  mount: 'page', accent: '#8A94A0' }
+```
+
+**No route collision:** `ASTRA_STUB_ENTRIES` excludes `mount: 'page'`, so no route is generated and
+the hand-written `/studio` route in `App.tsx` still wins. Checked before adding, not after.
+
+**THE ACCENT IS A PLACEHOLDER AND IS NOT PRESENTED AS CANON.** Per R-COLOR (owner, 2026-08-18:
+*"Brandosophic is a 2027 problem"*) the colour table parks whole. Rather than mint a hue — which
+would smuggle a taste decision into a bookkeeping pass — the row reuses the file's **existing**
+placeholder grey `#8A94A0`, already worn by `proservices`, `beehold` and `production`. It therefore
+joins a group finding B already records, deliberately: a fourth honest placeholder, not a fourth
+collision anyone chose. Commented PROVISIONAL in place.
+
+### 2. R1 — justice AND press CONFIRMED (ORACLE_MF v1.26, owner 2026-08-09)
+
+Both rows flipped `derived: true` → `derived: false`, and the awaiting-confirm notice deleted from
+`AstraStubPage.tsx`. It read:
+
+> Derived from a workspace tree + rail canon this pass — awaiting owner confirm before it enters the
+> canonical Astra registry.
+
+**That was shipped copy on `/justice` and `/press`, telling every visitor for nine days that a
+settled question was still open.** Nothing replaces it — the honest state of a confirmed Astra is
+silence, not a reassurance.
+
+`derived` is set to `false` rather than deleted: an absent field reads as *never derived*, where
+`false` records that the question was **asked and answered**. The interface field is kept (nothing
+reads it today) because the next tree-derived entry will need it; documented as such.
+
+**Press is the flag only.** R-PRESS (owner, 2026-08-18): *"Press is an october problem."* Nothing
+else about press was touched.
+
+### 3. TODAY'S RENAMES — the display half was already done; the domains were not
+
+R-SEC and R-TASKS. **Measured first, and the finding is that half the work already existed:** the
+`wordmark` fields already read `Security` and `Tasks` (landed with OPS94/OPS95's nested-repo sweeps),
+so the dispatch's rename was partly redundant. What was genuinely missing was the **domain**:
+
+| slug | was | now |
+|---|---|---|
+| `dingleberry` | `['DingleBERRY.tech', 'beeSECURE.dev', …]` | `['REBELUTION.icu', 'DingleBERRY.tech', …]` |
+| `miniwaves` | `['MiniWAVES.app']` | `['tasks.ing', 'MiniWAVES.app']` |
+
+New domain leads; the old one is kept as the registered-but-DARK record, which is what `hosts` is
+for. **Slugs, routes, table names untouched** — `/dingleberry`, `/miniwaves`, `dingleberry_*` are
+internal ids, per the R6 precedent and the 2026-08-08 no-codename ruling.
+
+**Copy sweep on the surfaces touched.** A grep for the old names across `src/` returns 25 files —
+far past a SMALL pass's scope, and the dispatch scoped it to surfaces touched. On those, every
+remaining `DingleBERRY` / `MiniWaves` occurrence is a **code comment or an identifier**, never a
+rendered label; `sidebarNav.ts:142` and `BottomToolbar.tsx:132,208` are comments, and the
+`BottomToolbar` popup already renders "Tasks". So the sweep is a **verification result, not an
+edit**.
+
+Two user-facing `Bee` strings were found and fixed on the Security surface — in the rename's direct
+blast radius, and against ORACLE_MF v1.27:
+
+- `DingleberryLayout.tsx:161` — *"Sign in with an operator (admin) **Bee**"* → **account**
+- `PostureBoardPage.tsx:126` — *"readable by operator (admin) **Bees** only"* → **users**
+
+### A CORRECTION TO FRONT74, which reached canon before it was caught
+
+FRONT74's report said accent finding C was *"two Astras carry #DC2626"*, and **ORACLE_MF v1.33 wrote
+that number into the record**. It is wrong, and so was the export — in the other direction.
+Measured live this pass:
+
+```
+SPINE_ACCENT_FINDINGS.reservedRedAstras → 7 entries
+  learning #E88938 · events #F97316 · pulse #DC2626 · freedomnetwork #C1440E
+  legalservices #C94C4C · justice #B23A48 · dingleberry #DC2626
+```
+
+`isReservedRed` is deliberately coarse and **catches oranges**: `#E88938`, `#F97316` and `#C1440E`
+are not reds by any reading. The genuinely red-family set is **four Astras across three colours** —
+`pulse` + `dingleberry` (#DC2626), `legalservices` (#C94C4C), `justice` (#B23A48). So FRONT74
+undercounted at 2 and the heuristic overcounts at 7.
+
+**THE THRESHOLD WAS NOT RETUNED.** Colours are parked to 2027 by owner word, and moving a cutoff is
+a taste decision wearing a bugfix's clothes. Instead `reservedRedAstras` now emits `{slug, accent}`
+rather than a bare slug, so whoever rules on this in 2027 sees the actual colours instead of trusting
+a boolean. **The 2027 pass should read four, not seven and not two.**
+
+### FINDING A — CLOSED, and closed in a way that cannot rot
+
+`SPINE_ACCENT_FINDINGS` gains `countMatchesCanon`, **computed** as
+`ASTRA_CATALOG.length === 41` rather than asserted in prose. If either number moves again the
+finding reopens itself. The mechanism was updated, not deleted, exactly as the dispatch required.
+Findings **B and C ride untouched** to 2027, still measured.
+
+### PROVE — all three, observed in a running dev build
+
+```
+catalogRows            41        ringLength   41
+countMatchesCanon      true      (finding A closed)
+workshop               { wordmark:'The Workshop', route:'/studio', mount:'page', accent:'#8A94A0' }
+derived === true       []        (R1 applied; zero rows remain)
+
+/justice  → h1 "Justice"                 noticeShown false
+/press    → h1 "Freedom of the Press"    noticeShown false
+
+/dingleberry → sidebar header renders "Security"   (screenshot)
+/miniwaves   → document.title "Tasks. In the Flow."
+               oldNamesVisible false
+miniwaves.hosts    ['tasks.ing', 'MiniWAVES.app']
+dingleberry.hosts  ['REBELUTION.icu', 'DingleBERRY.tech', …]
+```
+
+### FILES
+
+```
+MOD src/lib/astra-catalog.ts                    workshop row · R1 flags · domains · counts 40→41
+MOD src/lib/spine.ts                            finding A closed (computed) · reservedRed carries hex
+MOD src/pages/AstraStubPage.tsx                 awaiting-confirm notice deleted
+MOD src/pages/dingleberry/DingleberryLayout.tsx copy sweep, users not Bees
+MOD src/pages/dingleberry/PostureBoardPage.tsx  copy sweep, users not Bees
+```
+
+### DONE-TEST
+
+```
+npx tsc -b     → exit 0
+npm run build  → ✓ built in 18.68s
+npm run lint   → Found 23 errors — all pre-existing, ZERO in any FRONT76 file
+```
+
+Dev server on 3131: port asserted free before boot, owned by the vite child after. **The grandchild
+leak recurred for the third pass running** — `TaskStop` kills the npm wrapper, vite keeps the port
+(PID 25524 this time); killed by PID, release confirmed. It is now predictable enough to be worth a
+standing note rather than a per-pass surprise.
+
+### COULD NOT VERIFY
+
+- **The constellation rail was never seen listing 41.** It is admin-gated (FRONT31) and this session
+  is signed out, so the count was read from the module and from `ASTRA_ACCENT_RING.length`, not off a
+  rendered list. `/constellation` is admin-gated too.
+- **`workshop`'s registry row was not exercised as a destination.** `/studio` renders `StudioPage`
+  from a hand-written route that predates this pass; nothing about that path changed, and it was not
+  re-tested.
+- **The database side of F2 is untouched and still disagrees** — `astra_registry` holds 30 and is
+  load-bearing (`atlasoracle_directives.astra_id` references it). That is DB73's, and code-vs-canon
+  agreeing at 41 does not make the database agree with either.
+- **No mobile breakpoint exercised.**
+
+---
+
 ## DB75 — THE ROUTER BYPASS SWEEP. Sweep complete (2 bypasses, not 1). Reroute BLOCKED at the stated stop condition — question filed. (2026-08-18)
 
 **Pass:** DB75 · lane `db` · workdir `TheMANUAL.tech` · session `b4718c47`

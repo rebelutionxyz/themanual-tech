@@ -54,10 +54,14 @@ export const ASTRA_ACCENT_RING: readonly string[] = ASTRA_CATALOG.map((a) => a.a
  * commissioning dispatch says to FLAG a tree/doc conflict, not to resolve it
  * toward either side.
  *
- *  A. COUNT. ORACLE_MF v1.26 R9 made Workshop an Astra and put the registry —
- *     and with it "the accent table" — at 41 rows. The catalog holds 40 and has
- *     no `workshop` entry. The ring is therefore 40 long. Adding a 41st row
- *     would mean inventing a colour, which is forbidden.
+ *  A. COUNT — CLOSED by FRONT76 (2026-08-18). ORACLE_MF v1.26 R9 made Workshop
+ *     an Astra and put the registry — and with it "the accent table" — at 41
+ *     rows; the catalog held 40 and had no `workshop` entry, so the ring was 40
+ *     long. FRONT74 declined to add the row because doing so meant inventing a
+ *     colour. FRONT76 added it with the file's EXISTING placeholder grey rather
+ *     than a new hue, which registers the Astra without making a taste decision.
+ *     `countMatchesCanon` below now reports true, and it is COMPUTED — if either
+ *     number moves again, the finding reopens itself rather than going stale.
  *
  *  B. UNIQUENESS. The ring is not injective: three colours are shared by more
  *     than one Astra, so those pages rotate to a band a viewer cannot tell
@@ -66,12 +70,24 @@ export const ASTRA_ACCENT_RING: readonly string[] = ASTRA_CATALOG.map((a) => a.a
  *
  *  C. THE RESERVED HUE. ASTRA_STANDARD v1.2 item 14: "RED IS GLOBAL, MEANS
  *     ERROR, AND BELONGS TO NO ASTRA." Two catalog rows carry #DC2626.
+ *
+ * B AND C RIDE UNTIL 2027 by owner word — R-COLOR (ORACLE_MF v1.34,
+ * 2026-08-18): "Brandosophic is a 2027 problem." They stay measured here rather
+ * than being quietly dropped: a parked finding is still a finding, and the
+ * rotation was built to survive the table being replaced wholesale, so parking
+ * costs nothing structural.
  */
 export const SPINE_ACCENT_FINDINGS = {
   /** Rows in the accent table today. */
   catalogRows: ASTRA_CATALOG.length,
   /** Rows canon calls for — ORACLE_MF v1.26 R9. */
   canonRows: 41,
+  /**
+   * Finding A, computed rather than asserted. True since FRONT76 registered
+   * `workshop`. Deriving it means this cannot rot into a comment that claims
+   * a state the data has since left.
+   */
+  countMatchesCanon: ASTRA_CATALOG.length === 41,
   /** Slugs sharing a colour with at least one other Astra. */
   duplicateAccents: (() => {
     const byColor = new Map<string, string[]>();
@@ -84,8 +100,28 @@ export const SPINE_ACCENT_FINDINGS = {
       .filter(([, slugs]) => slugs.length > 1)
       .map(([color, slugs]) => ({ color, slugs }));
   })(),
-  /** Astras claiming a red, against ASTRA_STANDARD v1.2 item 14. */
-  reservedRedAstras: ASTRA_CATALOG.filter((a) => isReservedRed(a.accent)).map((a) => a.slug),
+  /**
+   * Astras the heuristic flags as claiming a red, against ASTRA_STANDARD v1.2
+   * item 14. CARRIES THE HEX, not just the slug — FRONT76 found that it had to.
+   *
+   * FRONT74's report said "two Astras carry #DC2626", and ORACLE_MF v1.33 wrote
+   * that number into canon. Both are wrong in different directions, and the
+   * export was the only thing telling the truth: it flags SEVEN, because
+   * `isReservedRed` is deliberately coarse and catches oranges — `learning`
+   * #E88938, `events` #F97316, `freedomnetwork` #C1440E are not reds by any
+   * reading. The genuinely red-family set is FOUR across three colours:
+   * `pulse` and `dingleberry` (#DC2626), `legalservices` (#C94C4C), `justice`
+   * (#B23A48).
+   *
+   * THE THRESHOLD WAS NOT RETUNED. Colours are parked to 2027 by owner word
+   * (R-COLOR), and moving the cutoff is a taste decision wearing a bugfix's
+   * clothes. Emitting the hex alongside the slug costs nothing and lets whoever
+   * rules on this see the actual colours instead of trusting a boolean.
+   */
+  reservedRedAstras: ASTRA_CATALOG.filter((a) => isReservedRed(a.accent)).map((a) => ({
+    slug: a.slug,
+    accent: a.accent,
+  })),
 } as const;
 
 /**

@@ -123,7 +123,8 @@ export function PostureBoardPage() {
         <DbCard className="p-5">
           <Eyebrow>Not authorised</Eyebrow>
           <p className="mt-2 text-text-silver" style={{ fontSize: 13.5, lineHeight: 1.55 }}>
-            Platform posture is readable by operator (admin) Bees only. Nothing here is hidden
+            {/* Copy sweep, ORACLE_MF v1.27: users, not Bees. */}
+            Platform posture is readable by operator (admin) users only. Nothing here is hidden
             because of a problem -- your account simply does not carry operator rights.
           </p>
         </DbCard>

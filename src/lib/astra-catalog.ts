@@ -3,8 +3,13 @@
 // constellation routing in themanual.tech. When canon changes, update both files
 // in parallel (no build-time derivation yet — future tooling).
 //
-// 40 Astras across 7 categories. Constellation hubs + director persona
+// 41 Astras across 7 categories. Constellation hubs + director persona
 // surfaces are NOT Astras and live in their own arrays below.
+//
+// 41 SINCE FRONT76 (2026-08-18), and the count is the point: R9 made WORKSHOP an
+// Astra on 2026-08-09 and this file never heard about it, so code read 40 against
+// canon's 41 for nine days (DOCS31 F2 measured it three ways: code 40, canon 41,
+// database 30). The database side is DB73's, not this file's.
 //
 // ── FRONT21 (2026-08-04) — THE MANUAL RULING (ORACLE_MF v1.24) ──────────
 // "we are all in themanual.tech only for now ... everything should be in the
@@ -18,8 +23,9 @@
 //      REBELUTION.icu, AtlasORACLE.to, TheMANUAL.tech)
 //   3. the rail canon doc chains in public.ops_docs (ORACLE_MF, JMF, GAMES_MF,
 //      VOTE_MF, IDENTITY_MODEL, H24_GESTURES)
-// Two entries are NEW vs canon v1 and are marked `derived: true` — they await
-// owner confirm before canon v1 is amended: `justice` and `press`. One existing
+// Two entries were NEW vs canon v1 and carried `derived: true` pending owner
+// confirm: `justice` and `press`. BOTH WERE CONFIRMED by R1 (ORACLE_MF v1.26,
+// owner 2026-08-09) and FRONT76 flipped them to `derived: false`. One existing
 // entry gained a host from a workspace tree: `gaming` ← TheHoneycomb.games.
 
 import { ASTRA_REGISTRY } from '@/lib/astras/registry';
@@ -70,7 +76,16 @@ export interface AstraCatalogEntry {
    * canonized. Flagged in the FRONT21 report; safe to overwrite wholesale.
    */
   accent: string;
-  /** true = derived this pass from a tree/rail source, not yet in canon v1. */
+  /**
+   * true = derived from a tree/rail source and NOT yet confirmed by the owner.
+   *
+   * FRONT76: no entry is `true` any more — R1 confirmed the only two that were
+   * (`justice`, `press`), and `AstraStubPage` no longer renders an
+   * awaiting-confirm notice, so nothing reads this field today. It is kept
+   * rather than deleted because the next tree-derived entry needs it, and
+   * because `derived: false` on those two rows records that the question was
+   * ASKED AND ANSWERED — an absent field would read as never-derived.
+   */
   derived?: boolean;
 }
 
@@ -91,7 +106,7 @@ export const ASTRA_STATUS_COLOR: Record<AstraStatus, { bg: string; text: string 
   'post-Swarm':{ bg: '#4b5563', text: '#ffffff' }, // gray-600
 };
 
-// 40 Astras. Status field reflects canon-stated status; runtime
+// 41 Astras. Status field reflects canon-stated status; runtime
 // cross-reference with ASTRA_REGISTRY upgrades to 'live' when hosts intersect.
 export const ASTRA_CATALOG: AstraCatalogEntry[] = [
   // ─── Core (3) ───────────────────────────────────────────────────────
@@ -116,9 +131,13 @@ export const ASTRA_CATALOG: AstraCatalogEntry[] = [
   { slug: 'learning',      wordmark: 'Learning',        category: 'knowledge', hosts: ['rebelution.you', 'atlasENLIGHTENED.com'],                status: 'scaffolded',                              description: 'Course + curriculum surface.', route: '/learning', mount: 'stub', accent: '#E88938' },
   { slug: 'memories',      wordmark: 'Memories',        category: 'knowledge', hosts: [],                                                        status: 'deferred',                                description: 'Long-form Bee memoirs + family archive.', route: '/memories', mount: 'stub', accent: '#B08968' },
   { slug: 'aitours',       wordmark: 'AI Tours',        category: 'knowledge', hosts: ['FredomRINGs.online'],                                    status: 'scaffolded', director: 'Ryan Dawson',     description: 'Pre-launch AI-curated tour engine.', route: '/tours', mount: 'stub', accent: '#57B17C' },
-  // DERIVED — workspace tree freedomofthe.press (Next.js /press flyer-ad
-  // storefront, live Supabase reads, multi-domain middleware). Not in canon v1.
-  { slug: 'press',         wordmark: 'Freedom of the Press', category: 'knowledge', hosts: ['freedomofthe.press', '406flyer.com'],               status: 'scaffolded',                              description: 'Regional flyer-ad editions — the /press storefront.', route: '/press', mount: 'stub', accent: '#2F4858', derived: true },
+  // Was DERIVED — workspace tree freedomofthe.press (Next.js /press flyer-ad
+  // storefront, live Supabase reads, multi-domain middleware).
+  // FRONT76 — R1 APPLIED (ORACLE_MF v1.26, owner 2026-08-09): "justice and press
+  // are Astras". CONFIRMED, so `derived` is false. This is the flag only — the
+  // PRESS BUILD IS OCTOBER per R-PRESS (owner, 2026-08-18) and nothing else about
+  // press is touched here.
+  { slug: 'press',         wordmark: 'Freedom of the Press', category: 'knowledge', hosts: ['freedomofthe.press', '406flyer.com'],               status: 'scaffolded',                              description: 'Regional flyer-ad editions — the /press storefront.', route: '/press', mount: 'stub', accent: '#2F4858', derived: false },
 
   // ─── Connection (12) ────────────────────────────────────────────────
   { slug: 'groups',        wordmark: 'Groups',          category: 'connection', hosts: ['rebelution.org', 'atlasnation.com'],                    status: 'scaffolded',                              description: 'Manual Groups browser + Group pages.', route: '/unite', mount: 'page', accent: '#7C3AED' },
@@ -134,8 +153,24 @@ export const ASTRA_CATALOG: AstraCatalogEntry[] = [
   { slug: 'genealogy',     wordmark: 'Genealogy',       category: 'connection', hosts: ['BeeGenie.family'],                                      status: 'deferred',                                description: 'Family tree + ancestry surface.', route: '/genealogy', mount: 'stub', accent: '#87A96B' },
   { slug: 'theranking',    wordmark: 'TheRanking',      category: 'connection', hosts: ['TheRanking.app'],                                       status: 'deferred',                                description: 'Hot-or-Not 2.0 (Bee-vetted lists).', route: '/theranking', mount: 'stub', accent: '#D4AF37' },
 
-  // ─── Do (4) ─────────────────────────────────────────────────────────
-  { slug: 'miniwaves',     wordmark: 'Tasks',           category: 'do', hosts: ['MiniWAVES.app'],                                                status: 'live',                                    description: 'Mode of Operations — task manager (live).', route: '/miniwaves', aliases: ['/waves'], mount: 'page', accent: '#0EA5E9' },
+  // ─── Do (5) ─────────────────────────────────────────────────────────
+  // FRONT76 — R9 APPLIED TO CODE (ORACLE_MF v1.26, owner 2026-08-09):
+  // "WORKSHOP is the Astra; STUDIO is a menu under it." That ruling reached
+  // canon and never reached this file, which is why the registry has read 40
+  // here against 41 in canon ever since (DOCS31 F2). The surface has existed the
+  // whole time — `pages/StudioPage.tsx` opens "CREATORS STUDIO — a Workshop
+  // section (/studio)" and renders a "The Workshop" strip — so this registers
+  // something already built, not something planned.
+  //
+  // ACCENT IS PROVISIONAL AND IS NOT A CANON COLOUR. Per R-COLOR (owner,
+  // 2026-08-18: "Brandosophic is a 2027 problem") the colour table parks whole;
+  // this reuses the file's existing placeholder grey rather than minting a hue,
+  // because inventing one would smuggle a taste decision into a bookkeeping
+  // pass. It therefore joins the #8A94A0 group that accent finding B already
+  // records, deliberately — a fourth honest placeholder, not a fourth collision
+  // anyone chose.
+  { slug: 'workshop',      wordmark: 'The Workshop',    category: 'do', hosts: ['TheWORKSHOP.to'],                                               status: 'live',                                    description: 'Build surface — Creator Studio and sibling Workshop sections.', route: '/studio', mount: 'page', accent: '#8A94A0' },
+  { slug: 'miniwaves',     wordmark: 'Tasks',           category: 'do', hosts: ['tasks.ing', 'MiniWAVES.app'],                                   status: 'live',                                    description: 'Mode of Operations — task manager (live).', route: '/miniwaves', aliases: ['/waves'], mount: 'page', accent: '#0EA5E9' },
   { slug: 'production',    wordmark: 'Production',      category: 'do', hosts: [],                                                               status: 'deferred',                                description: 'Long-form production pipeline.', route: '/production', mount: 'surface', accent: '#8A94A0' },
   { slug: 'brandosophic',  wordmark: 'BRANDoSOPHIC',    category: 'do', hosts: ['BRANDoSOPHIC.com', 'rebelution.site'],                          status: 'scaffolded',                              description: 'Brand-design + identity surface.', route: '/brand', mount: 'page', accent: '#6E1423' },
   { slug: 'safetycheck',   wordmark: 'Safety Check',    category: 'do', hosts: ['Takefiveforsafety.com', 'Safetymeeting.tech', 'Safetymeeting.ai'], status: 'deferred',                            description: 'Partner co-brand safety meetings.', route: '/safetycheck', mount: 'stub', accent: '#6FCF8F' },
@@ -145,14 +180,21 @@ export const ASTRA_CATALOG: AstraCatalogEntry[] = [
   { slug: 'therank',       wordmark: 'TheRANK',         category: 'governance', hosts: ['TheRank.site'],                                         status: 'scaffolded',                              description: '33-rank engine + identity reputation.', route: '/therank', mount: 'stub', accent: '#F2C14E' },
   { slug: 'legalservices', wordmark: 'Legal Services',  category: 'governance', hosts: ['rebelution.info', 'AtlasADVOCATE.com'],                 status: 'deferred',                                description: 'Legal services directory for Bees.', route: '/legal', mount: 'surface', accent: '#C94C4C' },
   { slug: 'willtestament', wordmark: 'Will & Testament',category: 'governance', hosts: ['FinalWaggle.com'],                                      status: 'deferred',                                description: 'Estate + final-wishes management.', route: '/willtestament', mount: 'stub', accent: '#7A6C5D' },
-  // DERIVED — workspace tree REBELUTION.org + rail canon JMF v0.3–v0.5
-  // ("justice_* LIVE", commit 08074d0). Not in canon v1.
+  // Was DERIVED — workspace tree REBELUTION.org + rail canon JMF v0.3–v0.5
+  // ("justice_* LIVE", commit 08074d0).
+  // FRONT76 — R1 APPLIED (ORACLE_MF v1.26, owner 2026-08-09): "justice and press
+  // are Astras". CONFIRMED, so `derived` is false.
   // JMF v0.8 (owner, 2026-08-13): the project is Justice; the old name is retired
   // and NO Justice URL exists or may be written — hence `hosts: []`, not a domain.
-  { slug: 'justice',       wordmark: 'Justice',         category: 'governance', hosts: [],                                                       status: 'scaffolded',                              description: 'Case record + accountability spine (justice_* tables live).', route: '/justice', mount: 'stub', accent: '#B23A48', derived: true },
+  { slug: 'justice',       wordmark: 'Justice',         category: 'governance', hosts: [],                                                       status: 'scaffolded',                              description: 'Case record + accountability spine (justice_* tables live).', route: '/justice', mount: 'stub', accent: '#B23A48', derived: false },
 
   // ─── Security (1) ───────────────────────────────────────────────────
-  { slug: 'dingleberry',   wordmark: 'Security',          category: 'security', hosts: ['DingleBERRY.tech', 'beeSECURE.dev', 'beeSafe.dev', 'DiEphone.app', 'SoSphone.app', 'MAYDAYphone.app', 'Minutemen.app'], status: 'post-Swarm', description: 'Consolidated surveillance + safety tools.', route: '/dingleberry', mount: 'page', accent: '#DC2626' },
+  // FRONT76 — R-SEC APPLIED (owner 2026-08-18: "Dingleberry is now Security and
+  // rebelution.icu"). The DISPLAY name was already 'Security'; the domain was
+  // not, so REBELUTION.icu leads the host list now. Slug, route and the
+  // dingleberry_* tables are internal ids and stay put, per the R6 precedent and
+  // the 2026-08-08 no-codename ruling.
+  { slug: 'dingleberry',   wordmark: 'Security',          category: 'security', hosts: ['REBELUTION.icu', 'DingleBERRY.tech', 'beeSECURE.dev', 'beeSafe.dev', 'DiEphone.app', 'SoSphone.app', 'MAYDAYphone.app', 'Minutemen.app'], status: 'post-Swarm', description: 'Consolidated surveillance + safety tools.', route: '/dingleberry', mount: 'page', accent: '#DC2626' },
 ];
 
 // ─── Constellation hubs (NOT Astras) ─────────────────────────────────

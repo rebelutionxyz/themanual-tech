@@ -102,12 +102,13 @@ export function AstraStubPage({ entry }: { entry: AstraCatalogEntry }) {
           )}
         </dl>
 
-        {entry.derived && (
-          <p className="mt-8 font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
-            Derived from a workspace tree + rail canon this pass — awaiting owner confirm
-            before it enters the canonical Astra registry.
-          </p>
-        )}
+        {/* FRONT76 — THE AWAITING-CONFIRM NOTICE IS GONE. It read "awaiting owner
+            confirm before it enters the canonical Astra registry", and it was
+            shipped copy on /justice and /press. The owner confirmed both on
+            2026-08-09 (R1, ORACLE_MF v1.26); the notice then told every visitor
+            for nine days that a settled question was still open. Both rows now
+            carry `derived: false`, so nothing renders here at all — the honest
+            state of a confirmed Astra is silence, not a reassurance. */}
       </div>
     </div>
   );

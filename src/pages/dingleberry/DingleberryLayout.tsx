@@ -158,8 +158,10 @@ function GateDenied() {
         Operator access required
       </h1>
       <p className="mt-2 text-text-silver" style={{ fontSize: 14, lineHeight: 1.5 }}>
-        This is the platform’s security console. Sign in with an operator (admin) Bee to view
-        it.
+        {/* Copy sweep, ORACLE_MF v1.27: users, not Bees. Swept here because
+            this is the Security surface the R-SEC rename lands on. */}
+        This is the platform’s security console. Sign in with an operator (admin) account to
+        view it.
       </p>
       <div
         className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-border-bright px-3 py-1 font-mono uppercase text-text-muted"
