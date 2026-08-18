@@ -1,12 +1,12 @@
-// POST /functions/v1/oracle-webhook                     verify_jwt = FALSE
+// POST /functions/v1/h24-webhook                     verify_jwt = FALSE
 //
 // ONE endpoint, ONE signing secret, BOTH oracle event families (OPS48 s3a):
 //
-//   checkout.session.completed (mode=payment)      pack  -> oracle_credit_token_purchase
+//   checkout.session.completed (mode=payment)      pack  -> h24_credit_token_purchase
 //   checkout.session.completed (mode=subscription) plan  -> ack only; invoice.paid grants
-//   invoice.paid                                   plan  -> subscription_sync + oracle_grant_plan_tokens
+//   invoice.paid                                   plan  -> subscription_sync + h24_grant_plan_tokens
 //   customer.subscription.created|updated|deleted  plan  -> subscription_sync only, NO token write
-//   charge.refunded                                pack  -> oracle_refund_token_purchase
+//   charge.refunded                                pack  -> h24_refund_token_purchase
 //
 // AUTHN: verify_jwt MUST be false. Stripe calls this; the only trust anchor is
 // the Stripe-Signature HMAC against STRIPE_WEBHOOK_SECRET_ORACLE. The _ORACLE
@@ -19,7 +19,7 @@
 // membership invoices, all of it. Every branch below refuses anything whose
 // metadata does not say product_type='oracle', and acks 200 so Stripe stops
 // retrying something that will never be ours. This is the exact mirror of the
-// F6 collision documented in oracle-checkout, pointed the other way.
+// F6 collision documented in h24-checkout, pointed the other way.
 // ---------------------------------------------------------------------------
 //
 // IDEMPOTENCY -- the guarantee is a partial unique index on the money row, never
@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
   try {
     event = await stripe.webhooks.constructEventAsync(raw, sig, SECRET, undefined, cryptoProvider);
   } catch (err) {
-    console.error('oracle-webhook signature verify failed', {
+    console.error('h24-webhook signature verify failed', {
       message: err instanceof Error ? err.message : String(err),
     });
     return new Response('Invalid signature', { status: 400 });
@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
           ?? unixToIso(s?.items?.data?.[0]?.current_period_end)
           ?? unixToIso(s?.current_period_end);
       } catch (err) {
-        console.error('oracle-webhook subscription retrieve failed', {
+        console.error('h24-webhook subscription retrieve failed', {
           subscription: subscriptionId, message: err instanceof Error ? err.message : String(err),
         });
       }
@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
         // deno-lint-ignore no-explicit-any
         meta = asMeta((intent as any)?.metadata);
       } catch (err) {
-        console.error('oracle-webhook payment intent retrieve failed', {
+        console.error('h24-webhook payment intent retrieve failed', {
           payment_intent: pi, message: err instanceof Error ? err.message : String(err),
         });
       }
@@ -210,7 +210,7 @@ Deno.serve(async (req) => {
   if (!beeId) {
     // A Stripe retry will never supply missing metadata, so ack 200 rather than
     // start a retry storm. The event row stays non-processed for reconciliation.
-    console.error('oracle-webhook unresolved bee', { type: event.type, id: event.id });
+    console.error('h24-webhook unresolved bee', { type: event.type, id: event.id });
     await recordEvent(sb, event, { beeId: null, amountCents, currency, customerId, subscriptionId, invoiceId, status: 'unresolved' });
     return ok({ received: true, unresolved: true });
   }
@@ -240,11 +240,11 @@ Deno.serve(async (req) => {
       const packCode = meta.pack_code;
       if (!packCode) return ok({ received: true, skipped: 'no pack_code' });
 
-      const { data, error } = await sb.rpc('oracle_credit_token_purchase', {
+      const { data, error } = await sb.rpc('h24_credit_token_purchase', {
         p_bee_id: beeId, p_pack_code: packCode, p_payment_ref: obj.id,
         p_amount_cents: obj.amount_total ?? 0, p_method: 'stripe',
       });
-      if (error) throw new Error(`oracle_credit_token_purchase: ${error.message}`);
+      if (error) throw new Error(`h24_credit_token_purchase: ${error.message}`);
       await markProcessed(sb, event.id, beeId);
       return ok({ received: true, result: data });
     }
@@ -267,17 +267,17 @@ Deno.serve(async (req) => {
       // that 23505 threw before the grant ever ran: a Bee paid and received
       // nothing, on every retry, forever. Proven in
       // db/proofs/ops67_plan_lifecycle_battery.sql s6 -- along with the fact
-      // that oracle_grant_plan_tokens has NO dependency on the subscriptions
+      // that h24_grant_plan_tokens has NO dependency on the subscriptions
       // row, which is what makes this order safe.
       //
       // The grant is idempotent on the invoice id (W-9), so a Stripe retry that
       // gets this far a second time settles as duplicate:true.
       // -------------------------------------------------------------------
-      const { data, error } = await sb.rpc('oracle_grant_plan_tokens', {
+      const { data, error } = await sb.rpc('h24_grant_plan_tokens', {
         p_bee_id: beeId, p_plan_tier: planTier, p_invoice_ref: invoiceId,
         p_period_end: periodEnd, p_amount_cents: amountCents,
       });
-      if (error) throw new Error(`oracle_grant_plan_tokens: ${error.message}`);
+      if (error) throw new Error(`h24_grant_plan_tokens: ${error.message}`);
 
       // Stripe just took money for THIS subscription, so any OTHER oracle
       // subscription row still marked live for this Bee is stale by definition.
@@ -289,7 +289,7 @@ Deno.serve(async (req) => {
         .in('status', ['active', 'trialing'])
         .neq('stripe_subscription_id', subscriptionId);
       if (staleErr) {
-        console.error('oracle-webhook stale subscription retire failed', {
+        console.error('h24-webhook stale subscription retire failed', {
           bee_id: beeId, subscription: subscriptionId, message: staleErr.message,
         });
       }
@@ -306,7 +306,7 @@ Deno.serve(async (req) => {
         // that may be permanent, so settle at 200 and flag the row instead:
         // status 'error' with processed_at still NULL is exactly what a
         // reconciliation sweep looks for. Money first, bookkeeping visible.
-        console.error('oracle-webhook subscription_sync failed AFTER a successful grant', {
+        console.error('h24-webhook subscription_sync failed AFTER a successful grant', {
           event_id: event.id, bee_id: beeId, subscription: subscriptionId,
           message: syncErr.message,
         });
@@ -326,7 +326,7 @@ Deno.serve(async (req) => {
         // a stale status column -- and it avoids an endless retry on a CHECK
         // that will refuse this value on every delivery. The event row stays
         // 'received' for reconciliation.
-        console.error('oracle-webhook unsupported Stripe subscription status', {
+        console.error('h24-webhook unsupported Stripe subscription status', {
           event_id: event.id, status, subscription: subscriptionId,
         });
         return ok({ received: true, skipped: `unsupported status ${status}` });
@@ -348,7 +348,7 @@ Deno.serve(async (req) => {
     }
 
     // ---------------- REFUND: unspent balance only ----------------
-    // ORACLE_MF v0.26 s2. The clamp lives in oracle_refund_token_purchase; this
+    // ORACLE_MF v0.26 s2. The clamp lives in h24_refund_token_purchase; this
     // branch only supplies the proportional cap for a PARTIAL refund, because
     // the ledger stores Tokens and Stripe stores cents.
     const pi = typeof obj?.payment_intent === 'string' ? obj.payment_intent : null;
@@ -368,22 +368,22 @@ Deno.serve(async (req) => {
     const charged = typeof obj?.amount === 'number' ? obj.amount : null;
     const refunded = typeof obj?.amount_refunded === 'number' ? obj.amount_refunded : null;
     if (meta.pack_code && charged && refunded && refunded < charged) {
-      const { data: pack } = await sb.from('oracle_token_packs')
+      const { data: pack } = await sb.from('h24_token_packs')
         .select('tokens').eq('pack_code', meta.pack_code).maybeSingle();
       if (pack?.tokens) maxTokens = (Number(pack.tokens) * refunded) / charged;
     }
 
-    const { data, error } = await sb.rpc('oracle_refund_token_purchase', {
+    const { data, error } = await sb.rpc('h24_refund_token_purchase', {
       p_payment_ref: sessionId, p_refund_ref: refundRef,
       p_max_tokens: maxTokens, p_memo: null,
     });
-    if (error) throw new Error(`oracle_refund_token_purchase: ${error.message}`);
+    if (error) throw new Error(`h24_refund_token_purchase: ${error.message}`);
     await markProcessed(sb, event.id, beeId);
     return ok({ received: true, result: data });
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error('oracle-webhook handler failed', { event_id: event.id, type: event.type, message });
+    console.error('h24-webhook handler failed', { event_id: event.id, type: event.type, message });
     await sb.from('stripe_events').update({ status: 'error' }).eq('event_id', event.id);
     // 500 -> Stripe retries. The retry is safe: every money write is guarded by
     // a partial unique index, and the event row stays non-processed so a replay
@@ -412,7 +412,7 @@ async function recordEvent(sb: any, event: any, f: {
     payload: event,
   }, { onConflict: 'event_id', ignoreDuplicates: true });
   if (error) {
-    console.error('oracle-webhook stripe_events write FAILED -- audit gap, money path continues', {
+    console.error('h24-webhook stripe_events write FAILED -- audit gap, money path continues', {
       event_id: event.id, message: error.message,
     });
   }

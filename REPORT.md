@@ -23,6 +23,89 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONTCODE1 — THE CODE-LAYER h24 RENAME. Code half of the coordinated code+schema rename (DBCODE1 is the DB half). Built green, committed, NOT pushed — lands in the SAME push as DBCODE1's apply. (2026-08-18)
+
+Session 79a4fea9 (fallback id). Dispatch FRONTCODE1, lane front, workdir TheMANUAL.tech, effort L.
+ORACLE_MF v1.57 ("code too" — the R6/v1.35 boundary keeping code identifiers as atlasoracle/oracle is
+LIFTED). Highest-risk pass on the board; sequenced LAST. Coordinated with DBCODE1 (DB objects) — must
+land in the same push so code and schema never disagree in production.
+
+### THE RENAME RULE — deterministic prefix-swap, not invented names
+
+DBCODE1's exact enumerated names were not yet published (still claimed), so divergence was foreclosed the
+only sound way: the same source + the same rule. I enumerated the live objects from pg_class/pg_proc (the
+identical query DBCODE1 step 1 runs) and applied the v1.57 rule uniformly — atlasoracle_ -> h24_,
+oracle_ -> h24_, atlasoracle-/oracle- -> h24-. Every target maps to a unique name (no collisions).
+Because both passes enumerate the same catalog and apply the same swap, the two name-sets are identical
+by construction — not by guessing DBCODE1's choices.
+
+RECONCILIATION CHECKPOINT (for the joint apply): before the coordinated apply+push, diff DBCODE1's final
+migration object-list against the code names below; they must match 1:1. The owner coordinates the joint
+apply, which is the natural gate.
+
+### WHAT WAS RENAMED (the schema-coupling set — breaks if code != schema)
+
+20 DB object references (.from, .rpc, query/comment references), all snake -> h24_:
+tables/views — canon_reads, directives, provider_pool, model_rates, token_balances, token_consumption,
+token_ledger, token_packs, token_plans; functions — check_rate_caps, credit, debit, deposit_to_escrow,
+get_escrow_balance, withdraw_from_escrow, credit_token_purchase, debit_tokens, grant_plan_tokens,
+refund_token_purchase, token_available.
+
+7 edge functions (directory git mv + every invoke string + own self-reference), dash -> h24-:
+atlasoracle-route -> h24-route (+ its canon.ts), atlasoracle-escrow-deposit -> h24-escrow-deposit,
+atlasoracle-escrow-withdraw -> h24-escrow-withdraw, atlasoracle-log -> h24-log,
+atlasoracle-providers -> h24-providers, oracle-checkout -> h24-checkout, oracle-webhook -> h24-webhook.
+22 files, 152/152 balanced identifier swaps; the 8 edge files show as git renames (R085–R099).
+
+### DELIBERATELY NOT RENAMED — cited exceptions (the PROVE grep's "allowed exceptions")
+
+Each is NOT schema-object coupling, so renaming it here would either break a different contract or churn
+cosmetics on the highest-risk pass. All eight remaining oracle/atlasoracle code occurrences are one of:
+
+1. atlasoracle_escrow_deposit / atlasoracle_escrow_withdraw (lib/freedomblings/ledger.ts) — these are
+   stored bling_transactions.type VALUES, not object names. Renaming the code key without migrating
+   existing rows' type data orphans every historical escrow row. Same class as the deferred type='minted'
+   enum debt. Needs a coordinated data migration + edge-write change — its own pass.
+2. Env vars — ORACLE_ROUTE_ENABLED, ORACLE_CHECKOUT_SUCCESS_URL/_CANCEL_URL, ORACLE_TOS_VERIFIED (edge
+   secrets), VITE_ATLASORACLE_MOCK (client build var, DEV-gated). Renaming the code reference without the
+   owner re-setting the secret under the new name breaks the feature at deploy. Owner secret-reset
+   required — cited, deferred.
+3. ORACLE_MF — the canon MASTER-FILE name, cited in ~40 rationale comments. A proper noun, not a code
+   identifier. Untouched (the doc is still ORACLE_MF at v1.57).
+4. feat/atlasoracle-v1 (hq/sections/AstraStatus.tsx) — a git branch name inside a display note.
+   Historical prose, untouched.
+5. atlasoracle_directives_select_own (h24-log/index.ts:12) — an RLS policy name in a rationale comment;
+   policy renames are DBCODE1's call and do not auto-follow a table rename. Left as the accurate current
+   name; \b-anchoring protected it automatically from the table sweep.
+6. oracle-tokens-refresh / ORACLE_TOKENS_REFRESH_EVENT — a client-internal custom DOM event (dispatch +
+   listen in the same bundle). No external coupling; cosmetic. Deferred with the folder set.
+7. Client CamelCase + folders — src/lib/atlasoracle/, supabase/functions/_shared/atlasoracle/,
+   AtlasOracleWalletBadge, useOracleTokens, atlasoracle-tier/-category DOM ids. None are
+   atlasoracle_/oracle_ snake identifiers (PROVE grep passes without them); the surface is already h24
+   (FRONT77). A cosmetic follow-up, out of the schema-coupling scope.
+
+### PROVE
+
+- Zero atlasoracle_/oracle_ snake DB-object or dashed edge identifiers remain in code, except the cited
+  exceptions above (grep quoted in the pass).
+- Front build GREEN — npm run build built in 39.21s. The supabase client is untyped (no
+  createClient<Database>), so the .from()/.rpc() strings are not schema-validated at compile time — the
+  build proves no syntax/type breakage, and stays green independent of DB state (exactly the "build
+  before DBCODE1 applies" case v1.57 anticipates).
+- Edge syntax GREEN — deno check --no-lock supabase/functions/h24-route/index.ts -> exit 0 (deno.lock
+  untouched).
+- PENDING the joint apply: runtime correctness against the RENAMED schema cannot be verified until
+  DBCODE1's migration is applied — the DB still has the atlasoracle_/oracle_ objects. Marked pending per
+  the dispatch. NO PUSH until the coordinated apply+push the owner sequences.
+
+### COULD NOT VERIFY
+
+- Runtime against renamed schema (above) — DBCODE1 not applied.
+- The name-set match to DBCODE1's final enumeration — DBCODE1's report not yet filed; the reconciliation
+  checkpoint above is the gate. By construction (same catalog, same rule) they should be identical.
+
+---
+
 ## FRONT86 — THE /mc COCKPIT BOARD: three-colour health + tiered time + the scroll fix. Build green; logic proven on live rows; the rendered UI is admin-gated. (2026-08-18)
 
 Session `79a4fea9` (fallback id). Dispatch FRONT86, lane `front`, workdir `TheMANUAL.tech`, effort M.

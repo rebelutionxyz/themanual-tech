@@ -31,7 +31,7 @@ import { Link } from 'react-router-dom';
  *
  * THE LEDGER TRUTH, SAID ON THE SURFACE (dispatch item 1): plan tokens reset each
  * cycle and are spent first; held tokens from a top-up never expire and are spent
- * after. This is not a promise — it is what `oracle_debit_tokens` does.
+ * after. This is not a promise — it is what `h24_debit_tokens` does.
  */
 export function H24Storefront() {
   const open = useH24Storefront((s) => s.open);

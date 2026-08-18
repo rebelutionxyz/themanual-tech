@@ -97,7 +97,7 @@ export function useOracleTokens(beeId: string | null): UseOracleTokens {
 
       // THE TOTAL IS AUTHORITATIVE IMMEDIATELY; THE SPLIT IS NOT. The router
       // returns only the post-debit total, and which bucket the debit came out
-      // of is recorded server-side by `oracle_debit_tokens` (plan grants first,
+      // of is recorded server-side by `h24_debit_tokens` (plan grants first,
       // FIFO by soonest expiry, then the durable pool). Rather than re-derive
       // that split here — two definitions of the same number is exactly the bug
       // the debit RPC's own comment records as F-1 — the stale split is dropped

@@ -13,13 +13,13 @@
 // to the debit.
 //
 // ⚠ THIS MODULE IS DISPLAY ONLY. It re-derives what the router already charged;
-// it never decides a charge. The authority is `oracle_token_ledger.amount_tokens`
+// it never decides a charge. The authority is `h24_token_ledger.amount_tokens`
 // and nothing here may override it — where the re-derivation disagrees with the
 // ledger, the UI shows the ledger figure and says the legs could not be
 // reconciled. Being visibly unable to explain a charge is honest; quietly
 // showing a prettier number than the one taken is not.
 
-/** One active row of `oracle_model_rates`, as the router reads it. */
+/** One active row of `h24_model_rates`, as the router reads it. */
 export interface ModelRateRow {
   modelName: string;
   tier: string;
@@ -61,7 +61,7 @@ export interface CostBreakdown {
   rate: ModelRateRow;
 }
 
-/** Ledger precision: `oracle_token_ledger.amount_tokens` is numeric(20,6). */
+/** Ledger precision: `h24_token_ledger.amount_tokens` is numeric(20,6). */
 const LEDGER_EPSILON = 0.0000005;
 
 /**

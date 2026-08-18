@@ -46,7 +46,7 @@ export function OraclePage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // POST-PURCHASE RETURN (FRONT81). oracle-checkout sends the user back to
+  // POST-PURCHASE RETURN (FRONT81). h24-checkout sends the user back to
   // /h24?tokens=1 after Stripe. The webhook credits the ledger asynchronously,
   // so we re-read the balance a few times (never optimistic math — a token only
   // shows once the webhook wrote it), show an honest banner, and strip the flag.

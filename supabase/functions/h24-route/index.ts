@@ -1,4 +1,4 @@
-// POST /functions/v1/atlasoracle-route
+// POST /functions/v1/h24-route
 // AtlasOracle directive router — v1 completion (tier routing, cost-shape
 // pricing, rate caps, frontier cost-preview).
 //
@@ -16,7 +16,7 @@
 //   - standard  → claude-sonnet-5,  metered at 3.0x provider cost, rates as data
 //   - frontier  → claude-opus-5,    metered at 2.5x provider cost, confirm-cost gate
 //
-// Prices are NOT in this file. They live in oracle_model_rates, newest active
+// Prices are NOT in this file. They live in h24_model_rates, newest active
 // row per model; a missing rate is a 503, never a guess.
 //
 // OPS11 (2026-07-27): standard and frontier are GATED OFF at PAID_TIERS_ENABLED
@@ -24,14 +24,14 @@
 // pricing machinery under them is left intact and unexercised.
 //
 // Rate caps (per rate-cap-pricing.md §5.1) enforced server-side via
-// atlasoracle_check_rate_caps RPC.
+// h24_check_rate_caps RPC.
 //
 // Charge-the-lesser (per bling-ledger-interface.md §13 Q8): Bee is debited
 // min(estimated, actual). Treasury absorbs underestimates. If actual exceeds
 // estimate by >25 %, console.warn for cost-model tuning.
 //
 // Content-leak posture (per v1 escrow migration + platform_thesis.md): the
-// response is returned in the HTTP body and NEVER persisted. atlasoracle_directives
+// response is returned in the HTTP body and NEVER persisted. h24_directives
 // carries metadata only.
 //
 // Frontier-preview row policy: NO directive row inserted for preview-only
@@ -124,12 +124,12 @@ const TIER_MAX_TOKENS: Record<Tier, number> = {
 
 // ─── Paid tiers (OPS11 gate, re-opened by OPS15). ───
 //
-// OPS11 shut these off because atlasoracle_debit could never succeed: it wrote
+// OPS11 shut these off because h24_debit could never succeed: it wrote
 // two bling_transactions legs sharing one source_ref against a unique index, so
 // every paid directive called Anthropic, failed the debit, discarded the answer
 // and returned 500. OPS15 does not fix that RPC — it stops calling it. Paid
-// tiers now debit oracle_token_ledger instead (DB8), append-only, one row.
-// atlasoracle_debit / _credit are untouched and dormant per OPEN-7.
+// tiers now debit h24_token_ledger instead (DB8), append-only, one row.
+// h24_debit / _credit are untouched and dormant per OPEN-7.
 const PAID_TIERS_ENABLED = true;
 
 // Frontier confirm_cost gate, in Oracle Tokens.
@@ -284,7 +284,7 @@ function estimateOutputTokens(tier: Tier, inputTokens: number): number {
 
 // ─── Rates as DATA (OPS15). ───
 //
-// Per-model Oracle Token rates live in oracle_model_rates (DB8), not in code,
+// Per-model Oracle Token rates live in h24_model_rates (DB8), not in code,
 // so re-pricing is an INSERT rather than a deploy. Current row per model =
 // newest active row by effective_from, which preserves rate history: a debit
 // can always be re-derived against the rate that was live when it happened.
@@ -341,7 +341,7 @@ function calculateCostTokens(
     + (cacheWriteTokens / 1_000_000) * cacheWriteRate
     + (outputTokens     / 1_000_000) * rate.output_tokens_per_m;
 
-  // Six decimals matches oracle_token_ledger.amount_tokens numeric(20,6).
+  // Six decimals matches h24_token_ledger.amount_tokens numeric(20,6).
   return Math.round(cost * 1_000_000) / 1_000_000;
 }
 
@@ -406,7 +406,7 @@ async function callAnthropic(
   if (!res.ok) {
     let excerpt = '';
     try { excerpt = (await res.text()).slice(0, 200); } catch { excerpt = '<unreadable>'; }
-    console.error('atlasoracle-route provider http error', {
+    console.error('h24-route provider http error', {
       provider: spec.label, status: res.status, body_excerpt: excerpt,
     });
     return { ...empty(`provider_http_${res.status}`), latencyMs };
@@ -487,7 +487,7 @@ async function callOpenAICompatible(
   if (!res.ok) {
     let excerpt = '';
     try { excerpt = (await res.text()).slice(0, 200); } catch { excerpt = '<unreadable>'; }
-    console.error('atlasoracle-route provider http error', {
+    console.error('h24-route provider http error', {
       provider: spec.label, status: res.status, body_excerpt: excerpt,
     });
     return { ...empty(`provider_http_${res.status}`), latencyMs };
@@ -581,7 +581,7 @@ Deno.serve(async (req) => {
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) {
-    console.error('atlasoracle-route fatal', {
+    console.error('h24-route fatal', {
       reason: 'ANTHROPIC_API_KEY not configured',
     });
     return errorResponse('Provider integration not configured', 503);
@@ -629,7 +629,7 @@ Deno.serve(async (req) => {
   // user's way, so it is not subject to it. Internal parity needs the paid
   // models (sonnet for validation) regardless of the user-facing paid-tier flag.
   if (!isInternal && !PAID_TIERS_ENABLED && tier !== 'free') {
-    console.log('atlasoracle-route paid tier refused', { bee_id: beeId, tier });
+    console.log('h24-route paid tier refused', { bee_id: beeId, tier });
     return jsonResponse({
       error: 'tier_unavailable',
       message: 'paid tiers temporarily offline',
@@ -657,30 +657,30 @@ Deno.serve(async (req) => {
       : null;
 
   // OPS15: the user-scoped client is gone with the escrow path — it existed
-  // only to call atlasoracle_get_escrow_balance as the Bee. Token balances are
-  // read server-side via the oracle_token_available RPC instead (OPS49; it was
-  // the oracle_token_balances view until that view was found expiry-blind).
+  // only to call h24_get_escrow_balance as the Bee. Token balances are
+  // read server-side via the h24_token_available RPC instead (OPS49; it was
+  // the h24_token_balances view until that view was found expiry-blind).
   const service = serviceClient();
 
   // ─── Rate cap check (BEFORE astra lookup / balance check / directive insert). ───
   //
   // Bee-scoped, so it does not apply to an internal caller: a 3,246-row question
-  // batch is not a Bee's usage shape and atlasoracle_check_rate_caps would 429 it.
+  // batch is not a Bee's usage shape and h24_check_rate_caps would 429 it.
   // Internal callers are trusted platform code; their throttling is the batch
   // job's own concern, not this per-Bee cap.
   if (!isInternal) {
     const { data: rateCapResult, error: rateCapErr } = await service.rpc(
-      'atlasoracle_check_rate_caps',
+      'h24_check_rate_caps',
       { p_bee_id: beeId, p_tier: tier },
     );
     if (rateCapErr) {
-      console.error('atlasoracle-route rate cap check failed', {
+      console.error('h24-route rate cap check failed', {
         bee_id: beeId, tier, message: rateCapErr.message,
       });
       return errorResponse('Rate cap check failed', 500);
     }
     if (rateCapResult?.allowed === false) {
-      console.log('atlasoracle-route rate capped', {
+      console.log('h24-route rate capped', {
         bee_id: beeId, tier, caps_hit: rateCapResult.caps_hit,
       });
       return jsonResponse({
@@ -700,7 +700,7 @@ Deno.serve(async (req) => {
       .eq('slug', 'themanual')
       .maybeSingle();
     if (!fallback) {
-      console.error('atlasoracle-route fatal', {
+      console.error('h24-route fatal', {
         reason: 'themanual astra_registry row missing',
       });
       return errorResponse('Astra registry not configured', 500);
@@ -722,7 +722,7 @@ Deno.serve(async (req) => {
         // caller_astra on the row below. For a user directive an unknown slug is
         // still just a soft warning, unchanged.
         if (!isInternal) {
-          console.warn('atlasoracle-route astra_slug unknown', {
+          console.warn('h24-route astra_slug unknown', {
             bee_id: beeId, astra_slug: astraSlug,
           });
         }
@@ -741,7 +741,7 @@ Deno.serve(async (req) => {
   // skipped, balance skipped — all already guarded.
   if (tier !== 'free' && !isInternal) {
     const { data: rateRow, error: rateErr } = await service
-      .from('oracle_model_rates')
+      .from('h24_model_rates')
       .select('input_tokens_per_m, output_tokens_per_m, cached_input_per_m, cache_write_per_m')
       .eq('model_name', providerModelForRate)
       .eq('active', true)
@@ -750,7 +750,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (rateErr || !rateRow) {
       // Refuse rather than guess. Charging an invented rate is worse than a 503.
-      console.error('atlasoracle-route rate lookup failed', {
+      console.error('h24-route rate lookup failed', {
         bee_id: beeId, model: providerModelForRate,
         message: rateErr?.message ?? 'no active rate row',
       });
@@ -788,7 +788,7 @@ Deno.serve(async (req) => {
     && estimatedCostTokens > FRONTIER_PREVIEW_THRESHOLD_TOKENS
     && !confirmCost
   ) {
-    console.log('atlasoracle-route frontier preview', {
+    console.log('h24-route frontier preview', {
       bee_id: beeId,
       estimated_cost_tokens: estimatedCostTokens,
       estimated_input_tokens: estimatedInputTokens,
@@ -808,7 +808,7 @@ Deno.serve(async (req) => {
 
   // ─── Oracle Token balance pre-check (using ESTIMATED cost). ───
   //
-  // Calls oracle_token_available (OPS49). Free tier costs 0 and skips it.
+  // Calls h24_token_available (OPS49). Free tier costs 0 and skips it.
   // This runs BEFORE the directive row insert and before the provider call, so
   // an underfunded Bee costs the platform nothing.
   // Internal callers have no token balance and are not billed, so the pre-check
@@ -816,16 +816,16 @@ Deno.serve(async (req) => {
   // lockstep: metered (counts recorded), never billed (no ledger row).
   let balanceBefore = 0;
   if (estimatedCostTokens > 0 && !isInternal) {
-    // OPS49: read through oracle_token_available, NOT oracle_token_balances.
+    // OPS49: read through h24_token_available, NOT h24_token_balances.
     // The view sums every 'grant' row forever and has no notion of expires_at,
     // so for a Bee whose plan cycle has ended it reports the expired plan
     // tokens as spendable. Proven in the OPS49 dry run: same fixture, view
     // says 800, truth is 100. Gating on the view would hand out 700 tokens
     // of free compute before the debit refused it.
     const { data: availRows, error: balErr } = await service
-      .rpc('oracle_token_available', { p_bee: beeId });
+      .rpc('h24_token_available', { p_bee: beeId });
     if (balErr) {
-      console.error('atlasoracle-route token balance lookup failed', {
+      console.error('h24-route token balance lookup failed', {
         bee_id: beeId, message: balErr.message,
       });
       return errorResponse('Token balance lookup failed', 500);
@@ -835,7 +835,7 @@ Deno.serve(async (req) => {
     balanceBefore = Number(avail?.total_available ?? 0);
 
     if (balanceBefore < estimatedCostTokens) {
-      console.log('atlasoracle-route insufficient tokens', {
+      console.log('h24-route insufficient tokens', {
         bee_id: beeId, tier,
         required_tokens: estimatedCostTokens,
         available_tokens: balanceBefore,
@@ -851,7 +851,7 @@ Deno.serve(async (req) => {
 
   // ─── Insert pending directive row (metadata only, no content). ───
   const { data: pendingRow, error: insertErr } = await service
-    .from('atlasoracle_directives')
+    .from('h24_directives')
     .insert({
       // bee_id is NULL for an internal call (DB75 migration made it nullable);
       // caller_kind/caller_astra carry the attribution instead.
@@ -866,13 +866,13 @@ Deno.serve(async (req) => {
     .select('id')
     .single();
   if (insertErr || !pendingRow) {
-    console.error('atlasoracle-route directive insert failed', {
+    console.error('h24-route directive insert failed', {
       bee_id: beeId, message: insertErr?.message ?? 'no row',
     });
     return errorResponse('Failed to create directive record', 500);
   }
   const directiveId: string = pendingRow.id;
-  console.log('atlasoracle-route directive created', {
+  console.log('h24-route directive created', {
     directive_id: directiveId, bee_id: beeId, tier, category,
     astra_slug: astraSlug,
     estimated_cost_tokens: estimatedCostTokens,
@@ -961,7 +961,7 @@ Deno.serve(async (req) => {
 
     ladderTrail.push({ provider: spec.label, failure: result.failureKind ?? 'unknown' });
     const isLast = i === ladder.length - 1;
-    console.warn('atlasoracle-route provider rung failed', {
+    console.warn('h24-route provider rung failed', {
       directive_id: directiveId,
       provider: spec.label,
       failure: result.failureKind,
@@ -979,7 +979,7 @@ Deno.serve(async (req) => {
           cachedTokens: result.cached,
         },
       );
-      console.error('atlasoracle-route all provider rungs failed', {
+      console.error('h24-route all provider rungs failed', {
         directive_id: directiveId, ladder: ladderTrail,
       });
       return errorResponse('Provider returned an error', 502);
@@ -1003,7 +1003,7 @@ Deno.serve(async (req) => {
     providerModel, inputTokens, outputTokens, cachedTokens, cacheWriteTokens,
   };
   if (ladderTrail.length > 0) {
-    console.log('atlasoracle-route served via fallback', {
+    console.log('h24-route served via fallback', {
       directive_id: directiveId,
       served_by: providerModel,
       skipped: ladderTrail,
@@ -1024,7 +1024,7 @@ Deno.serve(async (req) => {
     estimatedCostTokens > 0
     && actualCostTokens > estimatedCostTokens * ACTUAL_OVERAGE_WARN_RATIO
   ) {
-    console.warn('atlasoracle-route actual cost exceeded estimate >25%', {
+    console.warn('h24-route actual cost exceeded estimate >25%', {
       directive_id: directiveId,
       tier,
       estimated_cost_tokens: estimatedCostTokens,
@@ -1037,24 +1037,24 @@ Deno.serve(async (req) => {
     });
   }
 
-  // ─── Debit: ONE append-only row in oracle_token_ledger. ───
+  // ─── Debit: ONE append-only row in h24_token_ledger. ───
   //
   // Lead design ruling (OPS15): no second/treasury leg. Revenue is the sum of
   // debit rows, queryable directly; double-entry buys nothing in an append-only
   // ledger whose corrections are reversing entries. This is also what makes the
-  // write safe — the defect that killed atlasoracle_debit was precisely its
+  // write safe — the defect that killed h24_debit was precisely its
   // second leg colliding with a one-row-per-source_ref unique index.
   //
   // amount_tokens is NEGATIVE for a debit; the ledger CHECK enforces the sign.
-  // atlasoracle_debit / _credit are NOT called and NOT modified (OPEN-7).
+  // h24_debit / _credit are NOT called and NOT modified (OPEN-7).
   // DB75: INTERNAL IS METERED, NOT BILLED. The token counts and provider land on
   // the directive row in the finalize below (visibility — "the platform sees
-  // every token", ORACLE_MF v1.51), but NO oracle_token_ledger debit is written:
+  // every token", ORACLE_MF v1.51), but NO h24_token_ledger debit is written:
   // an internal caller has no Bee to charge. balanceAfter stays null, exactly as
   // it does for a free-tier user directive.
   let balanceAfter: number | null = null;
   if (finalCostTokens > 0 && !isInternal) {
-    // OPS49: the debit is no longer written here. oracle_debit_tokens owns it.
+    // OPS49: the debit is no longer written here. h24_debit_tokens owns it.
     //
     // It computes availability server-side under a per-bee advisory lock,
     // refuses an overdraft, and is idempotent per directive (the partial
@@ -1062,7 +1062,7 @@ Deno.serve(async (req) => {
     // un-bypassable from this file: there is no bucket for the route to
     // choose and no balance for it to compute.
     const { data: debitRes, error: debitErr } = await service
-      .rpc('oracle_debit_tokens', {
+      .rpc('h24_debit_tokens', {
         p_bee: beeId,
         p_directive: directiveId,
         p_amount_tokens: finalCostTokens,
@@ -1076,14 +1076,14 @@ Deno.serve(async (req) => {
       await markFailed(
         service, directiveId, latencyMs, `token_debit: ${msg}`, spendTelemetry,
       );
-      console.error('atlasoracle-route token debit failed', {
+      console.error('h24-route token debit failed', {
         directive_id: directiveId, message: msg,
       });
       return errorResponse('Failed to debit Oracle Tokens', 500);
     }
 
     // The RPC already returned the post-debit position. No second read, and
-    // in particular NOT another read of oracle_token_balances, which does not
+    // in particular NOT another read of h24_token_balances, which does not
     // understand expiry (OPS49: it reports 800 where the truth is 100).
     balanceAfter = Number((debitRes as any)?.total_available ?? 0);
   }
@@ -1091,11 +1091,11 @@ Deno.serve(async (req) => {
   // ─── Finalize directive row. ───
   //
   // cost_bling is gone entirely (DB7 write-stop, DB9 column DROP). Cost now
-  // lives where it belongs: as a signed row in oracle_token_ledger, joinable to
+  // lives where it belongs: as a signed row in h24_token_ledger, joinable to
   // this directive by directive_id. The directives table keeps the token counts
   // and the provider, which is what a spend audit should read anyway.
   const { error: finalizeErr } = await service
-    .from('atlasoracle_directives')
+    .from('h24_directives')
     .update({
       provider_selected: providerModel,
       latency_ms: latencyMs,
@@ -1112,12 +1112,12 @@ Deno.serve(async (req) => {
     })
     .eq('id', directiveId);
   if (finalizeErr) {
-    console.error('atlasoracle-route directive finalize failed', {
+    console.error('h24-route directive finalize failed', {
       directive_id: directiveId, message: finalizeErr.message,
     });
   }
 
-  console.log('atlasoracle-route directive ok', {
+  console.log('h24-route directive ok', {
     directive_id: directiveId,
     bee_id: beeId,
     tier,
@@ -1208,11 +1208,11 @@ async function markFailed(
   }
 
   const { error } = await service
-    .from('atlasoracle_directives')
+    .from('h24_directives')
     .update(patch)
     .eq('id', directiveId);
   if (error) {
-    console.error('atlasoracle-route markFailed update error', {
+    console.error('h24-route markFailed update error', {
       directive_id: directiveId, message: error.message,
     });
   }

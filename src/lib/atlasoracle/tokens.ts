@@ -8,16 +8,16 @@
 // it (OPS15), so both halves of this module went from stub to live:
 //
 //   * Balance was a hard-coded null with status 'design-pending'. It now reads
-//     `oracle_token_balances`, the DB8 view over the append-only ledger.
+//     `h24_token_balances`, the DB8 view over the append-only ledger.
 //   * TIER_RATES carried invented placeholder numbers (2 and 7 tokens per
 //     directive) with RATES_ARE_PLACEHOLDER = true. Those are deleted. The
-//     router prices off `oracle_model_rates` rows, so showing a Bee a different
+//     router prices off `h24_model_rates` rows, so showing a Bee a different
 //     number than the one they get charged would have been a lie the moment
 //     paid tiers went live.
 //
 // SECURITY NOTE — why reading the view from the browser is safe. It is defined
 // `security_invoker=true`, so it evaluates the underlying
-// `oracle_token_ledger` RLS as the caller, and that policy is select-own.
+// `h24_token_ledger` RLS as the caller, and that policy is select-own.
 // A signed-in Bee therefore sees exactly one row: theirs. Verified against
 // production 2026-07-27 (pg_class.reloptions + pg_policies). Without
 // security_invoker this query would leak every Bee's balance and would have to
@@ -69,7 +69,7 @@ export async function fetchOracleTokenBalance(beeId: string | null): Promise<Ora
   }
 
   const { data, error } = await supabase
-    .from('oracle_token_balances')
+    .from('h24_token_balances')
     .select('balance_tokens')
     .eq('bee_id', beeId)
     .maybeSingle();
@@ -98,7 +98,7 @@ export async function fetchOracleTokenBalance(beeId: string | null): Promise<Ora
  *
  * WHY A SECOND READ RATHER THAN MORE COLUMNS FROM THE VIEW. The view computes
  * this split and then throws two thirds of it away: it CROSS JOINs
- * `oracle_token_available(bee_id)`, which returns
+ * `h24_token_available(bee_id)`, which returns
  * `(plan_available, purchased_available, total_available)`, and selects only
  * `total_available` as `balance_tokens`. The split exists server-side and is
  * simply not exposed. Widening the view is a `db`-lane migration, so this pass
@@ -110,9 +110,9 @@ export async function fetchOracleTokenBalance(beeId: string | null): Promise<Ora
  * everything they were ever given.
  *
  * SECURITY — the same argument that makes the view safe from the browser.
- * `oracle_token_available` is `STABLE` and NOT `SECURITY DEFINER`
- * (`pg_proc.prosecdef = false`), so its reads of `oracle_token_ledger` and
- * `oracle_token_consumption` evaluate RLS AS THE CALLER. Both tables are
+ * `h24_token_available` is `STABLE` and NOT `SECURITY DEFINER`
+ * (`pg_proc.prosecdef = false`), so its reads of `h24_token_ledger` and
+ * `h24_token_consumption` evaluate RLS AS THE CALLER. Both tables are
  * `select-own` on `auth.uid() = bee_id` (verified against production
  * 2026-08-18 via `pg_policy`), so passing another user's uuid returns zeros
  * rather than their figures. `authenticated` holds EXECUTE.
@@ -133,7 +133,7 @@ export async function fetchOracleTokenSplit(
 ): Promise<OracleTokenSplit | null> {
   if (!beeId || !supabase) return null;
 
-  const { data, error } = await supabase.rpc('oracle_token_available', { p_bee: beeId });
+  const { data, error } = await supabase.rpc('h24_token_available', { p_bee: beeId });
   if (error || !data) return null;
 
   // A set-returning function comes back as an array of rows; one row for one bee.
@@ -148,7 +148,7 @@ export async function fetchOracleTokenSplit(
 }
 
 /**
- * Tier → model + live rate. Mirrors `oracle_model_rates`, which is the same
+ * Tier → model + live rate. Mirrors `h24_model_rates`, which is the same
  * table the router prices from, so the rate a Bee is quoted is the rate they
  * are charged. Rates are Oracle Tokens per 1,000,000 provider tokens.
  */
@@ -177,7 +177,7 @@ export async function fetchTierRates(): Promise<TierRate[]> {
   if (!supabase) return [];
 
   const { data, error } = await supabase
-    .from('oracle_model_rates')
+    .from('h24_model_rates')
     .select('model_name, tier, input_tokens_per_m, output_tokens_per_m, cached_input_per_m')
     .eq('active', true)
     .order('effective_from', { ascending: false });

@@ -1,11 +1,11 @@
-// POST /functions/v1/oracle-checkout                    verify_jwt = TRUE
+// POST /functions/v1/h24-checkout                    verify_jwt = TRUE
 //
 // ONE checkout surface, TWO products (OPS48 s2):
 //   { "pack_code": "plus" }        -> mode: 'payment'       one-time Token pack
 //   { "plan_tier": "sovereign" }   -> mode: 'subscription'  monthly plan
 //
 // The client names a PACK or a PLAN, never an amount. Amounts are read
-// server-side from oracle_token_packs / oracle_token_plans. A client that can
+// server-side from h24_token_packs / h24_token_plans. A client that can
 // name an amount can name 1.
 //
 // ---------------------------------------------------------------------------
@@ -58,7 +58,7 @@ function idempotencyKey(beeId: string, sku: string, attempt: string | undefined)
   const nonce = attempt && attempt.length <= 64
     ? attempt
     : String(Math.floor(Date.now() / 600_000));
-  return `oracle-checkout:${beeId}:${sku}:${nonce}`;
+  return `h24-checkout:${beeId}:${sku}:${nonce}`;
 }
 
 Deno.serve(async (req) => {
@@ -98,16 +98,16 @@ Deno.serve(async (req) => {
   // subscription_data.metadata is copied onto the Subscription object when
   // checkout completes, and Stripe snapshots it onto every invoice this
   // subscription raises (invoice.parent.subscription_details.metadata), which is
-  // how oracle-webhook routes invoice.paid without any Price metadata.
+  // how h24-webhook routes invoice.paid without any Price metadata.
   const base = { bee_id: beeId, product_type: 'oracle' };
 
   try {
     if (packCode) {
-      const { data: pack, error: pErr } = await sb.from('oracle_token_packs')
+      const { data: pack, error: pErr } = await sb.from('h24_token_packs')
         .select('pack_code, usd_cents, tokens, display_name')
         .eq('pack_code', packCode).eq('active', true).maybeSingle();
       if (pErr) {
-        console.error('oracle-checkout pack lookup failed', { message: pErr.message });
+        console.error('h24-checkout pack lookup failed', { message: pErr.message });
         return errorResponse('Lookup failed', 500);
       }
       if (!pack) return errorResponse('Unknown pack', 404);
@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
       .in('status', ['active', 'trialing'])
       .maybeSingle();
     if (liveErr) {
-      console.error('oracle-checkout live plan lookup failed', { message: liveErr.message });
+      console.error('h24-checkout live plan lookup failed', { message: liveErr.message });
       return errorResponse('Lookup failed', 500);
     }
     if (live) {
@@ -172,11 +172,11 @@ Deno.serve(async (req) => {
       }, 409);
     }
 
-    const { data: plan, error: plErr } = await sb.from('oracle_token_plans')
+    const { data: plan, error: plErr } = await sb.from('h24_token_plans')
       .select('plan_tier, usd_cents, tokens_per_cycle, display_name')
       .eq('plan_tier', planTier).eq('active', true).maybeSingle();
     if (plErr) {
-      console.error('oracle-checkout plan lookup failed', { message: plErr.message });
+      console.error('h24-checkout plan lookup failed', { message: plErr.message });
       return errorResponse('Lookup failed', 500);
     }
     if (!plan) return errorResponse('Unknown plan', 404);
@@ -218,7 +218,7 @@ Deno.serve(async (req) => {
       usd_cents: plan.usd_cents,
     });
   } catch (err) {
-    console.error('oracle-checkout session create failed', {
+    console.error('h24-checkout session create failed', {
       pack_code: packCode || null, plan_tier: planTier || null,
       message: err instanceof Error ? err.message : String(err),
     });

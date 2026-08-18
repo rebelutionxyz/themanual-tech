@@ -1,9 +1,9 @@
-// POST /functions/v1/atlasoracle-escrow-deposit
+// POST /functions/v1/h24-escrow-deposit
 // Move BLiNG! from the caller's main wallet into their AtlasOracle escrow pot.
 // Body: { amount: number }   (minimum 0.1 BLiNG!)
 // Auth: Bearer <supabase-user-jwt>
 //
-// Wraps public.atlasoracle_deposit_to_escrow(numeric). The RPC uses
+// Wraps public.h24_deposit_to_escrow(numeric). The RPC uses
 // auth.uid() to identify the caller, so the user's JWT must be forwarded —
 // we use userClient(jwt), NOT serviceClient(), for that reason.
 
@@ -42,14 +42,14 @@ Deno.serve(async (req) => {
   const sb = userClient(jwt);
 
   const startedAt = Date.now();
-  const { data, error } = await sb.rpc('atlasoracle_deposit_to_escrow', {
+  const { data, error } = await sb.rpc('h24_deposit_to_escrow', {
     p_amount: amount,
   });
   const latencyMs = Date.now() - startedAt;
 
   if (error) {
     const msg = error.message ?? 'unknown error';
-    console.error('atlasoracle-escrow-deposit error', {
+    console.error('h24-escrow-deposit error', {
       bee_id: auth.userId, amount, latency_ms: latencyMs, message: msg,
     });
     if (/insufficient/i.test(msg)) {
@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
     return errorResponse(msg, 400);
   }
 
-  console.log('atlasoracle-escrow-deposit ok', {
+  console.log('h24-escrow-deposit ok', {
     bee_id: auth.userId, amount, latency_ms: latencyMs,
   });
   return jsonResponse(data);

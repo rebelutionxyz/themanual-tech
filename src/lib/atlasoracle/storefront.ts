@@ -6,10 +6,10 @@
 //
 // TWO RULES CARRIED FROM THE BACKEND, verbatim in behaviour:
 //   1. PRICES ARE NEVER NAMED BY THE CLIENT. The storefront reads pack/plan rows
-//      from `oracle_token_packs` / `oracle_token_plans` (public-read, active-only)
+//      from `h24_token_packs` / `h24_token_plans` (public-read, active-only)
 //      only to DISPLAY them; checkout names a `pack_code` or `plan_tier` and the
 //      edge function reads the amount server-side. "A client that can name an
-//      amount can name 1" (oracle-checkout/index.ts).
+//      amount can name 1" (h24-checkout/index.ts).
 //   2. ONE OF pack_code XOR plan_tier. The function 400s on neither and on both.
 //
 // Language firewall (CLAUDE.md): user-facing copy uses GET / held / never "buy"
@@ -43,7 +43,7 @@ export interface TokenPlan {
 export async function fetchPacks(): Promise<TokenPack[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
-    .from('oracle_token_packs')
+    .from('h24_token_packs')
     .select('pack_code, usd_cents, tokens, display_name, sort_order')
     .eq('active', true)
     .order('sort_order', { ascending: true });
@@ -64,7 +64,7 @@ export async function fetchPacks(): Promise<TokenPack[]> {
 export async function fetchPlans(): Promise<TokenPlan[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
-    .from('oracle_token_plans')
+    .from('h24_token_plans')
     .select('plan_tier, usd_cents, tokens_per_cycle, display_name, sort_order')
     .eq('active', true)
     .order('sort_order', { ascending: true });
@@ -113,7 +113,7 @@ export async function startCheckout(sku: CheckoutSku, attempt?: string): Promise
   const body: Record<string, unknown> = { ...sku };
   if (attempt) body.attempt = attempt;
 
-  const { data, error } = await supabase.functions.invoke('oracle-checkout', { body });
+  const { data, error } = await supabase.functions.invoke('h24-checkout', { body });
 
   if (error) {
     const ctx = (error as { context?: unknown } | null)?.context;

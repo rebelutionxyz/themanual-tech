@@ -231,9 +231,9 @@ export function AtlasOracleWalletBadge({
                 the total above already said it.
 
                 "Plan is spent first" is not a design intention stated here — it
-                is what `oracle_debit_tokens` actually does: it walks live plan
+                is what `h24_debit_tokens` actually does: it walks live plan
                 grants FIFO by soonest expiry, then falls through to the durable
-                pool, and records the split it took in `oracle_token_consumption`.
+                pool, and records the split it took in `h24_token_consumption`.
                 The line is safe to print because the server enforces it. */}
             {split && (split.plan > 0 || split.purchased > 0) && (
               <div

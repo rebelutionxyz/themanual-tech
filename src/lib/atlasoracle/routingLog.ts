@@ -1,21 +1,21 @@
 // Per-Bee routing log — metadata only.
 //
-// atlasoracle_directives holds NO directive text and NO response text (the
+// h24_directives holds NO directive text and NO response text (the
 // sovereignty rule is enforced structurally: the columns do not exist). This
 // reader therefore cannot leak content even if it tried.
 //
-// RLS: atlasoracle_directives carries a select-own policy, so a Bee's own JWT
+// RLS: h24_directives carries a select-own policy, so a Bee's own JWT
 // returns only that Bee's rows. No service-role key is involved.
 //
 // FRONT18 (2026-07-31): the log now also carries what each directive COST.
 // Cost does not live on the directives table — DB9 dropped `cost_bling` and the
-// charge moved to `oracle_token_ledger`, joined by `directive_id`. Three reads
+// charge moved to `h24_token_ledger`, joined by `directive_id`. Three reads
 // therefore make the log reconcilable:
 //
-//   1. atlasoracle_directives  — the metadata and token counts (select-own)
-//   2. oracle_token_ledger     — the actual debit (select-own, verified in
+//   1. h24_directives  — the metadata and token counts (select-own)
+//   2. h24_token_ledger     — the actual debit (select-own, verified in
 //                                pg_policies: `auth.uid() = bee_id`)
-//   3. oracle_model_rates      — the rate card, to price the legs
+//   3. h24_model_rates      — the rate card, to price the legs
 //
 // All three are the Bee's own or public rate data. No service-role key, no new
 // RPC, and nothing here can read another Bee's spend.
@@ -70,7 +70,7 @@ interface DirectiveRow {
   created_at: string;
 }
 
-// Mock rate card — mirrors the shape of production's oracle_model_rates,
+// Mock rate card — mirrors the shape of production's h24_model_rates,
 // including the two-row claude-sonnet-5 history that makes `rateLiveAt`'s
 // time filter observable in the harness.
 const MOCK_RATES: ModelRateRow[] = [
@@ -155,7 +155,7 @@ const MOCK_LOG: RoutingLogEntry[] = [
 async function fetchModelRates(): Promise<ModelRateRow[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
-    .from('oracle_model_rates')
+    .from('h24_model_rates')
     .select(
       'model_name, tier, input_tokens_per_m, output_tokens_per_m, cached_input_per_m, effective_from',
     )
@@ -190,7 +190,7 @@ async function fetchDirectiveDebits(directiveIds: string[]): Promise<Map<string,
   if (!supabase || directiveIds.length === 0) return costs;
 
   const { data, error } = await supabase
-    .from('oracle_token_ledger')
+    .from('h24_token_ledger')
     .select('directive_id, amount_tokens')
     .in('directive_id', directiveIds);
 
@@ -211,7 +211,7 @@ export async function fetchRoutingLog(limit = 25): Promise<RoutingLogPage> {
   if (!supabase) throw new Error('Supabase client not configured.');
 
   const { data, error } = await supabase
-    .from('atlasoracle_directives')
+    .from('h24_directives')
     .select(
       'id, tier, directive_category, provider_selected, status, success, latency_ms, input_tokens, output_tokens, cached_tokens, error_message, created_at',
     )

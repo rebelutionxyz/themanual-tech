@@ -1,4 +1,4 @@
-// GET /functions/v1/atlasoracle-log?limit=&offset=
+// GET /functions/v1/h24-log?limit=&offset=
 //
 // Returns the current Bee's AtlasOracle directive history. Metadata only —
 // the underlying table holds no directive / response content.
@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
   // value leaves the response. This function is not currently deployed; the
   // fix lands now so the DROP is pure DDL with no callsite left to trip over.
   const { data, error, count } = await sb
-    .from('atlasoracle_directives')
+    .from('h24_directives')
     .select(
       'id, astra_id, nova_id, directive_category, tier, provider_selected, latency_ms, success, created_at',
       { count: 'exact' },

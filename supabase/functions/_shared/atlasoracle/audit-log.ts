@@ -1,6 +1,6 @@
 // AtlasOracle audit-log writer — server-side only.
 //
-// Wraps the INSERT into atlasoracle_directives behind a type-checked
+// Wraps the INSERT into h24_directives behind a type-checked
 // metadata-only interface. The shape EXCLUDES directive text and response
 // text by design — the compiler will refuse any call that tries to pass
 // content alongside metadata.
@@ -12,7 +12,7 @@
 // cost_bling WRITE-STOP (DB7, 2026-07-27): costBling removed from both the
 // interface and the INSERT, so this helper cannot resurrect the write after
 // the column is dropped. NOTE — nothing imports this module today;
-// atlasoracle-route writes atlasoracle_directives inline. It is kept in step
+// h24-route writes h24_directives inline. It is kept in step
 // with the retirement rather than left as a landmine for whoever wires it up.
 
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
@@ -43,7 +43,7 @@ export async function logDirective(
   metadata: DirectiveMetadata,
 ): Promise<LoggedDirective> {
   const { data, error } = await sb
-    .from('atlasoracle_directives')
+    .from('h24_directives')
     .insert({
       bee_id: metadata.beeId,
       astra_id: metadata.astraId,

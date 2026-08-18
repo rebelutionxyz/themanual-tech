@@ -7,7 +7,7 @@
  *   VAULT    — the Creator Studio Media Library (creator_studio_media_v1), read
  *              through `libraryUsage()`. Real per-kind counts and bytes.
  *   ACTIVITY — derived from the routing-log metadata the page already holds
- *              (atlasoracle_directives, metadata only). No second read.
+ *              (h24_directives, metadata only). No second read.
  *   WALLET   — the live token balance the page already holds.
  *
  * ABSENT BY DESIGN, each named in the dispatch as backendless at v1.46:
