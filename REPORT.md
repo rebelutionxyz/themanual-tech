@@ -23,6 +23,102 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONT86 — THE /mc COCKPIT BOARD: three-colour health + tiered time + the scroll fix. Build green; logic proven on live rows; the rendered UI is admin-gated. (2026-08-18)
+
+Session `79a4fea9` (fallback id). Dispatch FRONT86, lane `front`, workdir `TheMANUAL.tech`, effort M.
+Supersedes FRONT83 (ready/blocked) + FRONT85 (estimates) — the whole cockpit built once. tsc clean,
+build green, lint clean in the file. **Committed, NOT pushed.**
+
+### TWO FINDINGS THAT SHAPED THE BUILD
+
+- **`ops_dispatches` has NO `effort` and NO `est_minutes` column** — verified against
+  `information_schema` (the columns are: after_pass, author, body, claimed_at, claimed_by,
+  created_at, heartbeat_at, id, lane, pass, priority, scope, status, terminal, title, workdir). So
+  the estimate is parsed from the **`EFFORT: X` tag in the title**, and the `est_minutes` override
+  the dispatch (and its v0.31 amendment) describes is **inapplicable — the column does not exist**,
+  and the dispatch forbids adding one ("no new column, no migration"). Every row therefore takes the
+  effort-tag bucket; there is no per-row override to prefer.
+- **No dedicated success/warning/danger token exists** in the house system (only the `kettle` ramp
+  and Tailwind `amber-*`, which the board already used ad hoc). The closest house fit is the kettle
+  ramp — `sourced` #6FCF8F (green), `emerging` #E88938 (orange), `unsourced` #C94C4C (red) — used
+  here as the health colours. **Flagged as requested**: a dedicated `success/warning/danger` token
+  trio would be the right home for this and does not exist.
+
+### THE BUILD — all computed live, no column, no write
+
+- **Three-colour health, RED WINS** (`rowHealth`):
+  - **RED** — a claimed row silent > `STALE_MIN` (10 min), OR a claimed row whose elapsed exceeds
+    `OVER_EST_MULT` (2) × its estimate. (Reports-driven red — a `-Q`/held report — is the dispatch's
+    stated optional follow-up "if joining reports is too heavy"; it is NOT built this pass and is
+    named here as the follow-up, per that clause. The heartbeat + over-est cases are covered.)
+  - **GREEN** — queued AND its `after_pass` is satisfied (null, or not in the open set).
+  - **ORANGE** — queued AND its `after_pass` is still open (queued|claimed); the "Waits on" column
+    already shows which pass.
+  - **neutral** — a healthy claimed row (running) or a done/superseded row; rendered in its normal
+    style. A claimed healthy row is deliberately neither green nor orange.
+  - The alive-pulse fires ONLY on a healthy claimed row — a RED row does not pulse, because that is
+    the loudest signal on the row and it would be lying.
+- **Tiered time** (v0.31: the estimate drives, the tier is a bucket): est from the effort tag
+  (S=15, M=30, L=60, XL=90, XXL=100; letters and the words SMALL/MEDIUM/LARGE); the tier LABEL is
+  derived from the estimate (≤15 S, ≤30 M, ≤60 L, ≤90 XL, else XXL). Rendered `"L ~60m"`, LABELLED
+  as an estimate (tilde), never as measured. No tag → nothing shown, no guess. Elapsed for claimed
+  rows was already computed and stays.
+- **Named constants** `STALE_MIN = 10`, `OVER_EST_MULT = 2` — one place each, easy to tune.
+
+### THE SCROLL FIX — diagnosed, not assumed
+
+**Cause found:** `/mc` mounts inside `PlatformLayout`, whose `<main>` is `flex-1 overflow-hidden` and
+expects each surface to own its scroll. `MissionControlPage`'s root was a plain centered block
+(`mx-auto max-w-6xl px-4 py-6`) with no scroll of its own, so a board taller than the viewport was
+**clipped and its last rows unreachable** — exactly the owner's report. **Fix:** the root now carries
+`h-full overflow-y-auto`, so it fills the main and scrolls its own content. It is structural (it
+survives FRONT82's sidebar removal), so the fix lives on the board, not on the sidebar — as the
+dispatch instructed.
+
+### PROVE — logic proven against the LIVE board; rendered UI is admin-gated
+
+The colour/time model was run in SQL over the actual `ops_dispatches` rows (same logic as
+`rowHealth`), and it classifies real rows correctly:
+
+```
+FRONTCODE1  queued  · after_pass FRONT86 (claimed=open)  → ORANGE (waiting)     ✓
+DBCODE1     claimed · L est 60m · silent 1.6m · elapsed 12.6m → neutral (running) ✓
+FRONT86     claimed · M est 30m · silent 0.6m · elapsed 12.7m → neutral (running) ✓
+```
+
+ORANGE fires correctly; effort parsing (L→60, M→30) and the neutral-when-healthy rule hold. GREEN
+(queued + dep done) and RED (silent > 10m, or elapsed > 2× est) are the remaining rules — neither has
+a live example on the board right now, but the rules are demonstrated by the same query's CASE.
+
+### COULD NOT VERIFY — the screenshots
+
+**`/mc` is admin-gated** (`bees.is_admin`, enforced by DB policy; signed-out shows the Gate). With no
+admin session and no sanctioned way to create one (no synthetic credentials), **I could not render
+the board in a browser** — so the dispatch's screenshots (green/orange/red states + the scroll
+reaching the last row) are NOT produced. The build type-checks and builds clean, the pure logic is
+proven against live data, and the scroll fix is a diagnosed structural change, but the visual
+confirmation waits on an admin viewing `/mc` — Butch, or a signed-in admin pass.
+
+- **Reports-driven RED** (a `-Q`/held pass awaiting a ruling) is the dispatch's named optional
+  follow-up and is not built.
+- No mobile breakpoint exercised.
+
+### FILES
+
+```
+MOD src/pages/MissionControlPage.tsx   health model · tiered time · scroll fix
+```
+
+### DONE-TEST
+
+```
+npx tsc -b     → exit 0
+npm run build  → ✓ built in 18.55s
+npm run lint   → clean in MissionControlPage (only the standing 1 warning remains; 0 new errors)
+```
+
+---
+
 ## FRONT84 — COMPOSER MAX WIDTH. The shared bottom composer + the message column now share a centered readable measure (like the Claude chat) instead of full-bleed. Build green, committed, NOT pushed. (2026-08-18)
 
 Session `f8b19368` (fallback id). Dispatch FRONT84, lane `front`, workdir `TheMANUAL.tech`, effort SMALL.

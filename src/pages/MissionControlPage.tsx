@@ -66,6 +66,97 @@ const DISPATCH_MARK: Record<string, string> = {
   done: '✓',
 };
 
+// ─── FRONT86 — THE COCKPIT: three-color health + tiered time. ───
+//
+// All COMPUTED live over the fetched rows — no new column, no migration, no
+// write. Two findings shaped the build, both flagged in the FRONT86 report:
+//   * ops_dispatches has NO `effort` and NO `est_minutes` column (verified
+//     against information_schema). Effort is parsed from the "EFFORT: X" tag in
+//     the title; the est_minutes override the dispatch describes is inapplicable
+//     because the column does not exist.
+//   * There is no dedicated success/warning/danger token in the house system.
+//     The closest fit is the kettle ramp — sourced #6FCF8F (green), emerging
+//     #E88938 (orange), unsourced #C94C4C (red) — used here as health colours.
+const STALE_MIN = 10; // a claimed row silent longer than this (minutes) is RED
+const OVER_EST_MULT = 2; // a claimed row running past this × its estimate is RED
+
+// Effort tag → nominal minutes. Accepts the letters and the words.
+const EFFORT_MINUTES: Record<string, number> = {
+  S: 15,
+  SMALL: 15,
+  M: 30,
+  MEDIUM: 30,
+  L: 60,
+  LARGE: 60,
+  XL: 90,
+  XXL: 100,
+};
+
+// The estimate, parsed from the title's EFFORT tag. null = no tag → no guess.
+function estMinutesFromTitle(title: string): number | null {
+  const m = /EFFORT:\s*(XXL|XL|SMALL|MEDIUM|LARGE|[SML])\b/i.exec(title);
+  if (!m) return null;
+  return EFFORT_MINUTES[m[1].toUpperCase()] ?? null;
+}
+
+// The tier LABEL is derived FROM the estimate (v0.31: the estimate drives, the
+// tier is a bucket). <=15 S, <=30 M, <=60 L, <=90 XL, else XXL.
+function tierFromMinutes(mins: number): string {
+  if (mins <= 15) return 'S';
+  if (mins <= 30) return 'M';
+  if (mins <= 60) return 'L';
+  if (mins <= 90) return 'XL';
+  return 'XXL';
+}
+
+function claimedElapsedMin(claimedAt: string | null, now: number): number | null {
+  if (!claimedAt) return null;
+  const t = Date.parse(claimedAt);
+  return Number.isNaN(t) ? null : (now - t) / 60_000;
+}
+
+type Health = 'green' | 'orange' | 'red' | 'neutral';
+
+// RED WINS over everything. A healthy claimed row is 'neutral' (running) — it is
+// neither ready (green) nor waiting (orange). `openPasses` is the set of pass ids
+// currently queued or claimed, used to tell a satisfied dependency from an open one.
+function rowHealth(d: RailDispatch, now: number, openPasses: Set<string>): Health {
+  if (d.status === 'claimed') {
+    const silent = silentMinutes(d, now);
+    if (silent !== null && silent > STALE_MIN) return 'red'; // stale heartbeat / orphan claim
+    const est = estMinutesFromTitle(d.title);
+    const elapsed = claimedElapsedMin(d.claimed_at, now);
+    if (est !== null && elapsed !== null && elapsed > OVER_EST_MULT * est) return 'red';
+    return 'neutral'; // running and healthy — not a go/wait state
+  }
+  if (d.status === 'queued') {
+    // GREEN when the dependency is satisfied: no after_pass, or an after_pass
+    // that is not currently open (done, or gone). ORANGE while it is still open.
+    if (d.after_pass && openPasses.has(d.after_pass)) return 'orange';
+    return 'green';
+  }
+  return 'neutral'; // done / superseded / other — rendered in its normal style
+}
+
+const HEALTH_TEXT: Record<Health, string> = {
+  green: 'text-kettle-sourced',
+  orange: 'text-kettle-emerging',
+  red: 'text-kettle-unsourced',
+  neutral: 'text-text-silver',
+};
+const HEALTH_ROW: Record<Health, string> = {
+  green: 'border-l-2 border-l-kettle-sourced/50',
+  orange: 'border-l-2 border-l-kettle-emerging/50',
+  red: 'border-l-2 border-l-kettle-unsourced/60 bg-kettle-unsourced/[0.06]',
+  neutral: 'border-l-2 border-l-transparent',
+};
+const HEALTH_MARK: Record<Health, string> = {
+  green: '●',
+  orange: '●',
+  red: '⚠',
+  neutral: '',
+};
+
 const TITLE_MAX = 70;
 
 function shortTitle(t: string): string {
@@ -266,7 +357,16 @@ export default function MissionControlPage() {
     // FRONT58 widened this from max-w-4xl: the queue is a seven-column table now
     // and the folder column is the reason this pass exists — truncating it to fit
     // the old width would defeat the point.
-    <div className="mx-auto max-w-6xl px-4 py-6">
+    //
+    // FRONT86 — THE SCROLL FIX. /mc mounts inside PlatformLayout, whose <main> is
+    // `flex-1 overflow-hidden` and expects each surface to own its scroll. This
+    // page never did — it was a plain centered block, so a board taller than the
+    // viewport was CLIPPED and its last rows were unreachable. `h-full
+    // overflow-y-auto` makes this container fill the main and scroll its own
+    // content; it is harmless if a future parent scrolls instead. (Diagnosed, not
+    // assumed: the clip is the overflow-hidden main, and it survives FRONT82's
+    // sidebar removal because it is structural — so the fix lives here.)
+    <div className="mx-auto h-full max-w-6xl overflow-y-auto px-4 py-6">
       <header className="mb-5">
         <h1 className="font-display text-xl font-semibold text-text-silver-bright">
           Mission Control — build progress
@@ -377,6 +477,20 @@ function DispatchQueue({ board, now }: { board: RailBoard; now: number }) {
     (d) => d.status === 'claimed' && stale.has(d.pass),
   ).length;
 
+  // FRONT86 — the set of pass ids currently OPEN (queued or claimed). A queued
+  // row whose after_pass is in this set is ORANGE (still waiting); if the
+  // after_pass is absent from it (done, or gone) the dependency is satisfied and
+  // the row is GREEN. Built once per read.
+  const openPasses = useMemo(
+    () =>
+      new Set(
+        (queue ?? [])
+          .filter((d) => d.status === 'queued' || d.status === 'claimed')
+          .map((d) => d.pass),
+      ),
+    [queue],
+  );
+
   return (
     <section className="mb-7">
       <div
@@ -486,6 +600,7 @@ function DispatchQueue({ board, now }: { board: RailBoard; now: number }) {
                 locationReadable={locationError === null}
                 stale={stale.get(d.pass) ?? null}
                 thresholdMinutes={thresholdMinutes}
+                openPasses={openPasses}
               />
             ))}
             {(recentDone?.length ?? 0) > 0 && (
@@ -509,6 +624,7 @@ function DispatchQueue({ board, now }: { board: RailBoard; now: number }) {
                 locationReadable={locationError === null}
                 thresholdMinutes={thresholdMinutes}
                 dim
+                openPasses={openPasses}
               />
             ))}
           </tbody>
@@ -580,6 +696,7 @@ function DispatchRow({
   locationReadable,
   stale = null,
   thresholdMinutes,
+  openPasses,
   dim = false,
 }: {
   d: RailDispatch;
@@ -588,9 +705,14 @@ function DispatchRow({
   locationReadable: boolean;
   stale?: StaleClaim | null;
   thresholdMinutes: number | null;
+  openPasses: Set<string>;
   dim?: boolean;
 }) {
   const isClaimed = d.status === 'claimed';
+  // FRONT86 — the row's health colour, RED-wins. Its own est (from the title's
+  // EFFORT tag) and tier label; elapsed is already computed below.
+  const health = rowHealth(d, now, openPasses);
+  const est = estMinutesFromTitle(d.title);
   // Elapsed is shown ONLY while claimed — on a finished pass it would be the age
   // of a closed row, which means nothing.
   const elapsed = isClaimed ? elapsedSince(d.claimed_at, now) : null;
@@ -609,17 +731,24 @@ function DispatchRow({
 
   return (
     <>
-      <tr className={`border-t border-border/60 align-top ${suspect ? 'bg-amber-500/[0.07]' : ''}`}>
-        <td className={`w-8 py-1.5 text-center ${suspect ? 'text-amber-300' : 'text-text-silver'}`}>
-          {/* The pulse says "alive". A claim past the threshold must not pulse —
-              that animation is the strongest signal on the row and it would be
+      <tr className={`border-t border-border/60 align-top ${HEALTH_ROW[health]}`}>
+        <td className={`w-8 py-1.5 text-center ${HEALTH_TEXT[health]}`}>
+          {/* The pulse says "alive". It fires ONLY on a healthy claimed row —
+              a RED row (stale or over-estimate) must not pulse, because that
+              animation is the strongest signal on the row and it would be
               lying. */}
           <span
             className={
-              isClaimed && hbState === 'current' ? 'inline-block animate-pulse-slow' : undefined
+              isClaimed && health === 'neutral' && hbState === 'current'
+                ? 'inline-block animate-pulse-slow'
+                : undefined
             }
           >
-            {suspect ? '⚠' : (DISPATCH_MARK[d.status] ?? '·')}
+            {health !== 'neutral'
+              ? HEALTH_MARK[health]
+              : suspect
+                ? '⚠'
+                : (DISPATCH_MARK[d.status] ?? '·')}
           </span>
         </td>
         <td className={`py-1.5 ${dim ? 'text-text-dim' : 'text-text-silver-bright'}`}>
@@ -663,6 +792,15 @@ function DispatchRow({
           {shortTitle(d.title)}
           {' · '}
           {shortWhen(d.created_at)}
+          {/* FRONT86 — the estimate, LABELLED as an estimate (tilde), never as
+              measured. Tier is derived from the estimate. No tag → nothing shown,
+              no guess. */}
+          {est !== null && (
+            <span className="text-text-dim">
+              {' · '}
+              {tierFromMinutes(est)} ~{est}m
+            </span>
+          )}
           {elapsed && <span className="text-text-silver"> · {elapsed}</span>}
           {suspect && stale && (
             // The view's own triage sentence, verbatim. It already distinguishes
