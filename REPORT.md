@@ -23,6 +23,198 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONT78 — SPINE REDUCTION. Left rail, band and drop all retired; /h24 wears its own wordmark. (2026-08-18)
+
+Session `79a4fea9` (fallback id — no `MC_SESSION`). Dispatch FRONT78, lane `front`, workdir
+`TheMANUAL.tech`, effort SMALL, amended mid-flight by v1.38. Build green, typecheck clean, lint clean
+in every file touched, all removals observed absent in a running dev build. **Committed, NOT pushed.**
+
+**This pass deletes three of the five elements FRONT74 built four passes ago, and NONE OF THEM EVER
+SHIPPED.** FRONT74 was committed and never pushed, so no user has seen a left rail, a constellation
+band or a honey drop in the header. The cost of the round trip was four passes of tree time, not a
+user-visible change — which is the cheapest possible place for a design to be wrong.
+
+### WHAT CAME OUT
+
+| element | authority |
+|---|---|
+| **2. LEFT RAIL** — the 3px realm strip on every page | Owner, verbatim: *"the line on the left of the sidebar needs to be deleted from all pages."* |
+| **3. RIGHT RAIL** — `ConstellationBand` | **Lead's inference**, flagged below |
+| **5. THE DROP** — HoneyDrop in SiteHeader + the whole hop mechanism | Owner, verbatim: *"its h24.tech not themanual we dont need the bling drop"* |
+
+**THE BAND'S PROVENANCE IS AN INFERENCE, NOT A QUOTE, and the dispatch asked for that to be stated.**
+It rests on the lead's read of the owner approving a band-less v0.2 plus the v1.36 recommendation on
+record — not on an owner sentence about the band. **One word restores it**, and the restore is
+genuinely one line in `PlatformLayout`, exactly as FRONT74's own report predicted. This is the second
+time the band has been the thing nobody quite ruled on: FRONT74 escalated it as open question W4,
+and W4 was never answered before the band was removed on inference.
+
+### WHAT SURVIVED, and where it went
+
+"Delete the chrome" is not "delete the idea", and the dispatch was explicit that the resolution and
+the accent data stay. So:
+
+- **The realm-accent resolution → `useRealmAccent()`** in `hooks/useSpine.ts`. The 3px strip was its
+  first consumer, not its purpose; realm identity still has to be answerable for the switcher and for
+  whatever surface claims it next. It carries the route-first ordering FRONT74 measured into
+  existence — route beats a stale `selectedRealmId` — and the `/realm/nonsense` guard. **It has no
+  consumer today, and that is recorded in the file rather than hidden**: kept as a seam, and if
+  nothing ever claims it, deleting it is one edit with no callers to chase.
+- **`useConstellationAccent()` and `ASTRA_ACCENT_RING`** — untouched. `ConstellationRail` (the
+  admin-gated list) is now their only consumer, so its comment was corrected: it claimed the band and
+  the list "agree on the colour", which stopped being true the moment the band went.
+- **The idempotent ring advance stays, and still earns its keep with one consumer.** The rail mounts
+  and unmounts as `is_admin` settles and as the lg breakpoint crosses; keying the advance to the PATH
+  rather than to the effect firing is what keeps one navigation worth one step through all of that.
+- **`usePrefersReducedMotion()`** — kept despite losing its only caller. It is an accessibility
+  primitive, not spine plumbing, and the next animation needs exactly this, including the live
+  `change` subscription the obvious read-once version gets wrong.
+- **`HoneyDrop` itself** — untouched and still drawing the BLiNG! mark in LensRow, Bookmarks, Studio
+  and elsewhere. It was never a spine component; it was borrowed by one.
+- **The black top bar and the L1–L4 ramp** — untouched, as instructed.
+
+### WHAT WAS DELETED OUTRIGHT, and why nothing was left as a stub
+
+- `src/components/shell/ConstellationBand.tsx` — the file, not just the mount. It existed for one
+  mount and nothing else.
+- `SPINE_HONEY`, `BLING_HOP_EVENT`, `BLING_HOP_MS`, `fireBlingHop()` from `lib/spine.ts`.
+- `useBlingHop()` from `hooks/useSpine.ts`.
+- `hopping` and `data-spine` props from `HoneyDrop`.
+- The `bling-hop` **animation entry and keyframes** from `tailwind.config.ts` — **grepped first**, as
+  the dispatch required: `HoneyDrop.tsx` was the only consumer, and that prop went with it.
+
+**No stubs were left.** An exported constant with no caller is a trap: it reads as a supported seam,
+and the next pass wires something to it believing the element still exists. The honey colour is not
+lost — it is `--honey` in `index.css` and a local constant in every surface that draws the mark, none
+of which ever went through `spine.ts`.
+
+### THE ELEMENT NUMBERING KEEPS ITS GAPS
+
+`spine.ts` now documents elements **1 and 4**, with 2, 3 and 5 recorded as retired and why.
+**Deliberately not renumbered to 1 and 2.** Four passes of reports, commits and canon rows refer to
+"spine element 3" and "spine element 5"; renumbering would silently redirect every one of those
+references to the wrong thing. A gap in a list is cheaper than a wrong reference.
+
+`SPINE_ACCENT_FINDINGS` is untouched and still measures — the findings mechanism survives, its
+element list shrank, and **nothing now asserts on chrome that no longer exists**.
+
+### THE h24 WORDMARK
+
+`/h24` and the two paths that answer to it show **`h24.tech`** in the top bar; everywhere else still
+reads `TheMANUAL.tech`. An astra host still wins over both — on a real astra the header is that
+astra's, and h24 is not the surface being visited.
+
+**Matched on the FIRST PATH SEGMENT, not the whole path.** `/h24` has child routes, and an
+exact-match test would drop the wordmark the moment a reader went one level deeper into the same
+surface — the same class of bug as FRONT75's segment-vs-slug trap, caught in advance this time.
+
+**DISPLAY ONLY.** The `h24.tech` domain stays DARK per v1.24 — no DNS, no deploy config, no host
+change of any kind. This is a string in a header and calling it more than that would misrepresent
+what shipped.
+
+### PROVE — observed in a running dev build
+
+Three routes including a `/realm/*` page:
+
+```
+/realm/justice   leftRail false · rightRail false · drop false · hop-class false
+                 topBar rgb(10,11,14) · wordmark "TheMANUAL.tech"
+/manual          leftRail false · rightRail false · drop false · wordmark "TheMANUAL.tech"
+/collections     leftRail false · rightRail false · drop false · wordmark "TheMANUAL.tech"
+
+/h24             wordmark "h24.tech"      /oracle → redirects to /h24, "h24.tech"
+/manual          wordmark "TheMANUAL.tech"    (back and forth, twice)
+```
+
+`/realm/justice` is the load-bearing one: it is the route where FRONT74's rail was most visibly
+*correct*, so its absence there is the real check.
+
+**No orphaned imports**, grepped across `src/` and `tailwind.config.ts`: every surviving mention of
+`ConstellationBand`, `bling-hop`, `BLING_HOP`, `SPINE_HONEY` or `hopping` is a comment recording the
+removal. Screenshot of `/h24` — black bar, `h24.tech` wordmark, no drop, no rails at either edge:
+`C:\Users\Butch\AppData\Local\Temp\claude-chrome-screenshots-qBWcd5\screenshot-1787069778531-1.jpg`
+
+### FILES
+
+```
+DEL src/components/shell/ConstellationBand.tsx    the band, file and all
+MOD src/components/layout/PlatformLayout.tsx      both edge rails unmounted; RealmStrip gone
+MOD src/components/layout/SiteHeader.tsx          drop unmounted; h24.tech wordmark
+MOD src/components/shell/CommunityShell.tsx       hop dispatch removed; toggle is a toggle again
+MOD src/components/shell/ConstellationRail.tsx    comment corrected — it claimed the dead band
+MOD src/components/ui/HoneyDrop.tsx               hopping + data-spine props removed
+MOD src/hooks/useSpine.ts                         useBlingHop deleted; useRealmAccent added
+MOD src/lib/spine.ts                              drop plumbing deleted; element list shrunk
+MOD tailwind.config.ts                            bling-hop animation + keyframes deleted
+```
+
+### DONE-TEST
+
+```
+npx tsc -b     → exit 0
+npm run build  → ✓ built in 15.21s
+npm run lint   → Found 23 errors — all pre-existing, ZERO in any FRONT78 file
+```
+
+Dev server on 3131: port asserted free before boot, owned by the vite child after. **The grandchild
+leak recurred for the fourth pass running** (PID 7980), killed by PID, release confirmed. Four for
+four is not a flake — `TaskStop` reaches the npm wrapper and never the vite process it spawned.
+
+### ONE DISCREPANCY IN THE DISPATCH, recorded not silently corrected
+
+The dispatch says *"the 4px realm rail"*. It was **3px** (`w-[3px]`), as FRONT74 built and reported
+it. Nothing turns on this — the rail is gone either way — but the number is wrong in the dispatch and
+would be wrong in canon if copied forward.
+
+### COMMIT — SPLIT ACROSS TWO, and not by choice
+
+**FRONT78's source changes are NOT in a FRONT78 commit.** All eight file edits and the
+`ConstellationBand.tsx` deletion landed inside **`db5d6a0` — "[DB73][DB76] registry reconcile +
+consent ledger proposals"** — a concurrent db-lane session that staged the whole working tree while
+this pass was mid-flight. Its `--stat` carries every one of them:
+
+```
+src/components/layout/PlatformLayout.tsx     100 ++---
+src/components/layout/SiteHeader.tsx          49 ++-
+src/components/shell/CommunityShell.tsx       20 +-
+src/components/shell/ConstellationBand.tsx    58 ---      ← the deletion
+src/components/ui/HoneyDrop.tsx               20 +-
+src/hooks/useSpine.ts                        119 +++---
+src/lib/spine.ts                              67 ++--
+tailwind.config.ts                            15 +-
+```
+
+**Nothing was lost and the tree is correct** — `tsc -b` exit 0 and a green build were re-run against
+the post-commit tree to confirm the captured state was functionally complete, not a half-edit. What
+was lost is **attribution**: a db-lane commit message describes none of this, and it also carries a
+`D` its own pass never intended.
+
+This commit therefore carries only `REPORT.md` and one comment correction in `ConstellationRail.tsx`
+that was written after `db5d6a0` landed. **Read the two together**: `db5d6a0` for the code, this one
+for the record of why.
+
+**THIS IS THE SECOND SHARED-TREE COLLISION IN FOUR PASSES, AND THE FIRST ONE WAS MINE.** FRONT75's
+commit swept a concurrent session's DB75 `REPORT.md` section in under a FRONT75 message; this is the
+same failure with the lanes reversed and a wider blast radius, because a db-lane pass staging
+everything picks up front-lane *source*, not just a shared report file. Recorded plainly because it
+now looks structural rather than unlucky: **several sessions share one working tree, and staging by
+`-A` rather than by explicit path means whoever commits first owns everyone's in-flight work.**
+Staging every path by name — which both the SWEEP protocol and this pass already do — is what stops
+it, and it only works if every lane does it.
+
+### COULD NOT VERIFY
+
+- **The admin-gated `ConstellationRail` was never seen rendered**, this session being signed out, so
+  "the rotation still works with the band gone" is argued from the shared hook rather than observed.
+  The rail's own top band still reads `useConstellationAccent()`; nothing about that path changed.
+- **`useRealmAccent()` was never executed** — it has no consumer, so it typechecks and builds but has
+  not run. It is a lift-and-shift of code FRONT74 measured working in the strip, not new logic, but
+  it is untested in its new home and should be treated that way by whoever first claims it.
+- **No mobile breakpoint exercised.**
+- **Nothing was checked signed-in.**
+
+---
+
 ## DB76 — THE CONSENT LEDGER. Schema proposed, sovereignty walked column by column, nothing applied. (2026-08-18)
 
 **Pass:** DB76 · lane `db` · workdir `TheMANUAL.tech` · session `b4718c47`

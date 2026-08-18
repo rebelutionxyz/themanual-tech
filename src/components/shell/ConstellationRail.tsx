@@ -13,12 +13,14 @@ import { ASTRA_CATALOG, effectiveStatus } from '@/lib/astra-catalog';
 import { cn } from '@/lib/utils';
 import { Link, useLocation } from 'react-router-dom';
 
-/* FRONT74 — THE ROTATION MOVED OUT OF THIS FILE, to `hooks/useSpine.ts`.
-   It used to be a module-scope counter local to the rail, which meant the
-   rotation only existed where the rail existed. The rail is admin-gated
-   (FRONT31); the SPINE is not. Both now read `useConstellationAccent()`, so the
-   always-on ConstellationBand in PlatformLayout and this list agree on the
-   colour and the ring steps exactly once per page change across both. */
+/* THE ROTATION LIVES IN `hooks/useSpine.ts`, not here — FRONT74 moved it out of
+   a module-scope counter local to this file, because that meant the rotation
+   only existed where this admin-gated rail existed.
+
+   FRONT78 then removed the always-on band that was the other consumer, so this
+   list is the ONLY consumer again. The hook stays where it is: it is shared
+   infrastructure, the ring and its idempotent advance are worth keeping out of a
+   component, and moving it back would undo the fix rather than tidy it. */
 
 export function ConstellationRail({ className }: { className?: string }) {
   const { pathname } = useLocation();
