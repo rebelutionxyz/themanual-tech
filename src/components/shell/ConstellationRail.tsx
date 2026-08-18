@@ -8,32 +8,21 @@
    The rail lists the FULL derived Astra set (lib/astra-catalog.ts) — every
    entry is a live route inside themanual.tech per ORACLE_MF v1.24, so nothing
    in this list is a dead link. */
+import { useConstellationAccent } from '@/hooks/useSpine';
 import { ASTRA_CATALOG, effectiveStatus } from '@/lib/astra-catalog';
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-/** The rotation ring — every Astra accent, in catalog order. */
-const ACCENT_RING = ASTRA_CATALOG.map((a) => a.accent);
-
-/** Module-scope so the rotation advances across surface navigations, not per
- *  mount. The rail is mounted once by PlatformLayout and persists. */
-let rotationIndex = 0;
+/* FRONT74 — THE ROTATION MOVED OUT OF THIS FILE, to `hooks/useSpine.ts`.
+   It used to be a module-scope counter local to the rail, which meant the
+   rotation only existed where the rail existed. The rail is admin-gated
+   (FRONT31); the SPINE is not. Both now read `useConstellationAccent()`, so the
+   always-on ConstellationBand in PlatformLayout and this list agree on the
+   colour and the ring steps exactly once per page change across both. */
 
 export function ConstellationRail({ className }: { className?: string }) {
   const { pathname } = useLocation();
-  const [accent, setAccent] = useState(() => ACCENT_RING[rotationIndex % ACCENT_RING.length]);
-
-  // One step per page change. `pathname` is the TRIGGER, not an input — the
-  // next accent comes off the ring, not off the path — so the linter reads it
-  // as an unnecessary dependency. It is the whole mechanism: dropping it would
-  // rotate once per mount instead of once per page. Query and hash changes are
-  // deliberately not triggers; they are the same page.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname is the rotation trigger, by design
-  useEffect(() => {
-    rotationIndex = (rotationIndex + 1) % ACCENT_RING.length;
-    setAccent(ACCENT_RING[rotationIndex]);
-  }, [pathname]);
+  const accent = useConstellationAccent();
 
   return (
     <aside

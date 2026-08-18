@@ -2,6 +2,7 @@ import { useState, memo, useCallback } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { Atom, TreeNode } from '@/types/manual';
 import { KETTLE_COLORS } from '@/lib/constants';
+import { realmDepth, realmDepthTone } from '@/lib/spine';
 import { cn, formatCount } from '@/lib/utils';
 
 export type TreeSelectMode = 'single-path' | 'multi-atom';
@@ -209,8 +210,24 @@ const TreeBranch = memo(function TreeBranch({
         </span>
       </button>
 
+      {/* SPINE 4 — THE L1–L4 TONAL DEPTH GRADIENT. Each nesting level sits on
+          the next tone up the locked palette ladder, so how deep you are in the
+          taxonomy is legible from the fill alone, without counting indents or
+          reading the path. `depth` is 0-based at the realm root, so a node at
+          `depth` renders level depth+1 and the CHILDREN it wraps are level
+          depth+2. Past L4 the ramp clamps: the cue is depth, not a counter, and
+          a fifth step is not distinguishable at these values.
+
+          This complements the existing per-depth TEXT ramp above rather than
+          replacing it — text lightness carries emphasis, fill carries depth, and
+          the two stay legible when either is unavailable. */}
       {isExpanded && hasChildren && !reachedDepthLimit && (
-        <div className="ml-3 border-l border-border pl-2">
+        <div
+          className="ml-3 rounded-r border-l pl-2"
+          style={realmDepthTone(depth + 2)}
+          data-spine="realm-depth"
+          data-depth-level={realmDepth(depth + 2)}
+        >
           {node.children.map((c) => (
             <TreeBranch
               key={c.path}

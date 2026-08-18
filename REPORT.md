@@ -23,6 +23,284 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONT74 — THE SPINE, Phase C Component B. All five elements land and are measured in a running build. (2026-08-18)
+
+Session `79a4fea9` (fallback id — no `MC_SESSION`). Dispatch FRONT74, lane `front`, workdir
+`TheMANUAL.tech`, effort LARGE. Build green, lint clean in every file this pass touched, five spine
+elements observed in a running dev build. **Committed, NOT pushed**, per the dispatch.
+
+Design source: **ORACLE_MF v1.23 SPINE TRUTH**, which v1.28 names as the working spec because the
+MMF itself is UNREACHABLE in Drive. Where v1.23 and a later ruling conflict, this pass FLAGS and does
+not silently resolve — three such conflicts are recorded below, one of them structural.
+
+### THE ACCENT TABLE — FOUND AS DATA, and it does not match canon
+
+The dispatch made this the gate: find the accent table as data, or stop and report — never invent 41
+colours. **It exists**, in `src/lib/astra-catalog.ts`, one `accent` field per Astra row. Nothing in
+this pass invented a colour; `ASTRA_ACCENT_RING` in the new `src/lib/spine.ts` is derived from that
+file and nothing else.
+
+Three discrepancies, measured by parsing the file, and **none of them fixed here**. They are exported
+as `SPINE_ACCENT_FINDINGS` so a later pass or test can assert on them rather than re-derive them:
+
+| # | finding | detail |
+|---|---|---|
+| A | **40 rows, canon says 41** | ORACLE_MF v1.26 R9 made Workshop an Astra and put the registry — and "the accent table" — at 41. The catalog has no `workshop` entry. The ring is 40 long. **Adding the 41st means inventing a colour, which is forbidden**, so it is not added. |
+| B | **The ring is not unique** | 40 rows, **36 distinct colours**. `#FAD15E` → freedomblings + voting; `#8A94A0` → proservices + beehold + production; `#DC2626` → pulse + dingleberry. Three pairs/triples of Astras rotate to a band a viewer cannot tell apart. |
+| C | **Two Astras claim a reserved hue** | ASTRA_STANDARD v1.2 item 14: *"RED IS GLOBAL, MEANS ERROR, AND BELONGS TO NO ASTRA."* `pulse` and `dingleberry` both carry `#DC2626`. |
+
+The file's own header already says so, and this pass takes it at its word rather than treating the
+values as settled: *"the rest are PROVISIONAL — per-Astra accents are an MMF §15.1 / BRANDoSOPHIC
+item that has not been canonized … safe to overwrite wholesale."* **The rotation mechanism is built
+to survive the table being replaced wholesale** — one import, one derivation, no colour typed into a
+component.
+
+### THE FIVE ELEMENTS — what existed, what landed, what was measured
+
+Every number below is `getComputedStyle` off a running dev build on `localhost:3131`, not read from
+source.
+
+#### 1. TOP BAR — always black `#0A0B0E`
+
+Was `bg-bg/95 backdrop-blur-md`: `--bg` is `#07080a`, at 95% opacity, with a blur — so whatever
+scrolled underneath tinted the bar, which is exactly what *"no exceptions, no realm tinting of the
+bar itself"* forbids. Now an explicit opaque `SPINE_BLACK`, blur removed (nothing left to blur
+through).
+
+```
+topBar: { bg: "rgb(10, 11, 14)", backdrop: "none" }        // #0A0B0E, opaque
+```
+
+`#0A0B0E` is deliberately NOT aliased to the `--bg` token. They are close but not equal, and aliasing
+would silently redefine the spine the next time the palette moves.
+
+#### 2. LEFT RAIL — the closed sidebar wearing the current realm accent
+
+`RealmStrip` existed (3px, `REALM_COLORS` → astra accent → SILVER). **It was half-inert, and finding
+that is the substantive fix of this element.** It resolved only from `selectedRealmId`, which is
+written when something explicitly picks a realm — walking into a realm URL never sets it. Measured
+before the fix:
+
+```
+/realm/justice  → realm: "foundation", bg: rgb(200,209,218)   // silver. WRONG.
+```
+
+The design says the rail *"switches as the user navigates realms"*. Added the route as resolution
+step 1, ahead of the store — **where you are beats what you last picked**, so a stale selection from
+a previous surface cannot repaint the rail against the realm the URL is naming. Measured after, on
+real page loads:
+
+```
+/realm/justice  → realm: "justice",  bg: rgb(201, 76, 76)    // #C94C4C ✓
+/realm/religion → realm: "religion", bg: rgb(155,127,200)    // #9B7FC8 ✓
+/realm/nonsense → realm: "foundation"                        // guard holds ✓
+picking History in the realm sidebar → realm: "history", bg: rgb(212,165,116)  // #D4A574 ✓
+```
+
+The `/realm/nonsense` case matters: `useParams` is untyped at the route boundary, so a bad segment
+would otherwise index `REALM_COLORS` blind and paint the rail `undefined`, flickering to transparent
+through the transition.
+
+#### 3. RIGHT RAIL — rotating the Astra accent ring, one step per page change
+
+`ConstellationRail` already rotated, but the rotation was a module-scope counter **inside the rail**,
+and the rail is admin-gated. The rotation therefore only existed where the rail existed — i.e. not
+for anyone but an admin, on a screen ≥ lg. That is not a spine.
+
+The rotation moved to `useConstellationAccent()` in `src/hooks/useSpine.ts` and a new always-on
+`ConstellationBand` (3px, mirroring the left rail) renders for every viewer at every breakpoint.
+Measured across five navigations:
+
+```
+/manual → #4A6E96 → /collections → #E8B86E → /manual → #FAD15E
+        → /realm/justice → #F2B705 → /collections → #7F1D1D
+```
+
+Exactly catalog order — exchange, fnulnu, freedomblings, waggles, bazaar — one step per page change,
+no skips, no double-steps.
+
+**The double-step was the real hazard and is guarded structurally.** Two components now read the
+hook; a naive "advance on pathname change" effect fires in both and steps the ring twice per
+navigation, leaving the two disagreeing about the colour. The advance is keyed to the PATH, not to
+the effect firing, so the second caller for a given path is a no-op and both read one value.
+
+#### 4. REALM TOOLBARS — the L1–L4 tonal depth gradient
+
+Every value is drawn from the locked April-20 palette ladder in `index.css`, so the ramp reads as one
+material rising toward the surface rather than as four new colours. **Deeper taxonomy = lighter
+tone**: drilling in is coming up out of the black the top bar sits in.
+
+Measured on the `/manual` realm outline, expanded three levels:
+
+| level | measured | token |
+|---|---|---|
+| L1 | `#0F1014` | realm root — the ground the outline sits on |
+| L2 | `rgb(20, 23, 28)` | `#14171C` ✓ |
+| L3 | `rgb(25, 29, 36)` | `#191D24` ✓ |
+| L4 | `rgb(30, 35, 43)` | `#1E232B` ✓ |
+
+Past L4 the ramp clamps — the fill is a depth CUE, not a counter, and a fifth distinguishable step
+does not exist at these values. Screenshot of the L1→L2→L3 steps:
+`C:\Users\Butch\AppData\Local\Temp\claude-chrome-screenshots-qBWcd5\screenshot-1787063682503-0.jpg`
+
+Applied to three realm trees, all of which render on a dark ground (`TaxonomyTree`'s hosts were
+checked — `CategoryPicker` mounts it inside `bg-bg-elevated`, so the dark ramp is correct there and
+no white-shell surface receives it):
+
+- `OutlookView` — the realm outline on `/manual`. **This is the one a reader actually meets**, and
+  the one measured above.
+- `TaxonomyTree` — the INTEL pickers (`CategoryPicker`, `AtomPicker`, `L3Refinement`, `ThreadPage`).
+- `TopToolbar`'s `Breadcrumb` — the canonical realm toolbar. **See the structural conflict below: it
+  is not mounted.**
+
+#### 5. THE DROP — honey, right of the wordmark, hops on sidebar open
+
+`HoneyDrop` existed and `animate-bling-hop` existed in `tailwind.config.ts`, and `HoneyDrop`'s own
+doc comment referred to *"SiteHeader's use of the `bling-hop` window event"* — **but SiteHeader
+rendered no drop and no such event was ever dispatched by anything.** The element and its motion were
+both dead code, matching the Code 13 audit.
+
+Now: rendered at 15px right of the wordmark (outside the home `<Link>` — the drop is a spine element,
+not a navigation control, and swallowing it into the logo hit-target would make it one), listening
+for `bling-hop`, fired by `CommunityShell` on sidebar OPEN only. Measured:
+
+```
+event → class "inline-block animate-bling-hop flex-shrink-0", animationName "bling-hop"
+after 900ms → class cleared ✓
+on a chrome-free route (/waves) → drop absent ✓   (correct: no SiteHeader there)
+```
+
+**prefers-reduced-motion, measured properly on the second attempt.** The first test dispatched a
+synthetic `change` at `window.matchMedia(...)` and showed the hop still running — that result was a
+BROKEN TEST, not a broken feature, and is recorded because it would have been easy to file as a bug.
+`matchMedia` returns a **new** `MediaQueryList` per call (`a === b` → `false`), so the event never
+reached the hook's listener. Re-tested with a single shared stub installed before the header
+remounted:
+
+```
+stub.matches = true  → hop event → class "inline-block  flex-shrink-0"   // SUPPRESSED ✓
+listeners registered on the stub: 1                                       // hook really subscribed
+stub.matches = false, change fired → hop returns live                     // ✓
+```
+
+The reduced-motion check lives in the hook and returns a permanent `false`, not at the CSS layer, so
+the drop never enters the animating class at all and a future caller cannot reintroduce the motion by
+styling around a media query it forgot about. The listener is live, not read-once: someone who turns
+reduced motion ON mid-session is exactly the person who must not have to reload to be heard.
+
+### CONFLICTS FLAGGED, NOT RESOLVED
+
+The dispatch said to flag rather than fix toward either side. Three, in order of consequence.
+
+**1. THE RIGHT RAIL vs FRONT31 — split, not decided.** MMF §15.1 makes the right sidebar spine, which
+is by definition on every page for everyone. FRONT31 (owner ruling, 2026-08-08) says *"THE
+CONSTELLATION IS AN ADMIN TOOL"* — it was listing all 40 Astras and their build states, including
+everything unbuilt, to signed-out visitors.
+
+Read closely, those rule different things: **the objection was to publishing the build state of
+unbuilt worlds, not to a colour.** So this pass splits the element — the rotating BAND (no names, no
+statuses, nothing legible as a roadmap) renders for everyone; the LIST stays admin-gated, untouched.
+**If the intent of FRONT31 was that nothing constellation-shaped shows publicly at all, the band is
+the thing to delete, and deleting it is one line in `PlatformLayout`.** Owner call, not mine.
+
+**2. THE REALM TOOLBAR IS NOT MOUNTED — structural, and the spine cannot be fully delivered without
+an owner ruling.** `TopToolbar`, which owns the canonical `Breadcrumb` realm toolbar, was **removed
+from the black shell on 2026-07-16 by Butch**; `App.tsx` still carries the note and the component
+file. Spine element 4 names "realm toolbars" as a spine element; the black shell has none.
+
+Re-mounting it would restore chrome an owner ruling removed, so it was **not** re-mounted. Instead
+the ramp is applied to the `Breadcrumb` anyway — restoring the render is now a one-line change that
+lands the design already correct — and delivered for real on `OutlookView`, the realm outline that
+*is* mounted. **What is deferred: whether the black shell gets its realm toolbar back at all.**
+
+**3. 26 vs 41 ASTRAS.** ORACLE_MF v1.23 says the right sidebar rotates through **26** Astra accents;
+v1.26 R9 says the accent table is **41** rows. The dispatch already ruled for 41 (R9 supersedes), and
+this pass follows the dispatch. Recorded because the two canon rows still disagree in the record, and
+the catalog is a third number (40) — see finding A.
+
+### THE COPY SWEEP (ORACLE_MF v1.27 — users, not Bees)
+
+One user-facing string on a surface this pass touched: `TopToolbar`'s Astras panel,
+*"The Astra registry is visible to signed-in Bees."* → **"…signed-in users."**
+
+`SiteHeader`'s `useCopy('Bees')` was deliberately NOT changed: `'Bees'` there is a **lexicon key**
+feeding the Component B copy-swap mechanism (HoneyComb astras → "Bees", AtlasNation astras →
+"Members"), not displayed text — the attribute is non-rendering. Renaming the key breaks every
+lexicon map that answers to it. Noted in the file so the next sweep does not "fix" it.
+
+Code comments in the touched files still say "Bee" in places; those are rationale, not copy, and were
+left rather than churned.
+
+### FILES
+
+```
+NEW  src/lib/spine.ts                              values + derivations, no JSX (importable anywhere)
+NEW  src/hooks/useSpine.ts                         usePrefersReducedMotion · useBlingHop · useConstellationAccent
+NEW  src/components/shell/ConstellationBand.tsx    SPINE 3, always-on right rail
+MOD  src/components/layout/SiteHeader.tsx          SPINE 1 black bar · SPINE 5 drop mounted
+MOD  src/components/layout/PlatformLayout.tsx      SPINE 2 route-aware realm rail · band mounted
+MOD  src/components/shell/ConstellationRail.tsx    rotation moved out to the shared hook
+MOD  src/components/shell/CommunityShell.tsx       fires the hop on sidebar OPEN
+MOD  src/components/manual/OutlookView.tsx         SPINE 4 ramp (the mounted realm outline)
+MOD  src/components/manual/TaxonomyTree.tsx        SPINE 4 ramp (INTEL pickers, dark ground)
+MOD  src/components/layout/TopToolbar.tsx          SPINE 4 ramp on Breadcrumb + copy sweep
+MOD  src/components/ui/HoneyDrop.tsx               data-spine passthrough
+```
+
+`spine.ts` holds no JSX on purpose: the same ring feeds the rail and the band, the same ramp feeds
+three trees, and a value that lives inside one component cannot be reused by the next.
+
+### DONE-TEST
+
+```
+npx tsc -b                       → exit 0
+npm run build                    → ✓ built in 21.63s
+npm run lint                     → Found 23 errors — ALL pre-existing, ZERO in any FRONT74 file
+```
+
+The 23 are in `SecurityPage.tsx` (16), `comms/CallProvider.tsx` + `comms/RouletteView.tsx` (5),
+`admin/sections/ProfileSection.tsx` (1), `pages/SecurityPage.tsx` a11y (…) — none touched by this
+pass. Baseline before this pass was **24**; the one that went was mine, a
+`useExhaustiveDependencies` on `useBlingHop`'s timer, now carrying a `biome-ignore` with the reason
+(`hopSeq` is not read in the body but is the mechanism: without it a second hop lands inside the
+first one's timer and ends the new hop early). **Lint is not clean at baseline in this repo and this
+pass did not make it so** — it made its own files clean and left the rest alone.
+
+### TWO MISTAKES MADE AND CAUGHT, recorded because both are cheap to repeat
+
+- **A JSX comment cannot be the first child of a single-element `&&` expression.** Written that way
+  three times, in `TaxonomyTree` and twice in `OutlookView`. The first was caught by `tsc`; the other
+  two shipped past a typecheck I ran *before* those edits and were caught by the Vite error overlay
+  in the browser — which is also why the depth ramp read as `0 nodes` for several verification rounds
+  before I looked at the screen instead of the DOM. **The DOM said "not there"; the page said "syntax
+  error".** Reading the screenshot would have been faster than four more queries.
+- **The leaked dev server.** `TaskStop` killed the npm wrapper; vite (PID 14228) kept the port. Caught
+  by re-checking `netstat` for `LISTENING` after the stop rather than trusting the stop, and killed by
+  PID. Port 3131 was asserted free before boot and confirmed released after.
+
+### COULD NOT VERIFY
+
+- **The black shell has no openable sidebar, so its drop has no local trigger.** `PlatformLayout`
+  renders the left rail in its permanent CLOSED state; nothing opens it. The hop is fired by
+  `CommunityShell`, whose shell suppresses `SiteHeader` entirely — so in practice the header drop's
+  hop was proven by dispatching the event, not by opening a sidebar in the same shell. **Building an
+  openable left sidebar for the black shell is the missing structure**, implied by the design's
+  phrase "closed state" and deliberately not invented here.
+- **Nothing was checked while signed in.** All observation was as an anonymous visitor, so the
+  admin-gated `ConstellationRail` list was never rendered and the band-vs-list colour agreement is
+  argued from the shared hook, not measured side by side.
+- **Only the black shell was observed.** The white community shell (`/intel`, `/unite`, `/rule`) is
+  auth-gated; its `LensRow` and `GlobalSidebar` were read but not exercised, and the hop fire on its
+  sidebar toggle is therefore reviewed, not measured.
+- **No mobile/tablet breakpoint was exercised.** The band is `flex-shrink-0` at every breakpoint by
+  construction, but only a desktop viewport was rendered.
+- **The bottom swipe-up toolbar was not touched** — explicitly out of scope, style TBD by owner
+  taste. `BottomToolbar` is unchanged. **The h24 badge was not touched** — FRONT75 owns it;
+  `UtilityChrome` already mounts `AtlasOracleWalletBadge`, which IS the v1.23 spine badge, and no
+  second badge was added.
+
+---
+
 ## DB70 — DELETE ALL FUND CAMPAIGNS. APPLIED. give_campaigns and fountain_pledges are empty. (2026-08-18)
 
 Session `79a4fea9` (fallback id — no `MC_SESSION`). Dispatch DB70, lane `db`, workdir

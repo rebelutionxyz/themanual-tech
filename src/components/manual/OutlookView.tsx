@@ -1,4 +1,5 @@
 import { KETTLE_COLORS } from '@/lib/constants';
+import { realmDepth, realmDepthTone } from '@/lib/spine';
 import { cn, formatCount } from '@/lib/utils';
 import { useManualStore } from '@/stores/useManualStore';
 import type { Atom, TreeNode } from '@/types/manual';
@@ -85,8 +86,18 @@ function RealmBranch({ node, matches }: BranchProps) {
         </button>
         <GraphLaunch path={node.path} />
       </div>
+      {/* SPINE 4 — THE L1–L4 TONAL DEPTH GRADIENT. This is the realm outline on
+          /manual: the realm toolbar a reader actually meets. A realm root is L1,
+          so the children it wraps are L2. Deeper taxonomy = lighter tone, drawn
+          from the locked April-20 palette ladder, so depth is legible from the
+          fill before any label is read. */}
       {isExpanded && (
-        <div className="ml-3 mt-1 border-l border-border pl-3">
+        <div
+          className="ml-3 mt-1 rounded-r border-l pl-3"
+          style={realmDepthTone(2)}
+          data-spine="realm-depth"
+          data-depth-level={realmDepth(2)}
+        >
           {node.children.map((c) => (
             <TreeBranch key={c.path} node={c} matches={matches} depth={1} />
           ))}
@@ -156,8 +167,17 @@ const TreeBranch = memo(function TreeBranch({ node, matches, depth }: TreeBranch
         </button>
         {hasChildren && <GraphLaunch path={node.path} />}
       </div>
+      {/* SPINE 4 — one step further up the ramp per nesting level. A node at
+          `depth` wraps children at depth+1, which are taxonomy level depth+2.
+          `realmDepthTone` clamps past L4: the fill is a depth CUE, not a
+          counter, and a fifth distinguishable step does not exist here. */}
       {isExpanded && hasChildren && (
-        <div className="ml-3 border-l border-border pl-3">
+        <div
+          className="ml-3 rounded-r border-l pl-3"
+          style={realmDepthTone(depth + 2)}
+          data-spine="realm-depth"
+          data-depth-level={realmDepth(depth + 2)}
+        >
           {node.children.map((c) => (
             <TreeBranch key={c.path} node={c} matches={matches} depth={depth + 1} />
           ))}

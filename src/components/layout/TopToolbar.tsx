@@ -12,6 +12,7 @@ import {
 } from '@/components/layout/lensPanels';
 import { useAstraRegistry } from '@/lib/astras/useAstraRegistry';
 import { REALM_NAMES } from '@/lib/constants';
+import { realmDepth, realmDepthTone } from '@/lib/spine';
 import { cn } from '@/lib/utils';
 import type { RealmId } from '@/types/manual';
 import {
@@ -258,7 +259,8 @@ function AstrasPanel({ registry }: { registry: ReturnType<typeof useAstraRegistr
     return (
       <StubPanel
         line="Sign in to browse the Astra constellation."
-        note="The Astra registry is visible to signed-in Bees."
+        /* Copy sweep, ORACLE_MF v1.27: users, not Bees. */
+        note="The Astra registry is visible to signed-in users."
       />
     );
 
@@ -368,10 +370,25 @@ function Breadcrumb({
     segs.push({ label: currentName });
   }
 
+  /* SPINE 4 — THE L1–L4 TONAL DEPTH GRADIENT. The bar wears the tone of the
+     DEEPEST level it is showing, so the strip itself darkens-to-lightens as the
+     user drills in and the depth is readable before any label is. L1 is the
+     realm root; each further crumb is one step up the ramp. `realmDepthTone`
+     clamps past L4.
+
+     NOTE FOR WHOEVER RESTORES THIS TOOLBAR: as of FRONT74 the Top Top toolbar is
+     NOT RENDERED — Butch removed it from the black shell on 2026-07-16 and
+     App.tsx keeps the note. The spine ramp is applied here anyway so that
+     re-adding the render is a one-line change that lands the design already
+     correct, rather than a change that then needs a second pass to style. */
+  const depth = 1 + (l2 ? 1 : 0) + (l3 ? 1 : 0);
+
   return (
     <div
-      className="flex items-center gap-1 overflow-x-auto border-b border-border px-3 py-1.5"
-      style={{ background: '#0F1014', scrollbarWidth: 'none' }}
+      className="flex items-center gap-1 overflow-x-auto border-b px-3 py-1.5"
+      style={{ ...realmDepthTone(depth), scrollbarWidth: 'none' }}
+      data-spine="realm-toolbar"
+      data-depth-level={realmDepth(depth)}
     >
       <button
         type="button"

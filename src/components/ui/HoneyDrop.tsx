@@ -10,6 +10,9 @@ interface HoneyDropProps {
    * use of the `bling-hop` window event.
    */
   hopping?: boolean;
+  /** Spine marker — lets the shell tag the drop as a spine element for
+   *  verification without wrapping it in a span that would shift its baseline. */
+  'data-spine'?: string;
 }
 
 /**
@@ -22,6 +25,7 @@ export function HoneyDrop({
   style,
   animate = false,
   hopping = false,
+  'data-spine': dataSpine,
 }: HoneyDropProps) {
   const animClass = hopping ? 'animate-bling-hop' : animate ? 'animate-honey-drop' : '';
   return (
@@ -33,6 +37,7 @@ export function HoneyDrop({
       style={style}
       className={`inline-block ${animClass} ${className ?? ''}`}
       aria-hidden="true"
+      data-spine={dataSpine}
     >
       <defs>
         <radialGradient id="honeyGrad" cx="0.35" cy="0.3" r="0.8">
