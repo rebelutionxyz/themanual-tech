@@ -197,6 +197,74 @@ interface ProviderSpec {
   url:    string;
   apiKey: string | undefined;
   label:  string;
+  // DB77: how this provider reports cached tokens. See OPENAI_COMPAT_REGISTRY.
+  cacheSemantics?: 'read' | 'combined';
+}
+
+// ─── DB77: THE OPENAI-COMPATIBLE PROVIDER REGISTRY. ───
+//
+// The industry speaks one dialect — the OpenAI chat-completions wire — and this
+// route writes it ONCE (callOpenAICompatible). Every provider is therefore
+// CONFIG, not code: a base URL and the NAME of the secret that holds its key.
+// The model string comes from the caller. Adding OpenAI, DeepSeek, Mistral or
+// xAI is a row here, never a new code path (ORACLE_MF v1.47/v1.48).
+//
+// cacheSemantics — the v1.49 money rule, four legs {input, output, cache_read,
+// cache_write}:
+//   'read'     the provider's `prompt_tokens_details.cached_tokens` is a
+//              documented cache-READ count (OpenAI's wire). Priced at the cheap
+//              cache_read leg.
+//   'combined' the provider reports a single, semantically ambiguous cached
+//              figure. It is priced at the WORSE leg (cache_write, 1.25x input)
+//              until the provider's API distinguishes reads from writes — the
+//              platform NEVER absorbs the 12.5x spread again. This is the
+//              conservative default for any provider whose cached wire format is
+//              not verified.
+type OpenAICompatProvider = 'openai' | 'deepseek' | 'mistral' | 'xai' | 'groq';
+interface OpenAICompatConfig {
+  baseUrl:        string;
+  secretName:     string;
+  cacheSemantics: 'read' | 'combined';
+}
+const OPENAI_COMPAT_REGISTRY: Record<OpenAICompatProvider, OpenAICompatConfig> = {
+  // OpenAI documents prompt_tokens_details.cached_tokens as a READ count.
+  openai:   { baseUrl: 'https://api.openai.com/v1/chat/completions',   secretName: 'OPENAI_API_KEY',   cacheSemantics: 'read' },
+  // DeepSeek / Mistral / xAI: their cached-token wire format is NOT verified in
+  // this pass, so they take the conservative 'combined' → worse-leg treatment
+  // until a later pass confirms each one against its live API. A wrong guess
+  // here overcharges the platform's OWN internal spend, never a user, and never
+  // in the leak direction.
+  deepseek: { baseUrl: 'https://api.deepseek.com/v1/chat/completions', secretName: 'DEEPSEEK_API_KEY', cacheSemantics: 'combined' },
+  mistral:  { baseUrl: 'https://api.mistral.ai/v1/chat/completions',   secretName: 'MISTRAL_API_KEY',  cacheSemantics: 'combined' },
+  xai:      { baseUrl: 'https://api.x.ai/v1/chat/completions',         secretName: 'XAI_API_KEY',      cacheSemantics: 'combined' },
+  // Groq, the existing free-tier provider, folded into the registry so there is
+  // exactly one source of provider config. Its wire is OpenAI's (reads).
+  groq:     { baseUrl: GROQ_URL,                                       secretName: 'GROQ_API_KEY',     cacheSemantics: 'read' },
+};
+
+const OPENAI_COMPAT_PROVIDERS = Object.keys(OPENAI_COMPAT_REGISTRY) as OpenAICompatProvider[];
+
+// Resolve a registry provider to a concrete ProviderSpec, reading its key by
+// NAME from the environment. Returns null when the key is ABSENT — the caller
+// decides whether that is a hard failure (a directive that named this provider)
+// or merely "not available here" (the end-to-end proof probing for the first
+// present key). The key value is never logged or returned; only its presence.
+function resolveOpenAICompatSpec(
+  provider: OpenAICompatProvider,
+  model: string,
+): ProviderSpec | null {
+  const cfg = OPENAI_COMPAT_REGISTRY[provider];
+  if (!cfg) return null;
+  const apiKey = Deno.env.get(cfg.secretName);
+  if (!apiKey) return null;
+  return {
+    kind: 'openai-compatible',
+    model,
+    url: cfg.baseUrl,
+    apiKey,
+    label: `${provider}:${model}`,
+    cacheSemantics: cfg.cacheSemantics,
+  };
 }
 
 // Canon bundle length is fixed — compute once at module init for estimation.
@@ -216,6 +284,10 @@ interface RouteBody {
   model?:        unknown;  // model override (parity: haiku-gen, sonnet-validate)
   system?:       unknown;  // system-prompt override — REPLACES canon for internal
   max_tokens?:   unknown;  // max-tokens override (parity: gen@4096, validate@256)
+  // DB77: an internal caller may name an OpenAI-compatible provider from the
+  // registry (openai|deepseek|mistral|xai|groq). Requires `model`. Absent = the
+  // internal call stays on Anthropic (DB75 behaviour).
+  provider?:     unknown;
 }
 
 interface AnthropicUsage {
@@ -500,22 +572,44 @@ async function callOpenAICompatible(
     return { ...empty(`provider_parse: ${msg}`), latencyMs };
   }
 
-  const usage = payload.usage ?? {};
-  const cached = usage.prompt_tokens_details?.cached_tokens ?? 0;
+  // DB77 — FAIL CLOSED, THE MONEY RULE. A response whose tokens cannot be
+  // counted does not return to anyone. If the provider omitted usage entirely,
+  // or reported neither a prompt nor a completion count, the ledger math has
+  // nothing to bill and the sovereignty audit has no counts to record — so this
+  // is a provider FAILURE, not a free directive. Before this, missing usage
+  // defaulted to 0/0 and the response was returned uncounted; that was the leak.
+  const usage = payload.usage;
+  if (
+    !usage
+    || (usage.prompt_tokens === undefined && usage.completion_tokens === undefined)
+  ) {
+    console.error('atlasoracle-route provider usage missing', {
+      provider: spec.label, // metadata only — no directive or response text
+    });
+    return { ...empty('provider_usage_missing'), latencyMs };
+  }
+
+  const cachedRaw = usage.prompt_tokens_details?.cached_tokens ?? 0;
   // Nested → disjoint. See the trap note above. Math.max guards a provider that
   // reports cached > prompt_tokens rather than letting a negative leg through.
-  const input  = Math.max(0, (usage.prompt_tokens ?? 0) - cached);
+  const input  = Math.max(0, (usage.prompt_tokens ?? 0) - cachedRaw);
   const output = usage.completion_tokens ?? 0;
 
   const responseText = payload.choices?.[0]?.message?.content ?? '';
 
-  // DB27: the OpenAI wire has NO cache-creation concept — `cached_tokens` is a
-  // read count only. Reporting the whole thing as a read is therefore accurate,
-  // not a default, and it prices at the cheaper leg exactly as it did before.
+  // DB77 / v1.49 — FOUR LEGS. Where the cached figure is a verified READ count
+  // (OpenAI's wire) it prices at the cheap cache_read leg; where it is a single
+  // ambiguous 'combined' figure it prices at the WORSE cache_write leg, so the
+  // platform never absorbs the 12.5x spread. `cached` stays the SUM for the
+  // cached_tokens column and its existing readers.
+  const semantics = spec.cacheSemantics ?? 'combined';
+  const cacheRead  = semantics === 'read'     ? cachedRaw : 0;
+  const cacheWrite = semantics === 'combined' ? cachedRaw : 0;
+
   return {
     ok: responseText.length > 0,
-    responseText, input, output, cached,
-    cacheWrite: 0, cacheRead: cached, latencyMs,
+    responseText, input, output, cached: cachedRaw,
+    cacheWrite, cacheRead, latencyMs,
     failureKind: responseText.length > 0 ? null : 'provider_empty_content',
   };
 }
@@ -907,6 +1001,14 @@ Deno.serve(async (req) => {
     isInternal && typeof body.max_tokens === 'number' && body.max_tokens > 0
       ? Math.min(body.max_tokens, 8192)
       : null;
+  // DB77: an internal caller may name a registry provider. Validated against the
+  // registry keys; anything else is ignored (falls through to Anthropic).
+  const internalProvider =
+    isInternal
+    && typeof body.provider === 'string'
+    && (OPENAI_COMPAT_PROVIDERS as string[]).includes(body.provider)
+      ? (body.provider as OpenAICompatProvider)
+      : null;
 
   const maxTokens = internalMaxTokens ?? TIER_MAX_TOKENS[tier];
   const thinkingCfg = TIER_THINKING[tier];
@@ -916,7 +1018,29 @@ Deno.serve(async (req) => {
   const forceFallback = directive.startsWith('[OPS21-FORCE-FALLBACK]');
 
   const ladder: ProviderSpec[] = [];
-  if (isInternal && internalModel) {
+  if (isInternal && internalProvider) {
+    // DB77: route to a registry OpenAI-compatible provider. Requires a model,
+    // and FAILS CLOSED if the named provider has no key — never a silent
+    // fall-through to Anthropic, which would mis-attribute the spend and the
+    // provider. One rung: internal calls name exactly the provider they want.
+    if (!internalModel) {
+      return errorResponse('internal provider call requires a model', 400);
+    }
+    const spec = resolveOpenAICompatSpec(internalProvider, internalModel);
+    if (!spec) {
+      const secretName = OPENAI_COMPAT_REGISTRY[internalProvider].secretName;
+      console.error('atlasoracle-route internal provider key absent', {
+        provider: internalProvider, secret_name: secretName,
+      });
+      return jsonResponse({
+        error: 'provider_key_absent',
+        provider: internalProvider,
+        secret_name: secretName,
+        message: `no key configured for ${internalProvider} (${secretName})`,
+      }, 503);
+    }
+    ladder.push(spec);
+  } else if (isInternal && internalModel) {
     // One rung, the caller's chosen Anthropic model. Internal calls do not use
     // the free-tier Groq ladder — they name the model they need for parity.
     ladder.push({

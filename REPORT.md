@@ -23,6 +23,118 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## DB77 — THE OPENAI-COMPATIBLE ADAPTER. Built inside DB75's metered door, deno-checked; live proof BLOCKED-ON-KEY (none of the four provider keys exist). (2026-08-18)
+
+Session `79a4fea9` (fallback id — no `MC_SESSION`). Dispatch DB77, lane `db`, workdir
+**`TheMANUAL.tech-db`** (the separate db worktree, per the lead's WORKDIR UPDATE). Effort LARGE.
+`deno check` clean; committed. **Nothing deployed, no key created/printed/deleted.**
+
+### THE GATE THAT BLOCKED DB77 EARLIER — resolved
+
+DB77 depends on DB75's reroute ("the adapter goes INSIDE the single metered door"). DB75 was
+committed-but-unpushed in the sibling front tree; this db worktree (a separate clone) could not see
+it. Filed DB77-Q; the owner ruled **(a) push DB75**. Executed: fetched, and because a now-gone DB74
+session (`8a1bc505`) had left its **already-applied** migration + report uncommitted here, that had
+to be committed first (`7012ff7` `[DB74] media visibility v1`, pushed — verified `media_visibility`
+enum + `media_assets.visibility` live in prod, in `schema_migrations`) before the db tree could
+fast-forward. Then fast-forwarded to `origin/main` (5b087e7 → 7012ff7); DB75's internal-caller path
+is now present (`isServiceRolePrincipal` grep = 3). DB77 built on top.
+
+### THE BUILD — one adapter, providers as CONFIG not code
+
+The route ALREADY had a generic `callOpenAICompatible` written to the OpenAI chat-completions WIRE
+FORMAT (used for Groq's free tier). DB77 generalizes it into the metered door:
+
+1. **THE PROVIDER REGISTRY** (`OPENAI_COMPAT_REGISTRY`) — OpenAI, DeepSeek, Mistral, xAI and Groq
+   are each a row of `{ baseUrl, secretName, cacheSemantics }`. Adding a provider is a row, never a
+   code path. `resolveOpenAICompatSpec(provider, model)` reads the key BY NAME from the environment
+   and returns a `ProviderSpec`, or **null when the key is absent** — the caller decides if that is a
+   hard failure or "not available here". The key value is never logged or returned; only its
+   presence.
+
+2. **FAIL CLOSED — the money rule.** `callOpenAICompatible` now REFUSES a response it cannot count:
+   if the provider omitted `usage`, or reported neither `prompt_tokens` nor `completion_tokens`, it
+   returns `provider_usage_missing` and the response does not reach anyone. Before, missing usage
+   defaulted to 0/0 and the answer was returned uncounted — that was the leak the dispatch named.
+
+3. **FOUR LEGS (v1.49).** `{input, output, cache_read, cache_write}`. `cacheSemantics` per provider:
+   `'read'` where the cached figure is a documented cache-READ count (OpenAI's wire — priced at the
+   cheap cache_read leg); `'combined'` where the cached figure is a single ambiguous number — priced
+   at the **WORSE cache_write leg** (1.25x input) until that provider's API distinguishes, so the
+   platform never absorbs the 12.5x spread. DeepSeek/Mistral/xAI take `'combined'` because their
+   cached wire format is NOT verified this pass; a wrong guess overcharges the platform's own
+   internal spend, never a user, and never in the leak direction.
+
+4. **SOVEREIGNTY.** Every log on every path — success, HTTP error, parse error, usage-missing — is
+   metadata only (`provider`, `status`, token counts). No directive text, no response text, anywhere.
+
+5. **NO DOUBLE-CHARGE.** One attempt per rung, honest failure — the existing route posture, unchanged.
+   No retry was added.
+
+6. **SELECTION — service-principal only.** An internal caller (DB75's path) may name a `provider`
+   from the registry; the route builds the spec from the registry and **fails closed** if that
+   provider's key is absent (503 `provider_key_absent` with the secret name — never a silent
+   fall-through to Anthropic, which would mis-attribute the spend). Requires `model`. Users cannot
+   reach this — it is gated on the service principal exactly as DB75's overrides are. The user
+   billing path is byte-unchanged.
+
+### PROVE — BLOCKED-ON-KEY, verified honestly, never mocked
+
+Key existence was verified **via env presence only**, without deploying, using
+`supabase secrets list --project-ref anxmqiehpyznifqgskzc` (prints NAMES + digests, never values):
+
+```
+present:  ANTHROPIC_API_KEY, GROQ_API_KEY  (+ Stripe / LiveKit / Supabase infra)
+ABSENT:   OPENAI_API_KEY · DEEPSEEK_API_KEY · MISTRAL_API_KEY · XAI_API_KEY
+```
+
+**None of the four provider keys exists**, so there is no OpenAI-compatible provider to route a real
+directive to — the end-to-end proof cannot be run, and the dispatch is explicit: *"If NO key exists
+at verification time, build stands, report BLOCKED-ON-KEY with the exact secret names — never mock
+the proof."* The build stands; the proof waits on a key.
+
+### THE OWNER'S GO SEQUENCE (keys are yours — I never create, print, or delete one)
+
+1. Add **at least one** of `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `MISTRAL_API_KEY`, `XAI_API_KEY` to
+   Edge Function secrets.
+2. Deploy `atlasoracle-route` (ask-gated; the bundle `deno check`s clean). This same deploy also
+   carries DB75's internal-caller path — DB77 sits on it, so they deploy together.
+3. Verify live: one internal directive naming that provider (e.g.
+   `{ internal:true, caller:'db77-proof', provider:'<the one you added>', model:'<a model>',
+   system:'…', max_tokens:… }`) → an `atlasoracle_directives` row with the counts, priced against
+   the provider's own usage numbers, four legs correct.
+
+### FILES
+
+```
+MOD supabase/functions/atlasoracle-route/index.ts   registry · resolver · fail-closed usage · four-leg/worse-leg · internal provider selector
+```
+
+Additive: the user path and the Anthropic/Groq paths are unchanged; every new branch is gated on the
+service principal or on a registry provider being named.
+
+### DONE-TEST
+
+```
+deno check atlasoracle-route/index.ts   → EXIT 0
+```
+
+Build type-checks clean. The live proof is the owner's go sequence above; nothing was deployed and
+no provider call was made, because there was no provider key to make one with.
+
+### COULD NOT VERIFY
+
+- **No live provider call** — none of the four keys exist, and deploy is gated regardless. The
+  adapter's request/response mapping and fail-closed logic are proven by type-check and by reading
+  the OpenAI wire spec, not by a live round-trip.
+- **DeepSeek / Mistral / xAI cached-token wire formats are NOT verified** — they take the
+  conservative `'combined'` → worse-leg treatment until a later pass confirms each against its live
+  API. Flagged so it is a deliberate safety posture, not an assumption.
+- **`base_url` paths** for the four providers are the standard OpenAI-compatible chat-completions
+  endpoints; not one was hit live (no keys), so a path typo would only surface at the proof call.
+
+---
+
 ## FRONT80 — THE ROOMS BUTTON. Platform chrome in the shared header; on-demand names-only transport between the live astras. Build green, committed, NOT pushed. (2026-08-18)
 
 Session `f8b19368` (fallback id — no `MC_SESSION`). Dispatch FRONT80, lane `front`, workdir
