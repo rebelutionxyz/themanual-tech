@@ -23,6 +23,76 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## DB78 — THE GEMINI ADAPTER. Third dialect in the metered door, deno-checked; live proof BLOCKED-ON-KEY (GEMINI_API_KEY absent). (2026-08-18)
+
+Session `79a4fea9` (fallback id). Dispatch DB78, lane `db`, workdir **`TheMANUAL.tech-db`**, effort
+MEDIUM. `deno check` clean; committed on top of DB77 (`7e35864`). Nothing deployed, no key touched.
+
+### THE BUILD — Google's own shape, DB77's rules inherited unchanged
+
+Gemini does not speak the OpenAI wire, so it gets its own adapter (`callGemini`), not a registry row.
+Everything else is inherited from DB77 verbatim — not a weaker restatement:
+
+- **generateContent mapping.** Request: `contents[]` + `systemInstruction`; response:
+  `candidates[0].content.parts[].text`. The model rides the URL path
+  (`/models/{model}:generateContent`); the key is the **`x-goog-api-key` header**, never the query
+  string (a key in a URL leaks into logs and referrers).
+- **Usage normalized to the four legs.** `usageMetadata`: `promptTokenCount` INCLUDES
+  `cachedContentTokenCount` (nested, like OpenAI), so the adapter subtracts to the disjoint
+  convention `calculateCostTokens` expects. output = `candidatesTokenCount`, cached =
+  `cachedContentTokenCount`.
+- **FAIL CLOSED.** If `usageMetadata` is absent, or carries neither a prompt nor a candidate count,
+  the response is refused (`provider_usage_missing`) — not returned uncounted.
+- **Worse-leg (v1.49).** Gemini's cached figure is a documented context-cache READ, but is **not
+  verified live this pass**, so it takes the conservative `'combined'` → cache_write treatment. A
+  wrong guess overcharges the platform's own internal spend, never a user, never in the leak
+  direction.
+- **Sovereignty / one attempt / no retry / key-by-name** — identical to DB77; every log on every
+  path (success, HTTP error, parse error, usage-missing) is metadata only.
+- **Selection.** An internal caller (DB75's service-principal path) may name `provider:'gemini'`;
+  it requires a model and fails closed (503 `provider_key_absent`) if `GEMINI_API_KEY` is absent —
+  never a silent Anthropic fall-through. Users cannot reach it; the billing path is byte-unchanged.
+  `callProvider` now dispatches `anthropic` / `gemini` / `openai-compatible`.
+
+### PROVE — BLOCKED-ON-KEY, verified honestly
+
+`supabase secrets list --project-ref … ` (names + digests, no values): **`GEMINI_API_KEY` is
+ABSENT.** No provider to route to, so the end-to-end proof cannot run. Per the dispatch, the build
+stands and this reports BLOCKED-ON-KEY by name.
+
+### THE OWNER'S GO SEQUENCE (the key is yours)
+
+1. Add `GEMINI_API_KEY` to Edge Function secrets.
+2. Deploy `atlasoracle-route` (ask-gated; carries DB75 + DB77 + DB78 together).
+3. Verify live: one internal directive `{ internal:true, caller:'db78-proof', provider:'gemini',
+   model:'gemini-2.5-flash' (or another), system:'…', max_tokens:… }` → an `atlasoracle_directives`
+   row with counts from `usageMetadata`, four legs correct.
+
+### FILES
+
+```
+MOD supabase/functions/atlasoracle-route/index.ts   gemini types · config · resolver · callGemini · dispatch · selection
+```
+
+Additive: only new branches, all gated on the service principal naming `provider:'gemini'`.
+
+### DONE-TEST
+
+```
+deno check atlasoracle-route/index.ts   → EXIT 0
+```
+
+### COULD NOT VERIFY
+
+- **No live Gemini call** — `GEMINI_API_KEY` absent, deploy gated. Request/response mapping proven by
+  type-check and the generateContent spec, not a live round-trip.
+- **Gemini's cached-token semantics** taken as `'combined'` (worse leg) until verified live — a
+  deliberate safety posture, flagged, not an assumption.
+- **The model id** in the go-sequence example is illustrative; the caller supplies the model, and a
+  bad id would surface only at the proof call.
+
+---
+
 ## DB77 — THE OPENAI-COMPATIBLE ADAPTER. Built inside DB75's metered door, deno-checked; live proof BLOCKED-ON-KEY (none of the four provider keys exist). (2026-08-18)
 
 Session `79a4fea9` (fallback id — no `MC_SESSION`). Dispatch DB77, lane `db`, workdir

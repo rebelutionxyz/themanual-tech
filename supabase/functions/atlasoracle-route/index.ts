@@ -190,7 +190,7 @@ const GROQ_FREE_MODEL = 'llama-3.1-8b-instant';
 // Bees at the 2/min per-Bee cap. Above that Groq starts returning 429 and the
 // free tier would break outright without this ladder. Recorded rather than
 // discovered: see REPORT.md § OPS21 and OPS21-Q §2a.
-type ProviderKind = 'anthropic' | 'openai-compatible';
+type ProviderKind = 'anthropic' | 'openai-compatible' | 'gemini';
 interface ProviderSpec {
   kind:   ProviderKind;
   model:  string;
@@ -267,6 +267,37 @@ function resolveOpenAICompatSpec(
   };
 }
 
+// ─── DB78: GEMINI. Its own dialect, the same rules. ───
+//
+// Google speaks generateContent, not the OpenAI wire, so it gets its own adapter
+// (callGemini) rather than a registry row. Everything else is inherited from
+// DB77 unchanged: metadata-only logging, one attempt with no retry, FAIL CLOSED
+// when usage cannot be read, and the key is read by NAME and never logged.
+//
+// The model rides in the URL path (`/models/{model}:generateContent`), so the
+// base is stored without it and callGemini composes the full URL. The key goes
+// in the x-goog-api-key HEADER, never the query string (a key in a URL leaks
+// into logs and referrers).
+const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const GEMINI_SECRET_NAME = 'GEMINI_API_KEY';
+
+function resolveGeminiSpec(model: string): ProviderSpec | null {
+  const apiKey = Deno.env.get(GEMINI_SECRET_NAME);
+  if (!apiKey) return null;
+  return {
+    kind: 'gemini',
+    model,
+    url: GEMINI_BASE_URL,
+    apiKey,
+    label: `gemini:${model}`,
+    // Gemini's cachedContentTokenCount is a context-cache READ count, but it is
+    // NOT verified live this pass, so it takes the conservative 'combined' →
+    // worse-leg treatment (DB77 rule): a wrong guess overcharges the platform's
+    // own internal spend, never a user, never in the leak direction.
+    cacheSemantics: 'combined',
+  };
+}
+
 // Canon bundle length is fixed — compute once at module init for estimation.
 const CANON_BUNDLE_LENGTH = assembleCrossAstraCanon().length;
 
@@ -284,9 +315,9 @@ interface RouteBody {
   model?:        unknown;  // model override (parity: haiku-gen, sonnet-validate)
   system?:       unknown;  // system-prompt override — REPLACES canon for internal
   max_tokens?:   unknown;  // max-tokens override (parity: gen@4096, validate@256)
-  // DB77: an internal caller may name an OpenAI-compatible provider from the
-  // registry (openai|deepseek|mistral|xai|groq). Requires `model`. Absent = the
-  // internal call stays on Anthropic (DB75 behaviour).
+  // DB77/DB78: an internal caller may name a provider —
+  // openai|deepseek|mistral|xai|groq (OpenAI-wire) or gemini (its own dialect).
+  // Requires `model`. Absent = the internal call stays on Anthropic (DB75).
   provider?:     unknown;
 }
 
@@ -319,6 +350,23 @@ interface OpenAIUsage {
 interface OpenAIResponse {
   choices?: Array<{ message?: { content?: string | null } }>;
   usage?: OpenAIUsage;
+}
+
+// DB78 — Gemini's generateContent wire shape. Google does NOT speak the OpenAI
+// wire: the request is contents[]/systemInstruction, the response is
+// candidates[].content.parts[].text, and usage is usageMetadata with its own
+// field names. usageMetadata.promptTokenCount INCLUDES cachedContentTokenCount
+// (nested, like OpenAI), so the adapter subtracts to reach the disjoint
+// convention calculateCostTokens expects.
+interface GeminiUsage {
+  promptTokenCount?:        number;
+  candidatesTokenCount?:    number;
+  cachedContentTokenCount?: number;
+  totalTokenCount?:         number;
+}
+interface GeminiResponse {
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  usageMetadata?: GeminiUsage;
 }
 
 // Normalized result of one provider attempt. `failureKind` is null on success
@@ -614,6 +662,95 @@ async function callOpenAICompatible(
   };
 }
 
+// DB78 — the Gemini adapter. Same contract as the other two: one attempt, never
+// throws, metadata-only, FAIL CLOSED on unreadable usage.
+async function callGemini(
+  spec: ProviderSpec,
+  systemText: string,
+  directive: string,
+  maxTokens: number,
+): Promise<ProviderAttempt> {
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: directive }] }],
+    systemInstruction: { parts: [{ text: systemText }] },
+    generationConfig: { maxOutputTokens: maxTokens },
+  };
+
+  const startedAt = Date.now();
+  const empty = (kind: string): ProviderAttempt => ({
+    ok: false, responseText: '', input: 0, output: 0, cached: 0, cacheWrite: 0, cacheRead: 0,
+    latencyMs: Date.now() - startedAt, failureKind: kind,
+  });
+
+  let res: Response;
+  try {
+    res = await fetch(`${spec.url}/${spec.model}:generateContent`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-goog-api-key': spec.apiKey ?? '',
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'network failure';
+    return empty(`provider_network: ${msg}`);
+  }
+  const latencyMs = Date.now() - startedAt;
+
+  if (!res.ok) {
+    let excerpt = '';
+    try { excerpt = (await res.text()).slice(0, 200); } catch { excerpt = '<unreadable>'; }
+    console.error('atlasoracle-route provider http error', {
+      provider: spec.label, status: res.status, body_excerpt: excerpt,
+    });
+    return { ...empty(`provider_http_${res.status}`), latencyMs };
+  }
+
+  let payload: GeminiResponse;
+  try { payload = await res.json(); }
+  catch (err) {
+    const msg = err instanceof Error ? err.message : 'unknown parse error';
+    return { ...empty(`provider_parse: ${msg}`), latencyMs };
+  }
+
+  // FAIL CLOSED (DB77 rule, inherited): a response whose usage cannot be read is
+  // not returned. Gemini reports usageMetadata; if it is absent or carries
+  // neither a prompt nor a candidate count, there is nothing to bill and nothing
+  // to audit — a provider failure, not a free directive.
+  const usage = payload.usageMetadata;
+  if (
+    !usage
+    || (usage.promptTokenCount === undefined && usage.candidatesTokenCount === undefined)
+  ) {
+    console.error('atlasoracle-route provider usage missing', { provider: spec.label });
+    return { ...empty('provider_usage_missing'), latencyMs };
+  }
+
+  // Nested → disjoint: promptTokenCount INCLUDES cachedContentTokenCount, so
+  // subtract to reach the convention calculateCostTokens expects.
+  const cached = usage.cachedContentTokenCount ?? 0;
+  const input  = Math.max(0, (usage.promptTokenCount ?? 0) - cached);
+  const output = usage.candidatesTokenCount ?? 0;
+
+  // 'combined' semantics (see resolveGeminiSpec) → the whole cached figure prices
+  // at the worse cache_write leg until verified.
+  const semantics = spec.cacheSemantics ?? 'combined';
+  const cacheRead  = semantics === 'read'     ? cached : 0;
+  const cacheWrite = semantics === 'combined' ? cached : 0;
+
+  const responseText = (payload.candidates?.[0]?.content?.parts ?? [])
+    .map((p) => p.text ?? '')
+    .join('')
+    .trim();
+
+  return {
+    ok: responseText.length > 0,
+    responseText, input, output, cached, cacheWrite, cacheRead, latencyMs,
+    failureKind: responseText.length > 0 ? null : 'provider_empty_content',
+  };
+}
+
 function callProvider(
   spec: ProviderSpec,
   canonText: string,
@@ -621,9 +758,9 @@ function callProvider(
   maxTokens: number,
   thinkingCfg: ThinkingConfig,
 ): Promise<ProviderAttempt> {
-  return spec.kind === 'anthropic'
-    ? callAnthropic(spec, canonText, directive, maxTokens, thinkingCfg)
-    : callOpenAICompatible(spec, canonText, directive, maxTokens);
+  if (spec.kind === 'anthropic') return callAnthropic(spec, canonText, directive, maxTokens, thinkingCfg);
+  if (spec.kind === 'gemini')    return callGemini(spec, canonText, directive, maxTokens);
+  return callOpenAICompatible(spec, canonText, directive, maxTokens);
 }
 
 Deno.serve(async (req) => {
@@ -1009,6 +1146,8 @@ Deno.serve(async (req) => {
     && (OPENAI_COMPAT_PROVIDERS as string[]).includes(body.provider)
       ? (body.provider as OpenAICompatProvider)
       : null;
+  // DB78: Gemini is its own dialect, not a registry (OpenAI-compat) provider.
+  const internalGemini = isInternal && body.provider === 'gemini';
 
   const maxTokens = internalMaxTokens ?? TIER_MAX_TOKENS[tier];
   const thinkingCfg = TIER_THINKING[tier];
@@ -1018,7 +1157,26 @@ Deno.serve(async (req) => {
   const forceFallback = directive.startsWith('[OPS21-FORCE-FALLBACK]');
 
   const ladder: ProviderSpec[] = [];
-  if (isInternal && internalProvider) {
+  if (isInternal && internalGemini) {
+    // DB78: route to Gemini. Requires a model; fails closed if GEMINI_API_KEY is
+    // absent — never a silent fall-through, same rule as DB77's providers.
+    if (!internalModel) {
+      return errorResponse('internal gemini call requires a model', 400);
+    }
+    const spec = resolveGeminiSpec(internalModel);
+    if (!spec) {
+      console.error('atlasoracle-route internal provider key absent', {
+        provider: 'gemini', secret_name: GEMINI_SECRET_NAME,
+      });
+      return jsonResponse({
+        error: 'provider_key_absent',
+        provider: 'gemini',
+        secret_name: GEMINI_SECRET_NAME,
+        message: `no key configured for gemini (${GEMINI_SECRET_NAME})`,
+      }, 503);
+    }
+    ladder.push(spec);
+  } else if (isInternal && internalProvider) {
     // DB77: route to a registry OpenAI-compatible provider. Requires a model,
     // and FAILS CLOSED if the named provider has no key — never a silent
     // fall-through to Anthropic, which would mis-attribute the spend and the
