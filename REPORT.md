@@ -23,6 +23,79 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONT82 — CONSTELLATION DE-SCATTER + /hq RELOCATE. The scattered ConstellationRail is deleted; a live-astras-only quick-access list lands in /hq. Build green, committed, NOT pushed. (2026-08-18)
+
+Session `f8b19368` (fallback id). Dispatch FRONT82, lane `front`, workdir `TheMANUAL.tech`, effort
+MEDIUM. After FRONT80/81 (same tree, commit-clean). Committed on green, no push (dispatch:
+"COMMIT ON GREEN. NO PUSH"); the sha is recorded in the FRONT82 rail report. ORACLE_MF v1.52 + v1.53.
+
+### What the dispatch asked, and what shipped
+Owner (v1.52): "mission control of the rail not the constellation. I never have understood why it was
+added all over themanual." The constellation was scattered as navigation nobody asked for; remove it as
+nav everywhere, keep it only where sanctioned; relocate the admin list to /hq (v1.53).
+
+REMOVED:
+- `src/components/shell/ConstellationRail.tsx` — DELETED. This was the §15.1 rotating link-list rail that
+  `PlatformLayout` mounted on EVERY platform surface (incl. /mc) — the scattered nav. Its sole consumer
+  was PlatformLayout (grep-confirmed), so deletion is clean.
+- `src/components/layout/PlatformLayout.tsx` — dropped the `ConstellationRail` mount, the `useIsAdmin`
+  gate that guarded it, and both imports. `main` reclaims the width (the rail was a `flex-shrink-0`
+  sibling); no placeholder left behind. Comment block rewritten to record the FRONT82 removal.
+
+ADDED (v1.53 relocation):
+- `src/components/hq/sections/AstraQuickAccess.tsx` — NEW /hq section "Quick Access". A live-astras-only
+  jump list: reads `ASTRA_ROOMS` (the same `mount !== 'stub'` derivation FRONT80's rooms overlay uses),
+  renders name + accent tick + route as `Link`s to each surface. NO stub rows, NO build-state badges —
+  exactly v1.53's "never list the unbuilt." Admin-gated by HQControlRoom's `bees.is_admin` gate.
+- `src/components/hq/HQControlRoom.tsx` — registered the section (slug `quick-access`, LayoutGrid icon)
+  after "Astra Status".
+
+KEPT / NOT BROKEN (per dispatch):
+- /mc's admin board (MissionControlPage) — untouched; only the PlatformLayout rail that rode above it
+  is gone.
+- The shared ROOMS button (FRONT80) — the sanctioned user navigation, untouched.
+- `astra-catalog` data + `useConstellationAccent`/`useRealmAccent` hooks — kept. The rail was
+  `useConstellationAccent`'s last consumer, so it is now an exported-but-unused shared hook (kept
+  deliberately per the dispatch — the switcher/future surfaces read it; an exported symbol is not a
+  lint error).
+- FRONT31 admin gating — preserved (the /hq list inherits HQControlRoom's gate).
+
+### Left as-is, FLAGGED for the owner (not in the dispatch's explicit scope)
+Two ADMIN-ONLY surfaces still show the FULL catalog WITH build-states / stubs:
+- `/hq` "Astra Status" (`AstraStatus.tsx`) — the INFRA STATUS SLIDER monitoring panel (live/scaffolded/
+  deferred/post-Swarm counts + per-astra status). This is a status board, a different thing from the new
+  Quick Access nav list; the dispatch added the list, it did not ask to strip the monitor.
+- `/constellation` (`ConstellationPage.tsx`) — a standalone admin-gated (FRONT31) full-catalog page with
+  Surface/Landing/Stub labels.
+Both are admin-gated, so neither is a "user-facing" link-list (the PROVE clause is satisfied). But v1.52's
+"the constellation survives in exactly two places" arguably makes them redundant now that the rooms button
++ /hq quick-access are the sanctioned two. I did NOT remove them — deleting a whole page/panel absent an
+explicit instruction is over-reach on a MEDIUM pass. Flag for a ruling: should v1.53's "never list the
+unbuilt" extend to these admin monitors, or do they stay as the operator's full-catalog view?
+
+### Done-tests + PROVE (verbatim)
+- `npm run build` (tsc -b && vite build) → `✓ built in 17.13s` (green; the deleted component left no
+  dangling reference — tsc would have failed otherwise).
+- `npx biome lint` on the 3 touched/new files → `Checked 3 files. No fixes applied.` (clean).
+- PROVE grep — no remaining `ConstellationRail` CODE references (`grep -rn ConstellationRail src/` returns
+  only historical COMMENTS in useSpine/spine/useIsAdmin/ConstellationPage/PlatformLayout/AstraQuickAccess;
+  zero imports, zero mounts). The only surfaces rendering an astra list are now: RoomsButton (user nav),
+  AstraQuickAccess (/hq), AstraStatus (admin monitor), ConstellationPage (admin page). No link-list mount
+  on any user-facing surface.
+- Running-build check (dev localhost:3010, isolated automation profile): three routes observed CLEAN with
+  no layout regression from the rail removal — `/manual`, `/freedomblings`, `/h24` (screenshots). The
+  ROOMS button still opens and lists the 19 live astras ("The Manual" marked current) and navigates.
+- Copy: "users not Bees" — AstraQuickAccess says "live astras", "jump to any surface"; no "Bee(s)".
+
+### Could not verify (this pass)
+- Visual render of the /hq Quick Access section and the /mc board sans-rail: both are admin-gated
+  (`bees.is_admin`) and I hold no admin session (no synthetic credentials). Proven structurally instead:
+  build green + lint clean + the list uses the identical `ASTRA_ROOMS` derivation the rooms overlay just
+  rendered (19 live astras). The rail removal is definitive (component deleted; it cannot render for
+  anyone, admin included).
+
+---
+
 ## FRONT81 — THE h24 TOKEN STOREFRONT. Board P2.6 revenue path wired to the checkout that has waited since 08-01. Build complete + green + committed; Stripe test-mode e2e proof DEFERRED by owner (worker-2 ruling). NOT pushed. (2026-08-18)
 
 Session `f8b19368` (fallback id). Dispatch FRONT81, lane `front`, workdir `TheMANUAL.tech`, effort

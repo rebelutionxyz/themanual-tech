@@ -17,7 +17,7 @@ import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   AlertOctagon, BarChart3, TrendingUp, Users, Vote,
-  Wallet, Activity, ServerCog, Wrench, ShieldAlert, Palette,
+  Wallet, Activity, ServerCog, Wrench, ShieldAlert, Palette, LayoutGrid,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
@@ -31,6 +31,7 @@ import { RecentKettleVotes } from './sections/RecentKettleVotes';
 import { TreasuryBalances } from './sections/TreasuryBalances';
 import { EconomySnapshot } from './sections/EconomySnapshot';
 import { AstraStatus } from './sections/AstraStatus';
+import { AstraQuickAccess } from './sections/AstraQuickAccess';
 import { AdminActions } from './sections/AdminActions';
 import { BrandingSection } from './sections/BrandingSection';
 
@@ -51,6 +52,7 @@ const SECTIONS: SectionDef[] = [
   { slug: 'treasury',          label: 'Treasury Balances',    icon: Wallet,       status: 'live', Component: TreasuryBalances },
   { slug: 'economy',           label: 'Economy Snapshot',     icon: Activity,     status: 'live', Component: EconomySnapshot },
   { slug: 'astra-status',      label: 'Astra Status',         icon: ServerCog,    status: 'live', Component: AstraStatus },
+  { slug: 'quick-access',      label: 'Quick Access',         icon: LayoutGrid,   status: 'live', Component: AstraQuickAccess },
   { slug: 'admin-actions',     label: 'Admin Actions',        icon: Wrench,       status: 'live', Component: AdminActions },
   { slug: 'branding',          label: 'Branding',             icon: Palette,      status: 'live', Component: BrandingSection },
 ];
