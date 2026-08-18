@@ -8,17 +8,17 @@ import {
   isMocked,
 } from '@/lib/atlasoracle/client';
 import { formatTokensExact } from '@/lib/atlasoracle/reconcile';
+import type { ModelRateRow } from '@/lib/atlasoracle/reconcile';
 import { type RoutingLogEntry, fetchRoutingLog } from '@/lib/atlasoracle/routingLog';
-import { formatTokens } from '@/lib/atlasoracle/tokens';
+import { ORACLE_TOKENS_REFRESH_EVENT, formatTokens } from '@/lib/atlasoracle/tokens';
 import { useOracleDirective } from '@/lib/atlasoracle/useOracleDirective';
 import { useOracleTokens } from '@/lib/atlasoracle/useOracleTokens';
 import { useAuth } from '@/lib/auth';
 import { uploadToLibrary } from '@/lib/media';
 import { cn } from '@/lib/utils';
-import type { ModelRateRow } from '@/lib/atlasoracle/reconcile';
-import { ArrowLeft, ArrowRight, Download, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Download, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 /**
  * THE h24 SURFACE — the Claude pattern, built from H24_DESIGN_SPEC v1.0
@@ -44,6 +44,33 @@ import { useNavigate } from 'react-router-dom';
 export function OraclePage() {
   const { bee } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // POST-PURCHASE RETURN (FRONT81). oracle-checkout sends the user back to
+  // /h24?tokens=1 after Stripe. The webhook credits the ledger asynchronously,
+  // so we re-read the balance a few times (never optimistic math — a token only
+  // shows once the webhook wrote it), show an honest banner, and strip the flag.
+  const [topUpReturn, setTopUpReturn] = useState(false);
+  // Empty deps ON PURPOSE: this must fire exactly once on the flagged return.
+  // Stripping the flag (navigate below) changes location.search, so re-running
+  // would cancel the delayed refreshes via cleanup before they ever fire.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run-once return handler; see note.
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('tokens') !== '1') return;
+    setTopUpReturn(true);
+    const fire = () => window.dispatchEvent(new Event(ORACLE_TOKENS_REFRESH_EVENT));
+    fire();
+    const t1 = setTimeout(fire, 2000);
+    const t2 = setTimeout(fire, 5000);
+    const t3 = setTimeout(() => setTopUpReturn(false), 12000);
+    // Drop the query flag so a refresh or Back doesn't re-trigger the banner.
+    navigate('/h24', { replace: true });
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, []);
 
   const [directive, setDirective] = useState('');
   const [tier, setTier] = useState<Tier>('free');
@@ -110,14 +137,11 @@ export function OraclePage() {
   // KIND folds into the composer as its secondary selector. It is a REAL router
   // parameter (`category`), so it stays; that is the whole test for whether a
   // control belongs on this surface.
-  const kindOptions = useMemo(
-    () => DIRECTIVE_CATEGORIES.map((c) => ({ id: c, label: c })),
-    [],
-  );
+  const kindOptions = useMemo(() => DIRECTIVE_CATEGORIES.map((c) => ({ id: c, label: c })), []);
 
   const currentModel = tierRates.find((r) => r.tier === tier);
   const selectedEntry = selectedCostId
-    ? log.entries.find((e) => e.id === selectedCostId) ?? null
+    ? (log.entries.find((e) => e.id === selectedCostId) ?? null)
     : null;
 
   function submitDirective() {
@@ -184,6 +208,28 @@ export function OraclePage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-bg">
+      {/* POST-PURCHASE RETURN BANNER (FRONT81). Honest: the webhook credits
+          asynchronously, so this says the top-up is received and the balance
+          updates as it clears — it never asserts a number the ledger hasn't. */}
+      {topUpReturn && (
+        <div
+          className="flex flex-shrink-0 items-center gap-2 border-b border-honey/40 bg-honey/10 px-4 py-2 text-honey"
+          style={{ fontSize: '12.5px' }}
+          // biome-ignore lint/a11y/useSemanticElements: a polite status banner is a live region, not an <output> form result.
+          role="status"
+        >
+          <span>Top-up received — your h24 token balance updates here as the payment clears.</span>
+          <button
+            type="button"
+            onClick={() => setTopUpReturn(false)}
+            aria-label="Dismiss"
+            className="ml-auto rounded p-0.5 text-honey/80 transition-colors hover:bg-honey/20 hover:text-honey"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* h24 SURFACE TOOLBAR STRIP — the controls the global header lacks. */}
       <div className="flex h-11 flex-shrink-0 items-center gap-1 border-b border-border px-3">
         <ToolbarButton
@@ -284,7 +330,8 @@ export function OraclePage() {
                   {tokens.balance !== null && (
                     <>
                       {' · '}balance {formatTokens(tokens.balance)} → about{' '}
-                      {formatTokens(Math.max(0, tokens.balance - preview.estimatedCostTokens))} after
+                      {formatTokens(Math.max(0, tokens.balance - preview.estimatedCostTokens))}{' '}
+                      after
                     </>
                   )}
                 </p>
@@ -590,9 +637,7 @@ function RoutingLog({
                     ) : (
                       <button
                         type="button"
-                        onClick={() =>
-                          onSelectCost(selectedCostId === e.id ? null : e.id)
-                        }
+                        onClick={() => onSelectCost(selectedCostId === e.id ? null : e.id)}
                         aria-expanded={selectedCostId === e.id}
                         className="text-honey underline decoration-dotted underline-offset-2 transition-colors hover:text-text"
                         title="Open the cost breakdown in the side panel"

@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Bell, MessageCircle, ShoppingCart } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
-import { SearchModal } from './SearchModal';
 import { AtlasOracleWalletBadge } from '@/components/AtlasOracleWalletBadge';
+import { H24Storefront } from '@/components/h24/H24Storefront';
 import { surfacedActionsFor } from '@/lib/atlasoracle/surfacedActions';
+import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
+import { Bell, MessageCircle, ShoppingCart } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { SearchModal } from './SearchModal';
 
 /**
  * Utility chrome cluster shown in top-right of SiteHeader.
@@ -42,9 +43,7 @@ export function UtilityChrome() {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       const isTyping =
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable;
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
       if (e.key === '/' && !isTyping && !searchOpen) {
         e.preventDefault();
         setSearchOpen(true);
@@ -67,7 +66,9 @@ export function UtilityChrome() {
             ariaLabel="Notifications"
             title="Notifications"
             badge={notificationCount}
-            onClick={() => { /* TODO: notifications panel */ }}
+            onClick={() => {
+              /* TODO: notifications panel */
+            }}
           >
             <Bell size={16} />
           </IconButton>
@@ -79,7 +80,9 @@ export function UtilityChrome() {
             ariaLabel="Messages"
             title="Messages"
             badge={messageCount}
-            onClick={() => { /* TODO: messages panel */ }}
+            onClick={() => {
+              /* TODO: messages panel */
+            }}
           >
             <MessageCircle size={16} />
           </IconButton>
@@ -91,7 +94,9 @@ export function UtilityChrome() {
             ariaLabel="Cart"
             title="Cart"
             badge={cartCount}
-            onClick={() => { /* TODO: cart drawer */ }}
+            onClick={() => {
+              /* TODO: cart drawer */
+            }}
           >
             <ShoppingCart size={16} />
           </IconButton>
@@ -113,7 +118,6 @@ export function UtilityChrome() {
           astraSlug={astraSlug}
           surfacedActions={surfacedActionsFor(astraSlug)}
         />
-
 
         {/* 7. Profile-avatar: avatar on right, handle reveals on hover */}
         {bee ? (
@@ -152,6 +156,9 @@ export function UtilityChrome() {
       </div>
 
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
+      {/* h24 token storefront (FRONT81) — mounted once here so the single modal
+          serves every GET control (badge + h24 sidebar) via useH24Storefront. */}
+      <H24Storefront />
     </>
   );
 }

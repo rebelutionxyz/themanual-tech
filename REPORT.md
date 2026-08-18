@@ -23,6 +23,101 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONT81 — THE h24 TOKEN STOREFRONT. Board P2.6 revenue path wired to the checkout that has waited since 08-01. Build complete + green + committed; Stripe test-mode e2e proof DEFERRED by owner (worker-2 ruling). NOT pushed. (2026-08-18)
+
+Session `f8b19368` (fallback id). Dispatch FRONT81, lane `front`, workdir `TheMANUAL.tech`, effort
+LARGE. After FRONT80 (same tree). Commit `8b1b8ce` (amended to include this report), no push (dispatch:
+"COMMIT ON GREEN. NO PUSH").
+
+### Owner ruling mid-pass (recorded)
+On the e2e-proof fork the owner chose **"defer the test-mode proof, mark build-complete, record what's
+left to verify."** So this pass ships the BUILD complete and green; the Stripe TEST MODE end-to-end
+proof is deferred to a real-browser pass with a real signed-in user (see "What's left"). The build was
+not gated on that proof — it is a verification step, and the owner closed the pass as build-complete.
+
+### What the dispatch asked, and what shipped
+Board P2.6: "Bees can see Tokens, cannot buy them; revenue is unreachable until this exists." The whole
+server side (checkout function, webhook, rate-card tables, ledger) has been live and idempotent-safe
+since 2026-08-01 with **nothing calling it**. This pass is the CLIENT half. **No money code changed**
+(dispatch item 2: "do not redesign money code"); the contract served the view as-is, so nothing was
+touched or a question filed.
+
+Files (3 new + 6 edited):
+- `src/lib/atlasoracle/storefront.ts` — NEW. Reads `oracle_token_packs` / `oracle_token_plans`
+  (public-read, active-only — prices NEVER hardcoded) for display; `startCheckout(pack_code XOR
+  plan_tier, attempt?)` calls `oracle-checkout` and returns the Stripe URL. Parses 401/409 exactly the
+  way `client.ts` `unwrapError` does (FunctionsHttpError `.context` Response → `.json()`).
+- `src/components/h24/H24Storefront.tsx` — NEW. On-demand modal: **4 packs + 3 plans** from the rate
+  card with what-you-get in h24 tokens; the **ledger truth said on the surface** (plan tokens reset each
+  cycle + spent first; held tokens never expire + spent after); GET → `window.location = url` (Stripe);
+  honest states for 409 "plan already live" (with renew date), load-failure, and generic errors.
+  Signed-out visitors may BROWSE the card; GET flips an inline sign-in prompt (no synthetic session).
+- `src/stores/useH24Storefront.ts` — NEW. zustand open/close; the modal is mounted ONCE (UtilityChrome)
+  so the badge and the sidebar both drive the one modal.
+- `src/components/layout/UtilityChrome.tsx` — mounts `<H24Storefront />` globally.
+- `src/components/AtlasOracleWalletBadge.tsx` — both "GET h24 tokens" controls now open the storefront;
+  the stale `tokenNotice` stub ("no way to GET more yet — has not been ruled on") is REMOVED (it was
+  contradictory — packs/plans are ruled and seeded).
+- `src/components/h24/H24Sidebar.tsx` — Wallet section gains a "GET h24 tokens" button (signed-in only).
+- `src/lib/atlasoracle/tokens.ts` — added `ORACLE_TOKENS_REFRESH_EVENT` (the return-refresh signal).
+- `src/lib/atlasoracle/useOracleTokens.ts` — listens for that event and re-reads from the ledger
+  (additive; the hook's own doc already anticipated "a future GET-tokens purchase completing").
+- `src/pages/oracle/OraclePage.tsx` — `/h24?tokens=1` return handler: fires the ledger re-read at
+  0/2/5s (webhook credits async — NEVER optimistic math, a token shows only once the webhook wrote it),
+  shows an honest "top-up received, balance updates as it clears" banner, strips the flag.
+
+### The rate card (verified against the live DB, not hardcoded)
+- Packs (`oracle_token_packs`, one-time, never expire): Starter $5 / 5,000 · Regular $10 / 11,000 ·
+  Plus $25 / 30,000 · Pro $60 / 78,000.
+- Plans (`oracle_token_plans`, monthly): Scout $9 / 10,000 · Oracle $29 / 40,000 · Sovereign $99 /
+  150,000 per cycle.
+- Both tables carry `..._public_read` RLS (`active=true`, role `public`) + `GRANT SELECT` to
+  `anon`/`authenticated`, so the client read is safe and works for signed-out visitors too.
+
+### Done-tests (verbatim)
+- `npm run build` (tsc -b && vite build) → `✓ built in 21.57s` (green; also green at 34.78s and 14.85s
+  across iterations).
+- `npx biome lint` on all 9 touched files → `Checked 9 files. No fixes applied.` (clean). Fixed two of
+  my own findings pre-commit: `noArrayIndexKey` in the skeleton (stable keys) and `useSemanticElements`
+  on the status banner (biome-ignore — a polite live region is not an `<output>`). `biome check --write`
+  normalized import order on the touched files; nothing else.
+- Firewall: user copy uses GET / held / "you"; no buy/sell/purchase/price. USD amounts are shown because
+  h24 tokens are a real paid product (Stripe), which the existing checkout + badge already do.
+
+### Language-firewall note (judgement call, flagged)
+Plan tier `oracle` displays as "Oracle" next to "h24" branding — the middle plan literally carries the
+old product name. That is the DB `display_name`, canon-seeded; renaming is a `db`-lane call, not a
+front pass. Recorded, not touched.
+
+### What's left to verify (the deferred Stripe TEST MODE e2e proof)
+The dispatch's PROVE clause — "checkout opens, test card pays, webhook credits, ledger row exists,
+balance renders" — is NOT yet demonstrated. It needs a **real signed-in session**, which I did not
+fabricate (standing rule: no throwaway auth user / no pasted bearer token for an auth-gated flow). The
+exact remaining steps, for a real-browser pass with a real user (or once deployed to prod where real
+users exist):
+1. Signed in on the h24 surface, open the storefront from the wallet badge or the sidebar Wallet GET
+   button. **Verify the render**: 4 packs + 3 plans with the prices above, the ledger-truth note.
+2. Click GET on a pack (e.g. Starter) → confirm it **redirects to a Stripe TEST MODE Checkout Session**
+   (`oracle-checkout` returns `{ url }`). This proves "checkout opens".
+3. Pay with test card `4242 4242 4242 4242` → Stripe returns to the function's success URL
+   (`ORACLE_CHECKOUT_SUCCESS_URL` ?? `https://themanual.tech/oracle?tokens=1`, which 301s to
+   `/h24?tokens=1`). **NOTE:** that return URL is PROD, so a localhost checkout lands on prod, not the
+   dev server — the return-handler leg is best proven on prod or with the env pointed at the dev origin.
+4. Confirm `oracle-webhook` fired `checkout.session.completed` → `oracle_credit_token_purchase` wrote a
+   `oracle_token_ledger` row (`entry_type='purchase'`, `payment_ref=cs_...`, `expires_at=NULL`), and the
+   `/h24?tokens=1` handler's ledger re-read renders the new balance.
+5. State the evidence (Stripe test event ids + the ledger row) — that is the report line this pass could
+   not fill.
+Pre-req to confirm before that run: `oracle-checkout` / `oracle-webhook` carry Stripe **test-mode** keys
+(`STRIPE_SECRET_KEY` test + `STRIPE_WEBHOOK_SECRET_ORACLE` for the test endpoint). Not visible from here.
+
+### Could not verify (this pass)
+- Runtime render of the storefront modal (entry points gate on sign-in; signed-out on localhost the
+  badge does not mount). Deferred with the e2e proof above.
+- Any live Stripe interaction (no session; NO PUSH; local dev).
+
+---
+
 ## FRONT80 — THE ROOMS BUTTON. Platform chrome in the shared header; on-demand names-only transport between the live astras. Build green, committed, NOT pushed. (2026-08-18)
 
 Session `f8b19368` (fallback id — no `MC_SESSION`). Dispatch FRONT80, lane `front`, workdir

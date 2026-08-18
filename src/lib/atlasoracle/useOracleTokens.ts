@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
+  ORACLE_TOKENS_REFRESH_EVENT,
   type OracleTokenBalance,
   type OracleTokenSplit,
   type TierRate,
@@ -77,6 +78,15 @@ export function useOracleTokens(beeId: string | null): UseOracleTokens {
       cancelled = true;
     };
   }, [beeId]);
+
+  // A GET-tokens checkout return asks every mounted instance to re-read from the
+  // ledger (FRONT81). No optimistic math — refresh() reads the balance view.
+  useEffect(() => {
+    if (!beeId) return;
+    const onRefresh = () => void refresh();
+    window.addEventListener(ORACLE_TOKENS_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(ORACLE_TOKENS_REFRESH_EVENT, onRefresh);
+  }, [beeId, refresh]);
 
   const applyBalanceAfter = useCallback(
     (balanceAfterTokens: number | null) => {

@@ -25,6 +25,15 @@
 
 import { supabase } from '@/lib/supabase';
 
+/**
+ * Window event that asks every mounted `useOracleTokens` to re-read the balance
+ * from the ledger. Fired after a GET-tokens checkout returns to /h24 (FRONT81):
+ * the webhook credits asynchronously, so the storefront return handler dispatches
+ * this a few times to catch the credit landing. The refresh reads the LEDGER —
+ * never an optimistic increment, so a token only appears once the webhook wrote it.
+ */
+export const ORACLE_TOKENS_REFRESH_EVENT = 'oracle-tokens-refresh';
+
 export type TokenBalanceStatus = 'live' | 'signed-out' | 'unavailable';
 
 export interface OracleTokenBalance {
@@ -119,7 +128,9 @@ export interface OracleTokenSplit {
  * total alone rather than a split it had to guess at. A user with no ledger
  * entries gets zeros, which is true, not an error.
  */
-export async function fetchOracleTokenSplit(beeId: string | null): Promise<OracleTokenSplit | null> {
+export async function fetchOracleTokenSplit(
+  beeId: string | null,
+): Promise<OracleTokenSplit | null> {
   if (!beeId || !supabase) return null;
 
   const { data, error } = await supabase.rpc('oracle_token_available', { p_bee: beeId });

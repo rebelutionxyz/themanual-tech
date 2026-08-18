@@ -21,11 +21,12 @@
  * sovereignty state, which is the one thing this surface must never do.
  */
 
-import { type LibraryUsage, type MediaKind, formatBytes, libraryUsage } from '@/lib/media';
+import type { RoutingLogEntry } from '@/lib/atlasoracle/routingLog';
 import { formatTokens } from '@/lib/atlasoracle/tokens';
 import type { OracleTokenBalance } from '@/lib/atlasoracle/tokens';
-import type { RoutingLogEntry } from '@/lib/atlasoracle/routingLog';
+import { type LibraryUsage, type MediaKind, formatBytes, libraryUsage } from '@/lib/media';
 import { cn } from '@/lib/utils';
+import { useH24Storefront } from '@/stores/useH24Storefront';
 import { Activity, FileText, Image, Music, Video, Wallet } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 
@@ -45,6 +46,7 @@ export interface H24SidebarProps {
 }
 
 export function H24Sidebar({ collapsed, balance, entries, signedIn }: H24SidebarProps) {
+  const openStore = useH24Storefront((s) => s.openStore);
   const [vault, setVault] = useState<{ loaded: boolean; usage: LibraryUsage[] }>({
     loaded: false,
     usage: [],
@@ -184,6 +186,18 @@ export function H24Sidebar({ collapsed, balance, entries, signedIn }: H24Sidebar
           <div className="text-text-muted" style={{ fontSize: '11px' }}>
             {balance.status === 'live' ? 'h24 tokens' : balance.reason}
           </div>
+          {/* Top-up path into the storefront (FRONT81). Signed-in only — the
+              storefront itself gates, but a signed-out rail has no wallet to top. */}
+          {signedIn && (
+            <button
+              type="button"
+              onClick={openStore}
+              className="mt-2 w-full rounded-md border border-honey/50 bg-honey/10 px-2 py-1 font-semibold text-honey transition-colors hover:border-honey/80 hover:bg-honey/20"
+              style={{ fontSize: '11.5px' }}
+            >
+              GET h24 tokens
+            </button>
+          )}
         </div>
       </section>
     </nav>
