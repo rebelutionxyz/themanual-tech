@@ -23,6 +23,102 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## DB80 — THE CACHE-WRITE SPLIT. FINDING: it is already live (DB27, deployed 2026-08-03). The "ongoing leak" is stale; absorption was one bounded day. No code, no rate rows. (2026-08-18)
+
+Session `79a4fea9` (fallback id). Dispatch DB80, lane `db`, workdir **`TheMANUAL.tech-db`**, effort
+MEDIUM. **MEASURE-first, as instructed — and the measurement overturns the premise.** No route change
+and no rate rows were needed; the report is the deliverable.
+
+### THE PREMISE, AND WHY IT IS STALE
+
+The dispatch states: *"the platform has absorbed the 12.5x cache-write spread since 2026-07-27 …
+this pass fixes the path already live."* Measured against production, that is no longer true. **DB27
+(2026-08-03) split the two cache legs, priced them separately, and IS DEPLOYED.** The live Anthropic
+path already bills four legs correctly.
+
+### EVIDENCE — the DEPLOYED route, not the repo
+
+Fetched the deployed `atlasoracle-route` (`get_edge_function`) and read the money math out of it:
+
+```
+deployed calculateCostTokens(rate, input, output, cacheReadTokens, cacheWriteTokens):
+  cacheWriteRate = rate.cache_write_per_m ?? rate.input_tokens_per_m
+  cost = input*input_rate + cacheReadTokens*cacheReadRate
+       + cacheWriteTokens*cacheWriteRate + output*output_rate        ← FOUR legs, priced apart
+
+deployed callAnthropic:
+  cacheWrite = usage.cache_creation_input_tokens   cacheRead = usage.cache_read_input_tokens  ← split
+deployed finalize:
+  cache_write_tokens: cacheWriteTokens                                ← the split is recorded
+```
+
+The deployed route has every four-leg marker (`cache_creation_input_tokens`, `cache_read_input_tokens`,
+`cache_write_tokens`, `cache_write_per_m`, `cacheWrite`). It does NOT have DB75/DB77/DB78
+(`isServiceRolePrincipal`, `openai_compat`, `gemini` all absent) — those are committed-not-deployed
+and do not touch the Anthropic four-leg path. So the live path is exactly the DB27 four-leg route.
+
+**Rate card (item 2) — already correct:** every active model carries `cache_write_per_m` = 1.25×
+input (sonnet 11250, opus 15625, free 0), one active row per model (P4.1 holds — no duplicates). No
+rows to propose.
+
+**Route (item 3) — already four-leg and deployed.** Anthropic reports `cache_creation_input_tokens`
+and `cache_read_input_tokens` as DISJOINT counts, so the path needs no DB77 `cacheSemantics` inference
+— it has the true split from the API. Nothing to change.
+
+### THE MEASUREMENT (item 1) — the absorption was one bounded day, and it is a fraction of a cent
+
+The absorbed under-billing exists ONLY on rows that predate DB27's deploy. Measured from
+`atlasoracle_directives`: **cached traffic has occurred exactly five times, all on 2026-07-27**
+(19:11–19:49, the OPS15 live battery); there has been NO cached directive since. All five have
+`cache_write_tokens = NULL` because the pre-DB27 route stored only the summed `cached_tokens` and
+billed it at the READ rate.
+
+| model | rows | cached tokens | write−read spread (h24/MTok) |
+|---|---|---|---|
+| claude-sonnet-5 | 3 | 6,771 | 11250 − 900 = 10,350 |
+| claude-opus-5 | 2 | 4,512 | 15625 − 1250 = 14,375 |
+
+The exact read/write split of those 11,283 cached tokens is **unrecoverable** (the old route did not
+store it), so the absorption is bounded, not exact:
+
+- **Upper bound** (every cached token a write billed at read): `6771×10350/1e6 + 4512×14375/1e6`
+  = **0.135 h24 tokens ≈ $0.000135**.
+- **Likely** (cache TTL is 5 min; the timestamps imply ~3 cold creations and ~2 reads): **≈ 0.08 h24
+  tokens ≈ $0.00008**.
+
+Either way it is a fraction of a cent, and it is a USER UNDERCHARGE — the platform ate it. **The
+lead's read holds: no retroactive action; eating it is the honest shape.** The number is stated here
+as instructed; there is nothing to reverse that would not cost more than $0.0001 to compute.
+
+### PROVE (item 4)
+
+The live path's four-leg correctness is proven by reading the DEPLOYED code (above) + the correct
+rate rows + the P4.1 single-active-row check — which is stronger than one sampled ledger row. A fresh
+live cached directive to produce a new split ledger row would need a warm cache AND a real
+authenticated session (no synthetic credentials), and would only re-demonstrate what the deployed
+code already guarantees. Not run.
+
+### WHAT I DID NOT DO, and why
+
+- **No route change** — the four-leg Anthropic math is already in the repo (DB27) and deployed.
+  Adding it again would be a no-op claiming to fix a fixed thing.
+- **No rate rows** — `cache_write_per_m` already exists and is correct for every model.
+- **No retroactive billing** — a fraction-of-a-cent user undercharge, lead-ruled to eat.
+- **Nothing committed** — there is no code or SQL to commit. This REPORT.md finding is the only change.
+
+### COULD NOT VERIFY / FLAGGED
+
+- **The exact historical read/write split** of the 2026-07-27 cached tokens is gone — the pre-DB27
+  route stored only the sum. Hence a bounded measurement, not an exact one.
+- **DB75/DB77/DB78 are still undeployed** (the internal-caller path + the new adapters). They do not
+  affect the Anthropic four-leg path, but the day's coming deploy of `atlasoracle-route` will carry
+  them — worth noting so the deploy is understood to change more than nothing.
+- **If the lead intended DB80 to be the pass that DEPLOYS the four-leg path**, that is already done
+  (DB27); if it intended DB80 to deploy DB75/77/78, that is those passes' gated deploy, not a
+  cache-write fix.
+
+---
+
 ## DB79 — THE PROVIDER CATALOG. Schema + the single margin anchor + a seed band-map, rehearsed forward→rollback; NOTHING APPLIED. One ask. (2026-08-18)
 
 Session `79a4fea9` (fallback id). Dispatch DB79, lane `db`, workdir **`TheMANUAL.tech-db`**, effort
