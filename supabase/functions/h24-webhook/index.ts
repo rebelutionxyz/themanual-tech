@@ -10,10 +10,9 @@
 //
 // AUTHN: verify_jwt MUST be false. Stripe calls this; the only trust anchor is
 // the Stripe-Signature HMAC against STRIPE_WEBHOOK_SECRET_H24 (renamed from
-// _ORACLE per DBCODE1; a transition fallback to _ORACLE stays until the owner
-// re-adds the secret under _H24). The suffix follows the house convention
-// (_PRESS, _SUBSCRIPTION) -- one Stripe endpoint has exactly one signing secret,
-// and one function cannot verify two.
+// _ORACLE per DBCODE1). The suffix follows the house convention (_PRESS,
+// _SUBSCRIPTION) -- one Stripe endpoint has exactly one signing secret, and one
+// function cannot verify two.
 //
 // ---------------------------------------------------------------------------
 // THE FILTER IS NOT OPTIONAL. Stripe delivers every event of a subscribed type
@@ -42,19 +41,16 @@
 // current_period_end moved onto subscription ITEMS. Every read below uses the
 // dahlia path first and falls back to the legacy path.
 //
-// ENV: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET_H24 (fallback: _ORACLE),
-//      SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+// ENV: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET_H24, SUPABASE_URL,
+//      SUPABASE_SERVICE_ROLE_KEY
 
 import { getStripe, cryptoProvider } from '../_shared/stripe.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { invoiceRef } from '../_shared/ids.ts';
 
-// STRIPEHARDEN1 (a): the signing-secret env var is renamed _ORACLE -> _H24 to match
-// the DBCODE1 rename. Read the NEW name first, fall back to the OLD one during the
-// transition so the redeploy cannot 401 in the window before the owner has re-added
-// the secret under _H24. Once _H24 is set and _ORACLE removed, delete the fallback.
-const SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET_H24')
-  ?? Deno.env.get('STRIPE_WEBHOOK_SECRET_ORACLE') ?? '';
+// The Stripe webhook signing secret (renamed _ORACLE -> _H24 per DBCODE1; the
+// STRIPEHARDEN1 transition fallback to _ORACLE has been removed now that _H24 is live).
+const SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET_H24') ?? '';
 
 const ok = (b: unknown) =>
   new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } });
