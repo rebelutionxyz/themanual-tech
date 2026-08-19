@@ -61,6 +61,52 @@ function idempotencyKey(beeId: string, sku: string, attempt: string | undefined)
   return `h24-checkout:${beeId}:${sku}:${nonce}`;
 }
 
+// deno-lint-ignore no-explicit-any
+function isNoSuchCustomer(err: any): boolean {
+  const msg = (err?.message ?? '').toString();
+  return (err?.code === 'resource_missing' && err?.param === 'customer')
+    || /no such customer/i.test(msg);
+}
+
+// STRIPEHARDEN1 (b): create the Checkout Session, recovering from a stale/wrong-mode
+// stripe_customer_id. Stripe customer ids are account+mode scoped, so a stored id
+// minted under a different key stops existing -- which is exactly what bricked
+// checkout after the live->test switch, and WILL recur on the test->live flip (a
+// test customer id does not exist in live). If the create throws "No such customer"
+// for the Bee's stored id, mint a FRESH customer, persist it back to the Bee, and
+// retry ONCE with the new id. Billing identity is never silently dropped, and
+// idempotency is unaffected -- the webhook's payment_ref unique index still guards
+// double-credit. The retry uses a DISTINCT idempotency key so Stripe does not replay
+// the cached error from the first attempt.
+// deno-lint-ignore no-explicit-any
+async function createSessionRecovering(stripe: any, sb: any, beeId: string, email: string | null, existingCustomer: string | null, buildParams: (attach: Record<string, unknown>) => any, idemKey: string): Promise<any> {
+  const attach = existingCustomer
+    ? { customer: existingCustomer }
+    : (email ? { customer_email: email } : {});
+  try {
+    return await stripe.checkout.sessions.create(buildParams(attach), { idempotencyKey: idemKey });
+  } catch (err) {
+    if (!existingCustomer || !isNoSuchCustomer(err)) throw err;
+    const created = await stripe.customers.create({
+      ...(email ? { email } : {}), metadata: { bee_id: beeId },
+    });
+    const { error: persistErr } = await sb.from('bees')
+      .update({ stripe_customer_id: created.id }).eq('id', beeId);
+    if (persistErr) {
+      // Persisting the new id failed -- complete this checkout with it anyway; the
+      // next checkout simply recovers again rather than reusing a saved id.
+      console.error('h24-checkout persist new stripe_customer_id failed', {
+        bee_id: beeId, new_customer: created.id, message: persistErr.message,
+      });
+    }
+    console.log('h24-checkout recovered stale stripe_customer_id', {
+      bee_id: beeId, stale: existingCustomer, new_customer: created.id,
+    });
+    return await stripe.checkout.sessions.create(
+      buildParams({ customer: created.id }), { idempotencyKey: `${idemKey}:recustomer` });
+  }
+}
+
 Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
@@ -121,21 +167,23 @@ Deno.serve(async (req) => {
         `${pack.display_name} pack -- ${n(pack.tokens)} Tokens credited to your Bee the ` +
         `moment payment clears. These Tokens never expire and there is nothing recurring.`;
 
-      const session = await stripe.checkout.sessions.create({
-        mode: 'payment',
-        line_items: [{
-          price_data: { currency: 'usd', product_data: { name, description }, unit_amount: pack.usd_cents },
-          quantity: 1,
-        }],
-        payment_intent_data: { metadata },
-        metadata,
-        ...(existingCustomer
-          ? { customer: existingCustomer }
-          : (u.user.email ? { customer_email: u.user.email } : {})),
-        success_url: successUrl,
-        cancel_url: cancelUrl,
-        allow_promotion_codes: false,
-      }, { idempotencyKey: idempotencyKey(beeId, `pack:${pack.pack_code}`, body.attempt) });
+      const session = await createSessionRecovering(
+        stripe, sb, beeId, u.user.email ?? null, existingCustomer,
+        (attach) => ({
+          mode: 'payment',
+          line_items: [{
+            price_data: { currency: 'usd', product_data: { name, description }, unit_amount: pack.usd_cents },
+            quantity: 1,
+          }],
+          payment_intent_data: { metadata },
+          metadata,
+          ...attach,
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+          allow_promotion_codes: false,
+        }),
+        idempotencyKey(beeId, `pack:${pack.pack_code}`, body.attempt),
+      );
 
       return jsonResponse({
         url: session.url, sku_kind: 'pack',
@@ -191,26 +239,28 @@ Deno.serve(async (req) => {
       `month that granted them and do not roll over. Stop any time; you keep that month's ` +
       `Tokens until it ends. Tokens you GET in a pack are separate and never expire.`;
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: { name, description },
-          unit_amount: plan.usd_cents,
-          recurring: { interval: 'month' },
-        },
-        quantity: 1,
-      }],
-      subscription_data: { metadata },
-      metadata,
-      ...(existingCustomer
-        ? { customer: existingCustomer }
-        : (u.user.email ? { customer_email: u.user.email } : {})),
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      allow_promotion_codes: false,
-    }, { idempotencyKey: idempotencyKey(beeId, `plan:${plan.plan_tier}`, body.attempt) });
+    const session = await createSessionRecovering(
+      stripe, sb, beeId, u.user.email ?? null, existingCustomer,
+      (attach) => ({
+        mode: 'subscription',
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: { name, description },
+            unit_amount: plan.usd_cents,
+            recurring: { interval: 'month' },
+          },
+          quantity: 1,
+        }],
+        subscription_data: { metadata },
+        metadata,
+        ...attach,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        allow_promotion_codes: false,
+      }),
+      idempotencyKey(beeId, `plan:${plan.plan_tier}`, body.attempt),
+    );
 
     return jsonResponse({
       url: session.url, sku_kind: 'plan',

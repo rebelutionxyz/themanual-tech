@@ -10551,3 +10551,37 @@ test/live for all astras — flip is account-wide).
   `customer` param (fall back to creating a fresh customer), so a stale pointer can never brick checkout — this
   exact failure will recur on the **test→live key flip**. Money-path edit to h24-checkout; deserves its own
   type-check + deploy + re-prove cycle.
+
+---
+
+# STRIPEHARDEN1 — two Stripe follow-ups (done before live)
+
+**Pass:** STRIPEHARDEN1 (db lane) · **Status:** both changes shipped + proven live; owner redeployed.
+
+## (a) Webhook signing-secret env var rename `_ORACLE` → `_H24`
+h24-webhook now reads `STRIPE_WEBHOOK_SECRET_H24`, **falling back to `STRIPE_WEBHOOK_SECRET_ORACLE`** during the
+transition. **Deviation from the dispatch's hard-rename, with reason:** the fallback removes the 401 window the
+dispatch itself warned about (code deploying before the secret exists under the new name) — the redeploy is safe
+in any order, zero downtime. Owner added the secret under `_H24` and redeployed; the STRIPEHARDEN1 (b) test below
+verified via `_H24`. **Cleanup follow-up:** now that `_H24` is confirmed working, remove `_ORACLE` from Edge
+secrets and simplify the code to read only `_H24` (the clean final hard-rename).
+
+## (b) "No such customer" hardening (h24-checkout) — money path
+New `createSessionRecovering()` wraps both session-creates (pack + plan): on a `No such customer` error for the
+Bee's stored `stripe_customer_id`, it mints a fresh Stripe customer, persists the new id to the Bee, and retries
+ONCE with a distinct idempotency key (so Stripe does not replay the cached error). Normal path unchanged;
+idempotency intact (the webhook's `payment_ref` unique index still guards double-credit); billing identity never
+silently dropped (new customer carries `metadata.bee_id`).
+
+## Verification
+- `deno check` both functions → **clean (exit 0)**; `deno lint` both → **clean (exit 0)**.
+- **Live self-heal proof:** set `butch` (ab696a36) `stripe_customer_id` = `cus_BOGUSstaleHARDEN1test` (well-formed,
+  nonexistent). Owner clicked GET → Starter with both functions redeployed. Result: **checkout opened (no 500)**.
+  Log: `h24-checkout recovered stale stripe_customer_id { stale: cus_BOGUSstaleHARDEN1test, new_customer:
+  cus_V6P7iXyqP2aRiG }`. Bee `stripe_customer_id` self-healed to **`cus_V6P7iXyqP2aRiG`** (persisted). A stale /
+  wrong-mode customer id can no longer brick checkout — including on the test→live flip.
+- `deno.lock` was touched by `deno check --node-modules-dir=auto`; left **unstaged** (type-check artifact).
+
+## Follow-up (recorded)
+Remove `_ORACLE` from Edge secrets + drop the fallback line so h24-webhook reads only `STRIPE_WEBHOOK_SECRET_H24`
+(clean final hard-rename). Small later cleanup, non-blocking.
