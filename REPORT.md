@@ -10464,3 +10464,90 @@ non-Anthropic providers (deepseek, mistral) bill to the exact catalog rate throu
 debit is also exactly correct. Open follow-ups, all provider-config/retry — NOT router bugs: (1) OpenAI account
 credits; (2) spaced re-run to tick grok-4.6 + gemini past h24's own per-minute cap; (3) Anthropic-path
 `cached_tokens` recording artifact; (4) internal-caller `bee_id` nullability (deferred DB75).
+
+---
+
+# STRIPE1 — wire Stripe so checkout transacts (TEST MODE)
+
+**Pass:** STRIPE1 (db lane) · **Status:** code pre-flight verified from source; awaiting owner Stripe config + test purchase.
+
+## Owner config briefing (verified against the deployed code, not guessed)
+- **h24-webhook events (HANDLED set):** `checkout.session.completed`, `invoice.paid`,
+  `customer.subscription.created|updated|deleted`, `charge.refunded`. **NOT `payment_intent.succeeded`.**
+  For the one-time PACK test (card 4242), the event that credits tokens is **`checkout.session.completed`**
+  (mode=payment → `h24_credit_token_purchase`). Full coverage adds the other five (plans + refunds).
+- **Webhook endpoint URL:** `https://anxmqiehpyznifqgskzc.supabase.co/functions/v1/h24-webhook` ✅ (confirmed).
+- **⚠ SECRET NAME MISMATCH — the one blocking gotcha:** h24-webhook reads the signing secret from
+  **`STRIPE_WEBHOOK_SECRET_ORACLE`** (index.ts:50), NOT `STRIPE_WEBHOOK_SECRET`. Setting the wrong name →
+  `500 "Webhook secret not configured"`, no credit. The Stripe API key is `STRIPE_SECRET_KEY` (correct name,
+  `_shared/stripe.ts:13`).
+- **Deploy flag:** h24-webhook must be deployed **verify_jwt = FALSE** (Stripe carries no Supabase JWT; the
+  code header states it). h24-checkout stays verify_jwt = TRUE.
+- **Price mapping = TABLE-DRIVEN, not hardcoded.** h24-checkout reads `h24_token_packs` (pack_code, usd_cents,
+  tokens) / `h24_token_plans` (plan_tier, usd_cents, tokens_per_cycle); uses inline Stripe `price_data` (no
+  pre-created Price objects — deliberate F6 isolation). The webhook credits via `h24_credit_token_purchase(pack_code)`,
+  which reads the SAME table, so the grant always matches the storefront.
+
+## Live pack/plan grants (from the DB, 1,000 tokens = $1 anchor at Starter)
+| SKU | code | price | tokens |
+|---|---|---|---|
+| pack | starter | $5.00 | 5,000 |
+| pack | regular | $10.00 | 11,000 |
+| pack | plus | $25.00 | 30,000 |
+| pack | pro | $60.00 | 78,000 |
+| plan | scout | $9/mo | 10,000/cycle |
+| plan | oracle | $29/mo | 40,000/cycle |
+| plan | sovereign | $99/mo | 150,000/cycle |
+
+## Idempotency (no double-credit on replay) — verified
+- `stripe_events` dedupe: event recorded; if already `processed` → `duplicate:true`, 200, no re-credit.
+- The real guarantee is a **partial unique index on the money row**: pack purchase `UNIQUE(payment_ref) WHERE
+  entry_type='purchase'`, key = the Checkout Session id `cs_…`. `h24_credit_token_purchase` catches
+  `unique_violation` → `duplicate:true`. A Stripe retry/resend settles instead of double-crediting.
+- Ledger row is metadata-only (payment_ref, method='stripe'); no card data.
+
+## Expected TEST-MODE proof (pack, card 4242 4242 4242 4242)
+1. Signed-in Bee → storefront → h24-checkout `{pack_code:'starter'}` → returns Stripe URL; session metadata
+   `product_type='oracle', bee_id, sku_kind='pack', pack_code='starter'`.
+2. Pay 4242 (any future expiry / any CVC / any ZIP).
+3. Stripe fires `checkout.session.completed` → h24-webhook verifies signature → credits `h24_credit_token_purchase`.
+4. **Balance rises by exactly the pack's tokens (starter = +5,000).** `stripe_events.status='processed'`, one
+   `h24_token_ledger` purchase row keyed on `cs_…`.
+5. Resend the event in Stripe → `duplicate:true`, balance unchanged (idempotent).
+Code readback (Code side, post-purchase): `stripe_events`, the `h24_token_ledger` purchase row, and balance via
+`h24_token_available` before/after.
+
+## Setup incident (resolved) — stale Stripe customer bricked checkout
+After the owner set `STRIPE_SECRET_KEY` (test) + `STRIPE_WEBHOOK_SECRET_ORACLE` and redeployed, the storefront
+would not open: `h24-checkout session create failed … "No such customer: 'cus_UyUFEcJ18kwC5N'"`. Root cause
+(from `function_logs`, not guessed): the Bee `butch` (ab696a36) carried a `bees.stripe_customer_id` minted under a
+different Stripe key/mode; Stripe customer ids are account+mode scoped, so `sessions.create({customer})` threw. NOT
+a missing env / getStripe failure (the client authenticated). Fix: `UPDATE bees SET stripe_customer_id = NULL`
+for that one Bee (the only Bee with a customer id) — h24-checkout then falls back to `customer_email` and Stripe
+mints a fresh test-mode customer. Sequence enforced: confirm key = `sk_test_` + redeploy FIRST, then clear.
+
+## STRIPE1 PROOF (live TEST-MODE purchase, card 4242, Bee butch/ab696a36) — LOOP PROVEN
+1. **Webhook fired:** `stripe_events` `evt_1U6BO8APNYB78CQXpdtGIzZ6` · `checkout.session.completed` · status
+   **processed** · $5.00.
+2. **Ledger purchase row:** entry_type **purchase** · **+5,000.000000** · payment_ref
+   `cs_test_a1CQ…AQMvEPMFZ` (the Checkout Session id) · method `stripe` · memo `pack starter @ 5.00 USD`.
+3. **Balance rose exactly +5,000:** 961.8479 → **5,961.8479**.
+4. **Idempotency PROVEN (the critical safety):** owner resent the event in Stripe (15:38:27). Webhook did the
+   `stripe_events` status check, saw `processed`, and **returned `duplicate:true` — no PATCH, no credit RPC.**
+   State unchanged: purchase_rows still **1**, balance still **5,961.8479**. Double-credit is blocked by both the
+   event-status short-circuit AND the partial unique index on `payment_ref`.
+5. **Metadata-only ledger:** the credit row holds amount + session ref + method + short memo — no content/PII/card
+   data. (The `stripe_events` audit row retains the full event payload by design — reconciliation/idempotency trail,
+   separate from the ledger.)
+
+**STRIPE1 DONE:** the money loop transacts end-to-end in test mode — storefront → Stripe checkout → payment →
+webhook → correct token grant, idempotent. Owner swaps live keys when ready (shared `STRIPE_SECRET_KEY` = global
+test/live for all astras — flip is account-wide).
+
+## Follow-ups (recorded, NOT blocking — recommend a separate small pass each)
+- **(a) env rename straggler:** h24-webhook reads `STRIPE_WEBHOOK_SECRET_ORACLE`; rename to `_H24` to match the
+  DBCODE1 rename (rename secret → update code → redeploy, done deliberately).
+- **(b) "No such customer" hardening:** h24-checkout should catch `No such customer` and retry without the
+  `customer` param (fall back to creating a fresh customer), so a stale pointer can never brick checkout — this
+  exact failure will recur on the **test→live key flip**. Money-path edit to h24-checkout; deserves its own
+  type-check + deploy + re-prove cycle.
