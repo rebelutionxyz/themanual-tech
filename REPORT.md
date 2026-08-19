@@ -23,6 +23,67 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## FRONTHDR2 — DELETE THE TOP HEADER ON /mc. The shared Manual SiteHeader no longer renders on the /mc mission-control board; the surface wears only its own board chrome. Build green, biome clean, committed, NOT pushed. (2026-08-19)
+
+Session `ae0d9a96` (fallback id). Dispatch FRONTHDR2, lane `front`, workdir `TheMANUAL.tech`, effort S.
+Owner ruling 2026-08-19. Same shape as FRONTHDR1 (which stripped the leftover Manual header off /h24).
+Committed on green, no push ("COMMIT ON GREEN. NO PUSH (owner-gated)"). W-23 status stamp honored at close.
+
+### The two headers on /mc, told apart
+Live /mc rendered TWO stacked headers: (1) the shared black **SiteHeader** — TheMANUAL.tech logo + Rooms
+button + Sign in / wallet / avatar — mounted globally in `App.tsx` (`{!isCommunitySurface && !isChromeFree
+&& <SiteHeader />}`, line 206) plus the `TopTickerSlot` promo ticker just below it; and (2) the page's OWN
+`<header>` inside `MissionControlPage.tsx` (line 370) — "Mission Control — build progress" + the READ-ONLY
+note — which sits above the dispatch-queue board. The dispatch names the target precisely: "the
+dispatch-queue board content and its own controls stay; the site top header goes." Target = the shared
+SiteHeader (bar 1). Bar 2 (the board's own header + controls) stays.
+
+### What shipped (1 file, `src/App.tsx`)
+Mirrors FRONTHDR1 exactly:
+- Added `/mc` to `CHROME_FREE_PATHS` — so `isChromeFree` is true on /mc and neither the shared SiteHeader
+  nor the TopTickerSlot renders there.
+- Moved the `/mc` render route OUT of the `PlatformLayout` group to a top-level chrome-free route next to
+  `/h24`, so no PlatformLayout promo rail (`SidebarPromotedSlot`) renders over it either. Only the board
+  remains. `MissionControlPage.tsx` itself is UNTOUCHED — its own "build progress" header and the board are
+  preserved verbatim, and the FRONT58 admin gate is intact.
+
+Route-order safety: a static path (`/mc`) always out-ranks the dynamic `/:slug` route in React Router v6
+regardless of registration position, so /mc still wins over `SurfacePage` from the top-level position (the
+old in-group comment's "MUST stay ahead of /:slug" concern is satisfied by rank, not by list order). The
+old in-group route line was replaced with a pointer comment.
+
+FRONT86 scroll: `MissionControlPage`'s container is `h-full … overflow-y-auto`; its own FRONT86 note says
+the fix "is harmless if a future parent scrolls instead." The new chrome-free parent
+(`min-h-0 flex-1 overflow-y-auto`, App.tsx line 218) DOES scroll, so the board keeps its scroll behavior —
+strictly safer than the prior `overflow-hidden` main.
+
+Scope discipline: `SiteHeader` component untouched — still renders on every other surface.
+
+### Done-tests + PROVE (dev localhost:3017, isolated automation profile)
+- `npm run build` (tsc -b && vite build) → `✓ built in 1m 13s` (green).
+- `npx biome lint ./src/App.tsx` → `Checked 1 file … No fixes applied.` (clean).
+- `/mc` (signed out) observed: renders its own Gate ("Mission Control needs a sign-in") with **NO black
+  SiteHeader / ticker above it** — the top chrome is gone. Console: zero errors (only two pre-existing
+  React Router v7 future-flag warnings). Route resolves (Gate renders; not swallowed by `/:slug`).
+  Screenshot saved.
+- Regression / scope: `/constellation` (a normal PlatformLayout route) still renders the black SiteHeader
+  (TheMANUAL.tech logo + Rooms + Sign in) — confirming the removal is scoped to /mc only. Screenshot.
+
+### Could not verify
+- The signed-in admin board itself (the live dispatch-queue table + step rows) was not rendered: /mc is
+  admin-gated (`bees.is_admin`, RLS-enforced) and this pass created no synthetic credentials (standing
+  rule). The chrome removal is proven at the Gate layer, which shares the exact same global-chrome code
+  path as the board; the board markup in `MissionControlPage.tsx` was not edited, so its own header +
+  content are structurally preserved.
+
+### Files
+```
+src/App.tsx   — CHROME_FREE_PATHS += '/mc'; /mc route relocated out of PlatformLayout to top-level chrome-free
+REPORT.md     — this section
+```
+
+---
+
 ## FRONTCODE1 — THE CODE-LAYER h24 RENAME. Code half of the coordinated code+schema rename (DBCODE1 is the DB half). Built green, committed, NOT pushed — lands in the SAME push as DBCODE1's apply. (2026-08-18)
 
 Session 79a4fea9 (fallback id). Dispatch FRONTCODE1, lane front, workdir TheMANUAL.tech, effort L.

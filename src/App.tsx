@@ -147,11 +147,14 @@ const COMMUNITY_PREFIXES = [
 ];
 
 // Chrome-free paths — the front door (login / coming-soon), MiniWaves (V77),
-// and /h24, which wear their OWN shell. No shared Manual SiteHeader / ticker.
+// /h24, and /mc, which wear their OWN shell. No shared Manual SiteHeader / ticker.
 // FRONTHDR1 (ORACLE_MF v1.61 R2): the pre-h24 Manual SiteHeader was rendering on
 // /h24 in addition to the h24 chrome; /h24 now shows only its own toolbar +
 // sidebar + console (the Rooms button moved into the h24 toolbar).
-const CHROME_FREE_PATHS = new Set(['/', '/waves', '/miniwaves', '/h24']);
+// FRONTHDR2 (owner ruling 2026-08-19): the shared SiteHeader was rendering on the
+// /mc mission-control board too; /mc now shows only its own board chrome (the
+// "Mission Control — build progress" header + the dispatch-queue board).
+const CHROME_FREE_PATHS = new Set(['/', '/waves', '/miniwaves', '/h24', '/mc']);
 
 // Management allowlist — OG HUMAN only, until the role registries (Lock 8 /
 // 9.6) deploy and real tier checks replace this. Landing gate 2026-07-10.
@@ -256,6 +259,15 @@ function AppContent() {
             rail renders over it; OraclePage carries the h24 toolbar + sidebar +
             console. /oracle and /here24 still redirect here (below). */}
           <Route path="/h24" element={<OraclePage />} />
+
+          {/* Mission Control board — chrome-free, owns its own board chrome
+            (FRONTHDR2, owner ruling 2026-08-19). Moved OUT of PlatformLayout so no
+            shared Manual SiteHeader / ticker / promo rail renders over it; the page
+            carries its own "build progress" header + the dispatch-queue board.
+            Gates on bees.is_admin, with the real enforcement being RLS on the ops_
+            tables. A static path always out-ranks the PlatformLayout /:slug route,
+            so this stays ahead of SurfacePage without living inside that group. */}
+          <Route path="/mc" element={<MissionControlPage />} />
 
           {/* Auth */}
           <Route path="/login" element={<LoginPage />} />
@@ -468,10 +480,9 @@ function AppContent() {
                 element={<AstraStubPage entry={entry} />}
               />
             ))}
-            {/* Mission Control board. Gates on bees.is_admin like /hq, but the
-              real enforcement is RLS on the ops_ tables — the gate is courtesy.
-              MUST stay ahead of /:slug or SurfacePage swallows it. */}
-            <Route path="/mc" element={<MissionControlPage />} />
+            {/* Mission Control (/mc) moved OUT of this group to a top-level
+              chrome-free route (FRONTHDR2) — see near /h24 above. A static path
+              out-ranks /:slug, so it still wins over SurfacePage from up there. */}
             <Route path="/groups" element={<ManualGroupsPlaceholder />} />
             <Route path="/cart" element={<CartPlaceholder />} />
             <Route path="/api/docs" element={<OpenAPIDocs />} />
