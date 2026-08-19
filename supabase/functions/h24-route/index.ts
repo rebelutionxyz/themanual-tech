@@ -16,8 +16,10 @@
 //   - standard  → claude-sonnet-5,  metered at 3.0x provider cost, rates as data
 //   - frontier  → claude-opus-5,    metered at 2.5x provider cost, confirm-cost gate
 //
-// Prices are NOT in this file. They live in h24_model_rates, newest active
-// row per model; a missing rate is a 503, never a guess.
+// Prices are NOT in this file. ROUTEREPOINT1: they live in the CATALOG
+// (models JOIN providers), read via h24_route_model_card and priced through the
+// DB79 anchor h24_tokens_per_mtok; a missing card is a 503, never a guess. The
+// legacy h24_model_rates table is retained but no longer read (retire later).
 //
 // OPS11 (2026-07-27): standard and frontier are GATED OFF at PAID_TIERS_ENABLED
 // and return 503 before any provider call — see the const's comment below. The
@@ -402,12 +404,12 @@ function estimateOutputTokens(tier: Tier, inputTokens: number): number {
   );
 }
 
-// ─── Rates as DATA (OPS15). ───
+// ─── Rates as DATA (OPS15; ROUTEREPOINT1 moved the source to the catalog). ───
 //
-// Per-model Oracle Token rates live in h24_model_rates (DB8), not in code,
-// so re-pricing is an INSERT rather than a deploy. Current row per model =
-// newest active row by effective_from, which preserves rate history: a debit
-// can always be re-derived against the rate that was live when it happened.
+// The ModelRate shape is unchanged, but its VALUES now come from the catalog
+// (models JOIN providers) via h24_route_model_card + the DB79 anchor, not the
+// legacy h24_model_rates table. Re-pricing is still a row update, never a deploy:
+// change a models.price_* USD value (or the anchor) and every rate re-derives.
 interface ModelRate {
   input_tokens_per_m:  number;
   output_tokens_per_m: number;
@@ -463,6 +465,110 @@ function calculateCostTokens(
 
   // Six decimals matches h24_token_ledger.amount_tokens numeric(20,6).
   return Math.round(cost * 1_000_000) / 1_000_000;
+}
+
+// ─── ROUTEREPOINT1: the CATALOG drives dispatch AND billing. ───
+//
+// Before this pass, billing read the LEGACY h24_model_rates table (pre-derived
+// h24-token rates) and user dispatch was hard-wired to Anthropic + the free Groq
+// ladder. The catalog (models JOIN providers, DB79) now owns both: a card carries
+// the provider dialect/base_url/secret_name for dispatch and the four h24-token
+// rates, DERIVED IN SQL via the DB79 anchor h24_tokens_per_mtok so the margin +
+// anchor (1000 tok=$1, x3 standard / x2.5 frontier, cache_write = 1.25x input)
+// live in exactly one place. The route never re-derives the margin in TS.
+//
+// The card comes from the h24_route_model_card(text) function — it returns ZERO
+// rows for an unknown/inactive model, which the caller turns into a 503 (pricing
+// not configured), never a guessed rate. Same fail-closed posture the legacy
+// lookup held.
+type CatalogDialect = 'anthropic' | 'openai_compat' | 'groq_compat' | 'gemini';
+interface ModelCard {
+  model_string:     string;
+  provider_name:    string;
+  band:             Tier;
+  dialect:          CatalogDialect;
+  base_url:         string;
+  auth_secret_name: string;
+  input_per_m:      number;
+  output_per_m:     number;
+  cacheread_per_m:  number | null;
+  cachewrite_per_m: number | null;
+}
+
+// DB77's cacheSemantics ('read' vs conservative 'combined') has no column in the
+// providers table yet, so it stays a name-keyed map here, mirroring the retiring
+// OPENAI_COMPAT_REGISTRY exactly. Anything not listed defaults to 'combined' (the
+// worse leg), so a new provider never silently under-prices the cache-write leg.
+// FOLLOW-UP: promote this to a providers.cache_semantics column (surfaced in the
+// ROUTEREPOINT1 report) so provider config lives entirely in the catalog.
+const PROVIDER_CACHE_SEMANTICS: Record<string, 'read' | 'combined'> = {
+  openai: 'read',
+  groq:   'read',
+};
+
+// deno-lint-ignore no-explicit-any
+async function loadModelCard(service: any, modelString: string): Promise<ModelCard | null> {
+  const { data, error } = await service.rpc('h24_route_model_card', { p_model: modelString });
+  if (error) {
+    console.error('h24-route model card lookup failed', {
+      model: modelString, message: error.message,
+    });
+    return null;
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return {
+    model_string:     row.model_string,
+    provider_name:    row.provider_name,
+    band:             row.band as Tier,
+    dialect:          row.dialect as CatalogDialect,
+    base_url:         row.base_url,
+    auth_secret_name: row.auth_secret_name,
+    input_per_m:      Number(row.input_per_m),
+    output_per_m:     Number(row.output_per_m),
+    cacheread_per_m:  row.cacheread_per_m  === null ? null : Number(row.cacheread_per_m),
+    cachewrite_per_m: row.cachewrite_per_m === null ? null : Number(row.cachewrite_per_m),
+  };
+}
+
+function dialectToKind(d: CatalogDialect): ProviderKind {
+  if (d === 'anthropic') return 'anthropic';
+  if (d === 'gemini')    return 'gemini';
+  return 'openai-compatible'; // openai_compat + groq_compat share the OpenAI wire
+}
+
+// Build a ProviderSpec from a card, reading the key by NAME (never logged). Null
+// when the key is ABSENT — the caller fails closed (503), never a silent
+// fall-through to Anthropic that would mis-bill and mis-attribute (DB77 money rule).
+function specFromCard(card: ModelCard): ProviderSpec | null {
+  const apiKey = Deno.env.get(card.auth_secret_name);
+  if (!apiKey) return null;
+  return {
+    kind:   dialectToKind(card.dialect),
+    model:  card.model_string,
+    url:    card.base_url,
+    apiKey,
+    label:  `${card.provider_name}:${card.model_string}`,
+    // Anthropic reports the cache split natively (cacheSemantics is ignored for
+    // it). For the OpenAI wire + Gemini, price cached by the provider's verified
+    // semantics, defaulting to the conservative 'combined'.
+    cacheSemantics: card.dialect === 'anthropic'
+      ? undefined
+      : (PROVIDER_CACHE_SEMANTICS[card.provider_name] ?? 'combined'),
+  };
+}
+
+// The card's four derived h24-token rates, in the ModelRate shape the biller uses.
+// A NULL cache leg (e.g. Mistral has no published cache-read price) falls back to
+// the full input rate inside calculateCostTokens — over-charge visibly (DB27),
+// never a silent zero.
+function rateFromCard(card: ModelCard): ModelRate {
+  return {
+    input_tokens_per_m:  card.input_per_m,
+    output_tokens_per_m: card.output_per_m,
+    cached_input_per_m:  card.cacheread_per_m,
+    cache_write_per_m:   card.cachewrite_per_m,
+  };
 }
 
 // ─── Provider adapters (OPS21). ───
@@ -852,6 +958,42 @@ Deno.serve(async (req) => {
     tier = body.tier as Tier;
   }
 
+  // OPS15: the user-scoped client is gone; everything reads server-side. Created
+  // here (earlier than before) because ROUTEREPOINT1's model resolution needs it
+  // ahead of the paid-tier gate. It is only a client constructor — no cost.
+  const service = serviceClient();
+
+  // ─── ROUTEREPOINT1: optional user model selection. ───
+  //
+  // A user directive MAY name a specific catalog model (gpt-5, gemini-2.5-pro,
+  // deepseek-v4-pro, ...). When it does, the model's BAND drives the effective
+  // tier — margin, thinking config, max_tokens and the paid-tier gate all follow
+  // the band, because the catalog holds the price under that band. The `tier`
+  // field is then advisory: a conflicting one is logged and OVERRIDDEN by the
+  // band, never used to bill at a cheaper margin than the model carries. Absent =
+  // unchanged tier-driven behaviour (Anthropic sonnet/opus, or the free Groq
+  // ladder). Internal callers keep the DB75/DB77/DB78 provider path untouched.
+  let userTargetCard: ModelCard | null = null;
+  if (!isInternal && typeof body.model === 'string' && body.model.trim().length > 0) {
+    const requested = body.model.trim();
+    userTargetCard = await loadModelCard(service, requested);
+    if (!userTargetCard) {
+      // Unknown or inactive model — fail closed, never guess a rate or provider.
+      return jsonResponse({
+        error: 'model_unavailable',
+        model: requested,
+        message: 'no active catalog model by that name',
+      }, 400);
+    }
+    if (body.tier !== undefined && (body.tier as Tier) !== userTargetCard.band) {
+      console.log('h24-route model band overrides requested tier', {
+        bee_id: beeId, requested_tier: body.tier,
+        model: requested, band: userTargetCard.band,
+      });
+    }
+    tier = userTargetCard.band;
+  }
+
   // ─── Paid-tier guard (OPS11). ───
   // Refused as early as tier is known — ahead of the rate-cap RPC, the astra
   // lookup, the escrow pre-check, the directive row insert and, above all, the
@@ -886,12 +1028,6 @@ Deno.serve(async (req) => {
     typeof body.astra_slug === 'string' && body.astra_slug.length > 0
       ? body.astra_slug
       : null;
-
-  // OPS15: the user-scoped client is gone with the escrow path — it existed
-  // only to call h24_get_escrow_balance as the Bee. Token balances are
-  // read server-side via the h24_token_available RPC instead (OPS49; it was
-  // the h24_token_balances view until that view was found expiry-blind).
-  const service = serviceClient();
 
   // ─── Rate cap check (BEFORE astra lookup / balance check / directive insert). ───
   //
@@ -961,44 +1097,35 @@ Deno.serve(async (req) => {
     }
   }
 
-  // ─── Rate lookup (rates as data — OPS15). ───
-  const providerModelForRate = TIER_PROVIDER_MODEL[tier];
+  // ─── Rate lookup (ROUTEREPOINT1: the CATALOG, priced via the DB79 anchor). ───
+  //
+  // Repointed off the legacy h24_model_rates table onto h24_route_model_card,
+  // which JOINs models+providers and derives the four h24-token rates through
+  // h24_tokens_per_mtok. For a model-targeted directive the card is the user's
+  // model; for the tier path it is the tier's model (claude-sonnet-5/opus-5).
+  // The derived numbers reproduce the retired legacy rates EXACTLY — verified in
+  // the ROUTEREPOINT1 report before this repoint.
+  const providerModelForRate = userTargetCard
+    ? userTargetCard.model_string
+    : TIER_PROVIDER_MODEL[tier];
   let rate: ModelRate | null = null;
-  // Internal callers skip pricing: they name their own model (which need not be
-  // the tier's model), so pricing against TIER_PROVIDER_MODEL[tier] would record
-  // a cost for the wrong model. Internal rows carry accurate token COUNTS; an
-  // audit prices those against the real provider from the rate card if it wants a
-  // number, exactly as the routing log does. rate === null ⇒ cost 0, debit
-  // skipped, balance skipped — all already guarded.
+  // Internal callers skip pricing: they name their own model, so pricing against
+  // TIER_PROVIDER_MODEL[tier] would record a cost for the wrong model. Internal
+  // rows carry accurate token COUNTS; an audit prices those from the catalog if
+  // it wants a number. rate === null ⇒ cost 0, debit skipped, balance skipped.
   if (tier !== 'free' && !isInternal) {
-    const { data: rateRow, error: rateErr } = await service
-      .from('h24_model_rates')
-      .select('input_tokens_per_m, output_tokens_per_m, cached_input_per_m, cache_write_per_m')
-      .eq('model_name', providerModelForRate)
-      .eq('active', true)
-      .order('effective_from', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (rateErr || !rateRow) {
+    // Reuse the card already loaded for a user-targeted model; otherwise load the
+    // tier's model card now.
+    const rateCard = userTargetCard ?? await loadModelCard(service, providerModelForRate);
+    if (!rateCard) {
       // Refuse rather than guess. Charging an invented rate is worse than a 503.
       console.error('h24-route rate lookup failed', {
         bee_id: beeId, model: providerModelForRate,
-        message: rateErr?.message ?? 'no active rate row',
+        message: 'no active catalog card',
       });
       return errorResponse('Pricing not configured for this tier', 503);
     }
-    rate = {
-      input_tokens_per_m:  Number(rateRow.input_tokens_per_m),
-      output_tokens_per_m: Number(rateRow.output_tokens_per_m),
-      cached_input_per_m:  rateRow.cached_input_per_m === null
-        ? null : Number(rateRow.cached_input_per_m),
-      // DB27. Absent (pre-F-2 rate row, or a model never re-rated) falls back to
-      // the full input rate inside calculateCostTokens — over-charge visibly
-      // rather than silently restoring the 12.5x under-charge.
-      cache_write_per_m:   rateRow.cache_write_per_m === null
-        || rateRow.cache_write_per_m === undefined
-        ? null : Number(rateRow.cache_write_per_m),
-    };
+    rate = rateFromCard(rateCard);
   }
 
   // ─── Cost estimation, in Oracle Tokens. ───
@@ -1028,7 +1155,7 @@ Deno.serve(async (req) => {
     return jsonResponse({
       cost_preview: true,
       tier,
-      provider: TIER_PROVIDER_MODEL[tier],
+      provider: providerModelForRate,
       estimated_cost_tokens: estimatedCostTokens,
       estimated_input_tokens: estimatedInputTokens,
       estimated_output_tokens: estimatedOutputTokens,
@@ -1157,7 +1284,29 @@ Deno.serve(async (req) => {
   const forceFallback = directive.startsWith('[OPS21-FORCE-FALLBACK]');
 
   const ladder: ProviderSpec[] = [];
-  if (isInternal && internalGemini) {
+  if (userTargetCard) {
+    // ─── ROUTEREPOINT1: a user-named catalog model. ───
+    // One rung, the catalog provider (dialect → adapter, base_url → url,
+    // auth_secret_name → key). FAIL CLOSED if the provider's key is absent —
+    // never silently serve Anthropic in its place, which would mis-bill and
+    // mis-attribute the spend (the DB77 money rule). The two repointed strings
+    // (deepseek-v4-*, grok-4.6) must be proven to resolve at the provider API
+    // (no 404) as part of this pass's billing proof.
+    const spec = specFromCard(userTargetCard);
+    if (!spec) {
+      console.error('h24-route provider key absent', {
+        provider: userTargetCard.provider_name,
+        secret_name: userTargetCard.auth_secret_name,
+      });
+      return jsonResponse({
+        error: 'provider_key_absent',
+        provider: userTargetCard.provider_name,
+        secret_name: userTargetCard.auth_secret_name,
+        message: `no key configured for ${userTargetCard.provider_name}`,
+      }, 503);
+    }
+    ladder.push(spec);
+  } else if (isInternal && internalGemini) {
     // DB78: route to Gemini. Requires a model; fails closed if GEMINI_API_KEY is
     // absent — never a silent fall-through, same rule as DB77's providers.
     if (!internalModel) {
