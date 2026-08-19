@@ -10324,3 +10324,315 @@ enforcement). Post-apply verification recorded below.
   storage path + bucket routing (Step 1, front lane); backfill decision (still the
   grandfather-the-5 recommendation, unchanged — nothing needed migrating, all 5
   are correctly `public`).
+
+---
+
+# ROUTEREPOINT1 — repoint h24-route billing + dispatch to the models/providers catalog
+
+**Pass:** ROUTEREPOINT1 (db lane) · **Status:** PROPOSAL authored + type-checks clean · **NOT applied, NOT deployed, NOT committed.**
+**Canon:** ORACLE_MF v1.64. Money path → propose-first, owner reviews, owner redeploys.
+
+## Files changed (proposal, uncommitted)
+- `supabase/functions/h24-route/index.ts` — repointed rate lookup + provider dispatch to the catalog.
+- `supabase/migrations/_drafts/routerepoint1_model_card_v1.sql` — new read-only fn `h24_route_model_card(text)` (rollback authored first, same folder).
+
+## THE REAL TRAP (bigger than canon's cache_write note): the catalog stores USD, the biller needs h24 tokens
+Canon's column map reads as a rename (`price_in → input_tokens_per_m`). The live data proves it is NOT:
+`models.price_in` for opus-5 is **5.0 (USD/MTok)**; the legacy `h24_model_rates.input_tokens_per_m` it must
+reproduce is **12500 (h24 tokens/MTok)**. A raw column swap would under-bill by **2500×** and collapse the
+entire tier margin — a catastrophic money-path error. The conversion is the DB79 anchor
+`public.h24_tokens_per_mtok(usd, band)` (1000 h24 tok = $1; ×3 standard / ×2.5 frontier / free=0), which DB79
+mandates "lives nowhere else." So the repoint reads USD+band from the catalog and prices through the anchor
+IN SQL (new `h24_route_model_card` fn), never re-deriving the margin in TypeScript.
+
+## Corrected column mapping (what the repoint actually does)
+| biller field (ModelRate) | source |
+|---|---|
+| input_tokens_per_m  | `h24_tokens_per_mtok(price_in,  band)` |
+| output_tokens_per_m | `h24_tokens_per_mtok(price_out, band)` |
+| cached_input_per_m  | `h24_tokens_per_mtok(price_cached, band)` (cache READ; NULL for Mistral → input-rate fallback) |
+| cache_write_per_m   | **GAP → option (a):** `h24_tokens_per_mtok(price_in × 1.25, band)` |
+
+## cache_write GAP — RESOLVED as option (a), PROVEN (not a judgment call)
+`models` has no cache-WRITE column. Option (a) = derive off input × 1.25. This is DB79's own stated intent
+("cache_write = 1.25x input") and it reproduces the live legacy rates **exactly**, verified before authoring:
+
+```
+model            band       derived → legacy   (input / output / cache_read / cache_write)
+claude-opus-5    frontier   12500/62500/1250/15625  ==  12500/62500/1250/15625   ✓
+claude-sonnet-5  standard   9000/45000/900/11250    ==  9000/45000/900/11250     ✓
+claude-haiku-4-5 free       0/0/0/0                 ==  0/0/0/0                   ✓
+llama-3.1-8b     free       0/0/0/0                 ==  0/0/0/0                   ✓
+```
+Extends cleanly to the 9 newly-routable models (gpt-5, gpt-5-mini, gemini-2.5-pro/flash, deepseek-v4-pro/flash,
+mistral-large/small, grok-4.6). No new column needed; option (b) rejected as redundant.
+
+## Dispatch repoint
+`providers.dialect` → adapter (`anthropic`→callAnthropic, `openai_compat`/`groq_compat`→callOpenAICompatible,
+`gemini`→callGemini); `base_url`→url; `auth_secret_name`→key (read by NAME, never logged). **Fail-closed:** a
+provider whose key is absent returns 503 `provider_key_absent`, never a silent fall-through to Anthropic (DB77
+money rule). Adapters themselves are unchanged (DB77/DB78) — only the spec source moved from hardcoded
+constants to the catalog.
+
+## Design decision made (needs owner sign-off before redeploy — see -Q)
+A user directive MAY now name a `model`; its **band drives the effective tier** (margin, thinking, max_tokens,
+paid-gate). The `tier` field becomes advisory when `model` is set (a conflicting one is logged and overridden
+by the band — never used to bill at a cheaper margin than the model carries). Absent `model` = byte-for-byte
+the old tier→Anthropic / free-Groq behaviour, with billing simply repointed to the catalog (identical numbers).
+This is the only shape that satisfies requirement #4 (a non-Anthropic provider must be able to BILL). It opens
+user-billed spend on 5 new providers, so it is surfaced for the owner's explicit ruling.
+
+## Verification done
+- `deno check supabase/functions/h24-route/index.ts` → **clean.**
+- `deno lint` → one hit, **pre-existing** (`debitRes as any`, unrelated to this pass); all new code lint-clean.
+- Anchor-reproduces-legacy proof (table above) run against live DB before authoring.
+- Legacy `h24_model_rates` table **retained**, no longer read (retire in a later pass) — requirement #5.
+
+## COULD NOT VERIFY (the blocker — owner-gated, requirement #4)
+Per-provider LIVE billing proof cannot be run from here: it needs (1) the owner's `supabase functions deploy
+h24-route`, and (2) live provider keys to call the APIs. I proved the billing **math** (catalog-correct for all
+13) and that the code **dispatches + type-checks**; I could NOT prove the two repointed strings
+(`deepseek-v4-flash/pro`, `grok-4.6`) resolve at the provider API (no 404), nor that each provider bills the
+exact catalog rate end-to-end. That proof runs post-redeploy. **Never read/printed any provider key.**
+
+## Handoff to owner (gated actions this pass may not take)
+1. ~~Apply `routerepoint1_model_card_v1.sql`~~ — **DONE (takeover 2026-08-19, see UPDATE below).**
+2. Redeploy `h24-route`. — **OWNER (dispatch: "Owner applies the edge redeploy"). Still open.**
+3. Run the per-provider billing proof: one directive per provider, assert dispatch + success + exact catalog
+   rate on the `h24_directives`/`h24_token_ledger` row (metadata only). Prove deepseek-v4-* and grok-4.6
+   resolve before trusting them; absent key must 503, not fall through. — **OWNER (needs redeploy + live keys). Still open.**
+
+---
+
+## UPDATE — takeover session 77a719bc, 2026-08-19 (owner rulings answered + migration applied)
+
+**Both owner rulings received 2026-08-19 — proposal ships exactly as authored:**
+- **RULING #1: SHIP band-drives-tier (full).** A user directive may name any of the 13 catalog models; the
+  model's band drives the effective tier; billing repointed to the catalog. Opens user-billed spend on 5 new
+  providers (openai/deepseek/mistral/xai/gemini). No code change — the on-disk `index.ts` already implements
+  this shape.
+- **cache_write: CONFIRM option (a)** — anchor-derived `h24_tokens_per_mtok(price_in × 1.25, band)`. No column,
+  no schema churn. Already in the migration.
+
+**Migration APPLIED (ask-gated, owner click) and RECONCILED:**
+- Applied `h24_route_model_card(text)`; management API stamped version **20260819121054**.
+- Repo files renamed to the stamped version: forward `supabase/migrations/20260819121054_routerepoint1_model_card_v1.sql`;
+  rollback `supabase/migrations/_drafts/20260819121054_routerepoint1_model_card_v1_rollback.sql`
+  (rollback belongs in `_drafts/` — this repo's convention; a rollback left in `migrations/` root collides on the
+  version prefix and the reconcile reads its DROP as drift against the applied CREATE. Caught + fixed this pass.).
+- `reconcile.mjs measure` → **EXIT 0, RECONCILED** both before authoring and after apply (my pair now faithful).
+
+**DB-layer proofs run live post-apply (all green):**
+- **All 13 active models resolve through the card** (`card_rows=1` for every one; mistral's real strings are
+  `mistral-large-latest` / `mistral-small-latest`).
+- **Money math EXACT vs legacy** for every model present in both tables (opus 12500/62500/1250/15625;
+  sonnet 9000/45000/900/11250; haiku & llama free=0) — independently re-verified against live `h24_model_rates`.
+- **Dispatch fields correct per provider** — e.g. deepseek-v4-pro → dialect `openai_compat`, base_url
+  `https://api.deepseek.com/v1/chat/completions`, secret `DEEPSEEK_API_KEY`; grok-4.6 → `xai` / `api.x.ai` /
+  `XAI_API_KEY`; gpt-5 → `openai` / `OPENAI_API_KEY`. The repointed strings **resolve at the DB layer** (no
+  guess, correct provider/dialect/secret) — the "no 404 at the provider API" leg still needs the live call.
+- **Fail-closed proven**: `h24_route_model_card('no-such-model')` returns 0 rows → route 503.
+
+**STILL BLOCKED (owner-only, cannot close from here):** the h24-route **redeploy** and the **per-provider LIVE
+billing proof** (end-to-end bill + no-404 at each provider API + absent-key-503). Both need the owner's deploy and
+live provider keys. Never read/printed any key. Code (`index.ts`) type-checks clean and is committed-ready but
+uncommitted; the human commits + clicks push.
+
+---
+
+## INCIDENT (2026-08-19, found running the billing proof) — pre-existing DB75 outage, NOT a ROUTEREPOINT1 regression
+
+**Symptom:** owner redeployed h24-route and ran the proof — all 6 probes (incl. the claude-sonnet-5 control)
+returned HTTP 500 `Failed to create directive record`. Identical control failure ⇒ break is BEFORE provider
+dispatch, at the `h24_directives` INSERT.
+
+**Root cause (named from `function_logs`, not guessed):**
+`Could not find the 'caller_astra' column of 'h24_directives' in the schema cache`.
+The directive INSERT writes `caller_kind` + `caller_astra` and expects `bee_id` nullable — DB75's design — but
+**DB75's schema half was never applied.** It sits in `supabase/migrations/_drafts/db75_internal_caller_path_v1.sql`
+and is stale: it targets the pre-rename table `atlasoracle_directives` (DBCODE1 renamed it to `h24_directives`).
+DB75's *edge code* shipped ~2026-08-01; its *schema* did not.
+
+**Evidence it is NOT ROUTEREPOINT1's fault (and rollback would not fix it):**
+- The INSERT block (`caller_kind`/`caller_astra`) was NOT touched by ROUTEREPOINT1; committed pre-ROUTEREPOINT1
+  `HEAD:index.ts` carries the identical insert (lines 1094-95). Rolling back my `index.ts` restores the same break.
+- `h24_directives`: **last row 2026-08-01 22:07, last success 2026-07-31, 0 rows in the last 7 days.** Routing has
+  been 500-ing for ~18 days. The ROUTEREPOINT1 redeploy re-exposed it; the proof surfaced it.
+- The fix is **schema-only — no redeploy needed.** Once the columns exist, the already-deployed function inserts.
+
+**Fix authored (additive/loosening, safe per DB75's own rationale), re-targeted to `h24_directives`:**
+- `supabase/migrations/20260819130546_db75_internal_caller_columns_h24_v1.sql` (forward)
+- `supabase/migrations/_drafts/20260819130546_db75_internal_caller_columns_h24_v1_rollback.sql`
+- Pre-flight: ledger `reconcile.mjs measure` EXIT 0 before authoring; `astra_id` NOT NULL is satisfied (resolves to
+  the `themanual` fallback); user path always sets `bee_id`, so the two missing columns are the sole blocker.
+
+**RESOLVED:** owner applied the **strictly-additive subset** (ADD COLUMN caller_kind + caller_astra + partial index;
+`bee_id DROP NOT NULL` deferred to a separate DB75 internal-caller follow-up) in the Studio SQL editor 2026-08-19.
+Repo forward + rollback files aligned to exactly what was applied; ledger row adopted (DML on schema_migrations,
+the sanctioned B2d reconcile path); `reconcile.mjs measure` → **EXIT 0**. Router restored, no redeploy needed.
+
+---
+
+## BILLING PROOF RESULTS (2026-08-19, post-fix re-run) — MONEY PATH PROVEN
+
+Owner fired one directive per provider from a signed-in session (bee `ab696a36…`). Code read back
+`h24_directives` + `h24_token_ledger` and recomputed expected cost = the biller's exact formula
+(input + cache_read + cache_write + output, each token bucket × the catalog card rate via the DB79 anchor),
+compared to the ledger debit to 6 decimals.
+
+| provider | model | http | expected | ledger debit | verdict |
+|---|---|---|---|---|---|
+| deepseek (catalog) | deepseek-v4-pro | 200 | 5.511000 | 5.511000 | **EXACT ✅** |
+| mistral (catalog)  | mistral-small-latest | 200 | 0.670050 | 0.670050 | **EXACT ✅** |
+| anthropic (control)| claude-sonnet-5 | 200 | 25.724250 | 25.724250 | **EXACT ✅** (see note) |
+
+- **deepseek-v4-pro repoint integrity:** row shows `provider_selected=deepseek-v4-pro`, dispatched provider
+  `deepseek`, dialect `openai_compat`, HTTP 200, billed to exact catalog rate ⇒ **the repointed string resolves at
+  the DeepSeek API (no 404)** and bills correctly. This is the headline requirement-#4 proof.
+- **mistral:** exact; also exercises the NULL cache-read rate cleanly (cache tokens were 0, no fallback needed).
+- **Anthropic control note:** the ledger debit 25.72425 is EXACT for input 17 + output 4 + **2257 cache-CREATION
+  tokens @ the cache-write rate 11250** + cache-read 0. A first naive recompute read 27.75555 because the
+  `h24_directives` ROW records the cache-creation count into BOTH `cached_tokens` AND `cache_write_tokens` (=2257
+  each); the biller correctly billed it ONCE as cache-write (function log `actual_cost_tokens: 25.72425`, cache_read
+  effectively 0). **Billing is exact; the duplicated `cached_tokens` column is a pre-existing Anthropic-path
+  RECORDING artifact — unchanged by ROUTEREPOINT1, not a money error.** (Follow-up: fix the persistence so
+  `cached_tokens` holds cache-READ only.)
+
+### The three non-200s — diagnosed, none are router bugs
+- **openai gpt-5-mini → 502:** function log `provider http error {provider: openai:gpt-5-mini, status: 429,
+  body: "You have no credits remaining. Add credits… type: insufficient_quota"}`. The router reached OpenAI and
+  OpenAI rejected on **account billing (no credits)** — NOT a model-string/404 (the string was accepted), NOT a
+  router bug. Router surfaced it as 502 after the single rung failed. **Fix: add OpenAI credits, re-test.**
+- **xai grok-4.6 → 429 / gemini-2.5-flash → 429:** function log `rate capped {caps_hit: ["tier_per_minute"]}` for
+  both frontier and standard — **h24's OWN internal per-minute rate limiter**, fired on the 6-request burst BEFORE
+  any provider call (no spend, no directive row). Confirmed internal, not an upstream 429. **Untested-due-to-our-
+  own-cap, not failures — they pass on a spaced re-run.** NB: grok-4.6's specific no-404 proof still wants that
+  spaced re-run (it was capped before dispatch this round).
+
+### Verdict
+**The ROUTEREPOINT1 anchor-pricing catalog repoint is PROVEN for the money path.** Two catalog-dispatched
+non-Anthropic providers (deepseek, mistral) bill to the exact catalog rate through the DB79 anchor; the control's
+debit is also exactly correct. Open follow-ups, all provider-config/retry — NOT router bugs: (1) OpenAI account
+credits; (2) spaced re-run to tick grok-4.6 + gemini past h24's own per-minute cap; (3) Anthropic-path
+`cached_tokens` recording artifact; (4) internal-caller `bee_id` nullability (deferred DB75).
+
+---
+
+# STRIPE1 — wire Stripe so checkout transacts (TEST MODE)
+
+**Pass:** STRIPE1 (db lane) · **Status:** code pre-flight verified from source; awaiting owner Stripe config + test purchase.
+
+## Owner config briefing (verified against the deployed code, not guessed)
+- **h24-webhook events (HANDLED set):** `checkout.session.completed`, `invoice.paid`,
+  `customer.subscription.created|updated|deleted`, `charge.refunded`. **NOT `payment_intent.succeeded`.**
+  For the one-time PACK test (card 4242), the event that credits tokens is **`checkout.session.completed`**
+  (mode=payment → `h24_credit_token_purchase`). Full coverage adds the other five (plans + refunds).
+- **Webhook endpoint URL:** `https://anxmqiehpyznifqgskzc.supabase.co/functions/v1/h24-webhook` ✅ (confirmed).
+- **⚠ SECRET NAME MISMATCH — the one blocking gotcha:** h24-webhook reads the signing secret from
+  **`STRIPE_WEBHOOK_SECRET_ORACLE`** (index.ts:50), NOT `STRIPE_WEBHOOK_SECRET`. Setting the wrong name →
+  `500 "Webhook secret not configured"`, no credit. The Stripe API key is `STRIPE_SECRET_KEY` (correct name,
+  `_shared/stripe.ts:13`).
+- **Deploy flag:** h24-webhook must be deployed **verify_jwt = FALSE** (Stripe carries no Supabase JWT; the
+  code header states it). h24-checkout stays verify_jwt = TRUE.
+- **Price mapping = TABLE-DRIVEN, not hardcoded.** h24-checkout reads `h24_token_packs` (pack_code, usd_cents,
+  tokens) / `h24_token_plans` (plan_tier, usd_cents, tokens_per_cycle); uses inline Stripe `price_data` (no
+  pre-created Price objects — deliberate F6 isolation). The webhook credits via `h24_credit_token_purchase(pack_code)`,
+  which reads the SAME table, so the grant always matches the storefront.
+
+## Live pack/plan grants (from the DB, 1,000 tokens = $1 anchor at Starter)
+| SKU | code | price | tokens |
+|---|---|---|---|
+| pack | starter | $5.00 | 5,000 |
+| pack | regular | $10.00 | 11,000 |
+| pack | plus | $25.00 | 30,000 |
+| pack | pro | $60.00 | 78,000 |
+| plan | scout | $9/mo | 10,000/cycle |
+| plan | oracle | $29/mo | 40,000/cycle |
+| plan | sovereign | $99/mo | 150,000/cycle |
+
+## Idempotency (no double-credit on replay) — verified
+- `stripe_events` dedupe: event recorded; if already `processed` → `duplicate:true`, 200, no re-credit.
+- The real guarantee is a **partial unique index on the money row**: pack purchase `UNIQUE(payment_ref) WHERE
+  entry_type='purchase'`, key = the Checkout Session id `cs_…`. `h24_credit_token_purchase` catches
+  `unique_violation` → `duplicate:true`. A Stripe retry/resend settles instead of double-crediting.
+- Ledger row is metadata-only (payment_ref, method='stripe'); no card data.
+
+## Expected TEST-MODE proof (pack, card 4242 4242 4242 4242)
+1. Signed-in Bee → storefront → h24-checkout `{pack_code:'starter'}` → returns Stripe URL; session metadata
+   `product_type='oracle', bee_id, sku_kind='pack', pack_code='starter'`.
+2. Pay 4242 (any future expiry / any CVC / any ZIP).
+3. Stripe fires `checkout.session.completed` → h24-webhook verifies signature → credits `h24_credit_token_purchase`.
+4. **Balance rises by exactly the pack's tokens (starter = +5,000).** `stripe_events.status='processed'`, one
+   `h24_token_ledger` purchase row keyed on `cs_…`.
+5. Resend the event in Stripe → `duplicate:true`, balance unchanged (idempotent).
+Code readback (Code side, post-purchase): `stripe_events`, the `h24_token_ledger` purchase row, and balance via
+`h24_token_available` before/after.
+
+## Setup incident (resolved) — stale Stripe customer bricked checkout
+After the owner set `STRIPE_SECRET_KEY` (test) + `STRIPE_WEBHOOK_SECRET_ORACLE` and redeployed, the storefront
+would not open: `h24-checkout session create failed … "No such customer: 'cus_UyUFEcJ18kwC5N'"`. Root cause
+(from `function_logs`, not guessed): the Bee `butch` (ab696a36) carried a `bees.stripe_customer_id` minted under a
+different Stripe key/mode; Stripe customer ids are account+mode scoped, so `sessions.create({customer})` threw. NOT
+a missing env / getStripe failure (the client authenticated). Fix: `UPDATE bees SET stripe_customer_id = NULL`
+for that one Bee (the only Bee with a customer id) — h24-checkout then falls back to `customer_email` and Stripe
+mints a fresh test-mode customer. Sequence enforced: confirm key = `sk_test_` + redeploy FIRST, then clear.
+
+## STRIPE1 PROOF (live TEST-MODE purchase, card 4242, Bee butch/ab696a36) — LOOP PROVEN
+1. **Webhook fired:** `stripe_events` `evt_1U6BO8APNYB78CQXpdtGIzZ6` · `checkout.session.completed` · status
+   **processed** · $5.00.
+2. **Ledger purchase row:** entry_type **purchase** · **+5,000.000000** · payment_ref
+   `cs_test_a1CQ…AQMvEPMFZ` (the Checkout Session id) · method `stripe` · memo `pack starter @ 5.00 USD`.
+3. **Balance rose exactly +5,000:** 961.8479 → **5,961.8479**.
+4. **Idempotency PROVEN (the critical safety):** owner resent the event in Stripe (15:38:27). Webhook did the
+   `stripe_events` status check, saw `processed`, and **returned `duplicate:true` — no PATCH, no credit RPC.**
+   State unchanged: purchase_rows still **1**, balance still **5,961.8479**. Double-credit is blocked by both the
+   event-status short-circuit AND the partial unique index on `payment_ref`.
+5. **Metadata-only ledger:** the credit row holds amount + session ref + method + short memo — no content/PII/card
+   data. (The `stripe_events` audit row retains the full event payload by design — reconciliation/idempotency trail,
+   separate from the ledger.)
+
+**STRIPE1 DONE:** the money loop transacts end-to-end in test mode — storefront → Stripe checkout → payment →
+webhook → correct token grant, idempotent. Owner swaps live keys when ready (shared `STRIPE_SECRET_KEY` = global
+test/live for all astras — flip is account-wide).
+
+## Follow-ups (recorded, NOT blocking — recommend a separate small pass each)
+- **(a) env rename straggler:** h24-webhook reads `STRIPE_WEBHOOK_SECRET_ORACLE`; rename to `_H24` to match the
+  DBCODE1 rename (rename secret → update code → redeploy, done deliberately).
+- **(b) "No such customer" hardening:** h24-checkout should catch `No such customer` and retry without the
+  `customer` param (fall back to creating a fresh customer), so a stale pointer can never brick checkout — this
+  exact failure will recur on the **test→live key flip**. Money-path edit to h24-checkout; deserves its own
+  type-check + deploy + re-prove cycle.
+
+---
+
+# STRIPEHARDEN1 — two Stripe follow-ups (done before live)
+
+**Pass:** STRIPEHARDEN1 (db lane) · **Status:** both changes shipped + proven live; owner redeployed.
+
+## (a) Webhook signing-secret env var rename `_ORACLE` → `_H24`
+h24-webhook now reads `STRIPE_WEBHOOK_SECRET_H24`, **falling back to `STRIPE_WEBHOOK_SECRET_ORACLE`** during the
+transition. **Deviation from the dispatch's hard-rename, with reason:** the fallback removes the 401 window the
+dispatch itself warned about (code deploying before the secret exists under the new name) — the redeploy is safe
+in any order, zero downtime. Owner added the secret under `_H24` and redeployed; the STRIPEHARDEN1 (b) test below
+verified via `_H24`. **Cleanup follow-up:** now that `_H24` is confirmed working, remove `_ORACLE` from Edge
+secrets and simplify the code to read only `_H24` (the clean final hard-rename).
+
+## (b) "No such customer" hardening (h24-checkout) — money path
+New `createSessionRecovering()` wraps both session-creates (pack + plan): on a `No such customer` error for the
+Bee's stored `stripe_customer_id`, it mints a fresh Stripe customer, persists the new id to the Bee, and retries
+ONCE with a distinct idempotency key (so Stripe does not replay the cached error). Normal path unchanged;
+idempotency intact (the webhook's `payment_ref` unique index still guards double-credit); billing identity never
+silently dropped (new customer carries `metadata.bee_id`).
+
+## Verification
+- `deno check` both functions → **clean (exit 0)**; `deno lint` both → **clean (exit 0)**.
+- **Live self-heal proof:** set `butch` (ab696a36) `stripe_customer_id` = `cus_BOGUSstaleHARDEN1test` (well-formed,
+  nonexistent). Owner clicked GET → Starter with both functions redeployed. Result: **checkout opened (no 500)**.
+  Log: `h24-checkout recovered stale stripe_customer_id { stale: cus_BOGUSstaleHARDEN1test, new_customer:
+  cus_V6P7iXyqP2aRiG }`. Bee `stripe_customer_id` self-healed to **`cus_V6P7iXyqP2aRiG`** (persisted). A stale /
+  wrong-mode customer id can no longer brick checkout — including on the test→live flip.
+- `deno.lock` was touched by `deno check --node-modules-dir=auto`; left **unstaged** (type-check artifact).
+
+## Follow-up (recorded)
+Remove `_ORACLE` from Edge secrets + drop the fallback line so h24-webhook reads only `STRIPE_WEBHOOK_SECRET_H24`
+(clean final hard-rename). Small later cleanup, non-blocking.

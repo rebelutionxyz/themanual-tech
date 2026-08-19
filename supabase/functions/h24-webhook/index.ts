@@ -9,9 +9,10 @@
 //   charge.refunded                                pack  -> h24_refund_token_purchase
 //
 // AUTHN: verify_jwt MUST be false. Stripe calls this; the only trust anchor is
-// the Stripe-Signature HMAC against STRIPE_WEBHOOK_SECRET_ORACLE. The _ORACLE
-// suffix follows the house convention (_PRESS, _SUBSCRIPTION) -- one Stripe
-// endpoint has exactly one signing secret, and one function cannot verify two.
+// the Stripe-Signature HMAC against STRIPE_WEBHOOK_SECRET_H24 (renamed from
+// _ORACLE per DBCODE1). The suffix follows the house convention (_PRESS,
+// _SUBSCRIPTION) -- one Stripe endpoint has exactly one signing secret, and one
+// function cannot verify two.
 //
 // ---------------------------------------------------------------------------
 // THE FILTER IS NOT OPTIONAL. Stripe delivers every event of a subscribed type
@@ -40,14 +41,16 @@
 // current_period_end moved onto subscription ITEMS. Every read below uses the
 // dahlia path first and falls back to the legacy path.
 //
-// ENV: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET_ORACLE, SUPABASE_URL,
+// ENV: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET_H24, SUPABASE_URL,
 //      SUPABASE_SERVICE_ROLE_KEY
 
 import { getStripe, cryptoProvider } from '../_shared/stripe.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { invoiceRef } from '../_shared/ids.ts';
 
-const SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET_ORACLE') ?? '';
+// The Stripe webhook signing secret (renamed _ORACLE -> _H24 per DBCODE1; the
+// STRIPEHARDEN1 transition fallback to _ORACLE has been removed now that _H24 is live).
+const SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET_H24') ?? '';
 
 const ok = (b: unknown) =>
   new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } });
