@@ -26,6 +26,17 @@
 // SQL by hand. Polling and cadence live in `useRailBoard`; this file is the
 // board it draws. Realtime is deliberately not used — owner ruled polling now.
 //
+// FRONTMC1 — READABLE + TRACKABLE (owner: "the easier it is to read and keep
+// track the better"). Read-only board unchanged in function, just legibility:
+//   * ORDER is fixed and predictable — claimed group first, then queued, each
+//     sorted by LANE alphabetically so a lane is always in the same spot. The
+//     sort lives in `useRailBoard`; LAST N DONE trails separately.
+//   * HEARTBEAT STALENESS is a three-colour tier on the same 10/30-minute
+//     thresholds for BOTH the row health-dot and the Heartbeat column, so a
+//     hung code is spottable at a glance: GREEN fresh (<10m), AMBER drifting
+//     (10–30m), RED stale / likely-stuck (>30m). Replaces the old two-shade
+//     amber column and the flat 10-minute red.
+//
 // NEVER RENDER A BODY. `ops_dispatches.body` and `ops_reports.body` carry
 // operational instructions and are not board data. Titles only, and nothing on
 // this page selects a body column.
@@ -37,7 +48,6 @@ import {
   type RailDispatch,
   type RailLocation,
   type StaleClaim,
-  heartbeatState,
   shortDuration,
   silentMinutes,
   useRailBoard,
@@ -77,7 +87,12 @@ const DISPATCH_MARK: Record<string, string> = {
 //   * There is no dedicated success/warning/danger token in the house system.
 //     The closest fit is the kettle ramp — sourced #6FCF8F (green), emerging
 //     #E88938 (orange), unsourced #C94C4C (red) — used here as health colours.
-const STALE_MIN = 10; // a claimed row silent longer than this (minutes) is RED
+// FRONTMC1 — heartbeat staleness tiers, the key keep-track signal (owner spec).
+// A claimed row's silence colours GREEN below AMBER_MIN, AMBER up to RED_MIN, and
+// RED beyond it. These same two numbers drive BOTH the row health-dot and the
+// Heartbeat column, so the two signals never disagree on screen.
+const HB_AMBER_MIN = 10; // silent ≥ this (min) → drifting (amber)
+const HB_RED_MIN = 30; // silent > this (min) → stale / likely-stuck (red)
 const OVER_EST_MULT = 2; // a claimed row running past this × its estimate is RED
 
 // Effort tag → nominal minutes. Accepts the letters and the words.
@@ -123,10 +138,14 @@ type Health = 'green' | 'orange' | 'red' | 'neutral';
 function rowHealth(d: RailDispatch, now: number, openPasses: Set<string>): Health {
   if (d.status === 'claimed') {
     const silent = silentMinutes(d, now);
-    if (silent !== null && silent > STALE_MIN) return 'red'; // stale heartbeat / orphan claim
+    // FRONTMC1 — staleness on the 10/30 tiers, matching the Heartbeat column:
+    // past RED_MIN is red (likely stuck), the AMBER band is orange (drifting),
+    // fresh is neutral (running). Over-estimate stays red and wins.
+    if (silent !== null && silent > HB_RED_MIN) return 'red'; // stale heartbeat / orphan claim
     const est = estMinutesFromTitle(d.title);
     const elapsed = claimedElapsedMin(d.claimed_at, now);
     if (est !== null && elapsed !== null && elapsed > OVER_EST_MULT * est) return 'red';
+    if (silent !== null && silent >= HB_AMBER_MIN) return 'orange'; // drifting
     return 'neutral'; // running and healthy — not a go/wait state
   }
   if (d.status === 'queued') {
@@ -155,6 +174,29 @@ const HEALTH_MARK: Record<Health, string> = {
   orange: '●',
   red: '⚠',
   neutral: '',
+};
+
+// FRONTMC1 — the heartbeat-age tier for the Heartbeat column, on the same fixed
+// 10/30 thresholds the health-dot uses (single source of truth for staleness).
+// Reuses the kettle ramp already in play: fresh = green, drifting = amber, stale
+// = red. Only meaningful for a claimed row — a done row has no live silence.
+type HbTier = 'fresh' | 'drifting' | 'stale';
+
+function heartbeatAgeTier(mins: number): HbTier {
+  if (mins < HB_AMBER_MIN) return 'fresh';
+  if (mins <= HB_RED_MIN) return 'drifting';
+  return 'stale';
+}
+
+const HB_TIER_TEXT: Record<HbTier, string> = {
+  fresh: 'text-kettle-sourced',
+  drifting: 'text-kettle-emerging',
+  stale: 'text-kettle-unsourced',
+};
+const HB_TIER_DOT: Record<HbTier, string> = {
+  fresh: '●',
+  drifting: '●',
+  stale: '⚠',
 };
 
 const TITLE_MAX = 70;
@@ -599,7 +641,6 @@ function DispatchQueue({ board, now }: { board: RailBoard; now: number }) {
                 location={locations.get(d.pass) ?? null}
                 locationReadable={locationError === null}
                 stale={stale.get(d.pass) ?? null}
-                thresholdMinutes={thresholdMinutes}
                 openPasses={openPasses}
               />
             ))}
@@ -622,7 +663,6 @@ function DispatchQueue({ board, now }: { board: RailBoard; now: number }) {
                 now={now}
                 location={locations.get(d.pass) ?? null}
                 locationReadable={locationError === null}
-                thresholdMinutes={thresholdMinutes}
                 dim
                 openPasses={openPasses}
               />
@@ -695,7 +735,6 @@ function DispatchRow({
   location,
   locationReadable,
   stale = null,
-  thresholdMinutes,
   openPasses,
   dim = false,
 }: {
@@ -704,7 +743,6 @@ function DispatchRow({
   location: RailLocation | null;
   locationReadable: boolean;
   stale?: StaleClaim | null;
-  thresholdMinutes: number | null;
   openPasses: Set<string>;
   dim?: boolean;
 }) {
@@ -721,13 +759,11 @@ function DispatchRow({
   const suspect = isClaimed && stale !== null;
 
   const silent = isClaimed ? silentMinutes(d, now) : null;
-  const hbState = silent === null ? null : heartbeatState(silent, thresholdMinutes);
-  const hbClass =
-    hbState === 'past-threshold'
-      ? 'text-amber-300'
-      : hbState === 'quiet'
-        ? 'text-amber-200/70'
-        : 'text-text-silver';
+  // FRONTMC1 — the Heartbeat column's colour IS the staleness tier: green under
+  // 10m, amber 10–30m, red past 30m. Same tier the health-dot uses, so a stuck
+  // code reads the same on the left mark and in this column.
+  const hbTier = silent === null ? null : heartbeatAgeTier(silent);
+  const hbClass = hbTier === null ? 'text-text-silver' : HB_TIER_TEXT[hbTier];
 
   return (
     <>
@@ -739,9 +775,7 @@ function DispatchRow({
               lying. */}
           <span
             className={
-              isClaimed && health === 'neutral' && hbState === 'current'
-                ? 'inline-block animate-pulse-slow'
-                : undefined
+              isClaimed && health === 'neutral' ? 'inline-block animate-pulse-slow' : undefined
             }
           >
             {health !== 'neutral'
@@ -769,6 +803,7 @@ function DispatchRow({
             <span className="text-text-dim">—</span>
           ) : (
             <>
+              {hbTier && <span aria-hidden>{HB_TIER_DOT[hbTier]} </span>}
               {shortDuration(silent)}
               {d.heartbeat_at === null && (
                 <span

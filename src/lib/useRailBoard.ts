@@ -190,13 +190,27 @@ export function useRailBoard(enabled: boolean): RailBoard {
     if (live.error) {
       queueError = live.error.message;
     } else {
-      // claimed above queued — PostgREST cannot order on an expression, so the
-      // one derived key is applied here rather than faked in the query.
+      // FRONTMC1 — a fixed, predictable board order so a lane is always in the
+      // same spot and a watcher can track it without re-reading. PostgREST cannot
+      // order on the derived status key, so the whole comparison lives here:
+      //   1. CLAIMED/active group first, then QUEUED (LAST N DONE trails
+      //      separately in `recentDone`).
+      //   2. within a group, LANE alphabetically — the owner's ask, so a lane
+      //      never moves under you; a null lane sorts last.
+      //   3. then priority, then age — stable tie-breakers.
       queue = ((live.data ?? []) as RailDispatch[]).slice().sort((a, b) => {
         const ac = a.status === 'claimed' ? 0 : 1;
         const bc = b.status === 'claimed' ? 0 : 1;
         if (ac !== bc) return ac - bc;
-        return (a.priority ?? 100) - (b.priority ?? 100);
+        if (a.lane !== b.lane) {
+          if (a.lane === null) return 1;
+          if (b.lane === null) return -1;
+          return a.lane.localeCompare(b.lane);
+        }
+        const ap = a.priority ?? 100;
+        const bp = b.priority ?? 100;
+        if (ap !== bp) return ap - bp;
+        return a.created_at.localeCompare(b.created_at);
       });
     }
 
