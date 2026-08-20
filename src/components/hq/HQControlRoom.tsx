@@ -6,65 +6,37 @@
 // roles deferred until post-Swarm.
 //
 // Section routing: react-router useLocation().hash drives the active panel.
-// Reload-safe + deep-linkable via /hq#failed-logins style URLs. Default
-// section on entry: 'failed-logins'.
+// Reload-safe + deep-linkable via /hq#failed-logins style URLs. The default
+// section on entry is the first registered section (lowest `order`).
 //
-// Per shared/canon/manual-spine-api-v1.md §4 (9-section spec). This dispatch
-// wires 3 live sections (FailedLogins, PageViews, TrendingAtomsAdmin);
-// the other 6 ship as stubs that land in HQ-2 + HQ-3 dispatches.
+// HQ1 (MMF §19.8): sections come from the self-assembling registry, not a
+// hardcoded array here. `./sections/register` is imported for its side effects —
+// it populates the registry — and the shell renders getHQSections(). Each Astra
+// adds its admin section by registering there (or self-registering); the shell
+// never changes. See src/lib/hq/registry.ts.
 
-import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  AlertOctagon, BarChart3, TrendingUp, Users, Vote,
-  Wallet, Activity, ServerCog, Wrench, ShieldAlert, Palette, LayoutGrid, SlidersHorizontal,
-  type LucideIcon,
-} from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { getHQSections } from '@/lib/hq/registry';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
-import { FailedLogins } from './sections/FailedLogins';
-import { PageViews } from './sections/PageViews';
-import { TrendingAtomsAdmin } from './sections/TrendingAtomsAdmin';
-import { ActiveBees } from './sections/ActiveBees';
-import { RecentKettleVotes } from './sections/RecentKettleVotes';
-import { TreasuryBalances } from './sections/TreasuryBalances';
-import { EconomySnapshot } from './sections/EconomySnapshot';
-import { AstraStatus } from './sections/AstraStatus';
-import { AstraQuickAccess } from './sections/AstraQuickAccess';
-import { AdminActions } from './sections/AdminActions';
-import { BrandingSection } from './sections/BrandingSection';
-import { PatchboardAdmin } from './sections/PatchboardAdmin';
+import { ShieldAlert } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import './sections/register';
 
-interface SectionDef {
-  slug: string;
-  label: string;
-  icon: LucideIcon;
-  status: 'live' | 'stub';
-  Component: ComponentType;
-}
-
-const SECTIONS: SectionDef[] = [
-  { slug: 'failed-logins',     label: 'Failed Logins',        icon: AlertOctagon, status: 'live', Component: FailedLogins },
-  { slug: 'page-views',        label: 'Page Views',           icon: BarChart3,    status: 'live', Component: PageViews },
-  { slug: 'trending-atoms',    label: 'Trending Atoms',       icon: TrendingUp,   status: 'live', Component: TrendingAtomsAdmin },
-  { slug: 'active-bees',       label: 'Active Bees',          icon: Users,        status: 'live', Component: ActiveBees },
-  { slug: 'recent-votes',      label: 'Recent Kettle Votes',  icon: Vote,         status: 'live', Component: RecentKettleVotes },
-  { slug: 'treasury',          label: 'Treasury Balances',    icon: Wallet,       status: 'live', Component: TreasuryBalances },
-  { slug: 'economy',           label: 'Economy Snapshot',     icon: Activity,     status: 'live', Component: EconomySnapshot },
-  { slug: 'astra-status',      label: 'Astra Status',         icon: ServerCog,    status: 'live', Component: AstraStatus },
-  { slug: 'quick-access',      label: 'Quick Access',         icon: LayoutGrid,   status: 'live', Component: AstraQuickAccess },
-  { slug: 'admin-actions',     label: 'Admin Actions',        icon: Wrench,       status: 'live', Component: AdminActions },
-  { slug: 'branding',          label: 'Branding',             icon: Palette,      status: 'live', Component: BrandingSection },
-  { slug: 'patchboard',        label: 'Patchboard',           icon: SlidersHorizontal, status: 'live', Component: PatchboardAdmin },
-];
-
+const SECTIONS = getHQSections();
 const DEFAULT_SECTION = SECTIONS[0].slug;
 
 export function HQControlRoom() {
   const { bee, loading: authLoading } = useAuth();
-  const [adminCheck, setAdminCheck] = useState<{ checked: boolean; isAdmin: boolean; error: string | null }>({
-    checked: false, isAdmin: false, error: null,
+  const [adminCheck, setAdminCheck] = useState<{
+    checked: boolean;
+    isAdmin: boolean;
+    error: string | null;
+  }>({
+    checked: false,
+    isAdmin: false,
+    error: null,
   });
 
   // Query bees.is_admin for the current Bee. useAuth's bee object does not
@@ -94,7 +66,9 @@ export function HQControlRoom() {
       }
       setAdminCheck({ checked: true, isAdmin: !!data?.is_admin, error: null });
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [bee, authLoading]);
 
   if (authLoading || !adminCheck.checked) {
@@ -105,8 +79,20 @@ export function HQControlRoom() {
     );
   }
 
-  if (!bee) return <Gate title="HQ requires sign-in" body="Sign in with an admin username to access the HQ Control Room." />;
-  if (!adminCheck.isAdmin) return <Gate title="HQ Control Room is OG HUMAN only" body="Per og-human-v1 authority canon — Director and Treasury Council roles are deferred until post-Swarm. v1 admin access is restricted to bees.is_admin = true (currently a single OG HUMAN Bee)." />;
+  if (!bee)
+    return (
+      <Gate
+        title="HQ requires sign-in"
+        body="Sign in with an admin username to access the HQ Control Room."
+      />
+    );
+  if (!adminCheck.isAdmin)
+    return (
+      <Gate
+        title="HQ Control Room is OG HUMAN only"
+        body="Per og-human-v1 authority canon — Director and Treasury Council roles are deferred until post-Swarm. v1 admin access is restricted to bees.is_admin = true (currently a single OG HUMAN Bee)."
+      />
+    );
 
   return <HQShell bee={bee} />;
 }
@@ -117,7 +103,9 @@ function Gate({ title, body }: { title: string; body: string }) {
       <div className="max-w-lg rounded-lg border border-border bg-bg-elevated p-8 text-center">
         <ShieldAlert size={28} className="mx-auto mb-4 text-text-silver/60" aria-hidden />
         <h1 className="font-display text-xl font-semibold text-text-silver-bright">{title}</h1>
-        <p className="mt-3 text-text-dim" style={{ fontSize: '13px' }}>{body}</p>
+        <p className="mt-3 text-text-dim" style={{ fontSize: '13px' }}>
+          {body}
+        </p>
       </div>
     </div>
   );
@@ -179,7 +167,10 @@ function HQShell({ bee }: { bee: { handle: string } }) {
                       : 'border-transparent text-text-muted hover:bg-bg-elevated/50 hover:text-text-silver',
                   )}
                 >
-                  <span className="font-mono text-text-muted" style={{ fontSize: '10px', minWidth: '1.25em' }}>
+                  <span
+                    className="font-mono text-text-muted"
+                    style={{ fontSize: '10px', minWidth: '1.25em' }}
+                  >
                     {i + 1}
                   </span>
                   <Icon size={15} aria-hidden />
