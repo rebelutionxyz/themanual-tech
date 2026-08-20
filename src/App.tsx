@@ -17,6 +17,7 @@ import { useBranding } from '@/stores/useBranding';
 import { lazy, Suspense, useEffect } from 'react';
 import { type Location, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { ASTRA_STUB_ENTRIES } from '@/lib/astra-catalog';
+const AccountHubPage = lazy(() => import('@/pages/account/AccountHubPage').then((m) => ({ default: m.AccountHubPage })));
 const AdvertisePage = lazy(() => import('@/pages/AdvertisePage').then((m) => ({ default: m.AdvertisePage })));
 // FRONT21 — the constellation shell. Every Astra has a route in themanual.tech
 // (ORACLE_MF v1.24); the ones with no ported code render an honest stub.
@@ -29,6 +30,7 @@ const CollectionPage = lazy(() => import('@/pages/CollectionPage').then((m) => (
 const CollectionsIndexPage = lazy(() => import('@/pages/CollectionsIndexPage').then((m) => ({ default: m.CollectionsIndexPage })));
 import { ComingSoonPage } from '@/pages/ComingSoonPage';
 const HandleSettingsPage = lazy(() => import('@/pages/HandleSettingsPage').then((m) => ({ default: m.HandleSettingsPage })));
+const PatchboardSettingsPage = lazy(() => import('@/pages/PatchboardSettingsPage').then((m) => ({ default: m.PatchboardSettingsPage })));
 const HomePage = lazy(() => import('@/pages/HomePage').then((m) => ({ default: m.HomePage })));
 import { LoginPage } from '@/pages/LoginPage';
 const ManualPage = lazy(() => import('@/pages/ManualPage').then((m) => ({ default: m.ManualPage })));
@@ -137,6 +139,7 @@ const COMMUNITY_PREFIXES = [
   '/comms',
   '/security',
   // Sidebar utility-tail surfaces — same white shell, no skin switch.
+  '/account',
   '/bookmarks',
   '/notifications',
   '/studio',
@@ -353,6 +356,11 @@ function AppContent() {
               Notifications, Creators Studio (Workshop section), Premium
               (ad-relief ladder), Business (org hub). They live INSIDE the
               white community shell — no skin switch when navigating the tail. */}
+            {/* ACCOUNT hub (PROFILE1) — the @user account home: profile, wallet,
+              orders, sales, memberships, activity, settings. One legible surface
+              inside the same white shell (account surface in CommunityLayout).
+              The toolbar avatar + the sidebar Account item open it. */}
+            <Route path="/account" element={<AccountHubPage />} />
             <Route path="/bookmarks" element={<BookmarksPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/studio" element={<StudioPage />} />
@@ -367,6 +375,11 @@ function AppContent() {
             <Route path="/business" element={<BusinessPage />} />
             <Route path="/promotion" element={<AdvertisePage />} />
             <Route path="/settings/handle" element={<HandleSettingsPage />} />
+            {/* PATCHBOARD1 — the Bee-scope Patchboard (MMF §36): soft/hard
+              switches + Connected Accounts. Platform-wide surface; per-Astra
+              overrides render contextually inside an Astra. Master/Astra scope
+              admin lives in HQ (#patchboard). */}
+            <Route path="/settings/patchboard" element={<PatchboardSettingsPage />} />
           </Route>
 
           {/* Platform surfaces (right rail + utility chrome) */}

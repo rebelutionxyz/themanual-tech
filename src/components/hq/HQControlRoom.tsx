@@ -17,7 +17,7 @@ import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   AlertOctagon, BarChart3, TrendingUp, Users, Vote,
-  Wallet, Activity, ServerCog, Wrench, ShieldAlert, Palette, LayoutGrid,
+  Wallet, Activity, ServerCog, Wrench, ShieldAlert, Palette, LayoutGrid, SlidersHorizontal,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
@@ -34,6 +34,7 @@ import { AstraStatus } from './sections/AstraStatus';
 import { AstraQuickAccess } from './sections/AstraQuickAccess';
 import { AdminActions } from './sections/AdminActions';
 import { BrandingSection } from './sections/BrandingSection';
+import { PatchboardAdmin } from './sections/PatchboardAdmin';
 
 interface SectionDef {
   slug: string;
@@ -55,6 +56,7 @@ const SECTIONS: SectionDef[] = [
   { slug: 'quick-access',      label: 'Quick Access',         icon: LayoutGrid,   status: 'live', Component: AstraQuickAccess },
   { slug: 'admin-actions',     label: 'Admin Actions',        icon: Wrench,       status: 'live', Component: AdminActions },
   { slug: 'branding',          label: 'Branding',             icon: Palette,      status: 'live', Component: BrandingSection },
+  { slug: 'patchboard',        label: 'Patchboard',           icon: SlidersHorizontal, status: 'live', Component: PatchboardAdmin },
 ];
 
 const DEFAULT_SECTION = SECTIONS[0].slug;

@@ -119,12 +119,14 @@ export function UtilityChrome() {
           surfacedActions={surfacedActionsFor(astraSlug)}
         />
 
-        {/* 7. Profile-avatar: avatar on right, handle reveals on hover */}
+        {/* 7. Account-avatar: avatar on right, handle reveals on hover. Opens the
+            account hub (PROFILE1) — the @user home for profile, wallet, orders,
+            sales, memberships, activity, settings. */}
         {bee ? (
           <Link
-            to="/profile"
+            to="/account"
             className="group ml-0.5 flex items-center gap-0 rounded-full border border-border-bright bg-bg-elevated py-0.5 pl-1 pr-1 transition-all hover:gap-2 hover:border-text-silver/50 hover:bg-panel-2 hover:pl-3"
-            title={`Profile · @${bee.handle}`}
+            title={`Account · @${bee.handle}`}
           >
             <span
               className="max-w-0 overflow-hidden font-mono text-text-silver transition-[max-width] duration-200 ease-out group-hover:max-w-[120px]"

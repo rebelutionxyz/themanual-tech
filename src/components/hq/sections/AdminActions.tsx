@@ -4,7 +4,8 @@
 // dispatches (especially red-zone economy bootstrap).
 
 import { useState } from 'react';
-import { RefreshCw, ShieldCheck, FileText, Copy, Check } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { RefreshCw, ShieldCheck, FileText, Copy, Check, SlidersHorizontal } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 
@@ -14,7 +15,7 @@ export function AdminActions() {
       <header className="mb-4">
         <h2 className="font-display text-2xl font-semibold text-text-silver-bright">Admin Actions</h2>
         <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }}>
-          repeated operational actions · 3 live + 5 stubbed
+          repeated operational actions · 4 live + 4 stubbed
         </p>
       </header>
 
@@ -31,10 +32,7 @@ export function AdminActions() {
           title="Seed Missing Treasury Pots"
           description="Insert newbee + honeypot bling_pots rows for @combtreasury (production currently has 5 of 7 canon pots). Small migration; lands when needed."
         />
-        <StubAction
-          title="Toggle Patchboard Switches"
-          description="Adjust runtime tunables (rate caps, cache TTLs, feature flags). Post-Swarm — Patchboard runtime infrastructure pending."
-        />
+        <OpenPatchboardAction />
         <StubAction
           title="Force Re-Disposition of Atoms"
           description="Rebuild taxonomy paths + parent inference. Used after manual atom edits or canon-driven taxonomy revisions."
@@ -316,6 +314,29 @@ Page views (24h):    ${snapshot.page_views_24h}
           </div>
         )}
       </div>
+    </ActionCard>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// Action D — Open Patchboard (Master scope)
+// ───────────────────────────────────────────────────────────────────────
+function OpenPatchboardAction() {
+  return (
+    <ActionCard
+      icon={<SlidersHorizontal size={16} />}
+      title="Patchboard (Master scope)"
+      description="Provider registry, platform-default switches, and the four immutable hard switches (MMF §36). Astra scope is Director-managed."
+    >
+      <Link
+        to="/hq#patchboard"
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-md border border-text-silver/40 bg-bg-elevated px-3 py-1.5 text-sm font-medium text-text',
+          'transition-colors hover:bg-bg hover:text-text-silver-bright',
+        )}
+      >
+        Open Patchboard
+      </Link>
     </ActionCard>
   );
 }

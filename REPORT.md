@@ -23,6 +23,173 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## PROFILE1 — USER ACCOUNT HUB (profile · wallet · orders · sales · memberships · activity · settings). The @user account home at /account: one legible white-shell surface stitching existing data. Build green, biome clean, NOT committed (deferred to SWEEP — shared files mid-edit by concurrent front passes). (2026-08-20)
+
+Session `05a56cef` (fallback id). Dispatch PROFILE1, lane `front`, workdir `TheMANUAL.tech`, effort L. Per PLATFORM_SLATE v1. READ floor honored — the hub PRESENTS existing data; every write links out to the surface that already owns it (no new schema, no direct writes).
+
+### What shipped — a new /account surface in the community white shell
+The @user avatar (black-shell toolbar) and a new sidebar-tail **Account** item (every community surface) both open `/account`. The hub is one page with a 7-tab bar (`?tab=` deep-linkable, shareable, back-navigable), each tab a plain-language section:
+
+- **Profile** — identity from `useStanding()`: avatar, name, @handle, OG-generation badge, joined date, in-good-comb badge, bio; BLiNG! Rank (33) + The RiNG (9) cards with multiplier/action-count; location read from `bee_profiles` (edit links to `/profile`, which owns the write); handle + email facts.
+- **Wallet** — `useFreedomblingsBalance()` hero balance + FREEd/GOT/GAVE season tiles + recent movement (firewall-safe `TAG_LABEL`), h24 Oracle-token net from `h24_token_ledger` (::text + BigInt), link to full ledger.
+- **Orders** — `bazaarMyOrders()` (what you GOT), read-only; Manage → `/bazaar/orders`.
+- **Sales** — `bazaarMySales()` incoming orders + `bazaarMyListings()` live OFFERs, read-only.
+- **Memberships** — `getMyMembership()` current tier + `MEMBERSHIP_TIERS` ladder with current marked; Manage → `/premium`.
+- **Activity** — `listMyActivity()`: one merged timeline (threads, replies, thread votes, event RSVPs, group joins, games, competitions, FUND pledges, campaigns) — each source queried independently under owner-read RLS via `Promise.allSettled`, a failing source dropped (never blanks the timeline), newest first.
+- **Settings** — plain control page; editable settings link out (profile, premium handle, notifications); Patchboard-backed toggles (two-geo privacy MMF s25.7, notification prefs, connected accounts) named honestly as arriving with Patchboard, not faked; real Sign out.
+
+### Files
+New (12):
+```
+src/pages/account/accent.ts                 ACCOUNT_ACCENT (#B45309) — one source for shell + tabs
+src/pages/account/ui.tsx                     shared white-shell atoms (Card/SectionHead/StateLine/Field/MetaLabel/fmtDate)
+src/pages/account/AccountHubPage.tsx         orchestrator: tab bar + ?tab= routing + auth gate
+src/pages/account/tabs/ProfileTab.tsx
+src/pages/account/tabs/WalletTab.tsx
+src/pages/account/tabs/OrdersTab.tsx
+src/pages/account/tabs/SalesTab.tsx
+src/pages/account/tabs/MembershipsTab.tsx
+src/pages/account/tabs/SettingsTab.tsx
+src/pages/account/tabs/ActivityTab.tsx
+src/pages/account/tabs/orderRow.tsx          shared read-only order/sale row + status badge
+src/lib/account/activity.ts                  activity aggregation (read-only, allSettled per source)
+```
+Edited (4):
+```
+src/App.tsx                                  lazy-import AccountHubPage; '/account' → COMMUNITY_PREFIXES; route inside CommunityLayout group (anchored on /bookmarks to avoid the concurrent PATCHBOARD1 edit)
+src/pages/community/CommunityLayout.tsx      TAIL_ROUTE_ITEM += ['/account','account'] (utility-tail pattern, like /premium /business)
+src/components/shell/sidebarNav.ts           COMMON_TAIL += Account item (leads the tail, full-page not modal); import CircleUser
+src/components/layout/UtilityChrome.tsx      toolbar avatar → /account (was /profile), title "Account · @handle"
+```
+
+### Design decision — utility-tail destination, not a bespoke surface
+`/account` rides the established utility-tail pattern (`surfaceFromPath` defaults it to the intel surface; `TAIL_ROUTE_ITEM` lights the Account item), exactly as `/premium` and `/business` do. Considered a dedicated `account` surface (own accent + sidebar) but rejected it: it would touch the strict `Surface` union across CommunityLayout/CommunityShell — a heavier edit on a file concurrent passes are mid-edit on — for a cosmetic gain the platform's own precedent doesn't take. Convention + minimal blast radius won. The page keeps its own warm honey accent internally regardless.
+
+### Done-tests (verbatim)
+- `npm run build` (`tsc -b && vite build`) → **`✓ built in 26.21s`** (green). Emits `dist/assets/AccountHubPage-*.js 29.62 kB │ gzip: 8.04 kB` (lazy chunk).
+- Fixed one type error found by the build: `IconC` used `size?: number` but lucide's `size` is `number | string` — widened in AccountHubPage + ActivityTab (matches the repo's `ShellIcon` convention).
+- `npx biome lint` over all 12 new files + the 4 edited files → **`Checked 16 files … No fixes applied.`** (clean). `biome check --write` applied whitespace-only formatting to the new files.
+- Language firewall: no banned term (buy/sell/purchase/price/market/trade/invest/customer/mint) in any new string; copy uses GET/GIVE/GAVE/GOT/OFFER/FREEd/claim; BLiNG! bold-honey with the exclamation.
+
+### Could not verify (honest)
+- **Signed-in tab rendering + live data.** `/account` is auth-gated (`<Navigate to="/login">` when signed out) and this pass created no synthetic credentials (standing rule). The signed-in views (real orders/sales/wallet/activity) were NOT rendered live — deferred to a real-browser front pass. Type-safety + green build cover the wiring; the data shapes were verified against the live catalog (information_schema) before coding.
+- **Activity RLS reach.** Each activity source self-selects own rows under existing owner-read policies; any source RLS-blocks gracefully (allSettled → dropped) rather than erroring. Which sources actually return rows for a given member is a live-data question for the browser pass.
+
+### Not committed — deferred to SWEEP
+Tree left dirty. `src/App.tsx`, `src/pages/community/CommunityLayout.tsx`, `src/components/shell/sidebarNav.ts` and `REPORT.md` are being edited concurrently by other front passes (PATCHBOARD1, HQ) — a per-pass `git add` of those shared files would stage their in-progress work under this pass. Per the SWEEP protocol (the routine, gated commit), the integrated tree should be committed by a SWEEP, not free-handed here. NO PUSH regardless (owner-gated).
+
+---
+
+## PATCHBOARD1 — THE PATCHBOARD (MMF §36). Switch resolver + Connected Accounts data object + provider registry, with Bee-scope Settings surface and HQ Master-scope admin. Schema propose-first (authored, NOT applied). Build green, biome clean. (2026-08-20)
+
+Session `3489a078` (fallback id). Dispatch PATCHBOARD1, lane `front`, workdir `TheMANUAL.tech`, effort L
+(title-tagged L; body is DEEP — noted). Spec: MMF §36 (`shared/canon/master-master-file-v2-8.md` lines
+3021-3049) + `shared/canon/patchboard-pattern.md` + PLATFORM_SLATE v1 + IDENTITY_MODEL v1.1 + MMF_GIST
+v2.8-r2 (lexicon: **user**, not Bee, in member-facing copy). W-23 status stamp honored. W-24 concept gate
+satisfied by canon (Patchboard is fully specified). **NO PUSH** per dispatch.
+
+### What shipped
+**Lib layer — `src/lib/patchboard/`** (the real engineering; the "read/resolver floor"):
+- `types.ts` — Scope / SwitchClass / HardSwitchKey / ResolutionTerm / EffectiveState / Provider /
+  ConnectedAccount / ProviderSwitchState. `isHardSwitch()` + `HARD_SWITCH_KEYS`.
+- `registry.ts` — Master-scope canon in code: `HARD_SWITCHES` (TOS/KYC/18+/geo), `SENSITIVE_DEFAULT_OFF`
+  (5 opt-in categories), `systemDefaultFor()`, and the **PROVIDER REGISTRY** (§36.5): Tier-1 (Stripe
+  Connect, Google Analytics, X, OpenAI/Anthropic, Google Calendar) + Tier-2 (Mailchimp, QuickBooks, Slack,
+  Mastodon, BlueSky), each with `costBearer` + `affiliate` flags.
+- `resolver.ts` — THE SWITCH RESOLVER. Pure `resolveSwitch()` implementing the §36.2 cascade
+  (hard → Bee-Astra → Bee-platform → Astra-default → Master-default → ON), plus async
+  `getEffectiveSwitchState[s]()` / `isSwitchOn()` that read `patchboard_settings` in one round-trip.
+  **Floor-safe:** unconfigured client / absent table / RLS / network error → canon default, never throws.
+- `connectedAccounts.ts` — Connected Accounts data object (§36.4): Offer switch + Use switch + connection
+  record; `listConnections()` (never selects the token), `composeProviderStates()`, dormancy model; and
+  the propose-first mutators `setUse` / `beginConnect` / `disconnect` that classify a missing-RPC as
+  `pending` rather than a hard failure.
+- `writes.ts` — propose-first `setBeeSwitch()` (Bee scope) + `setMasterSwitch()` (HQ). Hard switches
+  refused client-side.
+- `index.ts` — barrel.
+
+**Store — `src/stores/usePatchboardStore.ts`** — loads effective switches + connected-account view for the
+current user in one pass; `isOn(key)`, `providers`, `load(beeId, astraId)`; floor-safe (holds defaults on error).
+
+**Bee-scope UI (lands in Settings) — `src/components/patchboard/`:**
+- `PatchboardSettings.tsx` — Preferences (soft toggles) + Required (locked hard switches with reason) +
+  Connected Accounts. Lexicon "user".
+- `ConnectedAccountsPanel.tsx` — provider rows grouped by tier, Use toggle, Connect/Disconnect, cost/affiliate
+  badges, dormant state.
+- `src/pages/PatchboardSettingsPage.tsx` → route **`/settings/patchboard`** registered inside `CommunityLayout`
+  in `App.tsx` (platform-wide surface; per-Astra overrides render contextually within an Astra).
+
+**Master/Astra-scope UI (lands in HQ) — `src/components/hq/sections/PatchboardAdmin.tsx`:**
+- Registered as HQ section `patchboard` in `HQControlRoom.tsx` `SECTIONS`. Shows the immutable hard switches,
+  the provider registry with Master-offer toggles (propose-first), and the Astra-scope boundary note.
+- Wired the previously-disabled **AdminActions** "Toggle Patchboard Switches" stub into a live
+  "Open Patchboard" tile → `/hq#patchboard` (header count 3→4 live).
+
+### Schema — PROPOSE-FIRST (authored, NOT applied) — FOR THE DB LANE
+`supabase/migrations/_drafts/patchboard1_switch_system_v1.sql` (+ `_rollback.sql`, authored first). Under
+`_drafts/` so no apply path picks it up. Creates: `patchboard_switches`, `patchboard_settings`,
+`patchboard_providers`, `connected_accounts` (RLS deny-by-default + per-scope allows), the resolver RPC
+`get_effective_switch_state(uuid,uuid,text)`, and write RPCs `patchboard_set_bee_switch` /
+`patchboard_set_master_switch` / `patchboard_set_use` / `patchboard_connect_begin` (stub) /
+`patchboard_disconnect`; seeds the 4 hard switches + 9 soft switches + 10 providers; REVOKE-from-PUBLIC +
+role GRANTs. **DB-lane pre-flight (in the file's tail):** confirm `is_platform_admin()` signature; decide the
+`astra_id` FK target (left as a bare uuid to avoid a Lock-8 ordering dependency); verify `pg_proc.proacl`
+after apply (project grants anon/authenticated via ALTER DEFAULT PRIVILEGES — REVOKE FROM PUBLIC won't remove
+those); run `get_advisors(security)` after apply.
+
+### Deviations / judgement calls (with reasons)
+1. **Did NOT edit `ProfilePage.tsx`.** PLATFORM_SLATE says the Bee-scope switch UI lands in PROFILE Settings,
+   but PROFILE1 (session 05a56cef) holds that tree concurrently — one-writer-per-file (W-19..W-23). My surface
+   stands alone at `/settings/patchboard`; **PROFILE1 handoff: add a link to `/settings/patchboard` from the
+   PROFILE Settings section.** No collision.
+2. **`App.tsx` co-edited with PROFILE1.** They added `AccountHubPage`; my `/settings/patchboard` route + lazy
+   import merged cleanly on disk (verified my lines present). One import + one route line only; not touched again.
+3. **`astra_id` as bare uuid (no FK) in the draft** — patchboard-pattern §8.2 wants an FK to the Astra
+   registry, but that would bind the draft to Lock-8 ordering. Left as a documented db-lane follow-up so the
+   migration can land independently.
+4. **costBearer values are canon-intent defaults**, flagged in `registry.ts` — the live Master registry row is
+   authoritative; economy revenue-routing is still an MMF §36.5 open item.
+5. **Effort tag L vs DEEP body** — recorded, built the full body (resolver + connected accounts + registry + two
+   UI homes) rather than the L-sized slice.
+
+### Commit status — DEFERRED to the human/lead (deviation from "commit", with reason)
+The dispatch says "commit, NO PUSH." I did **not** commit, because `src/App.tsx` is being **co-edited by the
+concurrently-running PROFILE1 pass** (session 05a56cef): the on-disk `App.tsx` carries both my
+`/settings/patchboard` route and PROFILE1's `AccountHubPage` import, and PROFILE1's `src/pages/account/*` +
+`src/lib/account/*` + `UtilityChrome.tsx` / `sidebarNav.ts` / `CommunityLayout.tsx` edits are still in flight.
+`git add src/App.tsx` stages the whole file, so a pass-isolated commit is impossible: committing `App.tsx`
+without `AccountHubPage.tsx` yields a broken commit (imports an uncommitted file); committing with it captures
+PROFILE1's incomplete pass under my pass id. Both are wrong. **Left green + uncommitted** (an accepted terminal
+state for front passes) and handing the commit to the human/lead. **Recommended:** commit my file-set —
+`src/lib/patchboard/*`, `src/stores/usePatchboardStore.ts`, `src/components/patchboard/*`,
+`src/pages/PatchboardSettingsPage.tsx`, `src/components/hq/sections/PatchboardAdmin.tsx`,
+`src/components/hq/HQControlRoom.tsx`, `src/components/hq/sections/AdminActions.tsx`,
+`supabase/migrations/_drafts/patchboard1_*`, `REPORT.md` — together with PROFILE1's when that pass closes, since
+`App.tsx` is shared between the two.
+
+### Done-tests (verbatim)
+- `npx tsc -b` → **exit 0** (full project; PROFILE1's transient `account/` errors cleared during the pass).
+- `npm run build` (`tsc -b && vite build`) → **build_exit=0**, `✓ built in 1m 2s` (chunk-size warning is the
+  pre-existing generic Vite note, not an error).
+- `npx biome check` on all new files → after `--write` format pass: **"No fixes applied"** on recheck (the 12
+  initial findings were all line-wrap/import-order formatting; zero lint defects). tsc re-run after format →
+  **exit 0**.
+- Firewall/lexicon grep on new files → **no banned commerce terms**; "Bee" appears only in code comments
+  (documenting scope names + the lexicon rule), never in user-facing JSX.
+
+### Could-not-verify
+- **Live runtime not exercised** — the `patchboard_*` tables don't exist in prod yet (propose-first), so the
+  floor path (defaults) is what renders today; the DB-backed path is verified by construction + the resolver
+  RPC mirrors the pure `resolveSwitch()` cascade, but not run end-to-end. Verify after the db-lane apply.
+- Route reachability confirmed by build (lazy import resolves) but not clicked in a browser.
+
+**Files:** 11 new (`src/lib/patchboard/*` ×6, `src/stores/usePatchboardStore.ts`,
+`src/components/patchboard/*` ×2, `src/pages/PatchboardSettingsPage.tsx`,
+`src/components/hq/sections/PatchboardAdmin.tsx`) + 2 draft SQL; 3 edited (`src/App.tsx`,
+`src/components/hq/HQControlRoom.tsx`, `src/components/hq/sections/AdminActions.tsx`).
+
+---
+
 ## FRONTHDR2 — DELETE THE TOP HEADER ON /mc. The shared Manual SiteHeader no longer renders on the /mc mission-control board; the surface wears only its own board chrome. Build green, biome clean, committed, NOT pushed. (2026-08-19)
 
 Session `ae0d9a96` (fallback id). Dispatch FRONTHDR2, lane `front`, workdir `TheMANUAL.tech`, effort S.

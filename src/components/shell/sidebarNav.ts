@@ -4,6 +4,7 @@ import {
   Bookmark,
   Briefcase,
   Calendar,
+  CircleUser,
   Clapperboard,
   Crown,
   Flag,
@@ -62,14 +63,22 @@ export const NEUTRAL_INK = '#536471';
  * destination are `soon`.
  */
 export const COMMON_TAIL: SidebarItem[] = [
-  // Divider: each surface's own items above, the shared tail below.
+  // Divider: each surface's own items above, the shared tail below. Account
+  // (PROFILE1) leads the tail — the @user home reachable from every community
+  // surface. Full-page (not modal): it is a deep, tabbed surface, not a popup.
+  {
+    id: 'account',
+    label: 'Account',
+    icon: CircleUser,
+    to: '/account',
+    dividerAbove: true,
+  },
   {
     id: 'notifications',
     label: 'Notifications',
     icon: Bell,
     to: '/notifications',
     modal: true,
-    dividerAbove: true,
   },
   { id: 'report', label: 'Reported', icon: Flag, to: '/intel/reported', modal: true },
   // Saved = the cross-surface shelf popup (/bookmarks). INTEL's own

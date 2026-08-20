@@ -61,6 +61,7 @@ const VIEW_ROUTE_MAP: Record<string, IntelView> = {
 
 /** Utility-tail route → tail item id (sidebar highlight on tail surfaces). */
 const TAIL_ROUTE_ITEM: [string, string][] = [
+  ['/account', 'account'],
   ['/notifications', 'notifications'],
   ['/studio', 'creators'],
   ['/premium', 'premium'],
