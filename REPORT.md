@@ -23,7 +23,35 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
-## PROFILE1 — USER ACCOUNT HUB (profile · wallet · orders · sales · memberships · activity · settings). The @user account home at /account: one legible white-shell surface stitching existing data. Build green, biome clean, NOT committed (deferred to SWEEP — shared files mid-edit by concurrent front passes). (2026-08-20)
+## FRONTMC1 — MAKE THE /mc BOARD READABLE + TRACKABLE. Legibility-only polish of the read-only /mc mission-control board: fixed lane-alpha sort within status groups, and a three-colour heartbeat-staleness tier (GREEN <10m / AMBER 10–30m / RED >30m) driving both the row health-dot and the Heartbeat column so a hung code is spottable at a glance. Function unchanged (8s live poll + admin RLS intact). Build green, biome clean, committed `7b2aff5`, NOT pushed (owner-gated). (2026-08-20)
+
+Session `ce731290` (fallback id). Dispatch FRONTMC1, lane `front`, workdir `TheMANUAL.tech`, effort S/M. Owner: "the easier it is to read and keep track the better." READ-only board — no schema, no writes, no cadence change.
+
+### Files touched (2)
+- `src/lib/useRailBoard.ts` — the board's data hook. Only the client-side sort of the live `queue` changed.
+- `src/pages/MissionControlPage.tsx` — the board it draws. Heartbeat staleness tier + row-health thresholds + a small amount of dead-code removal.
+
+### What changed, against the dispatch's five requirements
+1. **SORT CONSISTENTLY (done).** `useRailBoard` now sorts the live queue by: (a) CLAIMED group before QUEUED; (b) LANE alphabetically within a group (null lane last); (c) priority; (d) created_at. So a lane is always in the same spot and never jumps under the operator. LAST N DONE still trails separately via `recentDone` — untouched. Previously the sort was claimed-first then priority only, so lanes moved around as priorities changed.
+2. **EVERY ROW SHOWS ITS PASS (already met, verified).** Every `DispatchRow` renders `d.pass` in the Pass column (font-display) for both the live queue and the LAST-N-DONE tail. No dispatch row was missing it; the only pass-less rows are the section separators ("LAST N DONE"), which are labels, not passes. No change needed — recorded so the requirement is accounted for, not silently skipped.
+3. **HEARTBEAT STALENESS COLOUR (done — the key feature).** New `heartbeatAgeTier(mins)` on fixed thresholds: `fresh` <10m, `drifting` 10–30m, `stale` >30m, mapped to the house kettle ramp (sourced green / emerging amber / unsourced red) already used by the cockpit. Applied to the Heartbeat column text **and** a leading dot (● fresh/drifting, ⚠ stale). The row-health dot (`rowHealth`) was moved onto the **same** 10/30 thresholds — >30m red, 10–30m orange (drifting), fresh neutral — so the left mark and the Heartbeat column can never disagree. Over-estimate red still wins. Replaces the old two-shade amber Heartbeat column and the flat 10-minute red.
+4. **READABLE ALIGNED COLUMNS (already in place, kept).** Columns render PASS | LANE | STATUS | FOLDER | WAITS-ON | CLAIMED-BY | HEARTBEAT via a border-collapse table. Kept the WAITS-ON column (the dispatch's canonical list omits it, but it carries the dependency signal — removing it would drop function, and the pass is "legibility, not function"). Alignment unchanged.
+5. **POSTURE PRESERVED.** No touch to LIVE_MS/IDLE_MS (8s live / 60s idle), the visibility-pause, the setTimeout chain, the admin gate, or any RLS. Lexicon already "user"/"admin username", no "Bee" leak in user-facing copy.
+
+### Dead code removed (why it's safe)
+- Dropped the `heartbeatState` import in the page — its only caller (the Heartbeat column colour) now uses `heartbeatAgeTier`. `heartbeatState`/`HeartbeatState` remain exported from `useRailBoard` (unused exports are not flagged by tsc; left in place, harmless).
+- Dropped the now-unused `thresholdMinutes` prop from `DispatchRow` (its only use was `heartbeatState`) and from both call sites. The board-level `thresholdMinutes` is still read and still drives the "silent past Nm raises a suspicion" note at the foot of the queue — unchanged.
+- The pulse animation now fires on `isClaimed && health === 'neutral'` (a fresh, healthy claimed row) — previously it also checked `hbState === 'current'`, which is now redundant because a drifting/stale row is no longer `neutral`.
+
+### Verification — done tests, verbatim outcomes
+- `npm run build` (tsc -b && vite build): **PASS** — `✓ built in 57.54s`. The ">500 kB chunk" warnings are pre-existing and unrelated (libsodium/CallView/registry vendor bundles), not introduced here.
+- `npx biome check` on both files: **PASS** — one formatter nit (the shortened ternary collapsing to one line) auto-fixed with `--write`; re-run reports `Checked 2 files… No fixes applied.`
+- Manifest at commit: exactly the two files above, both `M`, no deletions/renames/forbidden paths. Staged by name, `git diff --cached --name-only` matched. Commit `7b2aff5`. **Not pushed** (owner-gated, canon).
+
+### Could NOT verify
+- **No live browser smoke of the three colour tiers.** /mc is admin-gated (DB RLS on `bees.is_admin`) and the tiers only render over claimed rows at varied heartbeat ages; confirming green→amber→red on screen would need an admin session and passes deliberately aged past 10m/30m. The tier logic is unit-obvious and type-checked, but the visual pass is unverified here. Recommend the owner eyeball /mc while a real pass is claimed (fresh row should read green ● + pulse; a pass silent >30m should read red ⚠).
+
+ The @user account home at /account: one legible white-shell surface stitching existing data. Build green, biome clean, NOT committed (deferred to SWEEP — shared files mid-edit by concurrent front passes). (2026-08-20)
 
 Session `05a56cef` (fallback id). Dispatch PROFILE1, lane `front`, workdir `TheMANUAL.tech`, effort L. Per PLATFORM_SLATE v1. READ floor honored — the hub PRESENTS existing data; every write links out to the surface that already owns it (no new schema, no direct writes).
 
