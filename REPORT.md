@@ -11216,3 +11216,118 @@ silently dropped (new customer carries `metadata.bee_id`).
 ## Follow-up (recorded)
 Remove `_ORACLE` from Edge secrets + drop the fallback line so h24-webhook reads only `STRIPE_WEBHOOK_SECRET_H24`
 (clean final hard-rename). Small later cleanup, non-blocking.
+
+---
+
+## JUSTICE_SCHEMA_APPLY1 (migrate lane, session 99998b51) — 2026-08-21
+
+**Dispatch:** apply the JUSTICE_ENGINE1 propose-first delta
+(REBELUTION.org/db/proposed/0001_justice_ingest.sql) per migrate-lane canon.
+
+**Applied file:** supabase/migrations/20260821060000_justice_ingest_substrate.sql
+**Rollback file:** supabase/migrations/20260821060000_justice_ingest_substrate_rollback.sql
+
+### Scope decision
+Applied §1 (justice_sources registry) + §2 (provenance columns on the 6 targets)
++ §3 (idempotency uniques on filings/claims/outcomes) + §5 (RLS + seed).
+**§4 (origin widening + record-visibility gate) DEFERRED** — proposal fences it as
+REQUIRES-OWNER-RULING (it changes what is publicly on-record). §4 stays parked in
+REBELUTION.org/db/proposed/0001_justice_ingest.sql. Until §4 lands, the engine's
+live review_status='entered' writes stay gated.
+
+### Pre-flight (recorded before apply, MIGRATION AMENDMENT)
+- reconcile.mjs measure BEFORE authoring: EXIT=0, "RECONCILED on/after baseline —
+  freeze-lift criterion MET" (baseline 20260801000000; all 407/39/32 discrepancies
+  are pre-baseline, 0 on/after).
+- All 6 target tables exist; justice_sources absent (clean create).
+- justice_is_admin() EXISTS — §5 admin policy dependency satisfied.
+- No existing provenance columns on any target (clean §2 add).
+- Triggers on §4 tables: justice_exhibits_append_only_trg (BEFORE DELETE/UPDATE),
+  justice_filings_touch (BEFORE UPDATE). NO INSERT trigger reads author_bee, so the
+  §4 karma-trigger risk (rationale item 1) is not present. §4 deferred regardless.
+- gen_random_uuid() resolves unqualified (existing justice_dockets.id default is
+  'gen_random_uuid()' and works; not in public schema — lives on the search_path).
+- Rows at risk: entities=1, dockets=5, filings=2, exhibits=1, claims=3, outcomes=0.
+  All additive/idempotent (IF NOT EXISTS / on conflict do nothing); no rows rewritten.
+
+### Rollback statement (on hand before apply)
+drop the 3 ingest_ref uniques; drop the 18 provenance columns across the 6 targets;
+drop the 2 justice_sources policies; drop table justice_sources. Full script in the
+rollback file above. Safe while no ingested rows exist (the case at apply time).
+
+### Apply + verify
+(recorded after the ask-gated apply_migration call — see below.)
+
+**APPLIED via apply_migration (ask-gated, owner-clicked) — success.**
+- Stamped version: 20260821153831 (apply_migration stamps its own; repo file renamed
+  from 20260821060000 to match). Migration: 20260821153831_justice_ingest_substrate.sql.
+  Rollback moved to supabase/migrations/_drafts/20260821153831_justice_ingest_substrate_rollback.sql
+  (repo convention: rollbacks live in _drafts/, alongside the prior justice rollbacks;
+  reconcile scans migrations/ non-recursively so _drafts/ is out of the ledger).
+- Verify (information_schema / pg_catalog): justice_sources seeded 4 rows;
+  18 provenance columns across the 6 targets; 3 ingest_ref unique indexes; 2 sources
+  policies; RLS enabled on justice_sources. §4 NOT applied: author_bee still NOT NULL,
+  origin CHECKs absent (all confirmed true).
+- Reconcile re-measure: EXIT 0, "RECONCILED on/after baseline — freeze-lift criterion MET".
+  Pair is version-matched + FAITHFUL (faithful 270->271, history 723->724, repo 355->356);
+  zero new drift on/after baseline.
+- Followed to justice lane via ops_message: substrate live (§1-3+§5); §4 record-visibility
+  gate DEFERRED pending owner ruling — ingest passes may register sources + write provenance,
+  but live 'entered' filing writes stay gated until §4 lands.
+
+[DONE] JUSTICE_SCHEMA_APPLY1 | §1-3+§5 applied (v20260821153831), §4 deferred, reconcile EXIT 0
+
+### §4 ADDENDUM — scope expanded by JUSTICE_SCHEMA v1 ruling (LEAD->migrate 15:36)
+The lead ruled (JUSTICE_SCHEMA v1, ops_docs) ~5 min after claim: apply ALL of 0001
+(§1-§5), §4 SCOPED. So this pass continues past the substrate to apply §4 as a second
+migration. Applied file: 20260821060100_justice_ingest_s4_visibility.sql (stamped
+version recorded below). Rollback: _drafts/..._s4_visibility_rollback.sql.
+
+**§4 pre-flight (MIGRATION AMENDMENT):**
+- §4a trigger check (ruling condition): trigger bodies inspected via pg_get_functiondef.
+  justice_filings only trigger = justice_touch_updated_at (BEFORE UPDATE, sets updated_at).
+  justice_exhibits = justice_append_only_guard (raises on UPDATE/DELETE). NO INSERT trigger
+  reads author_bee/submitter/recorded_by -> §4a origin-widening is trigger-safe.
+- §4b tightening (ruling MANDATE - "keys off trusted-source origin, not any non-Bee row"):
+  proposal keyed off "ingest_source_id is not null" (any source) -> TIGHTENED. Added
+  justice_sources.is_trusted (default false; 4 gov sources set true). Visibility gate
+  (RLS public_read) trusted path requires is_trusted source + source_cite; crowd path
+  requires reviewed_by (human review). An untrusted source-ingested 'entered' row is NOT
+  publicly visible (leak closed). CHECK reviewed_chk cannot subquery is_trusted, so it
+  only relaxes for ingest_source_id + source_cite + entered; the trust key lives in the
+  RLS gate where public-visibility is actually decided.
+- Existing rows: filings 2 / exhibits 1 / outcomes 0, all human origin -> origin CHECKs
+  hold; new reviewed_chk is a superset of old -> no existing row invalidated.
+
+**§4 rollback statement (on hand before apply):** drop+restore original crowd-review-only
+public_read; restore original reviewed_chk; drop the 3 origin CHECKs (leave columns
+nullable, leave is_trusted). Full script in the _drafts rollback file. Run before the
+substrate rollback (§4 references ingest_source_id/is_trusted).
+
+---
+
+## JUSTICE_SCHEMA_APPLY1 — §4 APPLIED (continuation, session be0bc0bc, 2026-08-21)
+
+**Superseding the §4a plan above:** SYSTEM_BEE v1 + boot ruling changed the origin model
+from "widen author_bee to null" to "author ingested rows AS fnulnu"
+(00000000-0000-0000-0000-deadbeefdead). So the origin columns STAY NOT NULL and §4a
+widening + §4b origin CHECKs were **intentionally NOT applied** — NOT NULL is a stronger
+guarantee against authorless rows than the origin CHECK. Kept the prior draft's tightenings
+(is_trusted key, cite-scoped §4c, closed-crowd-leak §4d).
+
+**Applied:** `20260821162337_justice_ingest_s4_visibility.sql` (apply_migration stamped its
+own version; repo file + rollback renamed 20260821060100 → 20260821162337 to pair).
+Substrate `20260821153831_justice_ingest_substrate.sql` was already applied by the prior
+attempt (now committed here for pairing).
+
+**Dry-run (rolled back) before apply:** fnulnu+trusted+cited+entered → visible; fnulnu+
+trusted+cited+pending → visible (citation is the review); crowd tip → not visible; null
+author_bee → blocked (NOT NULL); crowd 'entered' w/o reviewer → blocked (reviewed_chk).
+
+**Post-apply live verify:** is_trusted true=4; author_bee NOT NULL; reviewed_chk carries the
+ingest branch; public_read carries trusted-source + crowd-review + not-fixture logic.
+**reconcile.mjs measure = EXIT 0.**
+
+**Handoff:** engine authorship is the justice lane's job (JUSTICE_ENGINE_FNULNU1) — engine.ts
+must set author_bee/submitter/recorded_by = fnulnu before the first ingest run. Justice lane
+messaged "schema live — writes may begin". Status: **DONE**.
