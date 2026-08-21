@@ -23,6 +23,90 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## VOTE_IDEMPOTENCY_APPLY1 — controlled apply of VOTE_ENGINE1 ingest idempotency keys (2026-08-21)
+
+**Pass:** VOTE_IDEMPOTENCY_APPLY1 | lane `migrate` | workdir TheMANUAL.tech | EFFORT STANDARD | session `28c59d42` (fallback id). Gates the live vote ingest (VOTE_INGEST* passes carry `after_pass=VOTE_IDEMPOTENCY_APPLY1`).
+
+**Governing canon:** SQL_AUTONOMY v1.1 (standalone-app schema is propose-first; a dedicated TheMANUAL.tech pass applies + pairs into the app tree) + LEAD_PROTOCOL v0.38 (app-tree pairing) + MIGRATION AMENDMENT (named dispatch, recorded pre-flight, rollback stated first, ask-gated apply, verify by structure).
+
+**Source proposal:** `REBELUTION.vote/db/proposed/0003_ingest_idempotency.sql` (additive follow-up to VOTE_SCHEMA_APPLY1's 0002). Paired file: `supabase/migrations/<stamped>_vote_ingest_idempotency.sql` (Section B forward only; renamed to the apply_migration-stamped version post-apply).
+
+**Rollback (stated FIRST, per amendment) — from the proposal Section A:**
+```sql
+BEGIN;
+  ALTER TABLE public.election_field_citations
+    DROP CONSTRAINT IF EXISTS election_field_citations_entity_field_key;
+  ALTER TABLE public.election_races DROP COLUMN IF EXISTS natural_key;
+  ALTER TABLE public.election_polls DROP COLUMN IF EXISTS natural_key;
+COMMIT;
+```
+Additive-only ⇒ no data rewrite; rollback is DROP CONSTRAINT + DROP COLUMN. Owner has a same-day dump (`honeycomb_2026-08-20`).
+
+### PRE-FLIGHT (recorded before apply — all green)
+
+- **Additivity:** read full DDL. Only `ALTER TABLE … ADD CONSTRAINT … UNIQUE` and `ADD COLUMN IF NOT EXISTS … text` + unique on the new nullable column. Zero DROP / ALTER TYPE / RENAME. Section A rollback is commented in the proposal. **STRICTLY ADDITIVE confirmed.**
+- **Row counts (constraint-safety):** `election_field_citations` 0, `election_races` 0, `election_polls` 0 — all empty, so no unique constraint can fail on existing duplicate data.
+- **Target columns exist:** `election_field_citations.(entity, entity_id, field)` all present, all `text NOT NULL` — the B1 unique target is valid.
+- **No pre-existing collision:** constraint `election_field_citations_entity_field_key` does NOT exist (current: `_entity_check`, `_pkey`, `_source_id_fkey`). `natural_key` column absent on both `election_races` and `election_polls`; `election_races_natural_key_key` / `election_polls_natural_key_key` absent. All four additions are net-new.
+- **Reconcile measure (clean tree, before author):** `reconcile.mjs measure` → **EXIT 0**, "RECONCILED on/after baseline — freeze-lift criterion MET" (baseline 20260801000000, 0 discrepancies on/after baseline). Prior vote migration is properly paired.
+
+### APPLY — done (ask-gated apply_migration, `{"success":true}`)
+
+- **Channel:** `apply_migration` (name `vote_ingest_idempotency`) — the canon-sanctioned, ask-gated migration channel. **Deviation from dispatch body, recorded:** the dispatch said "apply via execute_sql," but CLAUDE.md R7 + the RAIL_README v1.7 MIGRATION AMENDMENT are explicit that `execute_sql` is *not* a migration channel and schema through it is a violation "regardless of what the permission layer allows." apply_migration honors the dispatch's intent through the correct, human-clicked channel and matches the immediately-prior VOTE_SCHEMA_APPLY1 precedent. No functional difference to the result.
+- **Stamped version:** `20260821053033` (apply_migration stamps its own; my filename request was ignored as documented). Paired repo file renamed to match: `supabase/migrations/20260821053033_vote_ingest_idempotency.sql` (forward SQL, rollback in header comment).
+
+### VERIFY (by structure, post-apply)
+
+- `election_field_citations_entity_field_key` — `UNIQUE (entity, entity_id, field)` ✔ (contype `u`)
+- `election_races_natural_key_key` — `UNIQUE (natural_key)` ✔
+- `election_polls_natural_key_key` — `UNIQUE (natural_key)` ✔
+- `election_races.natural_key` / `election_polls.natural_key` — `text`, nullable ✔
+- **Reconcile re-measure (post-pair):** `reconcile.mjs measure` → **EXIT 0**, freeze-lift criterion MET. history 722→723, repo 354→355, version-matched 301→302 (my pair faithful). **0 discrepancies on/after baseline — no fresh drift manufactured.**
+
+### BROADCAST / GATE RELEASE
+
+Closing this pass `done` ungates the vote lane: `VOTE_INGEST*` (after_pass=VOTE_IDEMPOTENCY_APPLY1) become READY. **Idempotency live — live ingest may run.** Engine `CONFLICT_FOR` may now use `race:'natural_key'`, `poll:'natural_key'`, and citations may switch delete-then-insert → on-conflict upsert on `(entity, entity_id, field)`.
+
+**Could not verify:** nothing outstanding. All four objects confirmed by catalog read; ledger green.
+
+
+
+**Pass:** VOTE_SCHEMA_APPLY1 | lane `migrate` | workdir TheMANUAL.tech | EFFORT STANDARD | session `ed7e20ec` (fallback id). Unblocks VOTE_ENGINE1 + all vote data passes.
+
+**Governing canon:** SQL_AUTONOMY v1.1 (controlled serialized apply — TheMANUAL.tech self-applies + pairs into the app tree) + LEAD_PROTOCOL v0.38 (app-tree pairing) + MIGRATION AMENDMENT (named dispatch, recorded pre-flight, rollback stated first, ask-gated apply, verify by structure).
+
+**Source proposal:** `REBELUTION.vote/db/proposed/0002_election_knowledge_graph.sql` (479 lines). `0001_civic_reference.sql` is a SUPERSEDED stub (do not apply). Paired file: `supabase/migrations/20260821000016_vote_election_knowledge_graph.sql` (Sections B–F; renamed to the stamped version post-apply).
+
+**Rollback (stated FIRST, per amendment):** `REBELUTION.vote/db/proposed/0002_election_knowledge_graph.rollback.sql` — drops the 15 new tables in reverse-of-create order (CASCADE), then the 22 additive columns on election_bills/election_actors. Additive-only ⇒ no data rewrite; rollback is DROP TABLE + DROP COLUMN. Owner has a same-day dump (`honeycomb_2026-08-20`).
+
+### PRE-FLIGHT (recorded before apply — all green)
+
+- **Additivity:** verified by reading the full DDL — only `CREATE TABLE/INDEX IF NOT EXISTS`, `ALTER TABLE … ADD COLUMN IF NOT EXISTS`, and guarded `CREATE POLICY`. Zero DROP / ALTER TYPE / RENAME of any existing object. Section A rollback is commented out in the proposal. STRICTLY ADDITIVE confirmed.
+- **Dependency: FK targets.** `election_bills` PK = `id` **text**; `election_actors` PK = `id` **text** — matches the proposal's text child FKs. ✔
+- **Dependency: `is_platform_admin()`** present in `public` (no args) — the admin RLS policies reference it. ✔ `gen_random_uuid()` standard. ✔
+- **Collision check (15 new tables):** `pg_tables` returned `[]` — none pre-exist. ✔
+- **Column collision (22 added columns):** `information_schema.columns` returned `[]` — none pre-exist. ✔
+- **Reconcile MEASURE (clean tree, before authoring the applied stamp):** `node scripts/migration-reconcile/reconcile.mjs measure` → **EXIT 0**, "RECONCILED on/after baseline — freeze-lift criterion MET" (baseline 20260801000000; all discrepancies pre-baseline, 0 on/after). ✔
+
+### Deviations / judgement calls
+
+1. **Apply channel: `apply_migration`, not the dispatch's `execute_sql`.** The MIGRATION AMENDMENT names `apply_migration` as THE migration channel (ask-gated; the human click is the enforcement) and calls schema via `execute_sql` a violation. `apply_migration` also auto-stamps `schema_migrations`, then the repo file is renamed to the stamped version (canon: it stamps its own version, not the filename). This is the conservative, gate-preserving reading; PROPOSAL_APPLY1's execute_sql path required a separate recorded owner go-ahead, whereas the ask-gate provides that gate inline.
+2. **Section E DO-block hardened idempotent.** The proposal's policy-creation loop would error on a re-run if a policy already existed; the paired file guards each `CREATE POLICY` with a `pg_policies` existence check. Behaviour on first apply is identical; the change only makes re-runs safe. Content of the policies is unchanged.
+
+### APPLY — DONE (owner ask-click approved apply_migration)
+
+- **Applied** via `apply_migration(name='vote_election_knowledge_graph')` → `{success:true}`. Stamped version **20260821044153**. Repo file renamed `20260821000016…` → **`supabase/migrations/20260821044153_vote_election_knowledge_graph.sql`** (git mv) so the paired filename matches the stamped version (no manufactured drift).
+- **VERIFY (by structure, vs pg_catalog/information_schema):**
+  - 15 new tables present, `relrowsecurity=true` on all 15, **3 policies each** (public_read + admin_insert + admin_update) — 45 policies total. ✔
+  - `election_bills` += **12** columns; `election_actors` += **10** columns (the 2 additive ALTERs). ✔
+  - `election_polls.source_url` **NOT NULL** (also pollster, conducted_end). ✔
+  - Seeds: `election_categories` = **117** rows (policy_area = **32** CRS spine), `election_sources` = **12**. ✔
+- **Re-measure:** `reconcile.mjs measure` → **EXIT 0**, "RECONCILED on/after baseline"; history 721→722, repo .sql 353→354, version-matched 300→301 (269 faithful); 0 on/after-baseline discrepancies. My file paired faithfully. ✔
+- **Broadcast:** `ops_messages` to `all` — VOTE schema LIVE, engine + data passes may write.
+- **Could not verify:** nothing outstanding — apply verified by live catalog. No app-code/typegen change in scope (schema-only pass; TS types regenerate in the engine pass).
+
+---
+
 ## PROPOSAL_APPLY1 — applied 15 pooled standalone-app schema proposals (14 schema + 1 data seed) in one serialized run, paired + stamped, reconcile stays EXIT 0; 2 built-object proposals -Q'd, 1 already-applied skipped. (2026-08-21)
 
 **Pass:** PROPOSAL_APPLY1 | lane `migrate` | workdir TheMANUAL.tech | EFFORT DEEP | single serialized ledger writer (after_pass=MIGRATE_SWEEP1). Session `db63c0bf`. Owner go-ahead recorded for the 15-apply / 2-hold plan before any production write.
