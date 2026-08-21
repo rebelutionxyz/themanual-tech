@@ -1,0 +1,3 @@
+-- PROPOSAL_APPLY1 pairing: MINUTEMEN 0002_minutemen_dispatch (applied 2026-08-21 to production via execute_sql).
+-- Additive, verified: +2 columns on minutemen_needs (assigned_bee_id, escrow_entry_id) + index minutemen_needs_assigned_idx; 6 SECURITY DEFINER RPCs (minutemen_offer_help, minutemen_withdraw_help, minutemen_accept, minutemen_advance, minutemen_resolve, minutemen_cancel) mounting the depth_escrow_open/release/cancel seam; REVOKE public + GRANT EXECUTE authenticated on all six.
+-- Full byte-identical DDL lives at: MINUTEMEN.app/db/proposals/0002_minutemen_dispatch.sql

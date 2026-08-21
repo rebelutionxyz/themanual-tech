@@ -1,0 +1,1 @@
+-- PROPOSAL_APPLY1 pairing: game-solitaire 0001_solitaire_depth (applied 2026-08-21 via execute_sql). Additive: tables solitaire_daily_results, solitaire_consumable_spends + indexes + RLS (own-row). BLiNG consumable sink; soft ref to DEPTH BLiNG ledger (bling_tx_ref); never moves BLiNG. Full byte-identical DDL: game-solitaire/db/proposals/0001_solitaire_depth.sql

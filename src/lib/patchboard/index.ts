@@ -4,3 +4,4 @@ export * from './registry';
 export * from './resolver';
 export * from './connectedAccounts';
 export * from './writes';
+export * from './cryptoNodes';

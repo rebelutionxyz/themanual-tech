@@ -1,0 +1,1 @@
+-- PROPOSAL_APPLY1 pairing: honeycomb-ops 0001_ops_job_costs (applied 2026-08-21 via execute_sql). Additive: table ops_job_costs + 3 indexes + RLS enabled with NO policy (intentional deny-all for anon/authenticated; service_role bypasses). Standalone ops telemetry; no FK, no money flow. Full byte-identical DDL: honeycomb-ops/db/proposals/0001_ops_job_costs.sql

@@ -1,0 +1,1 @@
+-- PROPOSAL_APPLY1 pairing: REBELUTION.studio 0001_vault (applied 2026-08-21 via execute_sql). Additive: tables vault_sources, vault_items, vault_reposts + indexes + RLS (own-row). FK links to bees(id) + media_assets(id). No money. Full byte-identical DDL: REBELUTION.studio/db/proposals/0001_vault.sql

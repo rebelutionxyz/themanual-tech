@@ -11,15 +11,19 @@
 // HQControlRoom before this ever renders.
 
 import {
+  CRYPTO_GATEWAY_LAW,
+  CRYPTO_GATEWAY_NODES,
+  CRYPTO_GATEWAY_NODE_COUNT,
   HARD_SWITCHES,
   HARD_SWITCH_KEYS,
   PROVIDER_REGISTRY,
+  cryptoSwitchKey,
   offerSwitchKey,
   setMasterSwitch,
 } from '@/lib/patchboard';
-import type { HardSwitchKey, Provider } from '@/lib/patchboard';
+import type { CryptoNode, HardSwitchKey, Provider } from '@/lib/patchboard';
 import { cn } from '@/lib/utils';
-import { Lock, PlugZap, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Coins, Lock, PlugZap, ShieldAlert, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useState } from 'react';
 
 export function PatchboardAdmin() {
@@ -41,7 +45,124 @@ export function PatchboardAdmin() {
       <div className="space-y-8">
         <HardSwitchesBlock />
         <ProviderRegistryBlock />
+        <CryptoNodesBlock />
         <AstraScopeNote />
+      </div>
+    </div>
+  );
+}
+
+// ── Crypto payment-method nodes (CRYPTO_NODES1) ──────────────────────────────
+function CryptoNodesBlock() {
+  const nodes = [...CRYPTO_GATEWAY_NODES].sort((a, b) => a.adoptionRank - b.adoptionRank);
+  return (
+    <section>
+      <h3 className="mb-2 flex items-center gap-2 font-display text-base font-semibold text-text-silver-bright">
+        <Coins size={16} className="text-text-muted" aria-hidden />
+        Crypto payment methods
+        <span
+          className="rounded-sm bg-text-muted/15 px-1.5 py-0.5 font-mono uppercase text-text-muted"
+          style={{ fontSize: '9px' }}
+        >
+          {CRYPTO_GATEWAY_NODE_COUNT} nodes · all off
+        </span>
+      </h3>
+      <p className="mb-3 max-w-2xl text-text-dim" style={{ fontSize: '12px' }}>
+        Optional external crypto payment rails. Every node is DORMANT until toggled — this is the
+        switch surface, not a wallet integration (no custody, no keys, no funds move). Turning one on
+        is a separate integration pass.
+      </p>
+      <div
+        className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-bg-elevated/15 px-3 py-2 text-text-dim"
+        style={{ fontSize: '11px' }}
+      >
+        <ShieldAlert size={13} className="text-text-muted" aria-hidden />
+        <span>
+          Architecture law: these are <strong>external, fiat-side gateway methods</strong> — KYC-gated
+          under the hard switch, and <strong>never crypto&nbsp;&rarr;&nbsp;BLiNG</strong>.
+          {CRYPTO_GATEWAY_LAW.neverAutoCreditBling ? ' No auto-credit, ever.' : ''}
+        </span>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {nodes.map((node) => (
+          <CryptoNodeRow key={node.id} node={node} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CryptoFlag({ label }: { label: string }) {
+  return (
+    <span
+      className="rounded-sm bg-text-muted/15 px-1.5 py-0.5 font-mono uppercase text-text-muted"
+      style={{ fontSize: '9px' }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function CryptoNodeRow({ node }: { node: CryptoNode }) {
+  // Default OFF/DORMANT (CRYPTO_GATEWAY_LAW.defaultState === false). The toggle is
+  // propose-first — the write RPC records the exception when it is deployed.
+  const [on, setOn] = useState<boolean>(CRYPTO_GATEWAY_LAW.defaultState);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  const toggle = async () => {
+    const next = !on;
+    setBusy(true);
+    setNote(null);
+    const r = await setMasterSwitch(cryptoSwitchKey(node.id), next);
+    setBusy(false);
+    if (r.ok) setOn(next);
+    else setNote(r.pending ? 'Propose-first — write RPC not deployed yet.' : r.error);
+  };
+
+  return (
+    <div className="rounded-md border border-border bg-bg-elevated/30 px-3 py-2.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="font-mono font-semibold text-text">{node.symbol}</span>
+            <span className="text-text-dim" style={{ fontSize: '12px' }}>
+              {node.name}
+            </span>
+            <span className="text-text-muted" style={{ fontSize: '11px' }}>
+              · {node.chain}
+            </span>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-1">
+            {node.stablecoin && <CryptoFlag label="stablecoin" />}
+            {node.privacyCoin && <CryptoFlag label="privacy" />}
+            {node.lightning && <CryptoFlag label="lightning" />}
+            {node.smartContract && <CryptoFlag label="contract" />}
+            {node.onramp === 'hard' && <CryptoFlag label="on-ramp hard" />}
+          </div>
+          {note && (
+            <p className="mt-1 text-text-muted" style={{ fontSize: '11px' }}>
+              {note}
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={busy}
+          className={cn(
+            'inline-flex flex-none items-center gap-1.5 rounded-md border px-2.5 py-1.5 transition-colors',
+            on
+              ? 'border-text-silver/40 bg-bg-elevated text-text hover:text-text-silver-bright'
+              : 'border-border bg-bg-elevated/50 text-text-muted hover:text-text-silver',
+            busy && 'cursor-not-allowed opacity-50',
+          )}
+          style={{ fontSize: '12px' }}
+          aria-pressed={on}
+        >
+          {on ? <ToggleRight size={15} aria-hidden /> : <ToggleLeft size={15} aria-hidden />}
+          {on ? 'On' : 'Off'}
+        </button>
       </div>
     </div>
   );

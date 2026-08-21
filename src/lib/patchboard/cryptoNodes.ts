@@ -1,0 +1,116 @@
+// PATCHBOARD2 — CRYPTO PAYMENT-METHOD NODES (CRYPTO_NODES1).
+//
+// The owner asked for "like 10 to 50 cryptos so users can have many options of
+// payments if we ever wanted to turn them on in the patchboard." This is the
+// SWITCH SURFACE + REGISTRY only — NOT a wallet integration. No custody, no keys,
+// no funds move. Every node is DORMANT/OFF by default; flipping one ON later is a
+// separate integration pass.
+//
+// ARCHITECTURE LAW (CONCEPTS v3.9 / CURRENCY_LAW v1): NONE of these are BLiNG.
+// Each node is an EXTERNAL crypto gateway method — firewall-side, KYC-gated, and
+// there is NEVER a crypto->BLiNG auto-credit. Crypto pays for a good/service on
+// the fiat-side firewall exactly as USD does; it never mints or credits BLiNG!.
+//
+// This constant is the CODE MIRROR of the `crypto_gateway_nodes` table (the same
+// pattern as PROVIDER_REGISTRY vs `patchboard_providers`): until the db-lane
+// migration lands it IS the sanctioned catalog and the resolver floor; after, the
+// table is the live source of truth and the seed matches this list row-for-row.
+
+/** On-ramp difficulty — how hard it is to acquire/settle, informs enablement order. */
+export type OnrampDifficulty = 'easy' | 'medium' | 'hard';
+
+export interface CryptoNode {
+  /** Stable node id / switch key segment (lowercase). */
+  id: string;
+  /** Ticker as shown, e.g. "BTC". */
+  symbol: string;
+  name: string;
+  /** Settlement chain / network. */
+  chain: string;
+  /** Rough adoption rank (1 = most adopted); display + default enablement order. */
+  adoptionRank: number;
+  /** Reality flags — recorded so a future integration pass reads the truth, not a guess. */
+  stablecoin: boolean;
+  /** Privacy coin (shielded/optional-shielded) — hard KYC/compliance surface. */
+  privacyCoin: boolean;
+  /** A Lightning / L2 fast-settlement rail rather than a base chain. */
+  lightning: boolean;
+  /** Smart-contract chain / token (contract risk + gas semantics). */
+  smartContract: boolean;
+  onramp: OnrampDifficulty;
+  note?: string;
+}
+
+/**
+ * ARCHITECTURE LAW flags carried by every node. These are invariants, not toggles:
+ * a crypto gateway node can never become a BLiNG rail, and can never auto-credit
+ * BLiNG. The Patchboard toggle only decides whether the EXTERNAL fiat-side method
+ * is offered — it can never flip these.
+ */
+export const CRYPTO_GATEWAY_LAW = {
+  /** External gateway method (fiat-side firewall), never internal BLiNG. */
+  external: true,
+  /** KYC is required before any real crypto settlement (sits under the hard KYC switch). */
+  kycGated: true,
+  /** There is NEVER a crypto -> BLiNG auto-credit. Immutable. */
+  neverAutoCreditBling: true,
+  /** Every node ships OFF/DORMANT; owner turns one on in a later integration pass. */
+  defaultState: false as const,
+} as const;
+
+/** The Patchboard switch key for a crypto node's Master "offer" switch. */
+export function cryptoSwitchKey(id: string): string {
+  return `crypto.gateway.${id}.offer`;
+}
+
+/**
+ * THE CATALOG — ~40 nodes, ordered by adoption. All OFF by default. Seeded 1:1 into
+ * `crypto_gateway_nodes`. "Room for more" (CRYPTO_NODES1): adding a coin is one row
+ * here + one seed row in the migration, never a code branch.
+ */
+export const CRYPTO_GATEWAY_NODES: readonly CryptoNode[] = [
+  { id: 'btc', symbol: 'BTC', name: 'Bitcoin', chain: 'Bitcoin', adoptionRank: 1, stablecoin: false, privacyCoin: false, lightning: false, smartContract: false, onramp: 'easy' },
+  { id: 'eth', symbol: 'ETH', name: 'Ethereum', chain: 'Ethereum', adoptionRank: 2, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'easy' },
+  { id: 'usdc', symbol: 'USDC', name: 'USD Coin', chain: 'multi (ETH/SOL/...)', adoptionRank: 3, stablecoin: true, privacyCoin: false, lightning: false, smartContract: true, onramp: 'easy', note: 'fiat-pegged stablecoin; fiat-side only, never BLiNG' },
+  { id: 'usdt', symbol: 'USDT', name: 'Tether', chain: 'multi (ETH/TRX/...)', adoptionRank: 4, stablecoin: true, privacyCoin: false, lightning: false, smartContract: true, onramp: 'easy', note: 'fiat-pegged stablecoin' },
+  { id: 'xmr', symbol: 'XMR', name: 'Monero', chain: 'Monero', adoptionRank: 5, stablecoin: false, privacyCoin: true, lightning: false, smartContract: false, onramp: 'hard', note: 'privacy-coin, on-ramp-hard; heightened compliance surface' },
+  { id: 'sol', symbol: 'SOL', name: 'Solana', chain: 'Solana', adoptionRank: 6, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'easy' },
+  { id: 'xrp', symbol: 'XRP', name: 'XRP', chain: 'XRP Ledger', adoptionRank: 7, stablecoin: false, privacyCoin: false, lightning: false, smartContract: false, onramp: 'easy' },
+  { id: 'ltc', symbol: 'LTC', name: 'Litecoin', chain: 'Litecoin', adoptionRank: 8, stablecoin: false, privacyCoin: false, lightning: false, smartContract: false, onramp: 'easy' },
+  { id: 'bch', symbol: 'BCH', name: 'Bitcoin Cash', chain: 'Bitcoin Cash', adoptionRank: 9, stablecoin: false, privacyCoin: false, lightning: false, smartContract: false, onramp: 'easy' },
+  { id: 'dai', symbol: 'DAI', name: 'Dai', chain: 'Ethereum', adoptionRank: 10, stablecoin: true, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium', note: 'crypto-collateralized stablecoin' },
+  { id: 'ada', symbol: 'ADA', name: 'Cardano', chain: 'Cardano', adoptionRank: 11, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'easy' },
+  { id: 'doge', symbol: 'DOGE', name: 'Dogecoin', chain: 'Dogecoin', adoptionRank: 12, stablecoin: false, privacyCoin: false, lightning: false, smartContract: false, onramp: 'easy' },
+  { id: 'trx', symbol: 'TRX', name: 'Tron', chain: 'Tron', adoptionRank: 13, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'easy' },
+  { id: 'dot', symbol: 'DOT', name: 'Polkadot', chain: 'Polkadot', adoptionRank: 14, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium' },
+  { id: 'matic', symbol: 'MATIC', name: 'Polygon', chain: 'Polygon', adoptionRank: 15, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'easy' },
+  { id: 'avax', symbol: 'AVAX', name: 'Avalanche', chain: 'Avalanche', adoptionRank: 16, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'easy' },
+  { id: 'link', symbol: 'LINK', name: 'Chainlink', chain: 'Ethereum', adoptionRank: 17, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium' },
+  { id: 'bnb', symbol: 'BNB', name: 'BNB', chain: 'BNB Chain', adoptionRank: 18, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium' },
+  { id: 'atom', symbol: 'ATOM', name: 'Cosmos', chain: 'Cosmos Hub', adoptionRank: 19, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium' },
+  { id: 'xlm', symbol: 'XLM', name: 'Stellar', chain: 'Stellar', adoptionRank: 20, stablecoin: false, privacyCoin: false, lightning: false, smartContract: false, onramp: 'easy' },
+  { id: 'algo', symbol: 'ALGO', name: 'Algorand', chain: 'Algorand', adoptionRank: 21, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium' },
+  { id: 'btc_lightning', symbol: 'BTC-LN', name: 'Bitcoin Lightning', chain: 'Bitcoin / Lightning', adoptionRank: 22, stablecoin: false, privacyCoin: false, lightning: true, smartContract: false, onramp: 'medium', note: 'L2 fast-settlement rail over Bitcoin' },
+  { id: 'zec', symbol: 'ZEC', name: 'Zcash', chain: 'Zcash', adoptionRank: 23, stablecoin: false, privacyCoin: true, lightning: false, smartContract: false, onramp: 'hard', note: 'optional-shielded privacy coin; compliance surface' },
+  { id: 'dash', symbol: 'DASH', name: 'Dash', chain: 'Dash', adoptionRank: 24, stablecoin: false, privacyCoin: true, lightning: false, smartContract: false, onramp: 'medium', note: 'optional-privacy (PrivateSend)' },
+  { id: 'ton', symbol: 'TON', name: 'Toncoin', chain: 'TON', adoptionRank: 25, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium' },
+  { id: 'near', symbol: 'NEAR', name: 'NEAR Protocol', chain: 'NEAR', adoptionRank: 26, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium' },
+  { id: 'fil', symbol: 'FIL', name: 'Filecoin', chain: 'Filecoin', adoptionRank: 27, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium' },
+  { id: 'hbar', symbol: 'HBAR', name: 'Hedera', chain: 'Hedera', adoptionRank: 28, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium' },
+  { id: 'arb', symbol: 'ARB', name: 'Arbitrum', chain: 'Arbitrum (ETH L2)', adoptionRank: 29, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium' },
+  { id: 'op', symbol: 'OP', name: 'Optimism', chain: 'Optimism (ETH L2)', adoptionRank: 30, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium' },
+  // "room for more" — common additions, still OFF/dormant:
+  { id: 'xtz', symbol: 'XTZ', name: 'Tezos', chain: 'Tezos', adoptionRank: 31, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium' },
+  { id: 'icp', symbol: 'ICP', name: 'Internet Computer', chain: 'ICP', adoptionRank: 32, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium' },
+  { id: 'sui', symbol: 'SUI', name: 'Sui', chain: 'Sui', adoptionRank: 33, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium' },
+  { id: 'apt', symbol: 'APT', name: 'Aptos', chain: 'Aptos', adoptionRank: 34, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium' },
+  { id: 'inj', symbol: 'INJ', name: 'Injective', chain: 'Injective', adoptionRank: 35, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'hard' },
+  { id: 'kas', symbol: 'KAS', name: 'Kaspa', chain: 'Kaspa', adoptionRank: 36, stablecoin: false, privacyCoin: false, lightning: false, smartContract: false, onramp: 'hard' },
+  { id: 'vet', symbol: 'VET', name: 'VeChain', chain: 'VeChain', adoptionRank: 37, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'medium' },
+  { id: 'grt', symbol: 'GRT', name: 'The Graph', chain: 'Ethereum', adoptionRank: 38, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'hard' },
+  { id: 'aave', symbol: 'AAVE', name: 'Aave', chain: 'Ethereum', adoptionRank: 39, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'hard' },
+  { id: 'mkr', symbol: 'MKR', name: 'Maker', chain: 'Ethereum', adoptionRank: 40, stablecoin: false, privacyCoin: false, lightning: false, smartContract: true, onramp: 'hard' },
+] as const;
+
+/** Total nodes in the catalog. */
+export const CRYPTO_GATEWAY_NODE_COUNT = CRYPTO_GATEWAY_NODES.length;
