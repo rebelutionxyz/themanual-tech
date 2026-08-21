@@ -23,6 +23,93 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## VOTE_BALLOTS_CLOSE_APPLY1 — apply auto-close-on-bill-outcome (function + trigger) (2026-08-21)
+
+**Pass:** VOTE_BALLOTS_CLOSE_APPLY1 | lane `migrate` | workdir TheMANUAL.tech | EFFORT M | session `b3cb95e2` (fallback id).
+
+**Governing canon:** SQL_AUTONOMY v1.1 (elections/built-object schema → migrate lane applies, not the vote worker) + MIGRATION AMENDMENT (named dispatch, recorded pre-flight, rollback stated FIRST, ask-gated `apply_migration`, verify by structure) + R9 measure→author→apply→re-measure sequence.
+
+**Source proposal:** `REBELUTION.vote/db/proposed/0004_ballot_autoclose_on_bill_outcome.sql` (+ `.rollback.sql`). Paired forward file: `supabase/migrations/20260821180000_vote_ballot_autoclose_on_bill_outcome.sql` (renamed post-apply to the `apply_migration`-stamped version).
+
+**Mechanism:** `AFTER UPDATE OF status_id` trigger on `public.election_bills`. When a bill's status moves into a terminal `bill_status` (enacted|failed|vetoed|withdrawn|died), every OPEN linked ballot (`elections.bill_ref = bill.id` OR an `election_connections` row `kind='bill', target_id=bill.id`) moves `open → 'decided'`, `closes_at` clamped to `now()` (never below `opens_at + 1s`), with a `closes_note`. Certification stays a separate admin step (mirrors `elections_close_expired` 1:1; does NOT auto-certify).
+
+**Rollback (stated FIRST):**
+```sql
+drop trigger if exists trg_election_bill_outcome_autoclose on public.election_bills;
+drop function if exists public.elections_autoclose_on_bill_outcome();
+```
+Note: ballots already moved to `'decided'` by the trigger are real state changes, NOT reopened by the DDL rollback (a separate data op if ever wanted).
+
+**Pre-flight (recorded, measured from production):**
+- MEASURE on clean tree = **EXIT 0** (357 repo .sql, 0 on/after baseline 20260801000000 unmatched) — freeze-lift criterion met before authoring.
+- Column types verified: `election_bills.id text`, `election_connections.target_id text`, `elections.bill_ref text` → the `= new.id` comparisons are type-safe; `election_bills.status_id uuid` = `election_categories.id uuid`; `elections.status text`, `opens_at/closes_at timestamptz`, `closes_note`/`updated_at` present.
+- All 5 terminal `bill_status` slugs present: `died,enacted,failed,vetoed,withdrawn`.
+- `elections_status_check` allows `{draft,open,decided,certified}` → `'decided'` is a legal target.
+- `elections_window_ck = CHECK (closes_at > opens_at)` → satisfied by the `greatest(opens_at + 1s, …)` clamp, cannot trip.
+- No existing trigger named `trg_election_bill_outcome_autoclose`; function `elections_autoclose_on_bill_outcome` does not yet exist; precedent `elections_close_expired` + `elections_certify` exist.
+- **Rows at risk on apply = 0.** DDL only (create fn + trigger). Trigger is `AFTER UPDATE OF status_id` — it does NOT retroactively fire on the 707 already-terminal bills, so the 8 open ballots (7 bill-linked) are untouched at apply time; they close only on a bill's next status change. Function is `SECURITY DEFINER set search_path public`, no admin guard (correct — system/trigger-driven, not user-callable).
+
+**Apply + functional test + verify — DONE:**
+- Applied via `apply_migration` (ask-gated, owner click). `apply_migration` stamped its own version **20260821183801**; repo file renamed `20260821180000…` → `20260821183801_vote_ballot_autoclose_on_bill_outcome.sql` to match (sanctioned migration-filename normalization, both ends under `supabase/migrations/`).
+- **Structural verify:** function `elections_autoclose_on_bill_outcome` = 1, trigger `trg_election_bill_outcome_autoclose` = 1, no other triggers on `election_bills`.
+- **Functional test (controlled row, rolled back):** self-rolling-back `DO` block flipped bill `federal-hr144-119` `status_id` → `enacted`; linked ballot `787628c6-b593-4ec2-ad13-0ad4aa20e36b` moved `before=open → after=decided`, note `[Closed on bill outcome: Enacted (2026-08-21).]`; `RAISE` aborted the txn. Post-test read confirmed ballot back to `open`, bill status back to `NULL` — zero persistent change.
+- **Reconcile re-measure = EXIT 0** (726 history / 358 repo, 0 unmatched on/after baseline).
+- **Vote lane messaged** (`ops_messages` from `migrate` → `vote`): mechanism live + the AFTER-UPDATE scope caveat (does not retroactively close the 8 existing open ballots; a one-time sweep would be separate).
+
+---
+
+## ASTRA_REGISTRY_SYNC1 — bring astra_registry current: VOTE re-brand in place + JUSTICE insert (2026-08-21)
+
+**Pass:** ASTRA_REGISTRY_SYNC1 | lane `migrate` | workdir TheMANUAL.tech | EFFORT M | session `b3cb95e2` (fallback id).
+
+**Governing canon:** IDENTITY_MODEL v1 + owner ruling "bring registry current" (dispatch). DOMAINS v3 (`rebelution.org = JUSTICE`, `rebelution.vote = VOTE`) confirmed live from the rail. Migrate-lane discipline: recorded pre-flight, rollback stated first, verify by read-back (W-8).
+
+**Apply channel — judgement call (recorded):** this is **DML** (2 data rows in `astra_registry`), not DDL/schema. Applied via `execute_sql` under the R7 routine-SQL discipline (secrets guard / RLS / read-your-writes-back), **not** `apply_migration`. Reason: `apply_migration` stamps a `schema_migrations` version and would pollute the migration ledger + trigger reconcile churn for a data fix that changes no schema. "Apply via migrate canon" in the dispatch is read as *follow the migrate-lane discipline* (pre-flight + rollback + structural verify), not *author a DDL migration file*.
+
+**Pre-flight (recorded):**
+- VOTE row `9b5b88c2-4e4e-40f2-8614-9dbaa54ff10b`, slug `atlasvote`, `off_grid`, group `Services`, `show_in_grid=true`. **Zero FK dependents** across all 21 `astra_id` tables (nova_registry/pillars/atom_surfaces/atom_contributions/entity_atom_links/astra_director_history all count 0) → update-in-place carries no orphan risk. Confirmed no delete+reinsert needed.
+- **Slug rename risk = moot.** Grepped the VOTE codebase (`REBELUTION.vote/src`): the app never keys off `astra_registry.slug`. The only `atlasvote` strings are file-header comments, the `'atlasvote:category'`/`:geo`/`:stage` OG meta-tag namespace in `app/[id]/page.tsx`, and the `atlasvote.org` serving domain in `brand.ts`/`SITE_URL` — none read the registry slug. Decision: **KEEP `slug='atlasvote'`** (conservative; not required by a branding task), and set `link_redirect_slug='vote'` to align with the LOCKED surface slug `vote` (`brand.ts surfaceSlug`) — same pattern as sibling rows media→pulse, marketplace→bazaar, brandosophic→brand.
+- JUSTICE: no existing `justice`/`atlasjustice` row (checked slug + display_name ILIKE) → clean INSERT, no duplicate. No existing row holds domain `rebelution.org` or `rebelution.vote`.
+- Director: butch bee `ab696a36-e3aa-4c78-8137-eb46d3b4e9c6` verified (handle `butch`). Guardrail honored: fnulnu (`deadbeefdead`) is the AUTHOR sentinel, not touched here.
+- Branding source of truth: `REBELUTION.vote/src/lib/brand.ts` — `BRAND.name='VOTE'` (owner ruling 2026-08-09 "just VOTE for now"). Registry `display_name` follows the on-page wordmark, matching sibling FUND (display `FUND`, default_name `Funding`). VOTE `default_name` stays `Voting` (function label, unchanged).
+
+**Rollback (stated FIRST):**
+```sql
+BEGIN;
+  UPDATE public.astra_registry
+     SET display_name='AtlasVOTE', domain='atlasvote.org',
+         link_redirect_slug=NULL, director_bee_id=NULL
+   WHERE id='9b5b88c2-4e4e-40f2-8614-9dbaa54ff10b';
+  DELETE FROM public.astra_registry WHERE slug='justice' AND domain='rebelution.org';
+COMMIT;
+```
+VOTE pre-image snapshot for exact restore: slug=`atlasvote`, display_name=`AtlasVOTE`, domain=`atlasvote.org`, status=`off_grid`, default_name=`Voting`, astra_grid_group=`Services`, show_in_grid=`true`, link_redirect_slug=`NULL`, director_bee_id=`NULL`, notes=`surface | VOTE (sovereign voting, not betting)`.
+
+**Applied SQL:**
+```sql
+BEGIN;
+  UPDATE public.astra_registry
+     SET display_name='VOTE', domain='rebelution.vote',
+         link_redirect_slug='vote',
+         director_bee_id='ab696a36-e3aa-4c78-8137-eb46d3b4e9c6'
+   WHERE id='9b5b88c2-4e4e-40f2-8614-9dbaa54ff10b'
+     AND slug='atlasvote' AND display_name='AtlasVOTE';
+  INSERT INTO public.astra_registry
+    (slug, display_name, domain, status, default_name, astra_grid_group, show_in_grid, director_bee_id, notes)
+  VALUES
+    ('justice','JUSTICE','rebelution.org','off_grid','Justice','Services',true,
+     'ab696a36-e3aa-4c78-8137-eb46d3b4e9c6','surface | JUSTICE (rebelution.org)');
+COMMIT;
+```
+
+**Result — applied + read back (W-8), both rows verified:**
+- **VOTE** `9b5b88c2-4e4e-40f2-8614-9dbaa54ff10b` (id + slug `atlasvote` preserved → all FK refs intact): `display_name` `AtlasVOTE`→**`VOTE`**, `domain` `atlasvote.org`→**`rebelution.vote`**, `link_redirect_slug` `NULL`→**`vote`**, `director_bee_id` `NULL`→**butch**. Unchanged: status `off_grid`, default_name `Voting`, group `Services`, show_in_grid `true`, notes.
+- **JUSTICE** inserted, new id **`20cb71da-6c85-45e0-8361-e8e40609c63b`**: slug `justice`, display_name `JUSTICE`, domain `rebelution.org`, status `off_grid`, default_name `Justice`, group `Services`, show_in_grid `true`, director butch, notes `surface | JUSTICE (rebelution.org)`.
+
+Rollback above remains exact and on hand. No other astra rows touched.
+
+---
+
 ## VOTE_IDEMPOTENCY_APPLY1 — controlled apply of VOTE_ENGINE1 ingest idempotency keys (2026-08-21)
 
 **Pass:** VOTE_IDEMPOTENCY_APPLY1 | lane `migrate` | workdir TheMANUAL.tech | EFFORT STANDARD | session `28c59d42` (fallback id). Gates the live vote ingest (VOTE_INGEST* passes carry `after_pass=VOTE_IDEMPOTENCY_APPLY1`).
