@@ -1,6 +1,14 @@
 import { COMPOSER_MEASURE, Composer, type ComposerBand } from '@/components/composer/Composer';
 import { H24CostPanel } from '@/components/h24/H24CostPanel';
 import { type ShellNavGroup, UniversalShell } from '@/components/shell/UniversalShell';
+import {
+  type ByokProvider,
+  MODEL_PROVIDER,
+  PROVIDER_LABEL,
+  clearByokKey,
+  getByokState,
+  setByokKey,
+} from '@/lib/atlasoracle/byok';
 import { type DirectiveCategory, type Tier, isMocked } from '@/lib/atlasoracle/client';
 import { formatTokensExact } from '@/lib/atlasoracle/reconcile';
 import type { ModelRateRow } from '@/lib/atlasoracle/reconcile';
@@ -39,17 +47,33 @@ import { useLocation, useNavigate } from 'react-router-dom';
  * post-purchase return, the token balance, the CSV export. What changed is the
  * CHROME (UniversalShell) and the COMPOSER SEMANTICS.
  *
- * COMPOSER SEMANTICS (SHELL_PORT1 scope = "shell now, Auto routing → AUTOTIER1",
- * owner-ruled this pass):
+ * COMPOSER SEMANTICS (H24_COMPOSER1, COMPOSER v1.1 owner ruling 2026-08-22 —
+ * "the composer brain": band / model / effort-behind-the-wheel + BYOK slot):
  *   - BAND = Auto | free ONLY. `free` is the real no-cost tier. `Auto` maps to
  *     the current best REAL tier (frontier) as a PLACEHOLDER — the "router picks
  *     best" intelligence + company-model mapping lands in AUTOTIER1. So Auto
  *     does a real thing today (routes to the frontier model), just not the smart
  *     one yet. Nothing fake ships.
+ *   - tokens <= 0 FORCES free: Auto costs tokens, so a Bee at or below zero is
+ *     given free only and a green "Get h24 tokens" link. Auto returns to the
+ *     band menu the moment the balance is positive again.
  *   - MODEL menu (Auto band only): Auto + COMPANY-NAME models. Display-only this
- *     pass; not wired to routing until AUTOTIER1. NO version strings, NO effort
- *     dial (the composer never had one — see Composer.tsx).
+ *     pass; the rail maps name+band → exact version at AUTOTIER1. NO versions.
+ *   - EFFORT chip: NO standing dial. Appears ONLY when the Bee picks a specific
+ *     model (model != Auto): low / medium / high[default] / max. Hides on Auto.
+ *     Captured state awaiting AUTOTIER1 — the router has no effort field yet.
+ *   - BYOK: when a specific model is picked, the Bee may enter their own
+ *     provider key. The key goes to the routing PROCESS only (VOTE_APIS v1.2) —
+ *     never the model context, never logged, masked at rest; when present the
+ *     model chip shows a "your key" marker. Routing through it lands at
+ *     AUTOTIER1; today it is captured + marked only (see byok.ts).
  *   - The routing-log "Tier" column is renamed to "Band".
+ *
+ * HONESTY: model / effort / BYOK are the SELECTION STATE MACHINE; the request
+ * that leaves the browser still carries only { directive, tier, category,
+ * astra_slug } because that is all the deployed h24-route contract accepts. No
+ * un-accepted field is ever sent. AUTOTIER1 turns these captured picks into real
+ * routing parameters.
  */
 
 type Band = 'auto' | 'free';
@@ -60,6 +84,15 @@ const bandToTier = (b: Band): Tier => (b === 'free' ? 'free' : 'frontier');
 const MODEL_OPTIONS = ['Auto', 'Claude', 'GPT', 'Grok', 'Llama', 'Mistral', 'DeepSeek'].map(
   (m) => ({ id: m, label: m }),
 );
+
+type Effort = 'low' | 'medium' | 'high' | 'max';
+/** COMPOSER v1.1 effort levels. `high` is the default (thorough). */
+const EFFORT_OPTIONS: { id: Effort; label: string }[] = [
+  { id: 'low', label: 'low' },
+  { id: 'medium', label: 'medium' },
+  { id: 'high', label: 'high' },
+  { id: 'max', label: 'max' },
+];
 
 export function OraclePage() {
   const { bee } = useAuth();
@@ -91,6 +124,14 @@ export function OraclePage() {
   const [directive, setDirective] = useState('');
   const [band, setBand] = useState<Band>('free');
   const [model, setModel] = useState('Auto');
+  // EFFORT (COMPOSER v1.1) — captured only when a specific model is picked;
+  // default high (thorough). Not yet a routed parameter (see the header note).
+  const [effort, setEffort] = useState<Effort>('high');
+  // BYOK — `byokTick` forces a re-read of the masked key state after a save or
+  // clear (sessionStorage does not notify React); `byokOpen` toggles the entry
+  // panel. No raw key ever lives in React state.
+  const [byokTick, setByokTick] = useState(0);
+  const [byokOpen, setByokOpen] = useState(false);
   // KIND (category) is a real router param but is NOT on the ruled composer row
   // (SHELL v1.5: [+][add-to-vault][Band][Model][mic][send]). It stays at its
   // default and is still sent to the router; surfacing it returns in a later
@@ -141,15 +182,44 @@ export function OraclePage() {
     if (response) applyBalanceAfter(response.balanceAfterTokens);
   }, [state, loadLog, response, applyBalanceAfter]);
 
+  // OUT OF TOKENS — Auto costs tokens; a Bee at or below zero gets free only.
+  // `balance === null` means "not loaded / no ledger read", NOT zero, so it does
+  // not force anything.
+  const noTokens = tokens.balance !== null && tokens.balance <= 0;
+
+  // Force the free band whenever the Bee has no tokens. The band menu also drops
+  // Auto in that state (below), so this only ever fires on a stale `auto` pick.
+  useEffect(() => {
+    if (noTokens) setBand('free');
+  }, [noTokens]);
+
   // BAND picker — Auto | free. The model each band routes to is read from the
-  // live rate card, so the sublabel is honest about what actually runs.
+  // live rate card, so the sublabel is honest about what actually runs. When the
+  // Bee is out of tokens, only free is offered.
   const bands: ComposerBand[] = useMemo(() => {
     const modelFor = (t: Tier) => tierRates.find((r) => r.tier === t)?.model;
+    const free = { id: 'free', label: 'free', sublabel: modelFor('free') ?? 'save your tokens' };
+    if (noTokens) return [free];
     return [
       { id: 'auto', label: 'Auto', sublabel: modelFor('frontier') ?? 'h24 picks best' },
-      { id: 'free', label: 'free', sublabel: modelFor('free') ?? 'save your tokens' },
+      free,
     ];
-  }, [tierRates]);
+  }, [tierRates, noTokens]);
+
+  // SELECTION STATE MACHINE — model menu shows in the Auto (paid) band; a picked
+  // company name unlocks the effort chip and the BYOK slot. `provider` is null on
+  // Auto, which is exactly when neither surfaces.
+  const showModel = band === 'auto';
+  const modelPicked = showModel && model !== 'Auto';
+  const provider: ByokProvider | null = MODEL_PROVIDER[model] ?? null;
+  // byokTick is the intentional re-read trigger after a save/clear (sessionStorage
+  // does not notify React); it belongs in the deps precisely because it is not
+  // read in the body.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: byokTick forces the re-read
+  const byokState = useMemo(
+    () => (provider ? getByokState(provider) : { present: false, last4: null }),
+    [provider, byokTick],
+  );
 
   const tier = bandToTier(band);
   const currentRate = tierRates.find((r) => r.tier === tier);
@@ -280,6 +350,34 @@ export function OraclePage() {
   // (or the log already has history).
   const docked = Boolean(bee) && (hasSent || log.entries.length > 0 || Boolean(response));
 
+  // BYOK save/clear — the raw value never re-enters React state; setByokKey
+  // writes it to session storage and we bump the re-read trigger.
+  function saveByok(raw: string) {
+    if (provider) setByokKey(provider, raw);
+    setByokTick((n) => n + 1);
+    setByokOpen(false);
+  }
+  function removeByok() {
+    if (provider) clearByokKey(provider);
+    setByokTick((n) => n + 1);
+  }
+
+  // "your key" marker on the model chip — only when a specific model is picked
+  // and a key for its provider is present.
+  const optionBadge =
+    modelPicked && byokState.present ? (
+      <span
+        className="rounded px-1.5 py-0.5"
+        style={{
+          fontSize: '10px',
+          color: 'var(--accent, #ef6c2a)',
+          border: '1px solid color-mix(in srgb, var(--accent, #ef6c2a) 45%, transparent)',
+        }}
+      >
+        your key
+      </span>
+    ) : null;
+
   const composerEl = (
     <>
       <input
@@ -292,6 +390,20 @@ export function OraclePage() {
           e.target.value = '';
         }}
       />
+      {/* OUT OF TOKENS — green Get-tokens link; the band menu is already free-only. */}
+      {bee && noTokens && (
+        <div className="mb-2 flex items-center gap-2" style={{ fontSize: 12 }}>
+          <span style={{ color: 'var(--mute)' }}>Out of h24 tokens — free band only.</span>
+          <button
+            type="button"
+            onClick={openStore}
+            className="font-semibold underline-offset-2 hover:underline"
+            style={{ color: 'var(--buy-green)' }}
+          >
+            Get h24 tokens
+          </button>
+        </div>
+      )}
       <Composer
         value={directive}
         onChange={setDirective}
@@ -303,14 +415,61 @@ export function OraclePage() {
         bands={bands}
         bandId={band}
         onBandChange={(id) => setBand(id as Band)}
-        // MODEL menu shows only in the Auto band (SHELL v1.5). Display-only until
+        // MODEL menu shows only in the Auto (paid) band. Display-only until
         // AUTOTIER1 — selecting a company name does not re-route yet.
-        options={band === 'auto' ? MODEL_OPTIONS : []}
+        options={showModel ? MODEL_OPTIONS : []}
         optionId={model}
         onOptionChange={setModel}
         optionLabel="Model"
+        optionBadge={optionBadge}
+        // EFFORT chip only once a specific model is picked (COMPOSER v1.1).
+        effortOptions={modelPicked ? EFFORT_OPTIONS : []}
+        effortId={effort}
+        onEffortChange={(id) => setEffort(id as Effort)}
+        effortLabel="Effort"
         enableMic
       />
+      {/* BYOK affordance — only when a specific model is picked. */}
+      {modelPicked && provider && (
+        <div className="mt-2" style={{ fontSize: 11.5 }}>
+          {byokState.present ? (
+            <div className="flex flex-wrap items-center gap-2" style={{ color: 'var(--mute)' }}>
+              <span>
+                Using your {PROVIDER_LABEL[provider]} key
+                {byokState.last4 ? ` ···· ${byokState.last4}` : ''}
+              </span>
+              <button
+                type="button"
+                onClick={() => setByokOpen((o) => !o)}
+                className="underline-offset-2 hover:underline"
+                style={{ color: 'var(--body)' }}
+              >
+                change
+              </button>
+              <button
+                type="button"
+                onClick={removeByok}
+                className="underline-offset-2 hover:underline"
+                style={{ color: 'var(--body)' }}
+              >
+                remove
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setByokOpen((o) => !o)}
+              className="underline-offset-2 hover:underline"
+              style={{ color: 'var(--mute)' }}
+            >
+              Use your own {PROVIDER_LABEL[provider]} key
+            </button>
+          )}
+          {byokOpen && (
+            <ByokEntry provider={provider} onSave={saveByok} onCancel={() => setByokOpen(false)} />
+          )}
+        </div>
+      )}
     </>
   );
 
@@ -683,6 +842,75 @@ export function OraclePage() {
         )}
       </div>
     </UniversalShell>
+  );
+}
+
+/**
+ * BYOK entry panel. Captures a provider key and hands the raw string UP via
+ * onSave exactly once, on submit. The value lives only in this component's local
+ * state until then; it is masked (type="password"), never logged, and cleared
+ * from local state on save/cancel. Persistence + the never-into-the-model
+ * discipline live in byok.ts.
+ */
+function ByokEntry({
+  provider,
+  onSave,
+  onCancel,
+}: {
+  provider: ByokProvider;
+  onSave: (raw: string) => void;
+  onCancel: () => void;
+}) {
+  const [val, setVal] = useState('');
+  return (
+    <div
+      className="mt-2 rounded-md p-3"
+      style={{
+        border: '1px solid var(--hairline, rgba(248,249,250,0.14))',
+        background: 'var(--input, #10141b)',
+      }}
+    >
+      <label
+        htmlFor="byok-key"
+        className="mb-1 block"
+        style={{ color: 'var(--body)', fontSize: 12 }}
+      >
+        Your {PROVIDER_LABEL[provider]} API key
+      </label>
+      <input
+        id="byok-key"
+        type="password"
+        autoComplete="off"
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        placeholder="Paste your key — used by the router only, never shown or logged"
+        className="w-full rounded-md border border-border-bright bg-panel-2 px-2 py-1.5 text-text focus:outline-none"
+        style={{ fontSize: 12.5 }}
+      />
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onSave(val)}
+          disabled={val.trim().length === 0}
+          className="rounded-md px-3 py-1 font-semibold transition-colors disabled:opacity-40"
+          style={{ background: 'var(--accent, #ef6c2a)', color: '#000', fontSize: 12 }}
+        >
+          Save key
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-md px-3 py-1 transition-colors"
+          style={{ border: '1px solid var(--line, rgba(248,249,250,0.2))', fontSize: 12 }}
+        >
+          Cancel
+        </button>
+      </div>
+      <p className="mt-2" style={{ color: 'var(--mute)', fontSize: 10.5, lineHeight: 1.5 }}>
+        Your key goes to the routing process only — never into the model, never logged, masked here.
+        Kept for this browser session. Routing through your key lands with AUTOTIER1.
+      </p>
+    </div>
   );
 }
 

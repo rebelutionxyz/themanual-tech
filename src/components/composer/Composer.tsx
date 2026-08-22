@@ -10,19 +10,26 @@
  * surface wires its own meaning to those slots. That is the whole point of
  * lifting it here on day one rather than growing it out of OraclePage later.
  *
- * ─── WHAT IS DELIBERATELY ABSENT ────────────────────────────────────────────
- * EFFORT. The spec's composer lists an effort selector "only if it changes a
- * real request parameter; otherwise omit and say so." The h24 router accepts
- * `{ directive, tier, astra_slug, category, confirm_cost }` and NOTHING that
- * carries an effort level — so an effort control would be a decorative select
- * that changes nothing. It is omitted here, and there is no prop for it: adding
- * a dead control to the shared component would spread the lie to every future
- * mount. When a real effort parameter exists, this is where it lands.
+ * ─── EFFORT (COMPOSER v1.1, owner ruling 2026-08-22) ────────────────────────
+ * EFFORT is now a slot, but a CONDITIONAL one. The earlier build omitted it
+ * because Auto routes effort for you and a standing dial changed nothing. The
+ * owner ruling keeps that truth — Auto shows NO dial ever — and adds one case:
+ * when a Bee manually picks a specific model, an Effort chip appears beside it
+ * (low / medium / high[default] / max). The shared component stays honest by
+ * making the slot OPT-IN exactly like the others: a surface passes effort props
+ * ONLY in the states where effort means something, and the control renders only
+ * then. It is never a standing dead select.
+ *
+ * WIRING STATUS: the deployed h24 router accepts only
+ * `{ directive, tier, category, astra_slug, confirm_cost }` — no effort field —
+ * so the picked effort is CAPTURED STATE awaiting AUTOTIER1, not yet a routed
+ * parameter. The composer surfaces it because the owner ruled the control in;
+ * the surface that mounts it owns the honesty of when to show it.
  */
 
 import { cn } from '@/lib/utils';
 import { ArrowUp, Mic, Plus, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 /**
  * THE SHARED READABLE MEASURE — FRONT84 (ORACLE_MF v1.54, owner: cap the
@@ -81,11 +88,23 @@ export interface ComposerProps {
   bandId?: string;
   onBandChange?: (id: string) => void;
 
-  /** A second small selector, e.g. h24's directive "kind". Omitted when empty. */
+  /** A second small selector, e.g. h24's Model menu. Omitted when empty. */
   options?: ComposerOption[];
   optionId?: string;
   onOptionChange?: (id: string) => void;
   optionLabel?: string;
+  /** Small marker rendered against the options chip — e.g. h24's "your key". */
+  optionBadge?: ReactNode;
+
+  /**
+   * Conditional EFFORT selector (COMPOSER v1.1). Rendered ONLY when a surface
+   * passes a non-empty list — h24 passes it solely when a specific model is
+   * picked, so Auto never shows a dial. Omitted entirely otherwise.
+   */
+  effortOptions?: ComposerOption[];
+  effortId?: string;
+  onEffortChange?: (id: string) => void;
+  effortLabel?: string;
 
   /** Offer the mic. It STILL only renders if the browser supports speech input. */
   enableMic?: boolean;
@@ -129,6 +148,11 @@ export function Composer({
   optionId,
   onOptionChange,
   optionLabel = 'Kind',
+  optionBadge,
+  effortOptions = [],
+  effortId,
+  onEffortChange,
+  effortLabel = 'Effort',
   enableMic = false,
 }: ComposerProps) {
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -280,16 +304,39 @@ export function Composer({
         )}
 
         {options.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <select
+              value={optionId}
+              onChange={(e) => onOptionChange?.(e.target.value)}
+              disabled={disabled}
+              aria-label={optionLabel}
+              title={optionLabel}
+              className="max-w-[130px] rounded-md border border-border-bright bg-panel-2 px-2 py-1 text-text-silver transition-colors hover:text-text disabled:opacity-40"
+              style={{ fontSize: '12px' }}
+            >
+              {options.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            {optionBadge}
+          </div>
+        )}
+
+        {/* EFFORT — conditional (COMPOSER v1.1). The surface passes options only
+            when a specific model is picked; Auto never mounts this. */}
+        {effortOptions.length > 0 && (
           <select
-            value={optionId}
-            onChange={(e) => onOptionChange?.(e.target.value)}
+            value={effortId}
+            onChange={(e) => onEffortChange?.(e.target.value)}
             disabled={disabled}
-            aria-label={optionLabel}
-            title={optionLabel}
-            className="max-w-[130px] rounded-md border border-border-bright bg-panel-2 px-2 py-1 text-text-silver transition-colors hover:text-text disabled:opacity-40"
+            aria-label={effortLabel}
+            title={effortLabel}
+            className="max-w-[110px] rounded-md border border-border-bright bg-panel-2 px-2 py-1 text-text-silver transition-colors hover:text-text disabled:opacity-40"
             style={{ fontSize: '12px' }}
           >
-            {options.map((o) => (
+            {effortOptions.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.label}
               </option>
