@@ -23,6 +23,61 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## PROFILE4 — Profile data layer (patchboard nodes, galleries, tip levels, social graph) — PROPOSE-FIRST (2026-08-22)
+
+**Pass:** PROFILE4 | lane `platform` | workdir TheMANUAL.tech | session `2e3d9c47` (fallback id) | claimed via AUTO-POOL fallthrough. after_pass PROFILE3 (done).
+
+**Governing canon:** PROFILE_SPEC v0.1–v0.4, PATCHBOARD_NODES v1, CURRENCY_LAW v1.3, **SQL_AUTONOMY v1.1** — all read from `ops_docs`. Dispatch scope: PROPOSE-FIRST schema (db/proposals, rollback-first, RLS); **do NOT stamp the shared ledger, do NOT apply**; scoped commit, no push.
+
+### Ruling that shaped the pass
+SQL_AUTONOMY v1.1 would let a *TheMANUAL.tech* pass self-apply schema — but the **dispatch explicitly overrides** to propose-first ("do NOT stamp the shared ledger"). I followed the stricter dispatch: everything is authored into `db/proposals/`, rollback-first, RLS + named-role grants, and **nothing was executed against the shared DB**. That also means no plan-mode gate (no production mutation).
+
+### Discovery against the live schema (drove the design)
+- **No `patchboard_*` tables exist in the DB** — the base patchboard storage (switches/node_values) is itself still unapplied. So the profile node layer is authored **self-contained** (its own catalog + per-Bee overrides), designed to merge into the patchboard2 catalog when that lands, rather than depending on tables that aren't there.
+- **`bees.id = auth.uid()`** (confirmed from `bee_follows_v1` RLS) — every policy keys off it.
+- **Galleries already exist and are complete** — `media_collections` (with a `visibility` column = the per-gallery public switch) + `media_collection_items` + `media_assets` + `media_folders` (vault feed), read via `src/lib/media.ts`. **No new gallery schema issued** — manufacturing redundant tables would be wrong; the remaining work is UI wiring on the existing schema.
+- **Follow already exists** (`public.bee_follows`, one-way) — left UNCHANGED; the new relations are additive.
+
+### What shipped — `db/proposals/` (authored, NOT applied)
+- **`0001_profile_nodes.sql`** (+ rollback) — the profile patchboard node layer. `profile_node_catalog` (census of every public profile element as a node, seeded with the PROFILE_SPEC v0.1 list **+** tab order, share-my-votes, contact method, ad slot, tip rails; each with a default + `sensitive` flag; **conservative posture — sections default OFF/private**, activity+rank default ON) and `profile_nodes` (per-Bee overrides). Resolver `profile_node_effective(bee,key)` = override → default. RLS: catalog + nodes world-readable (the public profile renders from them), nodes owner-write. **Nothing hardcoded** — section visibility, tab order, contact method, ad slot, tip rails all read from these rows.
+- **`0002_bee_relations.sql`** (+ rollback) — the social graph beyond follow. `bee_relations` with distinct types: **subscribe** (one-way, immediate), **contact** (one-way, private to the owner), **friend/connection** (mutual, request→accept). Writes via SECDEF RPCs only (`bee_relation_request` / `_accept` / `_remove`), mirroring `bee_follow`. Public counts via SECDEF `bee_relation_count` (so row-RLS stays strict while the profile shows a number; contact count is owner-only). RLS: edges visible to endpoints, contact private to `from_bee`.
+- **`0003_tip_donation_levels.sql`** (+ rollback) — creator tip reward tiers: amount + reward-of-any-kind + optional BLiNG!-back + **`max_count`** ("3 of 25 left") + `claimed_count`, unlimited per Bee, edit/deletable. **CONFIG only — no settlement**; live money stays owner-gated at the money walk (CURRENCY_LAW v1.3: tips accept USD + BLiNG! + configured cryptos). The tip **rails** and **tipper-BLiNG!-back switch** are `profile_nodes` (`tips.*`), not duplicated here.
+- **`README.md`** — the propose-first set, FK-respecting apply order, the galleries finding, the "not executed" note, and the conventions followed.
+
+### Deviations / judgement calls (with reasons)
+1. **Self-contained profile node layer instead of seeding `patchboard_switches`.** Those tables don't exist in this DB — seeding them is impossible and PATCHBOARD_NODES v1 keeps the base catalog its own propose-first draft. The self-contained layer applies independently and merges later; the "everything is a node, nothing hardcoded" law is honored.
+2. **No galleries proposal.** The schema already exists (`media_collections.visibility` is the per-gallery public switch). Issuing redundant tables would be drift. Documented in the README instead.
+3. **Tip rails/back as nodes, not a `tip_settings` table.** Avoids duplicating switch state that the profile node layer already owns; a *platform-scope* tipper-BLiNG!-back switch is noted as belonging to the patchboard2 master catalog.
+4. **DDL not executed against the shared DB.** Propose-first forbids it and a rehearsal that quietly commits is the DB37 breach (HARNESS_SAFETY). Syntax was reviewed by hand; the controlled MIGRATE_SWEEP/owner apply verifies against `information_schema` + re-measures reconcile to 0.
+5. **App left untouched.** PROFILE4 is the schema proposal; wiring the new tables into the app is post-apply. The PROFILE3 UI already degrades to empty states via its `.catch` handlers, so no app change is needed and the build is unaffected.
+6. **`db/` is gitignored in TheMANUAL.tech (OPEN ITEM for the lead).** `.gitignore:38` ignores all of `db/` (it holds DB dumps). SQL_AUTONOMY v1.1 explicitly names `db/proposals/NNNN_name.sql` as the propose-first path, so I kept the canon location and **`git add -f`-tracked only the `db/proposals/` subtree** (dumps stay ignored) so the deliverable travels with the repo and the MIGRATE_SWEEP can find it. This is reversible (local commit, not pushed) and reviewed before any push. If the lead prefers a different tracked home (a `!db/proposals/` gitignore negation, or `supabase/migrations/_drafts/` — which is tracked and NOT scanned by reconcile's top-level `readdirSync`), the files move trivially. Flagged rather than silently overriding the owner's ignore.
+
+### Done-test
+- **DDL not executed** (propose-first — by design; see deviation 4). No `apply_migration`, no ledger stamp.
+- **App build:** unchanged from PROFILE3 (zero app files touched this pass) — PROFILE3 left `npm run build` at exit 0. SQL_AUTONOMY v1.1 "your app still builds" holds because nothing references the unapplied tables.
+- Proposal files reviewed by hand for the RLS/grant idiom (`bee_follows_v1` template): RLS enabled, `drop policy if exists`/`create policy`, SECDEF `set search_path = public`, `revoke all … from public` / `revoke execute … from anon` / `grant … to authenticated`, `numeric(20,6)`, idempotent DDL.
+
+### Could not verify
+- **SQL executes cleanly / RLS behaves as intended** — not run against any live DB (propose-first forbids it; no local Postgres in this session). Correctness is by review against the deployed `bee_follows_v1` conventions. The MIGRATE_SWEEP/owner apply is where it is proven (apply → verify `information_schema` → reconcile 0).
+- **`notifications.type` accepts the new relation values** — the notify insert mirrors `bee_follow` but is wrapped in `exception when others → raise warning`, so a type-check constraint (if any) never blocks a relation write. Not exercised.
+
+### Manifest (scoped commit — NOT pushed)
+```
+NEW  db/proposals/0001_profile_nodes.sql
+NEW  db/proposals/0001_profile_nodes_rollback.sql
+NEW  db/proposals/0002_bee_relations.sql
+NEW  db/proposals/0002_bee_relations_rollback.sql
+NEW  db/proposals/0003_tip_donation_levels.sql
+NEW  db/proposals/0003_tip_donation_levels_rollback.sql
+NEW  db/proposals/README.md
+MOD  REPORT.md
+```
+No production schema was applied. `.claude-pass` never committed.
+
+[DONE] PROFILE4 | profile data layer authored as propose-first proposals (db/proposals), rollback-first, NOT applied; scoped commit staged (no push)
+
+---
+
 ## PROFILE3 — BUILD the profile page to PROFILE_SPEC v0.1–v0.4 + SHELL v1.5 (UI pass) (2026-08-22)
 
 **Pass:** PROFILE3 | lane `platform` | workdir TheMANUAL.tech | session `2e3d9c47` (fallback id) | claimed via AUTO-POOL fallthrough (session opened at `C:\Users\Butch`, no folder match).
