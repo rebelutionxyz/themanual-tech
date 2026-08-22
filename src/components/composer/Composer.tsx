@@ -133,6 +133,7 @@ export function Composer({
 }: ComposerProps) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const [listening, setListening] = useState(false);
+  const [focused, setFocused] = useState(false);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
 
   // The mic mounts only where speech is actually available. A dead mic never
@@ -189,11 +190,17 @@ export function Composer({
   }
 
   return (
+    // SHELL v1.5 H24 COMPOSER: white outline at rest, ACCENT outline on focus,
+    // directive text white, ground = the fixed --input token. The accent focus
+    // ring is driven by JS focus state (CSS focus-within can't reach a custom
+    // property swap cleanly across the fallback). Fallbacks keep the composer
+    // sane if it is ever mounted outside an `.astra-shell` scope.
     <div
-      className={cn(
-        COMPOSER_MEASURE,
-        'rounded-2xl border border-border-bright bg-bg-elevated p-2 focus-within:border-honey/50',
-      )}
+      className={cn(COMPOSER_MEASURE, 'rounded-2xl p-2 transition-colors')}
+      style={{
+        background: 'var(--input, #10141b)',
+        border: `1px solid ${focused ? 'var(--accent, #ef6c2a)' : 'rgba(248,249,250,0.22)'}`,
+      }}
     >
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-1.5 px-1 pb-2">
@@ -224,6 +231,8 @@ export function Composer({
         ref={taRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -233,8 +242,8 @@ export function Composer({
         placeholder={placeholder}
         rows={1}
         disabled={disabled}
-        className="w-full resize-none bg-transparent px-2 py-1.5 text-text placeholder:text-text-muted focus:outline-none disabled:opacity-50"
-        style={{ fontSize: '14px', maxHeight: '200px' }}
+        className="w-full resize-none bg-transparent px-2 py-1.5 placeholder:text-text-muted focus:outline-none disabled:opacity-50"
+        style={{ fontSize: '14px', maxHeight: '200px', color: 'var(--ink, #f8f9fa)' }}
       />
 
       <div className="flex items-center gap-1.5 px-1 pt-1">
@@ -309,8 +318,9 @@ export function Composer({
           </button>
         )}
 
-        {/* SEND is the up-arrow, aria-label "Send" — never the word on the
-            button, per the ruling. */}
+        {/* SEND — SHELL v1.5: solid ACCENT SQUARE, white up-arrow; the arrow
+            flips BLACK on hover, the box STAYS accent. aria-label "Send", never
+            the word on the button. */}
         <button
           type="button"
           onClick={submit}
@@ -318,13 +328,17 @@ export function Composer({
           aria-label="Send"
           title="Send"
           className={cn(
-            'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-colors',
-            canSubmit
-              ? 'bg-honey text-black hover:bg-honey/90'
-              : 'cursor-not-allowed bg-panel-2 text-text-muted',
+            'group flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md transition-colors',
+            !canSubmit && 'cursor-not-allowed',
           )}
+          style={{
+            background: canSubmit ? 'var(--accent, #ef6c2a)' : 'var(--input, #14171c)',
+          }}
         >
-          <ArrowUp size={18} />
+          <ArrowUp
+            size={18}
+            className={canSubmit ? 'text-white group-hover:text-black' : 'text-text-muted'}
+          />
         </button>
       </div>
     </div>

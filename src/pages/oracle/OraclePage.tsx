@@ -1,13 +1,7 @@
 import { COMPOSER_MEASURE, Composer, type ComposerBand } from '@/components/composer/Composer';
 import { H24CostPanel } from '@/components/h24/H24CostPanel';
-import { H24Sidebar } from '@/components/h24/H24Sidebar';
-import { RoomsButton } from '@/components/layout/RoomsButton';
-import {
-  DIRECTIVE_CATEGORIES,
-  type DirectiveCategory,
-  type Tier,
-  isMocked,
-} from '@/lib/atlasoracle/client';
+import { type ShellNavGroup, UniversalShell } from '@/components/shell/UniversalShell';
+import { type DirectiveCategory, type Tier, isMocked } from '@/lib/atlasoracle/client';
 import { formatTokensExact } from '@/lib/atlasoracle/reconcile';
 import type { ModelRateRow } from '@/lib/atlasoracle/reconcile';
 import { type RoutingLogEntry, fetchRoutingLog } from '@/lib/atlasoracle/routingLog';
@@ -16,46 +10,68 @@ import { useOracleDirective } from '@/lib/atlasoracle/useOracleDirective';
 import { useOracleTokens } from '@/lib/atlasoracle/useOracleTokens';
 import { useAuth } from '@/lib/auth';
 import { uploadToLibrary } from '@/lib/media';
+import { H24_TOKENS } from '@/lib/shell/astraTokens';
 import { cn } from '@/lib/utils';
-import { ArrowLeft, ArrowRight, Download, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
+import { useH24Storefront } from '@/stores/useH24Storefront';
+import {
+  Activity,
+  CalendarClock,
+  Download,
+  FolderKanban,
+  Image as ImageIcon,
+  Images,
+  Radio,
+  SlidersHorizontal,
+  SquarePen,
+  Wallet,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 /**
- * THE h24 SURFACE — the Claude pattern, built from H24_DESIGN_SPEC v1.0
- * (LOCKED, ORACLE_MF v1.46). The 678-line console this replaced was raw
- * material, not sacred: its balance, rate card, directive box and routing log
- * are all here, recomposed into sidebar / conversation / build-panel.
+ * THE h24 SURFACE — now wearing the PERFECTED UNIVERSAL SHELL (SHELL v1.5,
+ * ops_docs SHELL, owner+lead 2026-08-22). SHELL_PORT1 ports the shell here as
+ * the REFERENCE implementation the other astras copy-port.
  *
- * ── THE FUND DISCIPLINE GOVERNS: real data only. ────────────────────────────
- * Every control on this surface does a real thing today or it is not here.
- * What that rule removed, and why, is recorded in the FRONT79 report; the load-
- * bearing omissions are marked inline where a reader would expect the control.
+ * The real machinery is unchanged — directive send/confirm, the live routing
+ * log, the cost breakdown (now the CONTENT WINDOW split beside the log), the
+ * post-purchase return, the token balance, the CSV export. What changed is the
+ * CHROME (UniversalShell) and the COMPOSER SEMANTICS.
  *
- * ── WHERE THE TOOLBAR LIVES ─────────────────────────────────────────────────
- * The spec's toolbar is split across two bars by the existing architecture, and
- * this is deliberate, not an oversight:
- *   - The GLOBAL SiteHeader (black bar above this component) already carries the
- *     h24.tech WORDMARK, the BADGE (h24 + balance, glyphless per FRONT78) and
- *     the AVATAR — the toolbar's identity + right cluster.
- *   - This component adds the h24-SURFACE strip below it: sidebar toggle, back,
- *     forward, the reserved (empty) ROOMS slot FRONT80 owns, the breadcrumb, and
- *     export. Duplicating the badge/avatar/wordmark here would be two of each.
+ * COMPOSER SEMANTICS (SHELL_PORT1 scope = "shell now, Auto routing → AUTOTIER1",
+ * owner-ruled this pass):
+ *   - BAND = Auto | free ONLY. `free` is the real no-cost tier. `Auto` maps to
+ *     the current best REAL tier (frontier) as a PLACEHOLDER — the "router picks
+ *     best" intelligence + company-model mapping lands in AUTOTIER1. So Auto
+ *     does a real thing today (routes to the frontier model), just not the smart
+ *     one yet. Nothing fake ships.
+ *   - MODEL menu (Auto band only): Auto + COMPANY-NAME models. Display-only this
+ *     pass; not wired to routing until AUTOTIER1. NO version strings, NO effort
+ *     dial (the composer never had one — see Composer.tsx).
+ *   - The routing-log "Tier" column is renamed to "Band".
  */
+
+type Band = 'auto' | 'free';
+/** Auto → the best real tier (frontier) until AUTOTIER1 wires real routing. */
+const bandToTier = (b: Band): Tier => (b === 'free' ? 'free' : 'frontier');
+
+/** Company-name Model menu (Auto band only). NO version strings — SHELL v1.5. */
+const MODEL_OPTIONS = ['Auto', 'Claude', 'GPT', 'Grok', 'Llama', 'Mistral', 'DeepSeek'].map(
+  (m) => ({ id: m, label: m }),
+);
+
 export function OraclePage() {
   const { bee } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const openStore = useH24Storefront((s) => s.openStore);
 
-  // POST-PURCHASE RETURN (FRONT81). h24-checkout sends the user back to
-  // /h24?tokens=1 after Stripe. The webhook credits the ledger asynchronously,
-  // so we re-read the balance a few times (never optimistic math — a token only
-  // shows once the webhook wrote it), show an honest banner, and strip the flag.
+  // POST-PURCHASE RETURN (FRONT81) — unchanged. h24-checkout returns to
+  // /h24?tokens=1; the webhook credits asynchronously, so re-read a few times,
+  // show an honest banner, strip the flag.
   const [topUpReturn, setTopUpReturn] = useState(false);
-  // Empty deps ON PURPOSE: this must fire exactly once on the flagged return.
-  // Stripping the flag (navigate below) changes location.search, so re-running
-  // would cancel the delayed refreshes via cleanup before they ever fire.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: run-once return handler; see note.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run-once return handler.
   useEffect(() => {
     if (new URLSearchParams(location.search).get('tokens') !== '1') return;
     setTopUpReturn(true);
@@ -64,7 +80,6 @@ export function OraclePage() {
     const t1 = setTimeout(fire, 2000);
     const t2 = setTimeout(fire, 5000);
     const t3 = setTimeout(() => setTopUpReturn(false), 12000);
-    // Drop the query flag so a refresh or Back doesn't re-trigger the banner.
     navigate('/h24', { replace: true });
     return () => {
       clearTimeout(t1);
@@ -74,10 +89,15 @@ export function OraclePage() {
   }, []);
 
   const [directive, setDirective] = useState('');
-  const [tier, setTier] = useState<Tier>('free');
-  const [category, setCategory] = useState<DirectiveCategory>('suggest');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [band, setBand] = useState<Band>('free');
+  const [model, setModel] = useState('Auto');
+  // KIND (category) is a real router param but is NOT on the ruled composer row
+  // (SHELL v1.5: [+][add-to-vault][Band][Model][mic][send]). It stays at its
+  // default and is still sent to the router; surfacing it returns in a later
+  // composer pass. Recorded in REPORT.md.
+  const [category] = useState<DirectiveCategory>('suggest');
   const [attachStatus, setAttachStatus] = useState<string | null>(null);
+  const [hasSent, setHasSent] = useState(false);
   const attachInputRef = useRef<HTMLInputElement>(null);
 
   const { state, response, preview, failure, send, confirm, cancelConfirm, reset } =
@@ -91,8 +111,6 @@ export function OraclePage() {
     rates: ModelRateRow[];
   }>({ loaded: false, error: null, entries: [], rates: [] });
 
-  // The build panel's tenant: the log row whose cost is open. null = panel
-  // closed and the conversation takes the full width back.
   const [selectedCostId, setSelectedCostId] = useState<string | null>(null);
 
   const loadLog = useCallback(async () => {
@@ -123,57 +141,43 @@ export function OraclePage() {
     if (response) applyBalanceAfter(response.balanceAfterTokens);
   }, [state, loadLog, response, applyBalanceAfter]);
 
-  // MODEL PICKER = band + the model each band routes to (tiers-are-bands,
-  // surfaced to the user for the first time). The model name is read from the
-  // live rate card, so the sublabel is the real model the router will use.
+  // BAND picker — Auto | free. The model each band routes to is read from the
+  // live rate card, so the sublabel is honest about what actually runs.
   const bands: ComposerBand[] = useMemo(() => {
     const modelFor = (t: Tier) => tierRates.find((r) => r.tier === t)?.model;
-    return (['free', 'standard', 'frontier'] as Tier[]).map((t) => ({
-      id: t,
-      label: t,
-      sublabel: t === 'free' ? (modelFor(t) ?? 'no token cost') : modelFor(t),
-    }));
+    return [
+      { id: 'auto', label: 'Auto', sublabel: modelFor('frontier') ?? 'h24 picks best' },
+      { id: 'free', label: 'free', sublabel: modelFor('free') ?? 'save your tokens' },
+    ];
   }, [tierRates]);
 
-  // KIND folds into the composer as its secondary selector. It is a REAL router
-  // parameter (`category`), so it stays; that is the whole test for whether a
-  // control belongs on this surface.
-  const kindOptions = useMemo(() => DIRECTIVE_CATEGORIES.map((c) => ({ id: c, label: c })), []);
-
-  const currentModel = tierRates.find((r) => r.tier === tier);
+  const tier = bandToTier(band);
+  const currentRate = tierRates.find((r) => r.tier === tier);
   const selectedEntry = selectedCostId
     ? (log.entries.find((e) => e.id === selectedCostId) ?? null)
     : null;
 
   function submitDirective() {
     if (!bee || directive.trim().length === 0 || state === 'working') return;
+    setHasSent(true);
     void send(directive, { tier, category, astraSlug: 'themanual' });
   }
 
-  // [+] — REAL PATH ONLY. It uploads the chosen file INTO the Creator Studio
-  // Library (the file is persisted; the sidebar Vault count reflects it on the
-  // next load). It does NOT attach the file to the directive: the router accepts
-  // `{ directive, tier, astra_slug, category, confirm_cost }` and no file
-  // parameter, so a directive-attachment would be a control that submits
-  // nothing. The honest action [+] can perform today is "add to your library",
-  // and that is what it does — stated in the confirmation line, not implied.
   async function handleAttach(file: File) {
     if (!bee) return;
     setAttachStatus(`Uploading ${file.name}…`);
     try {
       const asset = await uploadToLibrary(bee.id, file, null);
-      setAttachStatus(`Added ${asset.fileName} to your library.`);
+      setAttachStatus(`Added ${asset.fileName} to your vault.`);
     } catch (e) {
       setAttachStatus(e instanceof Error ? e.message : 'Upload failed.');
     }
   }
 
   function exportCsv() {
-    // A real export of what is on screen — the user's own routing-log metadata,
-    // generated client-side, no content columns because none exist.
     const header = [
       'when',
-      'tier',
+      'band',
       'kind',
       'provider',
       'status',
@@ -185,7 +189,7 @@ export function OraclePage() {
     ];
     const rows = log.entries.map((e) => [
       new Date(e.createdAt).toISOString(),
-      e.tier,
+      e.tier === 'free' ? 'free' : 'Auto',
       e.category,
       e.provider ?? '',
       e.status,
@@ -207,323 +211,531 @@ export function OraclePage() {
     URL.revokeObjectURL(url);
   }
 
+  // SIDEBAR NAV (SHELL v1.5: pure nav). Top group = Claude-home shape; astra
+  // group = h24's Vault/Activity/Wallet. Items with a live destination navigate;
+  // the backendless top-group items are shown as structure with a "soon" hint
+  // and no action, per the real-data-only discipline (never a fake control).
+  const vaultCount = useMemo(() => log.entries.length, [log.entries.length]);
+  const nav: ShellNavGroup[] = [
+    {
+      id: 'top',
+      items: [
+        {
+          id: 'new',
+          label: 'New',
+          icon: <SquarePen size={17} />,
+          onClick: () => {
+            reset();
+            setDirective('');
+            setHasSent(false);
+          },
+        },
+        { id: 'projects', label: 'Projects', icon: <FolderKanban size={17} />, hint: 'soon' },
+        {
+          id: 'artifacts',
+          label: 'Artifacts',
+          icon: <Images size={17} />,
+          onClick: () => navigate('/studio'),
+        },
+        { id: 'scheduled', label: 'Scheduled', icon: <CalendarClock size={17} />, hint: 'soon' },
+        {
+          id: 'dispatch',
+          label: 'Dispatch',
+          icon: <Radio size={17} />,
+          onClick: () => navigate('/mc'),
+        },
+        {
+          id: 'customize',
+          label: 'Customize',
+          icon: <SlidersHorizontal size={17} />,
+          onClick: () => navigate('/account'),
+        },
+      ],
+    },
+    {
+      id: 'h24',
+      label: 'h24',
+      items: [
+        {
+          id: 'vault',
+          label: 'Vault',
+          icon: <ImageIcon size={17} />,
+          onClick: () => navigate('/studio'),
+          hint: bee ? vaultCount : undefined,
+        },
+        { id: 'activity', label: 'Activity', icon: <Activity size={17} />, active: true },
+        {
+          id: 'wallet',
+          label: 'Wallet',
+          icon: <Wallet size={17} />,
+          onClick: () => bee && openStore(),
+          hint: tokens.balance === null ? undefined : formatTokens(tokens.balance),
+        },
+      ],
+    },
+  ];
+
+  // HOME vs DOCKED — home is the centered greeting + composer biased above
+  // center; the composer docks to the bottom once the first directive is sent
+  // (or the log already has history).
+  const docked = Boolean(bee) && (hasSent || log.entries.length > 0 || Boolean(response));
+
+  const composerEl = (
+    <>
+      <input
+        ref={attachInputRef}
+        type="file"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void handleAttach(f);
+          e.target.value = '';
+        }}
+      />
+      <Composer
+        value={directive}
+        onChange={setDirective}
+        onSubmit={submitDirective}
+        busy={state === 'working'}
+        disabled={!bee}
+        placeholder={bee ? 'Type a directive…' : 'Sign in to send a directive'}
+        onAttach={() => attachInputRef.current?.click()}
+        bands={bands}
+        bandId={band}
+        onBandChange={(id) => setBand(id as Band)}
+        // MODEL menu shows only in the Auto band (SHELL v1.5). Display-only until
+        // AUTOTIER1 — selecting a company name does not re-route yet.
+        options={band === 'auto' ? MODEL_OPTIONS : []}
+        optionId={model}
+        onOptionChange={setModel}
+        optionLabel="Model"
+        enableMic
+      />
+    </>
+  );
+
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-bg">
-      {/* POST-PURCHASE RETURN BANNER (FRONT81). Honest: the webhook credits
-          asynchronously, so this says the top-up is received and the balance
-          updates as it clears — it never asserts a number the ledger hasn't. */}
-      {topUpReturn && (
-        <div
-          className="flex flex-shrink-0 items-center gap-2 border-b border-honey/40 bg-honey/10 px-4 py-2 text-honey"
-          style={{ fontSize: '12.5px' }}
-          // biome-ignore lint/a11y/useSemanticElements: a polite status banner is a live region, not an <output> form result.
-          role="status"
-        >
-          <span>Top-up received — your h24 token balance updates here as the payment clears.</span>
-          <button
-            type="button"
-            onClick={() => setTopUpReturn(false)}
-            aria-label="Dismiss"
-            className="ml-auto rounded p-0.5 text-honey/80 transition-colors hover:bg-honey/20 hover:text-honey"
-          >
-            <X size={14} />
-          </button>
-        </div>
-      )}
-
-      {/* h24 SURFACE TOOLBAR STRIP — the controls the global header lacks. */}
-      <div className="flex h-11 flex-shrink-0 items-center gap-1 border-b border-border px-3">
-        <ToolbarButton
-          label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          onClick={() => setSidebarCollapsed((v) => !v)}
-        >
-          {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
-        </ToolbarButton>
-        <ToolbarButton label="Back" onClick={() => navigate(-1)}>
-          <ArrowLeft size={17} />
-        </ToolbarButton>
-        <ToolbarButton label="Forward" onClick={() => navigate(1)}>
-          <ArrowRight size={17} />
-        </ToolbarButton>
-
-        {/* ROOMS — now the h24 shell's own transport (FRONTHDR1). The shared
-            SiteHeader that used to carry the Rooms button no longer renders on
-            /h24 (the pre-h24 Manual header was removed per ORACLE_MF v1.61 R2),
-            so the reserved slot is filled here — the one Rooms control on this
-            surface, still the FRONT80 component. */}
-        <RoomsButton />
-
-        {/* Breadcrumb. With no session store yet (sessions-are-content is an
-            OPEN ruling — no chat persistence), the title is the static surface
-            name, not a live session title. */}
-        <span
-          className="ml-2 truncate font-mono text-text-silver"
-          style={{ fontSize: '12px' }}
-          data-testid="h24-breadcrumb"
-        >
-          h24.tech <span className="text-text-muted">/ Console</span>
+    <UniversalShell
+      tokens={H24_TOKENS}
+      breadcrumb={
+        <span>
+          h24 <span style={{ color: 'var(--mute)' }}>/ Console</span>
         </span>
-
-        <div className="flex-1" />
-
-        {/* EXPORT = download the routing log as CSV. Real. SEARCH and SHARE are
-            omitted: there is no session store to search (site search is platform
-            navigation, out of h24 scope per spec v0.6), and sharing a session is
-            not a real action today. */}
-        <ToolbarButton
-          label="Export routing log (CSV)"
-          onClick={exportCsv}
-          disabled={log.entries.length === 0}
-        >
-          <Download size={16} />
-        </ToolbarButton>
-      </div>
-
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <H24Sidebar
-          collapsed={sidebarCollapsed}
-          balance={tokens}
-          entries={log.entries}
-          signedIn={Boolean(bee)}
-        />
-
-        {/* CENTER — conversation scrolls above, composer docked at the bottom.
-            FRONT84: the message column and the composer share COMPOSER_MEASURE, a
-            centered readable cap (like the Claude chat) instead of full-bleed. */}
-        <section className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-6 md:px-8">
-            <div className={cn(COMPOSER_MEASURE, 'flex flex-1 flex-col gap-6')}>
-              <header>
-                <h1 className="font-display text-xl font-semibold text-text">h24</h1>
-                <p className="mt-1 text-text-silver" style={{ fontSize: '13px' }}>
-                  Send a directive. h24 routes it to a provider against this platform's canon and
-                  hands the answer back — the directive and the response are never stored.
-                </p>
-              </header>
-
-              {isMocked() && (
-                <div
-                  className="rounded-md border border-honey/50 bg-honey/10 px-3 py-2 text-honey"
-                  style={{ fontSize: '12px' }}
+      }
+      nav={nav}
+      bling={tokens.balance}
+      handle={bee?.handle ?? null}
+      onBack={() => navigate(-1)}
+      onForward={() => navigate(1)}
+      onSearch={() => navigate('/manual')}
+      onAvatar={() => navigate('/profile')}
+      onSelectAstra={(k) => {
+        if (k === 'h24') navigate('/h24');
+        else navigate(`/${k}`);
+      }}
+      renderPanel={(slot) => {
+        if (slot === 'bling') {
+          return (
+            <div className="flex flex-col gap-3">
+              <div>
+                <div className="font-mono" style={{ color: 'var(--bling-gold)', fontSize: 22 }}>
+                  {tokens.balance === null ? '—' : formatTokens(tokens.balance)}
+                </div>
+                <div style={{ color: 'var(--mute)', fontSize: 11 }}>
+                  {tokens.status === 'live' ? 'h24 tokens' : tokens.reason}
+                </div>
+              </div>
+              {bee && (
+                <button
+                  type="button"
+                  onClick={openStore}
+                  className="rounded-md px-3 py-1.5 font-semibold transition-colors"
+                  style={{
+                    background: 'color-mix(in srgb, var(--buy-green) 16%, transparent)',
+                    color: 'var(--buy-green)',
+                    fontSize: 12.5,
+                  }}
                 >
-                  MOCK MODE — no provider is called and nothing is spent. Directives beginning{' '}
-                  <code>!preview</code>, <code>!fund</code>, <code>!cap</code> or <code>!fail</code>{' '}
-                  exercise the other response shapes.
-                </div>
+                  Get h24 tokens
+                </button>
               )}
+            </div>
+          );
+        }
+        if (slot === 'handle') {
+          return (
+            <div className="flex flex-col gap-2" style={{ fontSize: 12.5 }}>
+              <button
+                type="button"
+                onClick={() => navigate('/profile')}
+                className="text-left"
+                style={{ color: 'var(--body)' }}
+              >
+                Profile
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/account')}
+                className="text-left"
+                style={{ color: 'var(--body)' }}
+              >
+                Account
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/studio')}
+                className="text-left"
+                style={{ color: 'var(--body)' }}
+              >
+                Creator Studio
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/bookmarks')}
+                className="text-left"
+                style={{ color: 'var(--body)' }}
+              >
+                Bookmarks
+              </button>
+            </div>
+          );
+        }
+        // tasks / security / alerts / notifications — real destinations where
+        // they exist; otherwise the shell's honest "backend not live" note.
+        if (slot === 'security') {
+          return (
+            <button
+              type="button"
+              onClick={() => navigate('/security')}
+              style={{ color: 'var(--body)', fontSize: 12.5 }}
+            >
+              Open the security center →
+            </button>
+          );
+        }
+        if (slot === 'notifications') {
+          return (
+            <button
+              type="button"
+              onClick={() => navigate('/notifications')}
+              style={{ color: 'var(--body)', fontSize: 12.5 }}
+            >
+              Open notifications →
+            </button>
+          );
+        }
+        return null; // tasks, alerts — no backend yet; shell shows the honest note
+      }}
+    >
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {topUpReturn && (
+          <div
+            className="flex flex-shrink-0 items-center gap-2 px-4 py-2"
+            style={{
+              borderBottom: '1px solid color-mix(in srgb, var(--bling-gold) 40%, transparent)',
+              background: 'color-mix(in srgb, var(--bling-gold) 10%, transparent)',
+              color: 'var(--bling-gold)',
+              fontSize: 12.5,
+            }}
+            // biome-ignore lint/a11y/useSemanticElements: a polite status banner is a live region.
+            role="status"
+          >
+            <span>
+              Top-up received — your h24 token balance updates here as the payment clears.
+            </span>
+            <button
+              type="button"
+              onClick={() => setTopUpReturn(false)}
+              aria-label="Dismiss"
+              className="ml-auto rounded p-0.5"
+              style={{ color: 'var(--bling-gold)' }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
-              {!bee && (
-                <div
-                  className="rounded-md border border-border-bright bg-panel-2 p-4 text-text-silver"
-                  style={{ fontSize: '13px' }}
+        {/* SIGNED OUT — membership pitch, no composer/balance/handle (SHELL v1.5). */}
+        {!bee ? (
+          <div className="flex min-h-0 flex-1 items-center justify-center px-6">
+            <div
+              className="flex max-w-md flex-col items-center gap-4 text-center"
+              style={{ marginTop: '-16vh' }}
+            >
+              <h1
+                className="astra-display"
+                style={{ color: 'var(--ink)', fontSize: 40, lineHeight: 1.05 }}
+              >
+                h24
+              </h1>
+              <p style={{ color: 'var(--body)', fontSize: 14 }}>
+                One directive box, every model, routed against this platform's canon. Membership
+                unlocks it.
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate('/premium')}
+                  className="rounded-md px-4 py-2 font-semibold transition-colors"
+                  style={{ background: 'var(--accent)', color: '#000', fontSize: 13 }}
                 >
-                  Sign in to send directives and see your routing log.
-                </div>
-              )}
-
-              {state === 'awaiting-confirm' && preview && (
-                <div className="flex flex-col gap-3 rounded-md border border-honey/60 bg-honey/10 p-4">
-                  <p className="text-text" style={{ fontSize: '13px' }}>
-                    This directive is estimated at{' '}
-                    <span className="font-mono font-semibold">
-                      {formatTokens(preview.estimatedCostTokens)}
-                    </span>{' '}
-                    h24 tokens on {preview.provider}. Nothing has been spent yet — confirm to route
-                    it.
-                  </p>
-                  <p className="text-text-silver" style={{ fontSize: '11.5px' }}>
-                    est. {preview.estimatedInputTokens.toLocaleString()} in ·{' '}
-                    {preview.estimatedOutputTokens.toLocaleString()} out
-                    {tokens.balance !== null && (
-                      <>
-                        {' · '}balance {formatTokens(tokens.balance)} → about{' '}
-                        {formatTokens(Math.max(0, tokens.balance - preview.estimatedCostTokens))}{' '}
-                        after
-                      </>
-                    )}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void confirm()}
-                      className="rounded-md border border-honey/60 bg-honey/20 px-3 py-1 font-semibold text-honey transition-colors hover:border-honey/90"
-                      style={{ fontSize: '12.5px' }}
-                    >
-                      CONFIRM
-                    </button>
-                    <button
-                      type="button"
-                      onClick={cancelConfirm}
-                      className="rounded-md border border-border-bright px-3 py-1 text-text-silver transition-colors hover:text-text"
-                      style={{ fontSize: '12.5px' }}
-                    >
-                      cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {failure && (
-                <div
-                  className="flex flex-col gap-2 rounded-md border border-kettle-unsourced/60 bg-kettle-unsourced/10 p-3 text-text"
-                  style={{ fontSize: '12.5px' }}
-                  role="alert"
+                  GET membership
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/login')}
+                  className="rounded-md px-4 py-2 transition-colors"
+                  style={{ border: '1px solid var(--line)', color: 'var(--body)', fontSize: 13 }}
                 >
-                  <span>{failure.message}</span>
-                  {failure.action === 'get-tokens' &&
-                    failure.requiredTokens !== undefined &&
-                    failure.availableTokens !== undefined && (
-                      <span className="text-text-silver" style={{ fontSize: '11.5px' }}>
-                        needs {formatTokens(failure.requiredTokens)} · you hold{' '}
-                        {formatTokens(failure.availableTokens)} · short by{' '}
-                        {formatTokens(
-                          Math.max(0, failure.requiredTokens - failure.availableTokens),
-                        )}
-                      </span>
-                    )}
-                  {failure.action === 'retry-later' && failure.retryAfterSeconds && (
-                    <span className="text-text-silver" style={{ fontSize: '11.5px' }}>
-                      Try again in about {failure.retryAfterSeconds}s.
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {state === 'response-ready' && response && (
-                <div className="flex flex-col gap-2">
-                  <div
-                    className="rounded-md border border-border-bright bg-bg-elevated p-4 font-mono text-text"
-                    style={{ fontSize: '13px', whiteSpace: 'pre-wrap' }}
-                  >
-                    {response.response}
-                  </div>
-                  <div
-                    className="flex flex-wrap items-center gap-3 text-text-silver"
-                    style={{ fontSize: '11.5px' }}
-                  >
-                    <span>provider · {response.provider}</span>
-                    <span>
-                      tokens · {response.tokens.input.toLocaleString()} in /{' '}
-                      {response.tokens.output.toLocaleString()} out /{' '}
-                      {response.tokens.cached.toLocaleString()} cached
-                    </span>
-                    <span className={response.costTokens > 0 ? 'text-honey' : undefined}>
-                      cost ·{' '}
-                      {response.costTokens === 0
-                        ? 'FREE'
-                        : `${formatTokens(response.costTokens)} h24 tokens`}
-                    </span>
-                    {response.balanceAfterTokens !== null && (
-                      <span>balance · {formatTokens(response.balanceAfterTokens)}</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        reset();
-                        setDirective('');
-                      }}
-                      className="ml-auto rounded-md border border-border-bright px-2 py-0.5 text-text-silver transition-colors hover:border-honey/70 hover:text-text"
-                    >
-                      new directive
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* ROUTING LOG — the conversation history. The cost is the panel's
-                trigger: clicking it opens the build panel rather than expanding
-                the row in place. */}
-              <RoutingLog
-                log={log}
-                signedIn={Boolean(bee)}
-                selectedCostId={selectedCostId}
-                onSelectCost={setSelectedCostId}
-                onRefresh={() => void loadLog()}
-              />
+                  Sign in
+                </button>
+              </div>
             </div>
           </div>
-
-          {/* COMPOSER DOCK — pinned to the bottom of the conversation column. The
-              Composer self-caps to COMPOSER_MEASURE; the notes above it use the
-              same measure so they align with the input, not the dock edge. */}
-          <div className="flex-shrink-0 border-t border-border px-5 py-3 md:px-8">
-            <div className={COMPOSER_MEASURE}>
+        ) : !docked ? (
+          // HOME — centered greeting + one-line promise + composer, biased ~16vh
+          // above center. First send flips `docked`.
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-5 md:px-8">
+            <div
+              className={cn(COMPOSER_MEASURE, 'flex flex-col items-stretch gap-5')}
+              style={{ marginTop: '-16vh' }}
+            >
+              <div className="text-center">
+                <h1
+                  className="astra-display"
+                  style={{ color: 'var(--ink)', fontSize: 36, lineHeight: 1.05 }}
+                >
+                  h24
+                </h1>
+                <p className="mt-2" style={{ color: 'var(--body)', fontSize: 13.5 }}>
+                  Send a directive. h24 routes it to a model against this platform's canon and hands
+                  the answer back — the directive and the response are never stored.
+                </p>
+              </div>
+              {isMocked() && <MockNote />}
+              {failure && <FailureNote failure={failure} />}
               {attachStatus && (
-                <p className="mb-2 text-text-muted" style={{ fontSize: '11.5px' }}>
+                <p className="text-center" style={{ color: 'var(--mute)', fontSize: 11.5 }}>
                   {attachStatus}
                 </p>
               )}
-              {currentModel && tier !== 'free' && (
-                <p className="mb-2 text-text-muted" style={{ fontSize: '11px' }}>
-                  {currentModel.model} · {formatTokens(currentModel.inputPerM)} in /{' '}
-                  {formatTokens(currentModel.outputPerM)} out per 1M tokens
-                </p>
-              )}
+              {composerEl}
             </div>
-            <input
-              ref={attachInputRef}
-              type="file"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void handleAttach(f);
-                e.target.value = '';
-              }}
-            />
-            <Composer
-              value={directive}
-              onChange={setDirective}
-              onSubmit={submitDirective}
-              busy={state === 'working'}
-              disabled={!bee}
-              placeholder={bee ? 'Type a directive…' : 'Sign in to send a directive'}
-              onAttach={() => attachInputRef.current?.click()}
-              bands={bands}
-              bandId={tier}
-              onBandChange={(id) => setTier(id as Tier)}
-              options={kindOptions}
-              optionId={category}
-              onOptionChange={(id) => setCategory(id as DirectiveCategory)}
-              optionLabel="Kind"
-              enableMic
-            />
           </div>
-        </section>
+        ) : (
+          // DOCKED — conversation scrolls above, composer pinned at the bottom.
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-6 md:px-8">
+                <div className={cn(COMPOSER_MEASURE, 'flex flex-1 flex-col gap-6')}>
+                  {isMocked() && <MockNote />}
 
-        {selectedEntry && (
-          <H24CostPanel
-            entry={selectedEntry}
-            rates={log.rates}
-            onClose={() => setSelectedCostId(null)}
-          />
+                  {state === 'awaiting-confirm' && preview && (
+                    <div
+                      className="flex flex-col gap-3 rounded-md p-4"
+                      style={{
+                        border: '1px solid color-mix(in srgb, var(--accent) 55%, transparent)',
+                        background: 'var(--accent-bg)',
+                      }}
+                    >
+                      <p style={{ color: 'var(--ink)', fontSize: 13 }}>
+                        This directive is estimated at{' '}
+                        <span className="font-mono font-semibold">
+                          {formatTokens(preview.estimatedCostTokens)}
+                        </span>{' '}
+                        h24 tokens on {preview.provider}. Nothing has been spent yet — confirm to
+                        route it.
+                      </p>
+                      <p style={{ color: 'var(--body)', fontSize: 11.5 }}>
+                        est. {preview.estimatedInputTokens.toLocaleString()} in ·{' '}
+                        {preview.estimatedOutputTokens.toLocaleString()} out
+                        {tokens.balance !== null && (
+                          <>
+                            {' · '}balance {formatTokens(tokens.balance)} → about{' '}
+                            {formatTokens(
+                              Math.max(0, tokens.balance - preview.estimatedCostTokens),
+                            )}{' '}
+                            after
+                          </>
+                        )}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void confirm()}
+                          className="rounded-md px-3 py-1 font-semibold transition-colors"
+                          style={{ background: 'var(--accent)', color: '#000', fontSize: 12.5 }}
+                        >
+                          CONFIRM
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelConfirm}
+                          className="rounded-md px-3 py-1 transition-colors"
+                          style={{
+                            border: '1px solid var(--line)',
+                            color: 'var(--body)',
+                            fontSize: 12.5,
+                          }}
+                        >
+                          cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {failure && <FailureNote failure={failure} />}
+
+                  {state === 'response-ready' && response && (
+                    <div className="flex flex-col gap-2">
+                      <div
+                        className="rounded-md p-4 font-mono"
+                        style={{
+                          border: '1px solid var(--line)',
+                          background: 'var(--raised)',
+                          color: 'var(--ink)',
+                          fontSize: 13,
+                          whiteSpace: 'pre-wrap',
+                        }}
+                      >
+                        {response.response}
+                      </div>
+                      <div
+                        className="flex flex-wrap items-center gap-3"
+                        style={{ color: 'var(--body)', fontSize: 11.5 }}
+                      >
+                        <span>provider · {response.provider}</span>
+                        <span>
+                          tokens · {response.tokens.input.toLocaleString()} in /{' '}
+                          {response.tokens.output.toLocaleString()} out /{' '}
+                          {response.tokens.cached.toLocaleString()} cached
+                        </span>
+                        <span
+                          style={{
+                            color: response.costTokens > 0 ? 'var(--bling-gold)' : undefined,
+                          }}
+                        >
+                          cost ·{' '}
+                          {response.costTokens === 0
+                            ? 'FREE'
+                            : `${formatTokens(response.costTokens)} h24 tokens`}
+                        </span>
+                        {response.balanceAfterTokens !== null && (
+                          <span>balance · {formatTokens(response.balanceAfterTokens)}</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            reset();
+                            setDirective('');
+                          }}
+                          className="ml-auto rounded-md px-2 py-0.5 transition-colors"
+                          style={{ border: '1px solid var(--line)', color: 'var(--body)' }}
+                        >
+                          new directive
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <RoutingLog
+                    log={log}
+                    signedIn={Boolean(bee)}
+                    selectedCostId={selectedCostId}
+                    onSelectCost={setSelectedCostId}
+                    onRefresh={() => void loadLog()}
+                    onExport={exportCsv}
+                  />
+                </div>
+              </div>
+
+              {/* COMPOSER DOCK */}
+              <div
+                className="flex-shrink-0 px-5 py-3 md:px-8"
+                style={{ borderTop: '1px solid var(--hairline)' }}
+              >
+                <div className={COMPOSER_MEASURE}>
+                  {attachStatus && (
+                    <p className="mb-2" style={{ color: 'var(--mute)', fontSize: 11.5 }}>
+                      {attachStatus}
+                    </p>
+                  )}
+                  {currentRate && band === 'auto' && (
+                    <p className="mb-2" style={{ color: 'var(--mute)', fontSize: 11 }}>
+                      {currentRate.model} · {formatTokens(currentRate.inputPerM)} in /{' '}
+                      {formatTokens(currentRate.outputPerM)} out per 1M tokens
+                    </p>
+                  )}
+                </div>
+                {composerEl}
+              </div>
+            </section>
+
+            {/* CONTENT WINDOW — the cost breakdown, split beside the log. */}
+            {selectedEntry && (
+              <H24CostPanel
+                entry={selectedEntry}
+                rates={log.rates}
+                onClose={() => setSelectedCostId(null)}
+              />
+            )}
+          </div>
         )}
       </div>
+    </UniversalShell>
+  );
+}
+
+function MockNote() {
+  return (
+    <div
+      className="rounded-md px-3 py-2"
+      style={{
+        border: '1px solid color-mix(in srgb, var(--bling-gold) 50%, transparent)',
+        background: 'color-mix(in srgb, var(--bling-gold) 10%, transparent)',
+        color: 'var(--bling-gold)',
+        fontSize: 12,
+      }}
+    >
+      MOCK MODE — no provider is called and nothing is spent. Directives beginning{' '}
+      <code>!preview</code>, <code>!fund</code>, <code>!cap</code> or <code>!fail</code> exercise
+      the other response shapes.
     </div>
   );
 }
 
-function ToolbarButton({
-  label,
-  onClick,
-  disabled,
-  children,
+function FailureNote({
+  failure,
 }: {
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
+  failure: NonNullable<ReturnType<typeof useOracleDirective>['failure']>;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      title={label}
-      className="flex h-8 w-8 items-center justify-center rounded-md text-text-silver transition-colors hover:bg-bg-elevated hover:text-text disabled:opacity-30"
+    <div
+      className="flex flex-col gap-2 rounded-md p-3"
+      style={{
+        border: '1px solid color-mix(in srgb, var(--error) 60%, transparent)',
+        background: 'color-mix(in srgb, var(--error) 10%, transparent)',
+        color: 'var(--ink)',
+        fontSize: 12.5,
+      }}
+      role="alert"
     >
-      {children}
-    </button>
+      <span>{failure.message}</span>
+      {failure.action === 'get-tokens' &&
+        failure.requiredTokens !== undefined &&
+        failure.availableTokens !== undefined && (
+          <span style={{ color: 'var(--body)', fontSize: 11.5 }}>
+            needs {formatTokens(failure.requiredTokens)} · you hold{' '}
+            {formatTokens(failure.availableTokens)} · short by{' '}
+            {formatTokens(Math.max(0, failure.requiredTokens - failure.availableTokens))}
+          </span>
+        )}
+      {failure.action === 'retry-later' && failure.retryAfterSeconds && (
+        <span style={{ color: 'var(--body)', fontSize: 11.5 }}>
+          Try again in about {failure.retryAfterSeconds}s.
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -533,6 +745,7 @@ function RoutingLog({
   selectedCostId,
   onSelectCost,
   onRefresh,
+  onExport,
 }: {
   log: {
     loaded: boolean;
@@ -544,33 +757,45 @@ function RoutingLog({
   selectedCostId: string | null;
   onSelectCost: (id: string | null) => void;
   onRefresh: () => void;
+  onExport: () => void;
 }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center gap-3">
-        <h2 className="font-display font-semibold text-text" style={{ fontSize: '14px' }}>
+        <h2 className="astra-display font-semibold" style={{ color: 'var(--ink)', fontSize: 14 }}>
           Your routing log
         </h2>
         <button
           type="button"
           onClick={onRefresh}
-          className="rounded-md border border-border-bright px-2 py-0.5 text-text-silver transition-colors hover:border-honey/70 hover:text-text"
-          style={{ fontSize: '11.5px' }}
+          className="rounded-md px-2 py-0.5 transition-colors"
+          style={{ border: '1px solid var(--line)', color: 'var(--body)', fontSize: 11.5 }}
         >
           refresh
         </button>
+        <button
+          type="button"
+          onClick={onExport}
+          disabled={log.entries.length === 0}
+          className="ml-auto flex items-center gap-1 rounded-md px-2 py-0.5 transition-colors disabled:opacity-30"
+          style={{ border: '1px solid var(--line)', color: 'var(--body)', fontSize: 11.5 }}
+          title="Export routing log (CSV)"
+        >
+          <Download size={13} /> export
+        </button>
       </div>
 
-      {!log.loaded && (
-        <p className="text-text-silver" style={{ fontSize: '12.5px' }}>
-          Loading…
-        </p>
-      )}
+      {!log.loaded && <p style={{ color: 'var(--body)', fontSize: 12.5 }}>Loading…</p>}
 
       {log.loaded && log.error && (
         <p
-          className="rounded-md border border-kettle-unsourced/60 bg-kettle-unsourced/10 p-3 text-text"
-          style={{ fontSize: '12.5px' }}
+          className="rounded-md p-3"
+          style={{
+            border: '1px solid color-mix(in srgb, var(--error) 60%, transparent)',
+            background: 'color-mix(in srgb, var(--error) 10%, transparent)',
+            color: 'var(--ink)',
+            fontSize: 12.5,
+          }}
           role="alert"
         >
           Could not load the routing log: {log.error}
@@ -579,20 +804,26 @@ function RoutingLog({
 
       {log.loaded && !log.error && log.entries.length === 0 && (
         <p
-          className="rounded-md border border-border-bright bg-panel-2 p-3 text-text-silver"
-          style={{ fontSize: '12.5px' }}
+          className="rounded-md p-3"
+          style={{
+            border: '1px solid var(--line)',
+            background: 'var(--raised)',
+            color: 'var(--body)',
+            fontSize: 12.5,
+          }}
         >
           {signedIn ? 'No directives routed yet.' : 'Sign in to see your routing log.'}
         </p>
       )}
 
       {log.loaded && !log.error && log.entries.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-border-bright">
-          <table className="w-full" style={{ fontSize: '12px' }}>
-            <thead className="bg-panel-2 text-text-silver">
+        <div className="overflow-x-auto rounded-lg" style={{ border: '1px solid var(--line)' }}>
+          <table className="w-full" style={{ fontSize: 12 }}>
+            <thead style={{ background: 'var(--raised)', color: 'var(--body)' }}>
               <tr>
                 <th className="px-3 py-2 text-left font-medium">When</th>
-                <th className="px-3 py-2 text-left font-medium">Tier</th>
+                {/* SHELL v1.5: the "Tier" column is renamed to Band. */}
+                <th className="px-3 py-2 text-left font-medium">Band</th>
                 <th className="px-3 py-2 text-left font-medium">Kind</th>
                 <th className="px-3 py-2 text-left font-medium">Provider</th>
                 <th className="px-3 py-2 text-left font-medium">Status</th>
@@ -604,34 +835,50 @@ function RoutingLog({
                 <th className="px-3 py-2 text-left font-medium">Latency</th>
               </tr>
             </thead>
-            <tbody className="text-text">
+            <tbody style={{ color: 'var(--ink)' }}>
               {log.entries.map((e) => (
                 <tr
                   key={e.id}
-                  className={cn(
-                    'border-t border-border align-top',
-                    selectedCostId === e.id && 'bg-honey/5',
-                  )}
+                  style={{
+                    borderTop: '1px solid var(--hairline)',
+                    background:
+                      selectedCostId === e.id
+                        ? 'color-mix(in srgb, var(--accent) 6%, transparent)'
+                        : undefined,
+                    verticalAlign: 'top',
+                  }}
                 >
-                  <td className="whitespace-nowrap px-3 py-2 text-text-silver">
+                  <td className="whitespace-nowrap px-3 py-2" style={{ color: 'var(--body)' }}>
                     {new Date(e.createdAt).toLocaleString()}
                   </td>
-                  <td className="px-3 py-2 font-mono">{e.tier}</td>
-                  <td className="px-3 py-2 font-mono text-text-silver">{e.category}</td>
-                  <td className="px-3 py-2 font-mono text-text-silver">{e.provider ?? '—'}</td>
+                  {/* Band vocabulary: free stays free; everything else is Auto. */}
+                  <td className="px-3 py-2 font-mono">{e.tier === 'free' ? 'free' : 'Auto'}</td>
+                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--body)' }}>
+                    {e.category}
+                  </td>
+                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--body)' }}>
+                    {e.provider ?? '—'}
+                  </td>
                   <td className="px-3 py-2">
                     <span
-                      className={cn(
-                        'font-mono',
-                        e.success === true && 'text-kettle-sourced',
-                        e.success === false && 'text-kettle-unsourced',
-                      )}
+                      className="font-mono"
+                      style={{
+                        color:
+                          e.success === true
+                            ? 'var(--buy-green)'
+                            : e.success === false
+                              ? 'var(--error)'
+                              : undefined,
+                      }}
                       title={e.errorMessage ?? undefined}
                     >
                       {e.status}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 font-mono text-text-silver">
+                  <td
+                    className="whitespace-nowrap px-3 py-2 font-mono"
+                    style={{ color: 'var(--body)' }}
+                  >
                     {e.inputTokens === null && e.outputTokens === null && e.cachedTokens === null
                       ? '—'
                       : `${(e.inputTokens ?? 0).toLocaleString()} / ${(e.outputTokens ?? 0).toLocaleString()} / ${(e.cachedTokens ?? 0).toLocaleString()}`}
@@ -639,7 +886,7 @@ function RoutingLog({
                   <td className="whitespace-nowrap px-3 py-2 font-mono">
                     {e.costTokens === null ? (
                       <span
-                        className="text-text-silver"
+                        style={{ color: 'var(--body)' }}
                         title={
                           e.tier === 'free'
                             ? 'The free tier never debits.'
@@ -653,14 +900,18 @@ function RoutingLog({
                         type="button"
                         onClick={() => onSelectCost(selectedCostId === e.id ? null : e.id)}
                         aria-expanded={selectedCostId === e.id}
-                        className="text-honey underline decoration-dotted underline-offset-2 transition-colors hover:text-text"
+                        className="underline decoration-dotted underline-offset-2 transition-colors"
+                        style={{ color: 'var(--bling-gold)' }}
                         title="Open the cost breakdown in the side panel"
                       >
                         {formatTokensExact(e.costTokens)}
                       </button>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 font-mono text-text-silver">
+                  <td
+                    className="whitespace-nowrap px-3 py-2 font-mono"
+                    style={{ color: 'var(--body)' }}
+                  >
                     {e.latencyMs === null ? '—' : `${e.latencyMs}ms`}
                   </td>
                 </tr>
@@ -670,7 +921,7 @@ function RoutingLog({
         </div>
       )}
 
-      <p className="text-text-muted" style={{ fontSize: '11px' }}>
+      <p style={{ color: 'var(--mute)', fontSize: 11 }}>
         Metadata only. Directive text and routed responses are never stored — the columns do not
         exist. Click a cost to open its breakdown: each leg, its rate, and the subtotals adding up
         to the amount debited.

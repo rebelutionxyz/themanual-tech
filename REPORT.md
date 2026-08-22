@@ -23,6 +23,58 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## PROFILE2 — align the profile/account hub to SHELL v1.5 + the your-stuff drawer (2026-08-22)
+
+**Pass:** PROFILE2 | lane `platform` | workdir TheMANUAL.tech | session `sess-fee8a5ed` (fallback id) | claimed via AUTO-POOL fallthrough (session opened at `C:\Users\Butch`, no folder match).
+
+**Governing canon:** SHELL v1.5 (identity rule: own name NO @, others ALWAYS @name; handle→your-stuff drawer; avatar→profile page; the 9-item drawer set) + root/project language firewall. Dispatch body: routes /@handle (public) + own hub; menu parity 1:1 with the drawer (Profile/Settings/Activity/Orders/Memberships/Sales/BLiNG wallet/Security/Sign out); own name NO @, others @name; shell chrome per SHELL v1.5 **once SHELL_PORT1 lands**; **propose-first on any schema.**
+
+**Scope taken:** front-lane presentation only. No schema applied, no migration, no deploy, no git. Front lane owns the app tree (R5).
+
+### What shipped (build-green, biome-clean)
+
+1. **Public `/@handle` route + own hub.**
+   - New `src/pages/PublicProfilePage.tsx` — reads a Bee by handle (public), renders handle/ranks/OG-generation/public Creators-Studio showcase. Identity rule enforced: **own** landing shows the bare handle + a "Your account →" link into `/account`; **any other** Bee shows `@handle`. Missing/malformed handle → honest "No Bee here" empty state (handle-format guard `^[a-z0-9_-]{2,30}$` skips the round-trip).
+   - Wiring: react-router 6.26 **cannot match a partial-segment param** (`/@:handle` is invalid in v6 — dynamic segments must be whole segments). The existing `/:slug` catch-all (`SurfacePage`, inside PlatformLayout) already receives the single segment `@handle`, so `SurfacePage` now delegates any `slug` starting with `@` to `PublicProfilePage` (which reads the same `slug` param). One-line hook, no route ambiguity, `/@handle` stays a clean URL.
+   - **Schema:** none needed. Verified live that `bees_public_read` and `bee_profiles_select_public` are already `USING (true)` for public/anon — the old App.tsx note ("public /bees/:handle deferred pending a bees-RLS migration") was **stale** and is retired in a comment update. PublicProfilePage selects only public columns (id, handle, bling_rank, honeycomb_ring, created_at); it never selects email/balance.
+
+2. **Menu parity 1:1 with the drawer** (`src/pages/account/AccountHubPage.tsx`).
+   - Tab set + order now exactly the drawer's: Profile · Settings · Activity · Orders · Memberships · Sales · BLiNG! wallet · Security, with **Sign out** as the drawer's trailing action (rendered as an action button, not a section — it ends the session rather than switching a panel).
+   - **Wallet → "BLiNG! wallet".** Judgement call: the dispatch spelled the drawer item "BLiNG wallet" (no bang); I used **"BLiNG! wallet"** to preserve the locked currency spelling (root CLAUDE.md: BLiNG! bang preserved). If the owner wants the literal bang-less drawer label, it's a one-word change — SHELL_PORT1's drawer must match whichever is chosen. Flagged for the drawer build.
+   - **New `src/pages/account/tabs/SecurityTab.tsx`** — a top-level Security section (password/2FA/active-sessions named honestly as "soon"; live Sign-out for this device). Content lifted out of SettingsTab so each drawer concern lives in exactly one place; SettingsTab's old embedded Security section + Sign-out card were removed (its now-unused imports pruned).
+
+3. **Identity rule (own name NO @).**
+   - Account hub header subtitle `@{handle}` → `{handle}` (own hub).
+   - PublicProfilePage: self = bare handle, others = `@handle`.
+   - SettingsTab premium-handle line "You are @x" → "You are x".
+   - UtilityChrome avatar `title` "Account · @x" → "Account · x" (visible handle was already bang-less/@-less).
+
+4. **Deferred, correctly:** "shell chrome per SHELL v1.5" is **gated on SHELL_PORT1**, which is still `claimed` (not `done`) by session `7f0f39cc`. I did **not** rebuild the header/sidebar/right-toolbar chrome or the actual your-stuff drawer — that is SHELL_PORT1's surface. This pass makes the hub's sections 1:1 with that drawer so the two are aligned when it lands. The avatar still points at `/account` (pre-port behavior); SHELL v1.5's "handle→drawer, avatar→profile page" split belongs to SHELL_PORT1.
+
+### Files
+- ADD `src/pages/PublicProfilePage.tsx`
+- ADD `src/pages/account/tabs/SecurityTab.tsx`
+- EDIT `src/pages/ProfilePage.tsx` (export RankCard/ShowcaseSection/rank constants for reuse; ShowcaseSection gains an `owner` flag for owner-vs-visitor copy — DRY, no logic change to the own /profile view)
+- EDIT `src/pages/SurfacePage.tsx` (`@`-slug → PublicProfilePage; imports re-sorted by biome)
+- EDIT `src/pages/account/AccountHubPage.tsx` (tab set/order, BLiNG! wallet label, Security tab, Sign-out action, own-name @ drop)
+- EDIT `src/pages/account/tabs/SettingsTab.tsx` (Security/Sign-out moved to SecurityTab; own-name @ drop)
+- EDIT `src/components/layout/UtilityChrome.tsx` (avatar title own-name @ drop)
+- EDIT `src/App.tsx` (retire the stale /bees comment; record the propose-first RLS-narrowing item)
+
+### Done-test (verbatim)
+- `npm run build` (tsc -b && vite build): **`✓ built in 23.45s`** — clean, no type/unused errors. (First build pre-format also green at 40.19s.)
+- `npx biome check` on all 7 touched files: **`Checked 7 files ... No fixes applied`** (0 errors) after applying biome's own format/organizeImports fixes.
+- Language-firewall grep (buy|sell|purchase|invest|trade|market|price|customer|mint) over the new user-facing strings: **no matches**.
+
+### Could NOT verify (honest list)
+- **Runtime browser smoke was not run.** Build + types validate the wiring, but I did not start the dev server and click `/@handle`, the new Security tab, deep-links (`/account?tab=security`), or Sign-out in a browser. Recommend a smoke pass (or SHELL_PORT1 will exercise the hub).
+- Whether the owner wants the drawer label literally "BLiNG wallet" (no bang) vs my "BLiNG! wallet" — see judgement call above.
+
+### Propose-first (schema — NOT applied)
+- `bees_public_read` is `USING (true)` over **all** columns, so `email` and balance columns are anon-readable at the row level even though no UI selects them. The profile UI is safe (public columns only), but the **policy** should be narrowed to a public column projection (a view, or column-level grants) in a future DB pass. Recorded here and in an App.tsx comment; left for a `db`-lane dispatch since it is schema/security, not front-lane presentation.
+
+---
+
 ## VOTE_BALLOTS_CLOSE_APPLY1 — apply auto-close-on-bill-outcome (function + trigger) (2026-08-21)
 
 **Pass:** VOTE_BALLOTS_CLOSE_APPLY1 | lane `migrate` | workdir TheMANUAL.tech | EFFORT M | session `b3cb95e2` (fallback id).
@@ -11418,3 +11470,115 @@ ingest branch; public_read carries trusted-source + crowd-review + not-fixture l
 **Handoff:** engine authorship is the justice lane's job (JUSTICE_ENGINE_FNULNU1) — engine.ts
 must set author_bee/submitter/recorded_by = fnulnu before the first ingest run. Justice lane
 messaged "schema live — writes may begin". Status: **DONE**.
+
+
+---
+
+# SHELL_PORT1 — Port the perfected universal shell (SHELL v1.5) into the real h24 console
+
+**Pass:** SHELL_PORT1 · lane `shell` · workdir `TheMANUAL.tech` · session `7f0f39cc`
+**Date:** 2026-08-22 · **Canon:** SHELL v1.5 (ops_docs `SHELL`, owner+lead 2026-08-22)
+**Outcome:** DONE — universal shell ported onto `/h24` as the reference implementation. `npm run build` green, biome-clean. Scoped commit staged, **not pushed** (human pushes).
+
+## Owner ruling that scoped this pass
+Before building I surfaced the one genuine integration decision and Butch ruled it:
+**"Shell now, Auto routing → AUTOTIER1."** So the shell chrome + tokens + composer *structure*
+port now; the "router picks best" intelligence + company-model mapping is deferred to AUTOTIER1.
+Nothing fake ships — `Auto` maps to the real frontier tier as a placeholder, `free` is the real
+no-cost tier.
+
+## What shipped (SHELL v1.5 rulings encoded)
+- **Token layer** (`src/index.css`): a `.astra-shell` scope carrying the FIXED constellation
+  tokens (`--ink/--body/--mute/--raised/--input/--line/--hairline/--icon/--error/--bling-gold/
+  --buy-green/--brand-red`) + the **JetBrains Mono UI face**. Per-astra tokens (`--accent/-dim/-bg`,
+  `--display-face`, `--surface-accent`) are injected inline by `astraCssVars()`.
+- **Per-astra tokens** (`src/lib/shell/astraTokens.ts`): the reference other astras copy-port.
+  `H24_TOKENS` (burnt orange `#ef6c2a`) is ruled; VOTE/JUSTICE/FUND/GAMES are carried as
+  `proposed: true` per SHELL v1.5 (ratify at ASTRA_COLORS v1).
+- **Logo marks** (`src/components/shell/marks/AstraMark.tsx`): h24 butterfly (outline, astra
+  color) + the rebelution fist mark (circle/chord/triangle in BRAND red `#d43333` + ink fist),
+  inline SVG.
+- **UniversalShell** (`src/components/shell/UniversalShell.tsx`): the frame.
+  - Full-width 44px header; sidebar hangs below; left strip never moves.
+  - Left strip order: `[logo][TLD][astra picker][back][fwd][search][collapser]`, no dividers;
+    logo+TLD astra-colored, controls grey (`--icon`).
+  - Right toolbar order: astra logo, Tasks, Security, Alerts, Notifications, BLiNG (number FIRST +
+    gold drop, always gold), handle (own name no `@`), avatar. Icons rest `--icon`, each lights
+    its OWN color on hover; BLiNG fixed gold.
+  - Sidebar: pure nav; 52px icon rail at rest / 240px open; hovering the rail floats the panel
+    OVER content (absolute, no reflow — the peek panel is a descendant of the hover container so
+    rail→panel never trips mouseleave); collapser sets the resting state; mobile rails at rest.
+  - Icon drawer (right chrome), tinted `color-mix(accent 10%, near-black)`; astra picker menu
+    tinted 16%.
+  - Breadcrumbs render in the CONTENT top-left, never the header.
+  - ONE AUTH BOUNDARY preserved: the frame carries identity, never gates it.
+- **h24 surface** (`src/pages/oracle/OraclePage.tsx`): rewired onto UniversalShell. All real
+  machinery preserved — directive send/confirm-cost, live routing log, cost breakdown (now the
+  CONTENT WINDOW split beside the log), post-purchase return banner, token balance, CSV export,
+  vault attach. HOME = centered greeting (display face) + one-line promise + composer biased
+  ~16vh above center; first send DOCKS the composer to the bottom. Signed-out = membership pitch
+  (GET membership + Sign in), composer/balance/handle hidden.
+- **Composer** (`src/components/composer/Composer.tsx`): white outline at rest / ACCENT outline
+  on focus, directive text white, `--input` ground; SEND is a solid ACCENT SQUARE with a white
+  up-arrow that flips BLACK on hover (box stays accent). Effort dial remains absent (it never
+  existed — no real router param). Band = **Auto | free**; the Model menu (company names, Auto
+  band only) reuses the composer's secondary selector slot.
+- **Routing log**: the **Tier column is renamed to Band** (free→`free`, else→`Auto`).
+
+## Deviations & judgment calls (with reasons)
+1. **JetBrains Mono / accent tokens scoped to `.astra-shell`, not global.** SHELL v1.5 rules them
+   constellation-wide, but this pass is the h24 port; a global font swap would repaint all 40+
+   Manual surfaces (out of scope, surprising). Scoping to the shell root IS the copy-port pattern.
+   Constellation-wide application lands as each astra ports.
+2. **Auto → frontier tier (placeholder).** Per the owner ruling; real Auto routing is AUTOTIER1.
+   `bandToTier('auto') = 'frontier'` so Auto does a real thing today.
+3. **Model menu is display-only this pass.** Company names render (Auto band) but selecting one
+   does not re-route yet — AUTOTIER1.
+4. **`Kind` (directive category) removed from the composer face.** The ruled composer row is
+   `[+][add-to-vault][Band][Model][mic][send]` — no Kind. `category` still ships to the router at
+   its default (`suggest`); surfacing it returns in a later composer pass.
+5. **`[+]` and `add-to-vault` collapse to one real action (add to vault).** Directive-file
+   attachment isn't a real router param today (real-data-only), so the two-icon distinction folds
+   to the honest add-to-vault action until a file param exists.
+6. **Top-group nav (Projects/Scheduled) shown as structure with a "soon" hint, no action.** SHELL
+   v1.5 lists them; the real-data discipline forbids fake controls, so backendless items render
+   dimmed + inert. Artifacts→/studio, Dispatch→/mc, Customize→/account, New→new directive are real.
+7. **h24 display face defaults to JetBrains Mono.** SHELL v1.5 does not rule an h24 display face
+   (only VOTE/JUSTICE/FUND/GAMES proposed); a console reads mono-forward. One-line swap in
+   `astraTokens.ts` when ASTRA_COLORS v1 rules it.
+8. **Rooms button + old surface toolbar dropped.** The astra picker is the ruled transport; the
+   old `/h24` strip (Rooms/back/fwd/export) is superseded by the shell header. Export moved to the
+   routing-log header (still real).
+9. **`H24Sidebar.tsx` is now unused** (superseded by the shell's nav). Left in place — deletion
+   escalates per the SWEEP gate; prune in a later sweep.
+
+## Done-test (verbatim)
+- `npx tsc -b` → exit 0.
+- `npm run build` (`tsc -b && vite build`) → `✓ built in 24.79s`, exit 0. `OraclePage` bundle
+  40.17 kB gzip 11.39 kB. The >500 kB chunk warning is pre-existing (libsodium/CallView/registry),
+  not introduced here.
+- `npx biome check --write` on the 5 touched files → exit 0 (clean; formatting applied).
+
+## Could not verify
+- **Visual render / interaction (browser).** The Claude Chrome extension is not connected, so I
+  could not screenshot `/h24` or exercise the rail-peek, drawer, and dock behaviors live. Verified
+  by clean type-check + build + code review only. A dev server was confirmed serving on
+  `localhost:3002`; the visual pass still needs a human or a connected browser.
+- **Signed-in shell** (handle/avatar/BLiNG cluster, home→dock, cost content-window) — not rendered
+  live (requires an authenticated bee); logic reviewed against the preserved OraclePage machinery.
+
+## Manifest (scoped commit — NOT pushed)
+```
+NEW  src/lib/shell/astraTokens.ts
+NEW  src/components/shell/marks/AstraMark.tsx
+NEW  src/components/shell/UniversalShell.tsx
+MOD  src/index.css
+MOD  src/components/composer/Composer.tsx
+MOD  src/pages/oracle/OraclePage.tsx
+MOD  REPORT.md
+```
+Unrelated WIP from other codes (App.tsx, UtilityChrome.tsx, ProfilePage.tsx, SurfacePage.tsx,
+AccountHubPage.tsx, SettingsTab.tsx, PublicProfilePage.tsx, SecurityTab.tsx) was left untouched
+and unstaged. `.claude-pass` never committed.
+
+[DONE] SHELL_PORT1 | universal shell ported to /h24, build green, scoped commit staged (no push)
