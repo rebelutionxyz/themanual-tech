@@ -23,6 +23,55 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## PROFILE3 — BUILD the profile page to PROFILE_SPEC v0.1–v0.4 + SHELL v1.5 (UI pass) (2026-08-22)
+
+**Pass:** PROFILE3 | lane `platform` | workdir TheMANUAL.tech | session `2e3d9c47` (fallback id) | claimed via AUTO-POOL fallthrough (session opened at `C:\Users\Butch`, no folder match).
+
+**Governing canon:** PROFILE_SPEC v0.1 / v0.2 / v0.3 / v0.4 + SHELL v1.5 (all read from `ops_docs`). Reference render = the shell mock artifact (profile view). Dispatch scope: THE PAGE ITSELF — render from existing tables + stubs; **NO schema this pass** (patchboard-node wiring is PROFILE4); scoped commit, no push.
+
+### What shipped
+The public profile at `/@handle` (served by `PublicProfilePage` via the `SurfacePage /:slug` catch-all — routing unchanged) is now the full spec'd page, built to **Groups-page anatomy** in the **dark** profile shell tokens (`bg`/`text-silver`/`honey` + global `--accent` #ef6c2a; SurfacePage/ProfilePage are dark, not the white community shell).
+
+- **Cover header + avatar overlap + identity block.** Accent-gradient cover (see deviation: no `bees.cover_url` column yet), 96px avatar overlapping, name/handle/ring/location line, OG-generation badge. **Own name is bare; others are ALWAYS @handle** (SHELL v1.5). **Level-1 page → NO breadcrumb** (PROFILE_SPEC v0.1).
+- **Action row — all four states.** Public: **Follow (accent, first)** / Subscribe / Contact / Tip; mobile folds Tip + view-toggle into a `…` dots menu, Follow/Subscribe/Contact stay visible. Own: **Contact / Edit profile / View-as** — all visible on every size, no dropdown. **Follow is wired live** (`FollowBeeButton` → `bee_follows`); **View-as** flips an in-page `previewPublic` state (owner previews the public face without leaving). Subscribe/Contact are visual stubs (their backends are out of PROFILE3 scope).
+- **Stat strip.** Actions / Ring / BLiNG! rank (public columns) + Groups / Events counts. The patchboard-gated relation counts (followers/following/friends) are deferred to PROFILE4 per the spec's own open item — the follower count is not reliably public under current `bee_follows` RLS, so it is not fabricated here.
+- **Tab toolbar** (exactly the 9 panes the dispatch enumerates): Activity / Forums / Events / Watching / Campaigns / Listings / Groups / Rank / Badges. **No visible scrollbar** (clip via `[&::-webkit-scrollbar]:hidden` + `scrollbarWidth:none`), **end ARROWS only** (appear per side from a scroll-position check), **drag-to-reorder** (HTML5 DnD; order persisted to `localStorage` as the interim — patchboard persistence is PROFILE4), **no More menu**. **Timeline is a LENS** pinned at the end that opens the content window, not a pane.
+- **Panes wired to existing helpers:** Events (`listMyHostedEvents`), Campaigns (`listMyCampaigns`), Groups (`listMyGroups`), Watching (`listMySaves`), Listings (`bazaarMyListings`, own-view only — see deviation), Rank (BLiNG!/Ring/action_count via the existing `RankCard`), Activity (rich rows: thumbnail + linked object + date/time, synthesized from hosted events + campaigns + groups). **Forums** and **others' Listings** show honest empty states (no by-Bee helper yet). **Badges is a reserved placeholder** — owner ruled badges are their own design session; not improvised.
+- **THE QUICK-LOOK LAW** (`ProfileContentWindow`): clicking a specific item opens a **full-info content window** beside the page (right surface on desktop, overlay on mobile), NOT a page load. Event card carries date/time, address + **map link**, host, going count, and a Tickets row; group card carries members + **cross-linked events and posts**; campaign card carries the funding meter. **Cross-link doors SWAP the window in place** via a small nav stack (group → its event swaps the card; Back pops). The single **accent button is the only door that leaves** ("Open the full X on <astra>"). Tip opens the checkout shape (amount + currency selector; reward levels placeholder) — the live rails (BLiNG! + CURRENCY_LAW-gated fiat) are a structural stub here, activated at the money walk.
+- **Ballot secrecy:** the profile surfaces vote **activity by object, never a choice**; share-my-votes is a patchboard switch (PROFILE4), so nothing here leaks a ballot choice.
+
+### Deviations / judgement calls (with reasons)
+1. **Cover is an accent gradient, not an uploaded image.** `bees` has `name/bio/avatar_url` but **no `cover_url` column**. Adding one is schema — out of scope this pass. The gradient is the honest fallback; owner cover upload + the column are PROFILE4/schema. Recorded, not silently skipped.
+2. **Listings pane is own-view only.** `bazaarMyListings()` reads the signed-in Bee's own listings (`auth.uid`); there is no by-seller public read in the data layer yet. Others' listings show an honest "arrive with PROFILE4" empty state rather than a wrong/empty list.
+3. **Tab order + view-as persistence is `localStorage`, not patchboard.** PROFILE3 is explicitly "no patchboard wiring." Local persistence is the interim so the drag-reorder is real and testable now; PROFILE4 supersedes it with the patchboard node.
+4. **Tip / Tickets are structural stubs.** Building live fiat/BLiNG rails requires the CURRENCY_LAW allowlist confirm at the money walk (PROFILE_SPEC v0.1 forbids wiring live fiat without it). The checkout UI shape is present; the send button is inert with a note.
+5. **Follower/following counts gated.** Under current `bee_follows` RLS a public follower count for another Bee is not reliably readable; per the spec's own open item ("whether follower COUNTS show when list is off") these are left to PROFILE4 rather than shown wrong.
+6. **Language firewall:** BLiNG! amounts render as "N BLiNG!" and tips use GIVE/SEND/Tip language; no banned verbs (buy/sell/purchase/price/etc.) in any new string.
+
+### Done-test (verbatim)
+- `npx tsc -b` → **exit 0**.
+- `npx biome check --write` on the 3 touched files → **exit 0** ("Checked 3 files. No fixes applied.").
+- `npm run build` (`tsc -b && vite build`) → **exit 0**, `✓ built in 18.04s`, `1950 modules transformed`. `SurfacePage` bundle 36.18 kB / gzip 9.36 kB (the profile view lands in this lazy chunk). The `>500 kB` chunk warnings (libsodium / CallView / registry) are **pre-existing**, not introduced here.
+  - First build attempt died on `esbuild … write ENOMEM` (host memory, after tsc passed + all 1950 modules transformed); a clean retry built green. Recorded because it was a real non-zero exit, not hidden.
+
+### Could not verify
+- **Visual render / interaction (browser).** No Chrome extension connected, so the cover/avatar overlap, the tab arrows/drag-reorder, the content-window slide + cross-link swap, and the mobile `…` menu were **not** exercised live — verified by clean tsc + biome + build + code review only. Needs a human or connected browser pass.
+- **Signed-in own-view + Follow round-trip** (requires an authenticated Bee) — logic reviewed against `FollowBeeButton`/`bee_follows`, not rendered live.
+- **Others'-profile RLS reads** (another Bee's groups/events/campaigns/saves) — depends on production RLS returning public rows; not exercised against a second live account this pass.
+
+### Manifest (scoped commit — NOT pushed)
+```
+NEW  src/pages/profile/ProfileView.tsx
+NEW  src/pages/profile/ProfileContentWindow.tsx
+NEW  src/pages/PublicProfilePage.tsx   (was untracked WIP; fully authored to spec this pass)
+MOD  REPORT.md
+```
+Unrelated WIP from other codes (`src/App.tsx`, `UtilityChrome.tsx`, `ProfilePage.tsx`, `SurfacePage.tsx`, `AccountHubPage.tsx`, `SettingsTab.tsx`, `SecurityTab.tsx`) was left **untouched and unstaged**. `.claude-pass` never committed.
+
+[DONE] PROFILE3 | profile page built to PROFILE_SPEC v0.1–v0.4, build green, scoped commit staged (no push)
+
+---
+
 ## PROFILE2 — align the profile/account hub to SHELL v1.5 + the your-stuff drawer (2026-08-22)
 
 **Pass:** PROFILE2 | lane `platform` | workdir TheMANUAL.tech | session `sess-fee8a5ed` (fallback id) | claimed via AUTO-POOL fallthrough (session opened at `C:\Users\Butch`, no folder match).
