@@ -1,5 +1,6 @@
 import { COMPOSER_MEASURE, Composer, type ComposerBand } from '@/components/composer/Composer';
 import { H24CostPanel } from '@/components/h24/H24CostPanel';
+import { H24DrawerPanel } from '@/components/h24/H24DrawerPanel';
 import { type ShellNavGroup, UniversalShell } from '@/components/shell/UniversalShell';
 import {
   type ByokProvider,
@@ -559,8 +560,20 @@ export function OraclePage() {
             </div>
           );
         }
-        // tasks / security / alerts / notifications — real destinations where
-        // they exist; otherwise the shell's honest "backend not live" note.
+        // ALERTS slot = the h24 activity quick-look (Routing / Rail / Billing),
+        // wired to real data (H24_DRAWER1). The other slots below stay honest
+        // stubs / real destinations per the dispatch.
+        if (slot === 'alerts') {
+          return (
+            <H24DrawerPanel
+              entries={log.entries}
+              signedIn={Boolean(bee)}
+              onOpenBoard={() => navigate('/mc')}
+            />
+          );
+        }
+        // tasks / security / notifications — real destinations where they exist;
+        // otherwise the shell's honest "backend not live" note.
         if (slot === 'security') {
           return (
             <button
@@ -583,7 +596,7 @@ export function OraclePage() {
             </button>
           );
         }
-        return null; // tasks, alerts — no backend yet; shell shows the honest note
+        return null; // tasks — no backend yet; shell shows the honest note
       }}
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

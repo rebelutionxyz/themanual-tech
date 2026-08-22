@@ -64,6 +64,9 @@ export interface ShellNavGroup {
 /* ── toolbar model ─────────────────────────────────────────────────────────*/
 export type ToolbarSlot = 'tasks' | 'security' | 'alerts' | 'notifications';
 
+/** Desktop hover-open intent delay for toolbar icons (SHELL mock, H24_DRAWER1). */
+const HOVER_OPEN_MS = 140;
+
 /** Per-slot hover color (SHELL v1.5): each icon lights its OWN color on hover. */
 const SLOT_HOVER: Record<ToolbarSlot, string> = {
   tasks: '#3fbf6a', // green
@@ -345,7 +348,12 @@ function StripButton({
   );
 }
 
-/* ── right-toolbar icon — rests at --icon, lights its OWN color on hover ─────*/
+/* ── right-toolbar icon — rests at --icon, lights its OWN color on hover ─────
+   DESKTOP HOVER-OPEN (SHELL mock, H24_DRAWER1): hovering the icon opens its
+   drawer after a 140ms intent delay, so a quick sweep across the row does not
+   fire every panel. Touch devices report (hover: none) and never arm the timer;
+   the click path always works. NO title tooltip here — the panel IS the
+   affordance ("tooltips only on act-only buttons"); aria-label stays for a11y. */
 function ToolbarIcon({
   slot,
   label,
@@ -358,19 +366,39 @@ function ToolbarIcon({
   children: ReactNode;
 }) {
   const hover = SLOT_HOVER[slot];
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clear = () => {
+    if (timer.current !== null) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: clear is stable; cleanup only
+  useEffect(() => clear, []);
+
+  const canHover = () =>
+    typeof window !== 'undefined' && window.matchMedia?.('(hover: hover)').matches === true;
+
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        clear();
+        onClick();
+      }}
       aria-label={label}
-      title={label}
       className="flex h-8 w-8 items-center justify-center rounded-md transition-colors"
       style={{ color: 'var(--icon)' }}
       onMouseEnter={(e) => {
         e.currentTarget.style.color = hover;
+        if (canHover()) {
+          clear();
+          timer.current = setTimeout(onClick, HOVER_OPEN_MS);
+        }
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.color = 'var(--icon)';
+        clear();
       }}
     >
       {children}
@@ -590,8 +618,22 @@ function IconDrawer({
   bling: number | null;
 }) {
   const panel = render?.(slot);
+  // SHELL v1.5.1: any CHROME overlay closes on an outside click (the CONTENT
+  // WINDOW does not — that is a different component). Mirrors AstraPicker. A
+  // click on a toolbar icon lands outside the aside, so it closes this drawer
+  // and the icon's own onClick then opens the next — a clean switch.
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [onClose]);
+
   return (
     <aside
+      ref={ref}
       className="absolute right-0 top-0 z-40 flex h-full w-[320px] max-w-[85vw] flex-col shadow-2xl"
       style={{
         background: 'color-mix(in srgb, var(--accent) 10%, #06070a)',
