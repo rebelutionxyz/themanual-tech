@@ -1,6 +1,17 @@
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
-import { Activity, CircleUser, Crown, Loader2, Package, Settings, Tag, Wallet } from 'lucide-react';
+import {
+  Activity,
+  CircleUser,
+  Crown,
+  Loader2,
+  LogOut,
+  Package,
+  Settings,
+  ShieldCheck,
+  Tag,
+  Wallet,
+} from 'lucide-react';
 import type { ComponentType } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { ACCOUNT_ACCENT } from './accent';
@@ -9,20 +20,34 @@ import { MembershipsTab } from './tabs/MembershipsTab';
 import { OrdersTab } from './tabs/OrdersTab';
 import { ProfileTab } from './tabs/ProfileTab';
 import { SalesTab } from './tabs/SalesTab';
+import { SecurityTab } from './tabs/SecurityTab';
 import { SettingsTab } from './tabs/SettingsTab';
 import { WalletTab } from './tabs/WalletTab';
 
 type IconC = ComponentType<{ size?: number | string; className?: string }>;
-type TabId = 'profile' | 'settings' | 'orders' | 'sales' | 'memberships' | 'wallet' | 'activity';
+type TabId =
+  | 'profile'
+  | 'settings'
+  | 'activity'
+  | 'orders'
+  | 'memberships'
+  | 'sales'
+  | 'wallet'
+  | 'security';
 
+// Order + set are 1:1 with the SHELL v1.5 your-stuff drawer
+// (Profile / Settings / Activity / Orders / Memberships / Sales / BLiNG! wallet
+// / Security / Sign out). Sign out is the drawer's last item; it is an action,
+// not a section, so it renders as the trailing button below rather than a tab.
 const TABS: { id: TabId; label: string; icon: IconC }[] = [
   { id: 'profile', label: 'Profile', icon: CircleUser },
-  { id: 'wallet', label: 'Wallet', icon: Wallet },
-  { id: 'orders', label: 'Orders', icon: Package },
-  { id: 'sales', label: 'Sales', icon: Tag },
-  { id: 'memberships', label: 'Memberships', icon: Crown },
-  { id: 'activity', label: 'Activity', icon: Activity },
   { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'activity', label: 'Activity', icon: Activity },
+  { id: 'orders', label: 'Orders', icon: Package },
+  { id: 'memberships', label: 'Memberships', icon: Crown },
+  { id: 'sales', label: 'Sales', icon: Tag },
+  { id: 'wallet', label: 'BLiNG! wallet', icon: Wallet },
+  { id: 'security', label: 'Security', icon: ShieldCheck },
 ];
 
 const IS_TAB = new Set<string>(TABS.map((t) => t.id));
@@ -36,7 +61,7 @@ const IS_TAB = new Set<string>(TABS.map((t) => t.id));
  * and the sidebar's Account item both open this.
  */
 export function AccountHubPage() {
-  const { bee, loading } = useAuth();
+  const { bee, loading, signOut } = useAuth();
   const [params, setParams] = useSearchParams();
 
   const raw = params.get('tab') ?? 'profile';
@@ -74,7 +99,7 @@ export function AccountHubPage() {
             Your account
           </h1>
           <p className="font-mono text-zinc-500" style={{ fontSize: '12px' }} data-size="meta">
-            @{bee.handle} · everything you are and do, in one place
+            {bee.handle} · everything you are and do, in one place
           </p>
         </div>
       </div>
@@ -104,6 +129,19 @@ export function AccountHubPage() {
             </button>
           );
         })}
+
+        {/* Sign out — the drawer's last item. An action, not a section: it ends
+            the session rather than switching the panel. Pushed to the end and
+            tinted like a leave-action so it never reads as another tab. */}
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          className="-mb-px ml-auto flex flex-shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3 py-2 font-medium text-zinc-400 transition-colors hover:text-zinc-700"
+          style={{ fontSize: '14px' }}
+        >
+          <LogOut size={15} />
+          Sign out
+        </button>
       </div>
 
       {/* Active section */}
@@ -114,6 +152,7 @@ export function AccountHubPage() {
       {active === 'memberships' && <MembershipsTab />}
       {active === 'activity' && <ActivityTab />}
       {active === 'settings' && <SettingsTab />}
+      {active === 'security' && <SecurityTab />}
     </div>
   );
 }

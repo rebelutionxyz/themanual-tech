@@ -126,7 +126,7 @@ export function UtilityChrome() {
           <Link
             to="/account"
             className="group ml-0.5 flex items-center gap-0 rounded-full border border-border-bright bg-bg-elevated py-0.5 pl-1 pr-1 transition-all hover:gap-2 hover:border-text-silver/50 hover:bg-panel-2 hover:pl-3"
-            title={`Account · @${bee.handle}`}
+            title={`Account · ${bee.handle}`}
           >
             <span
               className="max-w-0 overflow-hidden font-mono text-text-silver transition-[max-width] duration-200 ease-out group-hover:max-w-[120px]"

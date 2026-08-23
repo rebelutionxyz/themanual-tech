@@ -277,9 +277,15 @@ function AppContent() {
           <Route path="/profile" element={<ProfilePage />} />
           {/* Premium handle claims (SINK 1) moved into the community shell —
             see the utility-tail routes inside CommunityLayout below. */}
-          {/* /bees/me — owner-profile alias → canonical /profile. Public
-            /bees/:handle is deferred pending a bees-RLS migration (email +
-            bling_balance are anon-readable; see feat/profile-public-view notes). */}
+          {/* /bees/me — owner-profile alias → canonical /profile. Public Bee
+            profiles now live at /@handle (PROFILE2), served by PublicProfilePage
+            via the SurfacePage `/:slug` catch-all — the bees_public_read /
+            bee_profiles_select_public policies it reads are already deployed, so
+            the old "deferred pending a bees-RLS migration" note is retired.
+            (Open item, propose-first: bees_public_read is USING(true) over ALL
+            columns, so email + balance are anon-readable at the row level; the
+            profile UI selects only public fields, but the policy itself wants
+            narrowing to a public column set in a future schema pass.) */}
           <Route path="/bees/me" element={<Navigate to="/profile" replace />} />
 
           {/* Nova portals — /n/:slug, chrome-free, each wearing its own skin.

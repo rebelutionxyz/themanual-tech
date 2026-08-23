@@ -15,7 +15,7 @@ import { Crown, FileText, Globe, Layers, LogOut, Music, Sparkles, X } from 'luci
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 
-const BLING_RANK_NAMES = [
+export const BLING_RANK_NAMES = [
   'Seed',
   'Sprout',
   'Sapling',
@@ -51,7 +51,7 @@ const BLING_RANK_NAMES = [
   'Miracle',
 ];
 
-const RING_NAMES = [
+export const RING_NAMES = [
   'NewBee',
   'Producer',
   'Scout',
@@ -63,7 +63,7 @@ const RING_NAMES = [
   'Queen',
 ];
 
-const RING_THRESHOLDS = [0, 500, 2000, 6000, 15000, 35000, 75000, 150000, 300000];
+export const RING_THRESHOLDS = [0, 500, 2000, 6000, 15000, 35000, 75000, 150000, 300000];
 
 export function ProfilePage() {
   const { bee, loading, signOut, configured } = useAuth();
@@ -155,10 +155,10 @@ export function ProfilePage() {
       {/* Phase C Component C-4: location editor — reads/writes bee_profiles */}
       <ProfileLocationEditor />
 
-      {/* Creator Studio Showcase — the Bee's PUBLIC shelves. Renders on the
-          Bee's own /profile today; the same data lights up for visitors when
-          /bees/:handle lands (hive-read policies already deployed). */}
-      <ShowcaseSection beeId={bee.id} />
+      {/* Creator Studio Showcase — the Bee's PUBLIC shelves. The same
+          component renders for visitors on /@handle (PublicProfilePage); the
+          hive-read policies it relies on are deployed. */}
+      <ShowcaseSection beeId={bee.id} owner />
 
       {/* Contributions placeholder */}
       <div className="mt-10 rounded-lg border border-border bg-bg-elevated/40 p-6">
@@ -199,7 +199,7 @@ interface RankCardProps {
   nextThreshold?: number | null;
 }
 
-function RankCard({
+export function RankCard({
   icon,
   title,
   subtitle,
@@ -242,7 +242,7 @@ function RankCard({
 
 /* ───────────────────────── Showcase (Creator Studio) ───────────────────────── */
 
-function ShowcaseSection({ beeId }: { beeId: string }) {
+export function ShowcaseSection({ beeId, owner = false }: { beeId: string; owner?: boolean }) {
   const [shelves, setShelves] = useState<MediaCollection[] | null>(null);
   const [open, setOpen] = useState<MediaCollection | null>(null);
 
@@ -258,20 +258,26 @@ function ShowcaseSection({ beeId }: { beeId: string }) {
         <Globe size={17} className="text-text-silver" /> Showcase
       </h2>
       <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
-        Public Albums, Playlists, and Categories from your Creators Studio Library
+        Public Albums, Playlists, and Categories{owner ? ' from your Creators Studio Library' : ''}
       </p>
       {shelves === null ? (
         <p className="mt-4 text-text-dim" style={{ fontSize: '12.5px' }}>
           Loading…
         </p>
       ) : shelves.length === 0 ? (
-        <p className="mt-4 text-text-dim" style={{ fontSize: '12.5px' }}>
-          Nothing public yet — open a shelf in your{' '}
-          <Link to="/studio" className="underline hover:text-text-silver-bright">
-            Creators Studio Library
-          </Link>{' '}
-          and flip it to Public.
-        </p>
+        owner ? (
+          <p className="mt-4 text-text-dim" style={{ fontSize: '12.5px' }}>
+            Nothing public yet — open a shelf in your{' '}
+            <Link to="/studio" className="underline hover:text-text-silver-bright">
+              Creators Studio Library
+            </Link>{' '}
+            and flip it to Public.
+          </p>
+        ) : (
+          <p className="mt-4 text-text-dim" style={{ fontSize: '12.5px' }}>
+            Nothing public yet.
+          </p>
+        )
       ) : (
         <ul className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           {shelves.map((c) => (

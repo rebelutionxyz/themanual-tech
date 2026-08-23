@@ -1,17 +1,20 @@
 import { useAuth } from '@/lib/auth';
-import { Bell, ChevronRight, Hash, LogOut, MapPin, Plug, ShieldCheck, UserCog } from 'lucide-react';
+import { Bell, ChevronRight, Hash, MapPin, Plug, UserCog } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, MetaLabel, SectionHead } from '../ui';
+import { MetaLabel, SectionHead } from '../ui';
 
 /**
  * SETTINGS — the plain-language control page. READ floor: every editable
  * setting links out to the surface that already owns the write (handle claim,
  * profile). Patchboard-backed toggles (privacy, notifications, connected
  * accounts) are named honestly as arriving with Patchboard rather than faked.
+ *
+ * Security (password / 2FA / sign out) is NOT here — it is its own top-level
+ * hub section (SecurityTab), keeping the hub 1:1 with the SHELL v1.5 drawer.
  */
 export function SettingsTab() {
-  const { bee, signOut } = useAuth();
+  const { bee } = useAuth();
   if (!bee) return null;
 
   return (
@@ -29,7 +32,7 @@ export function SettingsTab() {
           to="/settings/handle"
           icon={<Hash size={16} />}
           label="Premium handle"
-          sub={`You are @${bee.handle} — claim a shorter one`}
+          sub={`You are ${bee.handle} — claim a shorter one`}
         />
       </div>
 
@@ -67,37 +70,6 @@ export function SettingsTab() {
           label="Connect an account"
           sub="Arriving with Patchboard — the platform switch system"
         />
-      </div>
-
-      {/* Security */}
-      <div className="space-y-2">
-        <SectionHead title="Security" />
-        <SettingSoon
-          icon={<ShieldCheck size={16} />}
-          label="Password & sign-in"
-          sub="Change your password, add a second factor"
-        />
-        <Card className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-zinc-100 text-zinc-500">
-              <LogOut size={16} />
-            </span>
-            <div>
-              <p className="font-medium text-zinc-900" style={{ fontSize: '14px' }}>
-                Sign out
-              </p>
-              <MetaLabel>End this session on this device</MetaLabel>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => void signOut()}
-            className="rounded-md border border-zinc-200 px-3 py-1.5 text-zinc-700 transition-colors hover:bg-zinc-50"
-            style={{ fontSize: '13px' }}
-          >
-            Sign out
-          </button>
-        </Card>
       </div>
     </div>
   );

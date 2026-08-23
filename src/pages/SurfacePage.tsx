@@ -1,7 +1,8 @@
-import { useParams, Navigate, Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
-import { SURFACE_BY_SLUG, SURFACES } from '@/lib/surfaces';
+import { SURFACES, SURFACE_BY_SLUG } from '@/lib/surfaces';
 import { cn } from '@/lib/utils';
+import { PublicProfilePage } from '@/pages/PublicProfilePage';
+import { ArrowRight } from 'lucide-react';
+import { Link, Navigate, useParams } from 'react-router-dom';
 
 /**
  * Default rendering for any surface that hasn't been built out yet.
@@ -10,6 +11,12 @@ import { cn } from '@/lib/utils';
  */
 export function SurfacePage() {
   const { slug } = useParams<{ slug: string }>();
+
+  // /@handle — public Bee profile (PROFILE2). react-router 6 can't match a
+  // partial-segment param (`/@:handle`), so the single `@handle` segment lands
+  // on this catch-all; PublicProfilePage reads the same `slug` param.
+  if (slug?.startsWith('@')) return <PublicProfilePage />;
+
   const surface = slug ? SURFACE_BY_SLUG.get(slug) : undefined;
 
   if (!surface) return <Navigate to="/manual" replace />;
@@ -53,10 +60,7 @@ export function SurfacePage() {
             >
               {surface.name}
             </h1>
-            <p
-              className="mt-1 font-mono text-text-silver"
-              style={{ fontSize: '13px' }}
-            >
+            <p className="mt-1 font-mono text-text-silver" style={{ fontSize: '13px' }}>
               {surface.function}
             </p>
           </div>
@@ -64,9 +68,7 @@ export function SurfacePage() {
 
         {/* Description */}
         <div className="rounded-lg border border-border bg-bg-elevated/40 p-6">
-          <p className="text-lg leading-relaxed text-text-silver-bright">
-            {surface.description}
-          </p>
+          <p className="text-lg leading-relaxed text-text-silver-bright">{surface.description}</p>
           <p className="mt-3 text-text-dim" style={{ fontSize: '14px' }}>
             {surface.purpose}
           </p>
@@ -76,9 +78,7 @@ export function SurfacePage() {
         {surface.tier === 2 && <EmptyState surface={surface} />}
 
         {/* Tier 1 surfaces that aren't MANUAL also get empty state (will be built out in next sessions) */}
-        {surface.tier === 1 && surface.special !== 'manual' && (
-          <EmptyState surface={surface} />
-        )}
+        {surface.tier === 1 && surface.special !== 'manual' && <EmptyState surface={surface} />}
 
         {/* Sibling surfaces for discovery */}
         {siblings.length > 0 && (
@@ -151,11 +151,7 @@ function EmptyState({
       <p className="text-text-silver" style={{ fontSize: '14px' }}>
         No {surface.function.toLowerCase()} yet
       </p>
-      <p
-        className="mt-2 font-mono text-text-muted"
-        style={{ fontSize: '11px' }}
-        data-size="meta"
-      >
+      <p className="mt-2 font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
         The first Bees to contribute here will shape it.
       </p>
     </div>

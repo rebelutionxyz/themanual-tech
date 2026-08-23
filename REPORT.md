@@ -11686,3 +11686,282 @@ AccountHubPage.tsx, SettingsTab.tsx, PublicProfilePage.tsx, SecurityTab.tsx) was
 and unstaged. `.claude-pass` never committed.
 
 [DONE] SHELL_PORT1 | universal shell ported to /h24, build green, scoped commit staged (no push)
+
+
+---
+
+## H24_COMPOSER1 — 2026-08-22 (commit 02d3f26, not pushed)
+
+H24_COMPOSER1 — h24 composer brain (band / model / effort + BYOK slot)
+Pass: H24_COMPOSER1 | lane: h24 | workdir: TheMANUAL.tech | session: opus48-butch
+Commit: 02d3f269e9a9324bd58fca2549e38398293d5e58 (main, NOT pushed)
+Effort tag: DEEP (multi-file front feature + new lib module)
+
+=== WHAT WAS ASKED ===
+Wire the real composer logic into the ported shell (SHELL_PORT1, 429f399) per
+COMPOSER v1.1 + MMF_GIST: Band = Auto|free (tokens<=0 forces free + green GET
+link); Model menu = company names only; EFFORT chip only when model != Auto;
+BYOK settings surface (keys into the PROCESS never the model, never logged,
+masked at rest, "your key" marker on the model chip). Actual routing lands with
+AUTOTIER1 — build the state machine + honest placeholder route now. Deliver a
+scoped commit (NOT pushed) + ops_report.
+
+=== GOVERNING CANON READ ===
+COMPOSER v1.1, VOTE_APIS v1.2, H24_DESIGN_SPEC v1.0, H24_SHELL_BRIEF v1 (from
+ops_docs, latest per slug); the SHELL_PORT1 commit 429f399; both CLAUDE.md
+house-rule layers (root + TheMANUAL.tech).
+
+=== THE CENTRAL HONESTY CONSTRAINT (verified against source, not assumed) ===
+The deployed h24-route contract (src/lib/atlasoracle/client.ts, pinned + verified
+live 2026-07-27) accepts ONLY { directive, tier, category, astra_slug,
+confirm_cost }. It has no model / effort / key field. Therefore this pass builds
+the SELECTION STATE MACHINE and surfaces the controls the owner ruled in, but the
+request that leaves the browser is UNCHANGED — it still carries only tier (via
+band->tier) + category + astra_slug. No un-accepted field is ever sent; nothing
+fake is transmitted. model / effort / BYOK are captured, displayed, and marked as
+"lands with AUTOTIER1". This is the "honest placeholder route" the dispatch asked
+for: Auto -> frontier tier is a real route today; the smart name+band->version
+mapping and per-key routing are AUTOTIER1's job.
+
+=== FILES CHANGED (3) ===
+1. src/components/composer/Composer.tsx (shared, h24-agnostic component)
+   - Rewrote the "DELIBERATELY ABSENT / EFFORT" doc block to the COMPOSER v1.1
+     ruling: EFFORT is now a CONDITIONAL opt-in slot, never a standing dial.
+   - Added an opt-in EFFORT selector (effortOptions/effortId/onEffortChange/
+     effortLabel) that renders ONLY when a surface passes a non-empty list — so
+     it is never a dead control on any mount. Auto never mounts it.
+   - Added optionBadge?: ReactNode rendered against the Model chip, for h24's
+     "your key" marker. Kept the component h24-agnostic (the marker is passed in).
+   - Imported type ReactNode.
+2. src/lib/atlasoracle/byok.ts (NEW, 138 lines)
+   - Per-provider key capture with the VOTE_APIS v1.2 discipline encoded:
+     getters expose PRESENCE + last-4 ONLY (masked at rest) so a stray log of the
+     state object cannot leak the key; the single raw read
+     (readByokRawForRouting) is reserved for AUTOTIER1 and is called nowhere in
+     the composer today; no console statements anywhere in the module.
+   - MODEL_PROVIDER maps the company-name menu -> provider slug (Auto -> null).
+   - sessionStorage-backed (tab-scoped), fully window/try-catch guarded, matching
+     the src/lib/geo/storage.ts fail-closed pattern.
+3. src/pages/oracle/OraclePage.tsx (the /h24 surface)
+   - Header doc block rewritten to COMPOSER v1.1 + the honesty note above.
+   - State: effort (default 'high'), byokTick (re-read trigger), byokOpen.
+   - noTokens = balance !== null && balance <= 0. An effect forces band='free'
+     while noTokens; the band menu drops Auto in that state; a green "Get h24
+     tokens" link (var(--buy-green)) opens the storefront. Auto returns the moment
+     the balance is positive. (balance === null means "not loaded", NOT zero — it
+     forces nothing.)
+   - Model menu shows in the Auto/paid band (unchanged company-name list).
+   - EFFORT chip passed only when modelPicked (band auto AND model != 'Auto').
+   - BYOK affordance under the composer when modelPicked: "Use your own <Provider>
+     key" -> inline ByokEntry panel (type=password, never logged); when a key is
+     present it shows "Using your <Provider> key ···· <last4>" with change/remove,
+     and the model chip carries the "your key" marker.
+   - ByokEntry local component holds the raw value in its own local state only
+     until submit, hands it up via onSave once, then clears. Persistence + the
+     never-into-the-model discipline live in byok.ts.
+
+=== DONE-TEST (verbatim) ===
+$ npm run build   (= tsc -b && vite build)
+  ✓ built in 13.67s      (TypeScript type-check clean; production bundle emitted)
+  (pre-existing, unrelated: vite "chunks larger than 500 kB" advisory on
+   registry/CallView/libsodium — not introduced by this pass.)
+$ npx biome check ./src/components/composer/Composer.tsx \
+    ./src/pages/oracle/OraclePage.tsx ./src/lib/atlasoracle/byok.ts
+  Checked 3 files in 23ms. No fixes applied.   (clean; formatter run applied once
+  during the pass, re-check clean.)
+
+=== LANGUAGE FIREWALL ===
+All new user-facing strings audited: "Get h24 tokens" (GET, approved), "Out of
+h24 tokens — free band only.", "Use your own <Provider> key", "Using your
+<Provider> key", "Your <Provider> API key", "Save key", "Cancel", change/remove.
+No banned term (buy/sell/purchase/invest/trade/market/price/customer/mint). Note:
+var(--buy-green) is a pre-existing CSS TOKEN NAME (already used on line ~354 of
+this file), not a user-facing string.
+
+=== DEVIATIONS / JUDGEMENT CALLS (with reasons) ===
+- EFFORT/MODEL are surfaced but NOT sent to the router. The prior Composer.tsx
+  deliberately omitted effort to avoid a "dead control that changes nothing." The
+  owner ruling (COMPOSER v1.1) explicitly adds it back for the model-picked case.
+  Resolved by making it a captured state-machine control clearly documented as
+  "lands with AUTOTIER1", NOT by sending a field the router would reject. This is
+  the honest reading of "build the state machine + honest placeholder route now."
+- BYOK storage = sessionStorage, not localStorage. A plaintext provider secret
+  should not sit on disk indefinitely; tab-scoped lifetime is the safer resting
+  place for a placeholder. Trade-off: the "your key" marker and the key do not
+  survive a tab close. FLAGGED FOR BUTCH/AUTOTIER1: real BYOK must move to secure
+  server-side handling (a real secret store); the key must NOT persist plaintext
+  client-side long term. byok.ts documents this at the top.
+- EFFORT rendered as a <select> styled like the other composer chips (not a
+  bespoke segmented "chip"), for visual + a11y consistency with the existing
+  Band/Model selects, which are all selects. Labels: low/medium/high/max; default
+  high. The descriptor semantics (fast+cheap / balanced / thorough / burn tokens)
+  live in the code comment + COMPOSER v1.1, not crammed into the option labels.
+- Scoped commit contains ONLY the 3 files above. The working tree already carried
+  unrelated in-flight changes from another pass (src/App.tsx, UtilityChrome.tsx,
+  ProfilePage.tsx, SurfacePage.tsx, AccountHubPage.tsx, SettingsTab.tsx, and an
+  untracked SecurityTab.tsx). Those were left untouched and NOT staged — staged
+  set verified to equal exactly the 3 composer files before commit.
+- REPORT.md updated in place (this section appended) but left UNCOMMITTED for the
+  next SWEEP, alongside the other in-flight uncommitted changes. NOTE: REPORT.md
+  is ~717 KB, already over the 512 KB rotation threshold — the next SWEEP must
+  rotate it (docs/reports/REPORT-archive-NNN.md) BEFORE committing, per R6.
+
+=== COULD NOT VERIFY ===
+- No live/visual smoke of /h24 in a browser (no dev server run this pass; the
+  build + type-check + biome are the automated gates). The state machine is
+  verified by compilation + review, not by clicking through Auto/free/model/effort
+  /BYOK transitions in a running app.
+- BYOK end-to-end is inherently unverifiable this pass because there is no routing
+  seam that consumes the key yet (AUTOTIER1). Verified: capture, mask (last-4),
+  presence marker, change/remove, session scoping, and that no raw value is
+  logged or held in React state.
+- The exact company-name -> provider slug mapping (Meta for Llama, xAI for Grok,
+  etc.) is my own reasonable mapping; the authoritative name+band->version map is
+  AUTOTIER1's per the dispatch ("the rail maps name+band to exact version").
+
+=== HANDOFF TO AUTOTIER1 ===
+1. Extend the h24-route contract (client.ts InvokeArgs + edge fn) to accept model,
+   effort, and a BYOK key reference; wire submitDirective to send them.
+2. Replace byok.ts sessionStorage with secure server-side key handling.
+3. Map company name + band -> exact model version (the "rail" mapping).
+readByokRawForRouting() in byok.ts is the intended seam for step 2.
+
+[DONE] H24_COMPOSER1 | composer state machine wired, scoped commit 02d3f26 (not pushed), build+biome green
+
+
+---
+
+## H24_DRAWER1 — 2026-08-22 (commit 9f5df9c, not pushed)
+
+H24_DRAWER1 — h24 drawer panels wired to real data (Routing / Rail / Billing)
+Pass: H24_DRAWER1 | lane: h24 | workdir: TheMANUAL.tech | session: opus48-butch
+Commit: 9f5df9cb81ec41fe06074140eb894eadaa6aa282 (main, NOT pushed)
+Effort tag: DEEP (new component + shared-shell behavior changes across 3 files)
+
+=== WHAT WAS ASKED ===
+Wire the icon-drawer panels to real data per SHELL v1.5.1: h24 panel tabs
+Routing (last directives: when/provider/cost from the billing tables), Rail (live
+ops_dispatches: queue depth, claims, heartbeats - read-only), Billing
+(per-directive leg breakdown). Notifications/Tasks/Security stay honest stubs.
+Quick-Look Law: drawer = pertinent details, full page = the exit. Port the mock's
+desktop hover-opens (hover an icon opens its panel, 140ms intent delay, tooltips
+only on act-only buttons). Deliver scoped commit (NOT pushed) + ops_report.
+End-of-pass discipline + sweep.
+
+=== CANON READ ===
+SHELL v1.5.1 (outside-click closes chrome overlays; the CONTENT WINDOW does not),
+SHELL v1.5 (drawer structure), the SHELL_PORT1 shell (UniversalShell), and the
+existing rail-reader lib + admin gate.
+
+=== SLOT MAPPING (judgement call, flagged) ===
+The four toolbar drawer slots are tasks / security / alerts / notifications
+(+ bling + handle). The dispatch keeps Notifications / Tasks / Security as stubs,
+so by elimination the "h24 panel" = the ALERTS slot. I rendered the Routing /
+Rail / Billing tabbed panel there. I did NOT rename the shared slot type, its
+TriangleAlert icon, or the "Alerts" chrome title — that is shared chrome with
+blast radius across every astra, and renaming it is outside a "wire to real data"
+pass. The panel carries its own three-tab bar so the content is self-explanatory
+under the generic title. FLAG FOR OWNER/LEAD: if you want that toolbar icon/label
+to read "Activity"/"Console" for h24 (or a dedicated h24 slot), that is a small
+follow-up shell tweak; I left the shared chrome untouched on purpose.
+
+=== FILES CHANGED (3) ===
+1. src/components/h24/H24DrawerPanel.tsx (NEW)
+   - Three Quick-Look tabs, all REAL data:
+     * Routing: last 6 directives (provider / when / cost / status) from the
+       routing log OraclePage ALREADY fetched — passed in as a prop, so the
+       drawer adds NO second network read. null cost shown as FREE (free tier) or
+       "—" (uncharged failure), never a fake 0.
+     * Rail: live ops_dispatches via useRailBoard() — queue depth, claimed count,
+       stale-suspicion count, live dot + "Ns since last read", and up to 5 claimed
+       passes with per-pass silent-minutes coloured by heartbeatState
+       (green/amber/red). READ-ONLY. Admin-gated: useIsAdmin() gates the
+       useRailBoard(enabled) poll, so a non-admin issues ZERO queries and sees
+       "The rail board is admin-only." (RLS on ops_* would return nothing anyway —
+       defence in depth, same pattern as usePostureBoard). Exit: "Open the board
+       ->" navigates /mc.
+     * Billing: session spend (sum of costTokens over the loaded log) + the latest
+       billed directive's token-leg breakdown (input/output/cached) and cost. Exit
+       note points to the console's per-row cost panel for the full per-leg detail.
+   - Real-data-only throughout: empty says empty, failed read says failed.
+2. src/components/shell/UniversalShell.tsx (shared chrome)
+   - ToolbarIcon: DESKTOP HOVER-OPEN. onMouseEnter arms a 140ms timer that opens
+     the icon's drawer; onMouseLeave / click / unmount clear it. Gated on
+     matchMedia('(hover: hover)') so touch devices never arm it; the click path
+     is unchanged. Dropped the title tooltip from these hover-open icons
+     ("tooltips only on act-only buttons") — aria-label kept for a11y. Added the
+     HOVER_OPEN_MS = 140 constant.
+   - IconDrawer: OUTSIDE-CLICK CLOSE (SHELL v1.5.1). A document mousedown listener
+     closes the drawer when the click lands outside the aside — mirrors the
+     existing AstraPicker pattern. Esc + X unchanged. The CONTENT WINDOW
+     (H24CostPanel, quick-looks) is a separate component and is deliberately NOT
+     touched, per SHELL v1.5.1.
+3. src/pages/oracle/OraclePage.tsx
+   - renderPanel('alerts') now mounts <H24DrawerPanel entries={log.entries}
+     signedIn={Boolean(bee)} onOpenBoard={() => navigate('/mc')} />. tasks stays
+     the honest null note; security/notifications keep their real page links.
+
+=== INTERACTION MODEL (hover-open + outside-click, no fight) ===
+Hover (140ms) OR click opens a drawer; it then PERSISTS (no mouseleave auto-close)
+so the Bee can move into the panel and use the tabs / links. It closes on
+outside-click, Esc, or X. Hovering a different icon (140ms) switches panels.
+Clicking an already-open icon reopens the same slot (open, not toggle-close) —
+Esc/X/click-away are the close paths. Documented in the code.
+
+=== DONE-TEST (verbatim) ===
+$ npm run build   (= tsc -b && vite build)
+  ✓ built in 24.51s      (TypeScript clean; bundle emitted)
+  (pre-existing, unrelated vite "chunks > 500 kB" advisory only.)
+$ npx biome check ./src/components/h24/H24DrawerPanel.tsx \
+    ./src/components/shell/UniversalShell.tsx ./src/pages/oracle/OraclePage.tsx
+  Checked 3 files. No fixes applied.   (clean; formatter run once during the pass.)
+
+=== LANGUAGE FIREWALL ===
+New user-facing strings audited — "Routing", "Rail", "Billing", "queued",
+"claimed", "stale", "Open the board ->", "The rail board is admin-only.", "No
+directives routed yet.", "Sign in to see...", "h24 tokens across N directives",
+"input/output/cached", "cost", "FREE". No banned term
+(buy/sell/purchase/invest/trade/market/price/customer/mint).
+
+=== REAL-DATA / ACCESS DISCIPLINE ===
+- Routing/Billing read only the Bee's own routing log (h24_directives select-own +
+  h24_token_ledger auth.uid()=bee_id) — already fetched by the page; the drawer
+  reuses it, no new query, no content (the tables hold no directive/response text).
+- Rail reads ops_dispatches / ops_stale_claims / ops_dispatch_location through the
+  SAME anon-client + authenticated + is_platform_admin() RLS path /mc uses
+  (useRailBoard). NOTHING here loosens RLS, adds a policy, or ships a service key.
+  A non-admin gets zero rows, and we do not even poll for one.
+
+=== DEVIATIONS / JUDGEMENT CALLS ===
+- Alerts slot chosen as the h24 panel by elimination (see SLOT MAPPING). Shared
+  chrome name/icon/title left unchanged on purpose; flagged as a follow-up.
+- Billing "per-directive leg breakdown" rendered as the token legs (input/output/
+  cached) + total cost for the latest directive, plus session spend. The full
+  per-leg DOLLAR/rate math already lives in H24CostPanel, reachable by clicking a
+  log row on the console (the Quick-Look "exit"); duplicating that pricing engine
+  inside a 320px drawer would be redundant, so the drawer summarizes and points to
+  it. Honest and compact.
+- Rail elapsed minutes computed from Date.now() at render; the panel re-renders on
+  the 8s live poll, so the numbers stay fresh while the tab is open (no separate
+  ticking clock added — matches MissionControlPage's approach).
+
+=== COULD NOT VERIFY ===
+- No live/visual browser smoke (no dev server this pass; build + type-check +
+  biome are the gates). Not verified by clicking: the 140ms hover-open timing, the
+  outside-click-close, tab switching, and the admin/non-admin Rail branches in a
+  running app. The logic is verified by compilation + review.
+- The Rail tab's admin branch was not exercised against a live admin session; the
+  gate reuses useIsAdmin() + useRailBoard() exactly as MissionControlPage does, so
+  it inherits their verified behavior, but this specific mount was not run.
+- Whether the owner's mock intends the h24 icon to be TriangleAlert/"Alerts" or a
+  different mark — unverified (no mock in-repo); see SLOT MAPPING flag.
+
+=== SWEEP NOTE ===
+REPORT.md updated in place (this section appended) and left UNCOMMITTED for the
+next SWEEP, alongside the other in-flight uncommitted changes (App.tsx,
+UtilityChrome.tsx, ProfilePage.tsx, SurfacePage.tsx, AccountHubPage.tsx,
+SettingsTab.tsx, untracked SecurityTab.tsx — all another pass's work, untouched
+here). REPORT.md is now ~726 KB, over the 512 KB threshold: the next SWEEP must
+rotate it (docs/reports/REPORT-archive-NNN.md) BEFORE committing, per R6.
+
+[DONE] H24_DRAWER1 | Routing/Rail/Billing wired to real data, hover-open + outside-click ported, scoped commit 9f5df9c (not pushed), build+biome green
