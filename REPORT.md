@@ -23,6 +23,50 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## H24_FIX2 — routing log's 3rd surface (home activity panel) + date filter; Vault own-page confirmed (2026-08-29)
+
+**Pass:** H24_FIX2 | lane `h24` | workdir TheMANUAL.tech | session `a2c7713b` | claimed via `go h24` after H24_FIX1 closed. Follows H24_FIX1 (done).
+
+**Governing canon:** STUDIO_IA v0.1 (Vault/Archive rename), SHELL v1.5.1 (chrome-overlay law). Dispatch scope: routing log on THREE surfaces reading ONE record (drawer tab — done by H24_DRAWER1/H24_FIX1; minimizable home-screen side panel — new this pass; full filterable page — extended this pass); confirm h24 Vault's own page per STUDIO_IA v0.1 (largely landed by H24_FIX1 #8, verified here).
+
+**Note on the dispatch's own concurrency warning.** The dispatch said to read H24_FIX1's REPORT.md entry first (concurrent-edit collision) and run only one code on this pass. By the time I claimed H24_FIX2, H24_FIX1 had already closed and its commit (`9565f1c`) was on top of mine (`af4df99`) — `git status` was clean before I started, and `npx tsc -b` / `npm run build` were green on the merged tree, so there was no live collision to navigate this time; I worked solo on a settled tree.
+
+### What shipped
+- **`src/components/h24/HomeActivityPanel.tsx`** (new) — the routing log's **third surface**. On the h24 **home** screen (fresh/undocked session — no transcript exchanged yet this visit), a Bee's recent routing history now shows automatically in a right-hand panel, so returning Bees see their record before typing anything, instead of a blank composer. Reads the **same `log` state** `OraclePage` already fetched via `fetchRoutingLog` — no second query, so it can never drift from what the drawer tab or the full page show (the dispatch's explicit "never three queries that can drift"). Renders via the existing `RoutingLogTable` (no new rendering logic to keep in sync). **SHELL v1.5.1 chrome-overlay law**: floats absolutely over the content (no reflow), closes on an outside click exactly like `IconDrawer`/`AstraPicker` (same `mousedown` + ref-contains pattern). **"Minimizable, not fixed"**: closing (via the header button or an outside click) collapses it to a slim re-open tab at the same edge rather than making it vanish with no way back. Any cost drill-down inside it exits to `/h24/log` (Quick-Look Law) rather than duplicating `H24CostPanel`.
+- **`src/components/h24/RoutingLogTable.tsx`** — added the missing **date filter** ("Since", an `<input type="date">`) alongside the existing Band/Kind/Provider/Status filters, completing the dispatch's "filterable by date / band / kind / provider / status." Compares on the Bee's own local calendar date (constructs `T00:00:00` in browser-local time) rather than a UTC-midnight cutoff, so a same-day directive is never hidden by a timezone mismatch. `clear filters` now also accounts for `since`.
+- **`src/pages/oracle/OraclePage.tsx`** — wired `HomeActivityPanel` into the HOME (`!docked`) branch: made that branch's container `relative` and mounted the panel as an absolute sibling, passing the console's own `log` state plus its existing `loadLog`/`exportCsv` handlers (so refresh/export inside the panel are real, not stubs).
+- **h24 Vault's own page (STUDIO_IA v0.1) — verified, not rebuilt.** Read `H24VaultPage.tsx` + `h24Nav.ts`: the Vault sidebar item already sits beside Activity/Wallet in the `h24` nav group, routes to `/h24/vault` (never `/studio`), and the page is an honest stub (says plainly nothing lives there yet and why, links to Creator Studio **by name** rather than silently reusing it, fabricates nothing). This already satisfies STUDIO_IA v0.1 §2 as landed by H24_FIX1 #8; STUDIO_IA's Archive rename is explicitly Studio-side scope, out of bounds here per the dispatch. No code changed for this item.
+
+### Deviations / judgement calls (with reasons)
+1. **No live collision to navigate this pass** (see note above) — H24_FIX1 had already closed and merged. Worked normally rather than defensively re-reading before every edit, since the tree was settled; still re-read before edits touching `RoutingLogTable.tsx`/`OraclePage.tsx` as ordinary practice, not as collision defense.
+2. **Date filter compares on local calendar days, not a raw `Date` string comparison.** A naive `new Date(filters.since) <= new Date(e.createdAt)` would compare `filters.since` as UTC midnight, which can silently exclude a Bee's own same-day-local rows depending on their timezone offset from UTC. Built the comparison explicitly at local midnight instead.
+3. **`HomeActivityPanel` reuses `RoutingLogTable` rather than a bespoke compact renderer.** The dispatch's "one record" requirement reads as a mandate against re-implementing the table three times, not just against re-querying three times; reusing the same component is the stronger form of that guarantee (a rendering bug fixed once fixes all three surfaces).
+4. **Did not add a filter-aware CSV export.** `RoutingLogTable`'s `onExport` (wired to `OraclePage`'s `exportCsv`) has always exported the full fetched `log.entries`, not the current filtered `visible` set — that behavior predates this pass and the dispatch's "export intact" reads as "keep it working," not "make it filter-aware." Flagged rather than silently expanded.
+
+### Done-test
+- **`npx tsc -b`** — 0 errors, whole project.
+- **`npm run build`** — succeeds; only pre-existing >500 kB chunk-size warnings (`libsodium-wrappers`, `CallView`, `registry`), unrelated to this pass.
+- **`npx biome check`** on the three touched/new files (`HomeActivityPanel.tsx`, `RoutingLogTable.tsx`, `OraclePage.tsx`) in isolation — clean, 0 errors. (A whole-project `biome check ./src` run shows 262 pre-existing errors across unrelated files — e.g. `CallView.tsx`/`RouletteView.tsx` import-order — none touched by this pass; `H24RoutingLogPage.tsx`, H24_FIX1's file and untouched here, also carries pre-existing formatting-only diagnostics.)
+- **Firewall grep** (`buy|sell|purchase|invest|trade|market|price|customer|mint`, case-insensitive, bare word) on the new/changed files — zero user-facing hits (only the pre-existing `--buy-green` CSS token).
+- **HEADLESS LAW** — no `mousemove` listeners added; the panel's outside-click-close uses `mousedown`, mirroring `IconDrawer` exactly (which already uses that pattern, not a hover/mousemove one).
+
+### Could not verify
+- **No live browser smoke this pass** (dev server not started) — same posture as H24_DRAWER1/H24_FIX1's own reports. Not clicked in a running app: the home panel's default-expanded appearance, its collapse/expand/outside-click behavior, or the new date filter's actual picker UI.
+- **Whether "since" should also gate the CSV export** — not asked by the dispatch; flagged as deviation 4 rather than assumed.
+
+### Manifest (scoped commit, staged — see below)
+```
+NEW  src/components/h24/HomeActivityPanel.tsx
+MOD  src/components/h24/RoutingLogTable.tsx
+MOD  src/pages/oracle/OraclePage.tsx
+MOD  REPORT.md
+```
+No production schema applied, no Edge Function deployed, no money charged, no push.
+
+[DONE] H24_FIX2 | routing log's home-screen panel built (3rd surface, one shared `log` source), date filter added to the full page, h24 Vault own-page requirement confirmed already satisfied by H24_FIX1 — tsc/build/biome/firewall all clean, scoped commit, NO PUSH
+
+---
+
 ## H24_BYOK1 — real BYOK: validated key entry, Vault storage, two-doors quota, fee calc (2026-08-29)
 
 **Pass:** H24_BYOK1 | lane `h24` | workdir TheMANUAL.tech | session `a2c7713b` | claimed via W-26 folder-matched self-claim.

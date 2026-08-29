@@ -1,6 +1,7 @@
 import { COMPOSER_MEASURE, Composer, type ComposerBand } from '@/components/composer/Composer';
 import { H24CostPanel } from '@/components/h24/H24CostPanel';
 import { H24DrawerPanel } from '@/components/h24/H24DrawerPanel';
+import { HomeActivityPanel } from '@/components/h24/HomeActivityPanel';
 import { RoutingLogTable } from '@/components/h24/RoutingLogTable';
 import { UniversalShell } from '@/components/shell/UniversalShell';
 import {
@@ -717,8 +718,12 @@ export function OraclePage() {
           </div>
         ) : !docked ? (
           // HOME — centered greeting + one-line promise + composer, biased ~16vh
-          // above center. First send flips `docked`.
-          <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-5 md:px-8">
+          // above center. First send flips `docked`. H24_FIX2 — the routing
+          // log's THIRD surface (HomeActivityPanel) floats over this container
+          // (`relative` + the panel's own `absolute`) so a returning Bee sees
+          // their record before typing anything, per SHELL v1.5.1 chrome-overlay
+          // law (closes on outside click, minimizes rather than vanishing).
+          <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-5 md:px-8">
             <div
               className={cn(COMPOSER_MEASURE, 'flex flex-col items-stretch gap-5')}
               style={{ marginTop: '-16vh' }}
@@ -744,6 +749,13 @@ export function OraclePage() {
               )}
               {composerEl}
             </div>
+            <HomeActivityPanel
+              log={log}
+              signedIn={Boolean(bee)}
+              onOpenLog={() => navigate('/h24/log')}
+              onRefresh={() => void loadLog()}
+              onExport={exportCsv}
+            />
           </div>
         ) : (
           // DOCKED — conversation scrolls above, composer pinned at the bottom.

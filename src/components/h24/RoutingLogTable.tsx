@@ -22,9 +22,17 @@ interface Filters {
   kind: string;
   provider: string;
   status: string;
+  /** H24_FIX2 — "on or after" this calendar date (browser-local), or '' for no filter. */
+  since: string;
 }
 
-const EMPTY_FILTERS: Filters = { band: 'all', kind: 'all', provider: 'all', status: 'all' };
+const EMPTY_FILTERS: Filters = {
+  band: 'all',
+  kind: 'all',
+  provider: 'all',
+  status: 'all',
+  since: '',
+};
 
 export function RoutingLogTable({
   log,
@@ -55,7 +63,9 @@ export function RoutingLogTable({
   );
   const providers = useMemo(
     () =>
-      Array.from(new Set(log.entries.map((e) => e.provider).filter((p): p is string => !!p))).sort(),
+      Array.from(
+        new Set(log.entries.map((e) => e.provider).filter((p): p is string => !!p)),
+      ).sort(),
     [log.entries],
   );
   const statuses = useMemo(
@@ -73,6 +83,13 @@ export function RoutingLogTable({
       if (filters.kind !== 'all' && e.category !== filters.kind) return false;
       if (filters.provider !== 'all' && e.provider !== filters.provider) return false;
       if (filters.status !== 'all' && e.status !== filters.status) return false;
+      if (filters.since) {
+        // Compare on calendar dates (browser-local), not instants — a Bee
+        // picking "2026-08-29" expects everything from that day on, in their
+        // own timezone, not a UTC-midnight cutoff that can hide same-day rows.
+        const sinceLocalMidnight = new Date(`${filters.since}T00:00:00`);
+        if (new Date(e.createdAt) < sinceLocalMidnight) return false;
+      }
       return true;
     });
   }, [log.entries, filters, showFilters]);
@@ -105,6 +122,24 @@ export function RoutingLogTable({
 
       {showFilters && log.entries.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
+          <label
+            className="flex items-center gap-1.5"
+            style={{ fontSize: 11.5, color: 'var(--mute)' }}
+          >
+            Since
+            <input
+              type="date"
+              value={filters.since}
+              onChange={(e) => setFilters((f) => ({ ...f, since: e.target.value }))}
+              className="rounded-md px-1.5 py-0.5"
+              style={{
+                background: 'var(--raised)',
+                border: '1px solid var(--line)',
+                color: 'var(--body)',
+                fontSize: 11.5,
+              }}
+            />
+          </label>
           <FilterSelect
             label="Band"
             value={filters.band}
@@ -136,7 +171,8 @@ export function RoutingLogTable({
           {(filters.band !== 'all' ||
             filters.kind !== 'all' ||
             filters.provider !== 'all' ||
-            filters.status !== 'all') && (
+            filters.status !== 'all' ||
+            filters.since !== '') && (
             <button
               type="button"
               onClick={() => setFilters(EMPTY_FILTERS)}
