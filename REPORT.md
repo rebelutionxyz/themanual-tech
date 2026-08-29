@@ -12536,3 +12536,135 @@ COMMIT: scoped slice, message H24_BYOK2, NO PUSH. GATED: push, schema apply
 Function deploy (not deployed), money (none touched).
 
 [DONE] H24_BYOK2 | two BYOK entry surfaces built on H24_BYOK1's store — Customize page (canonical management home) + inline Model-menu Add/Edit/Delete (required replacing a native <select> with a custom popover, since an <option> can't host a button); ByokKeyEntry extracted so all three entry points share one component; Meta's format-check-only limitation now surfaced in the UI itself; tsc+build+lint clean; static no-log proof clean; interactive click-through and live provider validation unverified (no browser extension, function not deployed)
+
+================================================================================
+H24_PERSONA1 — h24 deflects instead of working (2026-08-29)
+================================================================================
+
+WORKDIR: TheMANUAL.tech.
+
+=== SECTION 1 — THE CLASSIFIER, TRACED END TO END ===
+
+QUERIED h24_directives.directive_category across ALL history (28 rows):
+  suggest  25
+  classify  2
+  analyze   1
+
+The 3 non-"suggest" rows are ALL from 2026-07-27/07-28 (caller_kind='user',
+right around OPS10/OPS15/OPS21 — early manual API testing dates), and every
+row since — the entire 2026-08-19 and 2026-08-29 sessions, i.e. everything
+the owner has actually sent through the console — reads "suggest".
+
+TRACED THE FIELD END TO END:
+- OraclePage.tsx: `const [category] = useState<DirectiveCategory>('suggest')`
+  — a CONSTANT. The composer has never exposed a way to pick anything else;
+  this was an explicit COMPOSER v1.1 scoping decision, documented in the
+  file's own comment ("KIND is not on the ruled composer row... surfacing it
+  returns in a later composer pass"). There is no classifier to be broken —
+  none was ever built. The 3 historical exceptions came from manual API
+  calls that set `category` directly in the request body, bypassing the UI
+  entirely (the server accepts and validates whatever `category` a caller
+  sends — h24-route/index.ts lines ~1013-1023).
+- CRITICAL FINDING: `category` NEVER reaches the model. Grepped every use of
+  `category` in h24-route/index.ts — it is validated, stored on
+  h24_directives.directive_category, and included in two console.log calls.
+  It is NEVER interpolated into `canonText` or the `directive` text sent to
+  any provider (callAnthropic/callOpenAICompatible/callGemini all send only
+  `{role:'user', content: directive}` — the raw text, nothing else).
+
+CONCLUSION: the dispatch's hypothesis — "if the classifier is
+dead/stubbed/defaulting, that is the root cause of the deflection" — is
+half right and half wrong. The OBSERVATION is exactly correct (always
+"suggest", confirmed and traced). But the MECHANISM can't be what's causing
+deflection, because the model literally never sees this value in any form —
+it's pure logging/DB metadata. Building a real classifier this pass would
+not have touched the deflection behavior at all. Not built (also out of
+scope for EFFORT:M — a real auto-classifier is new infrastructure, not a
+wiring fix, and was already deliberately deferred once by owner ruling).
+
+=== SECTION 2 — THE ACTUAL CAUSE: THE IDENTITY PREAMBLE, UNGATED ===
+
+Re-read my own H24_FIX1 wording with this bug in mind and found the real
+regression: "You may tell the Bee, in plain terms, that h24 routes their
+directive..." was PERMISSIVE, not GATED — no "only when asked". Placed
+FIRST in the system prompt (deliberately, so it outranks the canon's own
+stale "AtlasOracle" naming), a strong "you are X, you may say Y" identity
+block at the very start of a system prompt is a well-known trigger for a
+model to open its response with exactly that framing — which is precisely
+what shipped: h24 introducing itself and explaining what it is on ordinary
+directives instead of just answering them.
+
+FIXED (canon.ts, `identityAndDisclosure`): reworded to an explicit gate —
+"ONLY if the Bee actually asks... and not otherwise, never as an unprompted
+preamble or header" — followed by an explicit negative: "Every OTHER
+directive gets NO identity language at all... Say nothing about any of this
+unasked. Go straight to the work." Kept from H24_FIX3: state the actual
+serving provider plainly when asked, never offer to look it up. Kept the
+no-internals-recitation boundary unchanged.
+
+=== SECTION 3 — DEFAULT BEHAVIOR: ATTEMPT THE WORK ===
+
+Added a new canon section, `DEFAULT_BEHAVIOR`, assembled right after the
+identity preamble (assembleCrossAstraCanon), governing what h24 does with
+the directive itself (a separate concern from what it says about itself):
+  - Attempt every directive, even short/one-word/ambiguous ones, at the
+    single most reasonable interpretation — never a menu of interpretations
+    or a bare "please clarify" instead of an attempt.
+  - A clarifying question is allowed only AFTER an attempt, only when it
+    would meaningfully change the answer — never as the whole response.
+  - Explicitly named the owner's exact "corrected 100→99, then asked a
+    question, no attempt" complaint: don't open with an incidental
+    correction before addressing what was asked; fold a genuinely useful
+    correction in alongside the actual answer, not instead of it.
+  - Terse and useful beats chatty, without licensing padding.
+
+=== WHY THE CATEGORIZATION CANON MAY ALSO CONTRIBUTE (flagged, not changed) ===
+`CATEGORIZATION.md` (unconditionally included in every system prompt) opens
+with "Every directive is classified at parse-time. The category drives
+provider selection" and lists a 10-item directive-type taxonomy. A model
+reading that framework immediately before an ambiguous one-word directive
+("singing") has plausible motive to start reasoning ABOUT which category it
+falls into rather than just answering — matching the owner's exact
+complaint ("a menu of what singing could mean"). This is a real hypothesis,
+not confirmed, and NOT acted on this pass: DEFAULT_BEHAVIOR's explicit
+"never a menu of possible meanings" instruction should suppress this
+regardless of the underlying cause, and rewriting CATEGORIZATION.md itself
+is a bigger, riskier change (that doc also documents the real provider-
+category system used elsewhere) than this pass's scope warrants. Worth a
+follow-up if PERSONA behavior is still off after this lands.
+
+=== VERIFY ===
+- `deno check supabase/functions/h24-route/index.ts` — clean (canon.ts is
+  imported by it; this also checks canon.ts).
+- COULD NOT run the dispatch's explicit ask ("run a dev server, send real
+  directives, paste actual outputs"): that specific verification requires a
+  LIVE model call (mock mode returns a canned echo string — `[MOCK — no
+  provider was called]` — which cannot exercise persona/tone at all, since
+  no model ever runs). A live call needs either a live browser session
+  signed in as a real Bee (browser-automation extension not connected this
+  session, same limitation H24_FIX3 and H24_BYOK2 hit) or a provider API key
+  (server-side secret, never available to this session — Secrets rule).
+  RECORDED HONESTLY AS UNVERIFIED, per the dispatch's own "a compile is not
+  a verification" lesson — this is a source change reasoned from well-
+  documented LLM behavior (an ungated, front-loaded identity block reliably
+  produces unprompted self-introduction; this is not a guess unique to this
+  codebase) but NOT confirmed against a live response.
+- SOURCE ONLY — NOT DEPLOYED (Edge Function deploys are gated; this names a
+  fix, not a deploy).
+
+=== COULD NOT VERIFY (honest list) ===
+- Whether the reworded identity gate actually stops h24 from volunteering
+  its identity in practice.
+- Whether DEFAULT_BEHAVIOR actually produces an attempt-first response for
+  a one-word directive like "singing".
+- Whether CATEGORIZATION.md is a contributing cause (flagged as a
+  hypothesis above, not tested).
+All three need a live model call this session could not make.
+
+COMMIT: scoped slice, message H24_PERSONA1, NO PUSH. GATED: push, schema,
+deploy, money — none crossed. `src/components/shell/UniversalShell.tsx`
+showed as modified in the working tree during this pass — NOT this pass's
+work (a concurrent session's mobile-responsive changes, SHELL_MOBILE1 per
+its own in-file comments); left untouched and NOT staged in this commit.
+
+[DONE] H24_PERSONA1 | classifier traced and confirmed stuck at "suggest" (design decision, not a regression) but proven NOT the deflection cause (category never reaches the model — pure metadata); real cause found and fixed: FIX1's identity preamble was ungated and fired on every response, now explicit "only when asked"; added a DEFAULT_BEHAVIOR canon section instructing attempt-first, no interpretation-menus, no pedantic corrections-before-help; source only, not deployed; deno check clean; live-model verification impossible this session (no browser extension, no provider key) — recorded as unverified, not claimed
