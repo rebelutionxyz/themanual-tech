@@ -1,4 +1,4 @@
-# db/proposals — PROFILE4 profile data layer (PROPOSE-FIRST)
+# db/proposals — profile + BYOK data layers (PROPOSE-FIRST)
 
 These migrations are **authored, not applied**. Per **SQL_AUTONOMY v1.1** and the
 PROFILE4 dispatch ("do NOT stamp the shared ledger"), nothing here runs
@@ -29,6 +29,18 @@ header (MIGRATION AMENDMENT: rollback written first).
    - `tip_donation_levels` (amount + reward + BLiNG!-back + `max_count`). CONFIG
      only; live money is owner-gated at the money walk. Rails + tipper-BLiNG!-back
      switch live as `profile_nodes` (`tips.*`), not duplicated here.
+
+4. `0004_byok_keys.sql` — H24_BYOK1: real BYOK key storage.
+   - `bee_byok_keys` (masked pointer only: provider, last4, status,
+     validated_at) + `vault_secret_id` referencing **Supabase Vault**
+     (`vault.secrets` / `vault.create_secret`, confirmed already provisioned
+     on this project). No raw-key column exists anywhere in this table.
+   - `byok_key_store(bee_id, provider, raw_key)` — SECDEF, `service_role`
+     only; called by the `byok-key` Edge Function after live provider
+     validation. `byok_key_revoke(provider)` — SECDEF, `authenticated`,
+     self-serve via `auth.uid()`, no Edge Function needed. `byok_key_read_raw`
+     — SECDEF, `service_role` only, **reserved for AUTOTIER1 routing**, not
+     called by anything in this pass.
 
 ## Galleries (dispatch item b) — NO new schema needed
 

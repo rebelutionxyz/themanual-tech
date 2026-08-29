@@ -23,6 +23,68 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## H24_BYOK1 — real BYOK: validated key entry, Vault storage, two-doors quota, fee calc (2026-08-29)
+
+**Pass:** H24_BYOK1 | lane `h24` | workdir TheMANUAL.tech | session `a2c7713b` | claimed via W-26 folder-matched self-claim.
+
+**Governing canon:** COMPOSER v1.2, KNOW_SPEC v0.2 (fee schedule) + v0.3, VOTE_APIS v1.2 (key discipline) — all read from `ops_docs`. Dispatch scope: build the real BYOK key-entry surface, storage, provider selection, live validation, revoke, and the two-doors quota state; schema is propose-only (any table/column is a `-Q`); money is gated (build metering + fee calc, charge nothing).
+
+**CONCURRENT-EDIT NOTE (flag for the lead).** `TheMANUAL.tech` is a single shared working directory, not a per-session worktree. A second session (**H24_FIX1**, `aa04df87`) held a live claim on the same lane+workdir for this entire pass, actively rewriting `src/pages/oracle/OraclePage.tsx` (extracting `RoutingLogTable`/`h24Nav`, defect fixes 1/3/4/6/7) at the same time I was wiring BYOK into that same file. I re-read before every edit and scoped my changes to BYOK-owned lines only (imports, BYOK state/handlers, the two composer JSX islands, `ByokEntry`/new `ByokDoor`), leaving their in-flight nav/log-table refactor untouched. `npx tsc -b` at pass end shows 3 residual errors that are **entirely theirs** (`RoutingLogTable` unused, `H24DrawerPanel` missing `onOpenLog`, `sentDirective` unused) — none trace to BYOK code; see Done-test.
+
+### What shipped
+- **`db/proposals/0004_byok_keys.sql` + rollback** (PROPOSE-FIRST, not applied — SQL_AUTONOMY v1.1 + dispatch "propose it, do not apply"). `bee_byok_keys`: one row per Bee+provider, **no raw-key column ever** — only a `vault_secret_id` pointer into **Supabase Vault** (confirmed already provisioned on this project: the 2026-07-28 restore-verification report lists `vault.secrets` / `vault.create_secret(text,text,text,uuid)` / `vault.decrypted_secrets` present, `vault.secrets` holding 0 rows — this is Vault's first real tenant here), plus masked metadata (provider, last4, status, validated_at). RLS: read-own only, no direct write policies.
+  - `byok_key_store(bee_id, provider, raw_key)` — SECDEF, **`service_role` only**; the Edge Function calls it after live validation, passing its own server-derived `bee_id` (never client-supplied, so a forged id can't plant a key on someone else's row). Rotates the existing vault secret on a re-save rather than orphaning it.
+  - `byok_key_revoke(provider)` — SECDEF, **`authenticated`**, `auth.uid()`-scoped, self-serve — works even before the Edge Function ships. Deletes both the metadata row and the vault secret.
+  - `byok_key_read_raw(bee_id, provider)` — SECDEF, **`service_role` only**, **reserved for AUTOTIER1 routing**, not called anywhere this pass.
+  - `README.md` updated with the apply-order entry and the Vault provenance note.
+- **`supabase/functions/byok-key/index.ts`** (written, **NOT deployed** — Edge Function deploys are gated, never auto-deployed per CLAUDE.md). Verifies the caller's JWT (`verifyAuth`), validates the key **live** against the provider, then calls `byok_key_store` with a service-role client. Validation is one cheap `GET .../v1/models` per provider — anthropic/openai/xai/mistral/deepseek all already have a **verified-working base URL** in `h24-route`'s `OPENAI_COMPAT_REGISTRY`, so this reuses hosts this codebase already calls in production; the sibling `/v1/models` listing endpoint is documented for Anthropic's own API and for every OpenAI-wire API. **Meta is the one honest gap**: `h24-route`'s provider registry has no meta/Llama entry at all (no verified direct Meta API anywhere in this codebase), so meta gets a **format-only** check and is reported to the Bee as such rather than a silently faked "valid". 8s timeout via `AbortController` on every live call.
+- **`src/lib/atlasoracle/byok.ts` — full rewrite**, replacing the H24_COMPOSER1 sessionStorage placeholder. The raw key now never rests in browser storage at all — it lives only as the argument to `submitByokKey` for the duration of one `functions.invoke` call. `listByokStates()` reads masked state (provider/last4/status) from `bee_byok_keys`; `revokeByokKey()` calls the self-serve RPC directly (no Edge Function round-trip needed). `isMocked()` (`VITE_ATLASORACLE_MOCK=1`) exercises the full flow against an in-memory masked-only fake, so the composer stays demoable before the schema/function land.
+- **`src/lib/atlasoracle/byokQuota.ts`** — COMPOSER v1.2's "TWO DOORS" mechanic. `FREE_DIRECTIVE_QUOTA` is the **one config constant** (owner-set N is still TBD at ratify time per the canon — this is the single place to change it, not a hardcode buried in a component). `countFreeDirectives()` counts this Bee's all-time free-tier rows in the **already-live** `h24_directives` table (no schema needed for the quota itself) — all-time because the reset cadence is explicitly unratified in canon, and resetting on a made-up schedule would be worse than never resetting.
+- **`src/lib/atlasoracle/byokFee.ts`** — `computeByokPlatformFee()`, a pure function implementing KNOW_SPEC v0.2's "10% of metered provider-equivalent spend" (owner-to-ratify). **Money is gated**: this only computes what the fee would be; nothing charges anyone, nothing touches `bling_transactions`/`h24_token_ledger`. Metering itself is flagged, not built: a real `meteredSpendUsd` needs BYOK usage actually flowing through `h24-route` under the Bee's own key, which is AUTOTIER1's job everywhere else in this codebase — adding a metered-spend column to `h24_directives` ahead of that would be schema nobody can use yet.
+- **`src/pages/oracle/OraclePage.tsx`** (surgical edits only, see concurrent-edit note): real async `byokStates` (replacing the sync `getByokState`/sessionStorage reads), `ByokEntry` now shows a live validation error inline instead of silently closing on a rejected key, `removeByok` calls the real revoke RPC. New two-doors banner: **before quota the composer stays clean (no banner at all)**; **at quota** (`noTokens && atFreeQuota`) it shows both doors — the existing green "Get h24 tokens" link and a new "Add your provider API key" door that expands `ByokDoor` (its own provider picker + key entry, since no model is picked yet at that point in the flow). This is a real behavior change from before this pass (which nagged from directive 1) — it now matches the ruling's "clean before quota" language.
+
+### Deviations / judgement calls (with reasons)
+1. **Vault over a bespoke pgcrypto column.** Supabase Vault is confirmed already provisioned and unused (0 rows) on this project — using the platform's own secret store is less code and less risk than hand-rolling pgcrypto + a passphrase-management story, and it's exactly what Supabase recommends for this shape of secret.
+2. **Revoke as a direct `authenticated` RPC, store as `service_role`-only.** Revoke needs no external call, so making it self-serve means a Bee can always get rid of a key even before the Edge Function is deployed. Store needs a live provider round-trip that only Deno can make, so it stays gated behind the function + service-role RPC.
+3. **Meta gets format-only validation, not a guessed endpoint.** Inventing an unverified Meta API URL would violate the same "verified live, not from memory" discipline `h24-route`'s own comments repeatedly cite (OPS21, ORACLE_TOS_VERIFIED). Flagged here, not silently shipped as fake "live" validation.
+4. **Quota counted all-time, not on a cadence.** COMPOSER v1.2 explicitly leaves the reset cadence to a future owner ruling; counting all-time is the conservative reading until that lands.
+5. **No live metering table this pass.** Building real per-directive BYOK metering requires AUTOTIER1's routing wiring first (BYOK keys don't route through `h24-route` yet, by design — see the file's own COMPOSER SEMANTICS header). The fee **calculator** is complete and ready for that data; the metering **capture** is explicitly out of scope until routing exists to meter.
+6. **Did not touch `RoutingLogTable`/`h24Nav`/`H24DrawerPanel`/`UniversalShell`/`h24-route/canon.ts`.** All mid-flight under the concurrent H24_FIX1 claim in the same folder — touching them would fight that session's work. See the concurrent-edit note above.
+
+### Done-test
+- **`deno check supabase/functions/byok-key/index.ts`** — clean, zero errors.
+- **`npx tsc -b`** — zero errors traceable to BYOK code. 3 residual errors (`RoutingLogTable` unused import, `H24DrawerPanel` missing `onOpenLog` prop, `sentDirective` unused) belong to H24_FIX1's in-flight refactor of the same file (confirmed: those symbols/props were introduced by their concurrent edits, not mine).
+- **`npx biome check --write`** on every new/rewritten BYOK file — clean (2 files auto-formatted, no logic change).
+- **Firewall grep** (`buy|sell|purchase|invest|trade|market|price|customer|mint`, case-insensitive, bare word) across every new/changed BYOK file and the touched region of `OraclePage.tsx` — zero user-facing hits (the only matches are the pre-existing `--buy-green` CSS token and a pre-existing "post-purchase return" code comment about the Stripe checkout flow, neither introduced by this pass).
+- **"Plant a key, grep the logs, show it absent" — static proof (no live deploy to test against yet, see Could-not-verify).** Every `console.*` call in `byok-key/index.ts` was grepped and each one's logged object contains only `provider` / `status` / `reason` / `error.message` — never `apiKey`. The one place the SQL RPC's raw-key parameter appears near a `raise exception` is a **fixed literal string** (`'p_raw_key required'`), not string interpolation of the value. `byok.ts` has no `console.*` call at all. Commands + output recorded in this pass's session; reproducible via:
+  ```
+  grep -n "console\." -A3 supabase/functions/byok-key/index.ts | grep -iE "apikey|rawkey|p_raw_key"   # → no output
+  grep -n "p_raw_key" db/proposals/0004_byok_keys.sql   # → only param decl / null-check / trim() calls
+  ```
+
+### Could not verify
+- **Live provider validation actually works** (Anthropic/OpenAI/xAI/Mistral/DeepSeek `/v1/models` with a real key) — no synthetic credentials were created or pasted to test an auth-gated live call (standing practice: defer the live round-trip to a real-browser front pass with a real key), and the function is not deployed. The base URLs are reused from `h24-route`'s already-verified-working registry, but the sibling `/v1/models` path itself is unverified against a live key this pass.
+- **The schema actually applies** — propose-first forbids running it; not executed against any DB. Reviewed by hand against the `bee_relations`/`tip_donation_levels` RLS+grant idiom already in `db/proposals/`.
+- **The two-doors banner in a real browser** — `npm run dev` was not started this pass (headless verify only, per the concurrent-edit risk of also running a dev server against a tree another session is actively saving to). Logic was traced by hand: `atFreeQuota` requires `freeDirectiveCount !== null && >= 20`, gated additionally on `noTokens`; before that, `bee && noTokens && atFreeQuota` is false so the banner block renders nothing.
+
+### Manifest (scoped commit — NOT pushed)
+```
+NEW   db/proposals/0004_byok_keys.sql              (gitignored by db/ — needs `git add -f`, like 0001-0003)
+NEW   db/proposals/0004_byok_keys_rollback.sql      (gitignored by db/ — needs `git add -f`)
+MOD   db/proposals/README.md
+NEW   supabase/functions/byok-key/index.ts
+MOD   src/lib/atlasoracle/byok.ts                   (full rewrite)
+NEW   src/lib/atlasoracle/byokQuota.ts
+NEW   src/lib/atlasoracle/byokFee.ts
+MOD   src/pages/oracle/OraclePage.tsx                (BYOK-scoped edits only — see concurrent-edit note; file also carries H24_FIX1's own in-flight, uncommitted changes)
+MOD   REPORT.md
+```
+No production schema applied, no Edge Function deployed, no money charged. `.claude-pass` never committed. **Not committing `src/pages/oracle/OraclePage.tsx` this pass is worth the lead's attention** — it currently mixes my BYOK edits with H24_FIX1's unfinished, non-compiling refactor of the same file; committing now would either commit their unfinished work under my pass id or require me to split a shared file's diff by hand. Recommend the lead sequences the commit after H24_FIX1 closes (or dispatches a merge pass) rather than have either session commit a file the other is mid-editing.
+
+[DONE] H24_BYOK1 | real BYOK shipped as code (client + Edge Function + propose-first schema) — live validation, Vault storage, self-serve revoke, two-doors quota banner, fee calculator; schema/function await Butch's apply+deploy approval; commit deferred pending H24_FIX1's OraclePage.tsx conflict (see manifest note)
+
+---
+
 ## PROFILE4 — Profile data layer (patchboard nodes, galleries, tip levels, social graph) — PROPOSE-FIRST (2026-08-22)
 
 **Pass:** PROFILE4 | lane `platform` | workdir TheMANUAL.tech | session `2e3d9c47` (fallback id) | claimed via AUTO-POOL fallthrough. after_pass PROFILE3 (done).
