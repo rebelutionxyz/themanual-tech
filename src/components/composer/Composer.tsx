@@ -28,7 +28,7 @@
  */
 
 import { cn } from '@/lib/utils';
-import { ArrowUp, Mic, Plus, X } from 'lucide-react';
+import { ArrowUp, ChevronDown, Mic, Plus, X } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 /**
@@ -65,6 +65,14 @@ export interface ComposerBand {
 export interface ComposerOption {
   id: string;
   label: string;
+  /**
+   * H24_BYOK2 — optional rich content rendered at the row's trailing edge in
+   * the dropdown (NOT the native-select era; see the options block below).
+   * The generic Composer knows nothing about what this renders — h24 uses it
+   * for per-provider Add/Edit/Delete so a Bee can manage a BYOK key without
+   * leaving the composer. Omit for a plain label row.
+   */
+  adornment?: ReactNode;
 }
 
 export interface ComposerProps {
@@ -168,6 +176,24 @@ export function Composer({
   const [listening, setListening] = useState(false);
   const [focused, setFocused] = useState(false);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
+
+  // H24_BYOK2 — the options (Model) menu, popover instead of a native
+  // <select>: an <option> element cannot host the Add/Edit/Delete adornment
+  // BYOK2 needs per row. Click-outside close mirrors UniversalShell's
+  // AstraPicker (document mousedown listener — a click handler, not the
+  // mousemove HEADLESS LAW forbids).
+  const [optionMenuOpen, setOptionMenuOpen] = useState(false);
+  const optionMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!optionMenuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (optionMenuRef.current && !optionMenuRef.current.contains(e.target as Node)) {
+        setOptionMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [optionMenuOpen]);
 
   // The mic mounts only where speech is actually available. A dead mic never
   // renders — the same real-data-only rule the sidebar sections follow.
@@ -313,23 +339,54 @@ export function Composer({
         )}
 
         {options.length > 0 && (
-          <div className="flex items-center gap-1.5">
-            <select
-              value={optionId}
-              onChange={(e) => onOptionChange?.(e.target.value)}
+          <div className="relative flex items-center gap-1.5" ref={optionMenuRef}>
+            <button
+              type="button"
+              onClick={() => setOptionMenuOpen((o) => !o)}
               disabled={disabled}
+              aria-haspopup="true"
+              aria-expanded={optionMenuOpen}
               aria-label={optionLabel}
               title={optionLabel}
-              className="max-w-[130px] rounded-md border border-border-bright bg-panel-2 px-2 py-1 text-text-silver transition-colors hover:text-text disabled:opacity-40"
+              className="flex max-w-[150px] items-center gap-1 rounded-md border border-border-bright bg-panel-2 px-2 py-1 text-text-silver transition-colors hover:text-text disabled:opacity-40"
               style={{ fontSize: '12px' }}
             >
-              {options.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              <span className="truncate">
+                {options.find((o) => o.id === optionId)?.label ?? optionLabel}
+              </span>
+              <ChevronDown size={12} className="flex-shrink-0" />
+            </button>
             {optionBadge}
+            {optionMenuOpen && (
+              <div
+                className="absolute bottom-full left-0 z-50 mb-1 w-56 rounded-lg p-1 shadow-xl"
+                style={{ background: 'var(--panel-2, #171b23)', border: '1px solid var(--border-bright, rgba(248,249,250,0.22))' }}
+              >
+                {options.map((o) => (
+                  <div
+                    key={o.id}
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5"
+                    style={{
+                      background:
+                        o.id === optionId ? 'color-mix(in srgb, var(--accent, #ef6c2a) 14%, transparent)' : undefined,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onOptionChange?.(o.id);
+                        setOptionMenuOpen(false);
+                      }}
+                      className="flex-1 truncate text-left text-text-silver transition-colors hover:text-text"
+                      style={{ fontSize: '12.5px' }}
+                    >
+                      {o.label}
+                    </button>
+                    {o.adornment}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

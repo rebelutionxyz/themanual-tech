@@ -21,7 +21,7 @@ import {
 import { createElement } from 'react';
 
 /** Which h24 surface is currently mounted — drives the sidebar's `active` dot. */
-export type H24ActiveSurface = 'console' | 'log' | 'vault';
+export type H24ActiveSurface = 'console' | 'log' | 'vault' | 'customize';
 
 function icon(Icon: LucideIcon) {
   return createElement(Icon, { size: 17 });
@@ -52,11 +52,16 @@ export function buildH24Nav(opts: {
         },
         { id: 'scheduled', label: 'Scheduled', icon: icon(CalendarClock), hint: 'soon' },
         { id: 'dispatch', label: 'Dispatch', icon: icon(Radio), onClick: () => navigate('/mc') },
+        // H24_BYOK2 — Customize is now h24's real BYOK-key management home
+        // (was a placeholder pointing at the generic /account hub, which has
+        // nothing BYOK-specific on it; /account stays reachable via the
+        // avatar and the handle drawer, so nothing is lost).
         {
           id: 'customize',
           label: 'Customize',
           icon: icon(SlidersHorizontal),
-          onClick: () => navigate('/account'),
+          onClick: () => navigate('/h24/customize'),
+          active: active === 'customize',
         },
       ],
     },

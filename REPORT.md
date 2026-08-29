@@ -12442,3 +12442,97 @@ COMMIT: scoped slice, message H24_FIX3, NO PUSH. GATED: push, schema apply,
 Edge Function deploy, money — none of those crossed.
 
 [DONE] H24_FIX3 | model selection now genuinely reaches the router for 5/6 companies (Llama visibly blocked, not silently substituted); billing investigation found the meter works correctly (a unit/scale misreading, not a debit bug) — proposed a USD-equivalent display fix, not implemented (out of scope, read-only ask); canon.ts identity wording fixed to state the provider plainly (source only, not deployed); tsc+deno check+lint clean; dev server run and booted clean, interactive click-through unverified (no browser extension this session)
+
+================================================================================
+H24_BYOK2 — Customize page + inline switcher Add/Edit/Delete (2026-08-29)
+================================================================================
+
+WORKDIR: TheMANUAL.tech. Built entirely on H24_BYOK1's store (byok.ts's
+listByokStates/submitByokKey/revokeByokKey, the byok-key Edge Function,
+db/proposals/0004_byok_keys.sql) — none of it rebuilt, all of it reused as-is.
+
+=== TWO SURFACES, ONE STORE ===
+
+(a) CUSTOMIZE PAGE — new /h24/customize (H24CustomizePage.tsx), the canonical
+    management home: all 6 providers listed, each showing "Key set — ••••1234"
+    or "No key set" with Add / Edit / Delete inline. Wired into the h24 nav's
+    existing "Customize" item, which used to point at the generic /account hub
+    (nothing BYOK-specific lives there) — repurposed rather than adding a new
+    nav slot, since nothing else had claimed that one for h24 yet. /account
+    stays reachable via the avatar and the handle drawer, so nothing is lost.
+
+(b) INLINE MODEL SWITCHER — the composer's Model menu was a native <select>,
+    which cannot host a button inside an <option> (a real HTML constraint, not
+    a choice). Replaced it with a custom popover (Composer.tsx) so each
+    provider row can carry a real trailing action: "Add" when no key is set,
+    "Edit  Delete" when one is. Composer stays h24-agnostic (per its own
+    header comment) — the new `ComposerOption.adornment?: ReactNode` field is
+    generic; OraclePage supplies the BYOK-specific buttons via
+    `modelOptionsWithByok`. Clicking Add/Edit selects that company AND opens
+    the SAME entry panel the composer already showed below itself (H24_BYOK1's
+    UI, unchanged) — "add in the moment" without leaving the composer, per the
+    dispatch. Clicking Delete revokes immediately (no confirm dialog — matches
+    the existing composer "remove" link's own precedent, already un-confirmed).
+
+BOTH surfaces write through the identical store: `ByokKeyEntry` (the masked,
+live-validated entry form) was extracted out of OraclePage into
+`src/components/h24/ByokKeyEntry.tsx` so the composer's inline panel, the
+Model-menu's Add/Edit, and the Customize page all render the exact same
+component — one place to get the entry UX right, not three.
+
+=== HONEST LIMITATIONS CARRIED FORWARD ===
+- Deleting a key never silently reroutes to a paid lane — revoke only touches
+  the key store; band/tier selection is untouched by it. If the currently
+  selected provider loses its key, the existing "Use your own X key" prompt
+  simply reappears next render (byokState.present flips false) — no crash, no
+  silent substitution, no dedicated new copy needed since the existing
+  present/absent branching already covers it correctly.
+- Meta/Llama: `ByokKeyEntry` now shows an explicit gold note — "{Meta} has no
+  verified direct API in h24 yet — this only checks the key LOOKS right
+  (format), not that it actually works" — wherever the entry form renders for
+  meta (composer panel, Model-menu Add/Edit, Customize page). Previously this
+  limitation lived only in the Edge Function's behavior and BYOK1's own report
+  text; now it's visible to the Bee at the point of entry, on both surfaces.
+
+=== NO-LOG PROOF (static — no live plant, see Could-not-verify) ===
+`grep -n "console\." ` across every new/changed BYOK2 file
+(ByokKeyEntry.tsx, H24CustomizePage.tsx, Composer.tsx, and the BYOK2 region of
+OraclePage.tsx) returns ZERO matches — there is no logging statement in any
+of these files, on any code path, so a raw key cannot reach a log through code
+this pass touched. The raw key's only journeys are: composer input `val` state
+→ `onSubmit(raw)` → `submitByokKey`/`byok-key` Edge Function (BYOK1's already-
+audited path, unchanged this pass).
+
+=== VERIFY ===
+- `npx tsc -b --noEmit` — clean.
+- `npm run build` — succeeds.
+- `npm run lint` (biome) — introduced 4 a11y errors on first pass
+  (`role="listbox"`/`role="option"` on non-focusable divs — an ARIA pattern
+  that doesn't actually fit what was built, since there's no keyboard
+  interaction implemented for it); FIXED by dropping those roles (the pattern
+  now matches UniversalShell's own AstraPicker — a plain popover of buttons,
+  no listbox semantics claimed). Re-ran clean: zero errors in any file this
+  pass touched.
+- Static no-log proof above.
+
+=== COULD NOT VERIFY ===
+- Interactive click-through of either surface (Add a key via the dropdown,
+  Edit via the Customize page, Delete from either) — no browser-automation
+  extension connected this session (same limitation H24_FIX3 hit and recorded
+  honestly rather than working around with synthetic credentials).
+- Live provider key validation (a real Anthropic/OpenAI/xAI/Mistral/DeepSeek
+  key against `/v1/models`) — the byok-key Edge Function is still NOT
+  deployed (H24_BYOK1's own status, unchanged: Edge Function deploys are
+  gated). Nothing this pass could exercise that live path.
+- The actual "plant a key, grep logs, show absent" proof BYOK1's dispatch
+  originally asked for requires a LIVE plant (a real submitted key hitting a
+  real log pipeline) — not reproducible without a deployed function and a
+  live browser session. The static proof above (zero console.* calls in the
+  touched code) is the honest substitute, same posture as BYOK1's own
+  "Could not verify" section for the identical ask.
+
+COMMIT: scoped slice, message H24_BYOK2, NO PUSH. GATED: push, schema apply
+(none touched — 0004_byok_keys.sql was BYOK1's, not re-touched here), Edge
+Function deploy (not deployed), money (none touched).
+
+[DONE] H24_BYOK2 | two BYOK entry surfaces built on H24_BYOK1's store — Customize page (canonical management home) + inline Model-menu Add/Edit/Delete (required replacing a native <select> with a custom popover, since an <option> can't host a button); ByokKeyEntry extracted so all three entry points share one component; Meta's format-check-only limitation now surfaced in the UI itself; tsc+build+lint clean; static no-log proof clean; interactive click-through and live provider validation unverified (no browser extension, function not deployed)

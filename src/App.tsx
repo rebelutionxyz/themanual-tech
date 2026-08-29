@@ -99,6 +99,10 @@ const H24VaultPage = lazy(() =>
 const H24RoutingLogPage = lazy(() =>
   import('@/pages/oracle/H24RoutingLogPage').then((m) => ({ default: m.H24RoutingLogPage })),
 );
+// H24_BYOK2 — the canonical BYOK-key management page ("Customize" in the h24 nav).
+const H24CustomizePage = lazy(() =>
+  import('@/pages/oracle/H24CustomizePage').then((m) => ({ default: m.H24CustomizePage })),
+);
 // /mc — build-progress board (OPS34). Admin-only and READ-ONLY: spawning stays
 // in local mission control. Lazy so the rail types never reach a patron bundle.
 const MissionControlPage = lazy(() => import('@/pages/MissionControlPage'));
@@ -172,6 +176,7 @@ const CHROME_FREE_PATHS = new Set([
   '/h24',
   '/h24/vault',
   '/h24/log',
+  '/h24/customize',
   '/mc',
 ]);
 
@@ -281,6 +286,7 @@ function AppContent() {
           {/* h24 sub-surfaces (H24_FIX1) — same chrome-free posture as /h24. */}
           <Route path="/h24/vault" element={<H24VaultPage />} />
           <Route path="/h24/log" element={<H24RoutingLogPage />} />
+          <Route path="/h24/customize" element={<H24CustomizePage />} />
 
           {/* Mission Control board — chrome-free, owns its own board chrome
             (FRONTHDR2, owner ruling 2026-08-19). Moved OUT of PlatformLayout so no

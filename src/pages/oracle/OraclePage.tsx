@@ -1,4 +1,5 @@
 import { COMPOSER_MEASURE, Composer, type ComposerBand } from '@/components/composer/Composer';
+import { ByokKeyEntry } from '@/components/h24/ByokKeyEntry';
 import { H24CostPanel } from '@/components/h24/H24CostPanel';
 import { H24DrawerPanel } from '@/components/h24/H24DrawerPanel';
 import { HomeActivityPanel } from '@/components/h24/HomeActivityPanel';
@@ -388,7 +389,7 @@ export function OraclePage() {
   // BYOK save/revoke (H24_BYOK1) — submitByokKey validates live + vaults the
   // key server-side; the raw value passes through this call only and is never
   // written to any local state here. onSaveByok resolves the validation
-  // outcome back to ByokEntry so it can show a validation error inline rather
+  // outcome back to ByokKeyEntry so it can show a validation error inline rather
   // than closing on a rejected key.
   function onSaveByok(raw: string): Promise<ByokSubmitResult> {
     if (!provider) return Promise.resolve({ valid: false, error: 'Pick a model first.' });
@@ -398,11 +399,72 @@ export function OraclePage() {
     setByokOpen(false);
     void loadByok();
   }
-  async function removeByok() {
-    if (!provider) return;
-    await revokeByokKey(provider);
+  // H24_BYOK2 — revoke a NAMED provider, not necessarily the one currently
+  // picked. The Model menu's per-row Delete acts on whatever row it's on;
+  // `removeByok` (the existing composer-panel "remove" link) is just this
+  // applied to the current selection.
+  async function removeByokFor(p: ByokProvider) {
+    await revokeByokKey(p);
     void loadByok();
   }
+  async function removeByok() {
+    if (!provider) return;
+    await removeByokFor(provider);
+  }
+  // H24_BYOK2 — "add in the moment": selects the row's company (so `provider`
+  // resolves to it on the next render) and opens the SAME entry panel the
+  // composer already shows below itself. Used by both the dropdown's Add and
+  // Edit actions — Edit just finds byokState.present already true.
+  function openByokEditor(companyName: string) {
+    setModel(companyName);
+    setByokOpen(true);
+  }
+
+  // H24_BYOK2 — the Model menu, with a real per-row Add/Edit/Delete action
+  // instead of a plain label list. `Auto` has no provider and stays a plain
+  // row. This is what makes "the switcher shows ADD/EDIT/DELETE" true instead
+  // of decorative — the SAME real actions the composer's own BYOK panel uses.
+  const modelOptionsWithByok = useMemo(
+    () =>
+      MODEL_OPTIONS.map((o) => {
+        const p = MODEL_PROVIDER[o.id];
+        if (!p) return o;
+        const st = byokStates[p];
+        return {
+          ...o,
+          adornment: st.present ? (
+            <span className="flex flex-shrink-0 items-center gap-1.5" style={{ fontSize: 10.5 }}>
+              <button
+                type="button"
+                onClick={() => openByokEditor(o.id)}
+                className="underline-offset-2 hover:underline"
+                style={{ color: 'var(--body)' }}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => void removeByokFor(p)}
+                className="underline-offset-2 hover:underline"
+                style={{ color: 'var(--error)' }}
+              >
+                Delete
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => openByokEditor(o.id)}
+              className="flex-shrink-0 underline-offset-2 hover:underline"
+              style={{ fontSize: 10.5, color: 'var(--accent, #ef6c2a)' }}
+            >
+              Add
+            </button>
+          ),
+        };
+      }),
+    [byokStates],
+  );
 
   // "your key" marker on the model chip — only when a specific model is picked
   // and a key for its provider is present.
@@ -484,8 +546,10 @@ export function OraclePage() {
         onBandChange={(id) => setBand(id as Band)}
         // MODEL menu shows only in the Auto (paid) band. H24_FIX3 — picking a
         // company name now genuinely re-routes there (catalogModel, sent as
-        // request `model`); this was display-only before this pass.
-        options={showModel ? MODEL_OPTIONS : []}
+        // request `model`); this was display-only before this pass. H24_BYOK2 —
+        // each row also carries a real Add/Edit/Delete action for that
+        // provider's key (modelOptionsWithByok).
+        options={showModel ? modelOptionsWithByok : []}
         optionId={model}
         onOptionChange={setModel}
         optionLabel="Model"
@@ -542,7 +606,7 @@ export function OraclePage() {
             </button>
           )}
           {byokOpen && (
-            <ByokEntry
+            <ByokKeyEntry
               provider={provider}
               onSubmit={onSaveByok}
               onSaved={onByokSaved}
@@ -979,104 +1043,10 @@ export function OraclePage() {
 }
 
 /**
- * BYOK entry panel (H24_BYOK1 — real validation). Captures a provider key and
- * hands the raw string UP via onSubmit exactly once, on submit; the value
- * lives only in this component's local state until then (masked,
- * type="password", never logged). onSubmit validates the key LIVE against the
- * provider and vaults it server-side — a rejected key surfaces its reason
- * inline and the panel stays open; onSaved fires only on a real success.
- */
-function ByokEntry({
-  provider,
-  onSubmit,
-  onSaved,
-  onCancel,
-}: {
-  provider: ByokProvider;
-  onSubmit: (raw: string) => Promise<ByokSubmitResult>;
-  onSaved: () => void;
-  onCancel: () => void;
-}) {
-  const [val, setVal] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSave() {
-    setBusy(true);
-    setError(null);
-    const result = await onSubmit(val);
-    setBusy(false);
-    if (result.valid) {
-      setVal('');
-      onSaved();
-    } else {
-      setError(result.error ?? 'Key validation failed.');
-    }
-  }
-
-  return (
-    <div
-      className="mt-2 rounded-md p-3"
-      style={{
-        border: '1px solid var(--hairline, rgba(248,249,250,0.14))',
-        background: 'var(--input, #10141b)',
-      }}
-    >
-      <label
-        htmlFor="byok-key"
-        className="mb-1 block"
-        style={{ color: 'var(--body)', fontSize: 12 }}
-      >
-        Your {PROVIDER_LABEL[provider]} API key
-      </label>
-      <input
-        id="byok-key"
-        type="password"
-        autoComplete="off"
-        value={val}
-        onChange={(e) => setVal(e.target.value)}
-        placeholder="Paste your key — validated live, used by the router only, never shown or logged"
-        className="w-full rounded-md border border-border-bright bg-panel-2 px-2 py-1.5 text-text focus:outline-none"
-        style={{ fontSize: 12.5 }}
-      />
-      <div className="mt-2 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={busy || val.trim().length === 0}
-          className="rounded-md px-3 py-1 font-semibold transition-colors disabled:opacity-40"
-          style={{ background: 'var(--accent, #ef6c2a)', color: '#000', fontSize: 12 }}
-        >
-          {busy ? 'Validating…' : 'Save key'}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-          className="rounded-md px-3 py-1 transition-colors disabled:opacity-40"
-          style={{ border: '1px solid var(--line, rgba(248,249,250,0.2))', fontSize: 12 }}
-        >
-          Cancel
-        </button>
-      </div>
-      {error && (
-        <p className="mt-2" style={{ color: 'var(--error)', fontSize: 11.5 }} role="alert">
-          {error}
-        </p>
-      )}
-      <p className="mt-2" style={{ color: 'var(--mute)', fontSize: 10.5, lineHeight: 1.5 }}>
-        Your key is validated live against the provider, then goes to the routing process only —
-        never into the model, never logged. Routing through it lands with AUTOTIER1.
-      </p>
-    </div>
-  );
-}
-
-/**
  * BYOK "door 2" of the COMPOSER v1.2 free-quota two-doors mechanic. Shown
  * before a model is picked (the Bee is on the free band, out of tokens, and
  * at quota), so this owns its own provider choice rather than reusing the
- * model-scoped ByokEntry above.
+ * model-scoped ByokKeyEntry above.
  */
 function ByokDoor({ onSaved }: { onSaved: () => void }) {
   const providers = Object.keys(PROVIDER_LABEL) as ByokProvider[];
