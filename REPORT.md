@@ -23,6 +23,43 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## SHELL_MOBILE1 — mobile header: drop back/forward, tighten gaps, accent-colored switcher chevron (2026-08-29)
+
+**Pass:** SHELL_MOBILE1 | lane `h24` | workdir TheMANUAL.tech | session `a2c7713b` | claimed via folder-matched self-claim (workdir TheMANUAL.tech).
+
+**Governing canon:** SHELL v1.6 (per-astra header icon manifest — new this pass's ruling), CURRENCY_LAW v1.6 (BLiNG/h24 account separation). Dispatch scope: three concrete mobile-header fixes (owner design notes 2026-08-29) — hide back/forward on mobile, tighten header icon gaps without shrinking tap targets, color the astra-switcher chevron with the astra's own accent. The header-icon-MANIFEST mechanism and h24's BLiNG-exclusion are explicitly conditional ("implement... if the manifest mechanism lands in this pass; if not, flag it") — not built this pass, flagged below.
+
+### What shipped — all in `src/components/shell/UniversalShell.tsx`
+- **Back/forward dropped on mobile.** Owner ruling: mobile has OS-level back, so the in-shell arrows just waste header width and duplicate a gesture the device already owns. Both `StripButton`s now carry `className="hidden md:flex"` (desktop, `md:` = 768px, unchanged) — `StripButton` gained a `className` prop merged via `cn()` (was previously un-mergeable; a caller's `className` in `...rest` would have clobbered the base sizing classes rather than extend them) so this composes instead of forking the component.
+- **Header gaps tighten below `md`.** `header`'s own `gap-1 px-2` → `gap-0.5 px-1.5 md:gap-1 md:px-2`; the left-strip wrapper's `gap-1` → `gap-0.5 md:gap-1`. Responsive Tailwind classes, not a shell fork (SHELL v1.6 s2: "mobile differences are responsive rules in the one shell"). **Tap targets untouched** — every `StripButton` stays `h-8 w-8` (32px) at every breakpoint; only the space BETWEEN controls shrinks, per the dispatch's explicit instruction ("reduce GAPS, not touch area"). Combined with dropping two 32px buttons + their gaps, this is the real fix for "crowding the astra name or the balance" on narrow viewports.
+- **Switcher chevron takes the astra's own accent.** `StripButton` gained an `iconColor` prop (default `var(--icon)`, unchanged for every other control — Back/Forward/Search/collapser stay grey per SHELL v1.5's original rule); the astra-picker chevron passes `iconColor="var(--accent)"`. Wired to the **CSS custom property**, not a hardcoded hex — when ASTRA_COLORS v1 mints real per-astra values and updates `--accent` per astra (via `astraCssVars`), this chevron re-colors automatically with no further edit here. Hover still lifts to `var(--ink)` (unchanged affordance), then rests back at the custom color rather than hardcoded grey.
+
+### Deviations / judgement calls (with reasons)
+1. **Did not build the HEADER ICON MANIFEST mechanism.** The dispatch made this explicitly conditional ("if the manifest mechanism lands in this pass; if not, flag it") and SHELL v1.6 itself lists the minimum-manifest ruling and per-astra manifests beyond h24 as **OPEN** (owner ruling needed, to be done "alongside ASTRA_COLORS v1 so each astra gets swatch + tagline + manifest in one sitting"). A per-astra config abstraction affecting every astra's header is a materially larger, cross-cutting change than an `EFFORT: S` mobile-CSS pass — building a one-off version now to satisfy h24 alone would likely be redone (or fought) once the real manifest lands, and SHELL v1.6 s2 explicitly warns against special-casing shell internals ("if you find yourself special-casing shell internals, stop and file a -Q"). **Flagged, not built**, exactly as the dispatch permits.
+2. **Did NOT touch the "BLiNG" wording still hardcoded in this file.** Read CURRENCY_LAW v1.6 §2 closely: the toolbar's bling-slot button still carries `title="BLiNG! balance"` / `aria-label="BLiNG balance"`, and `IconDrawer`'s `DRAWER_TITLE` map hardcodes `bling: 'BLiNG!'` — on the h24 page, that slot actually renders the **h24 token** balance (H24_FIX1 already fixed the *number's* format/label via `blingDisplay`/`blingUnit`), so the surrounding chrome copy still says "BLiNG!" over an h24 figure. This is a real instance of exactly the adjacency problem CURRENCY_LAW v1.6 §2 describes, but fixing just the copy (without the manifest mechanism to let it vary per astra) would be a one-off string edit to shared shell chrome for one astra's sake — the same "special-casing shell internals" SHELL v1.6 warns against. **Flagged as an open item**, not patched around.
+3. **`h-8 w-8` (32px) kept as the tap-target floor**, not raised to a stricter 44px accessible minimum, because the dispatch's instruction was explicitly "do not shrink... below accessible minimums" (a floor, preserving the existing size), not "raise to a new minimum" — that would be a bigger, unrequested redesign of every strip control.
+
+### Done-test
+- **`npx tsc -b`** — 0 errors, whole project.
+- **`npx biome check src/components/shell/UniversalShell.tsx`** — clean (one pre-existing formatting nit unrelated to this pass's edits was auto-fixed by `--write`; verified by diff that the fix touched only the pre-existing `blingUnit` JSX, not any SHELL_MOBILE1 line).
+- **Firewall grep** — n/a (no new user-facing copy strings added; only `className`/`style` changes and one new prop).
+- **Dev server boots clean**: `npm run dev` → Vite ready in ~400ms, no console errors, confirming the responsive-class changes don't break the build at runtime.
+
+### Could not verify
+- **"Real browser at mobile widths"** (the dispatch's explicit verify instruction) — attempted via the Chrome extension; **the extension was not connected in this environment** (`tabs_context_mcp` returned "Browser extension is not connected"). Could not click through /h24 at mobile viewport widths to confirm: back/forward actually disappear below 768px, the gap tightening reads as "not crowded," or the chevron renders in the accent color against real astra tokens. This is a real gap against the dispatch's own verify bar, not a formality — flagging plainly rather than claiming a browser check that did not happen. The dev server itself was confirmed to start and serve without error (see Done-test), which is evidence short of the requested browser click-through.
+- **Whether `--accent` genuinely differs from `--icon` visually** on every current `AstraTokens` entry (i.e., whether the chevron color change is perceptible at all on every astra today) — not cross-checked against `src/lib/shell/astraTokens.ts`'s actual color values this pass.
+
+### Manifest (scoped commit — NOT pushed)
+```
+MOD  src/components/shell/UniversalShell.tsx
+MOD  REPORT.md
+```
+No schema, no Edge Function, no money, no push.
+
+[DONE] SHELL_MOBILE1 | back/forward hidden on mobile, header gaps tightened responsively (tap targets unchanged), switcher chevron wired to --accent; tsc/biome clean; HEADER ICON MANIFEST + BLiNG-chrome-copy both explicitly flagged as open (not built, per the dispatch's own conditional); no live-browser click-through — extension not connected this session
+
+---
+
 ## H24_FIX2 — routing log's 3rd surface (home activity panel) + date filter; Vault own-page confirmed (2026-08-29)
 
 **Pass:** H24_FIX2 | lane `h24` | workdir TheMANUAL.tech | session `a2c7713b` | claimed via `go h24` after H24_FIX1 closed. Follows H24_FIX1 (done).

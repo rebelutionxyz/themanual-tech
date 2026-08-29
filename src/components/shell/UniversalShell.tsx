@@ -23,6 +23,12 @@
  *    — no page load. Tinted color-mix(accent 10%, near-black).
  *  - ONE AUTH BOUNDARY: this frame carries session identity but never gates it;
  *    jumping astras keeps the same login/bee/balance (DOMAINS_MAP v2.2).
+ *
+ * SHELL_MOBILE1 (2026-08-29, responsive rules — NOT a fork, per SHELL v1.6 s2):
+ *  - Back/forward drop below `md` (owner ruling — mobile has OS-level back).
+ *  - Header/left-strip gaps tighten below `md`; tap targets never shrink.
+ *  - The switcher chevron takes `--accent` (was grey) — a live astra cue,
+ *    ready for ASTRA_COLORS v1 without touching this file again.
  */
 
 import { AstraMark } from '@/components/shell/marks/AstraMark';
@@ -161,15 +167,19 @@ export function UniversalShell({
     <div className="astra-shell flex h-full min-h-0 flex-col overflow-hidden" style={rootStyle}>
       {/* ── FULL-WIDTH HEADER (44px) ─────────────────────────────────────── */}
       <header
-        className="flex flex-shrink-0 items-center gap-1 px-2"
+        className="flex flex-shrink-0 items-center gap-0.5 px-1.5 md:gap-1 md:px-2"
         style={{
           height: 44,
           borderBottom: '1px solid var(--hairline)',
           background: 'var(--raised)',
         }}
       >
-        {/* LEFT STRIP — never moves. [logo][TLD][picker][back][fwd][search][collapser] */}
-        <div className="flex items-center gap-1">
+        {/* LEFT STRIP — never moves. [logo][TLD][picker][back][fwd][search][collapser].
+            SHELL_MOBILE1: back/forward are OS-level gestures on mobile (owner
+            ruling) — hidden below md, desktop unchanged. Gaps tighten below md
+            so the row fits without crowding the astra name/balance; tap targets
+            (h-8 w-8, already above the StripButton floor) are never shrunk. */}
+        <div className="flex items-center gap-0.5 md:gap-1">
           <span className="flex items-center pl-1" style={{ color: 'var(--accent)' }}>
             <AstraMark logo={tokens.logo} size={20} title={tokens.tld} />
           </span>
@@ -180,12 +190,15 @@ export function UniversalShell({
             {tokens.tld}
           </span>
 
-          {/* astra picker */}
+          {/* astra picker — chevron takes the astra's own --accent (SHELL v1.6):
+              a live cue to which astra you're in, wired to the token so
+              ASTRA_COLORS v1 resolves it later without touching this file. */}
           <div className="relative">
             <StripButton
               label="Switch astra"
               onClick={() => setPickerOpen((v) => !v)}
               aria-expanded={pickerOpen}
+              iconColor="var(--accent)"
             >
               <ChevronDown size={16} />
             </StripButton>
@@ -201,10 +214,10 @@ export function UniversalShell({
             )}
           </div>
 
-          <StripButton label="Back" onClick={onBack}>
+          <StripButton label="Back" onClick={onBack} className="hidden md:flex">
             <ArrowLeft size={16} />
           </StripButton>
-          <StripButton label="Forward" onClick={onForward}>
+          <StripButton label="Forward" onClick={onForward} className="hidden md:flex">
             <ArrowRight size={16} />
           </StripButton>
           <StripButton label="Search" onClick={onSearch}>
@@ -258,9 +271,7 @@ export function UniversalShell({
             <span className="font-mono font-semibold tabular-nums">
               {blingDisplay ?? (bling === null ? '—' : bling.toLocaleString())}
             </span>
-            {blingUnit && (
-              <span style={{ fontSize: 10, color: 'var(--mute)' }}>{blingUnit}</span>
-            )}
+            {blingUnit && <span style={{ fontSize: 10, color: 'var(--mute)' }}>{blingUnit}</span>}
             <Droplet size={14} fill="var(--bling-gold)" stroke="var(--bling-gold)" />
           </button>
 
@@ -335,16 +346,25 @@ export function UniversalShell({
   );
 }
 
-/* ── left-strip control button — grey (--icon), no accent ───────────────────*/
+/* ── left-strip control button — grey (--icon) by default, no accent ────────
+   SHELL_MOBILE1: `iconColor` lets ONE control override the rest-state color
+   (the switcher chevron takes the astra's own --accent, a live cue to which
+   astra you're in — SHELL v1.6 keeps every OTHER strip control grey). `className`
+   merges via cn() so a caller can add responsive visibility (`hidden md:flex`)
+   without losing the base sizing/shape classes. */
 function StripButton({
   label,
   onClick,
   children,
+  className,
+  iconColor = 'var(--icon)',
   ...rest
 }: {
   label: string;
   onClick?: () => void;
   children: ReactNode;
+  className?: string;
+  iconColor?: string;
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
@@ -352,13 +372,16 @@ function StripButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="flex h-8 w-8 items-center justify-center rounded-md transition-colors"
-      style={{ color: 'var(--icon)' }}
+      className={cn(
+        'flex h-8 w-8 items-center justify-center rounded-md transition-colors',
+        className,
+      )}
+      style={{ color: iconColor }}
       onMouseEnter={(e) => {
         e.currentTarget.style.color = 'var(--ink)';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.color = 'var(--icon)';
+        e.currentTarget.style.color = iconColor;
       }}
       {...rest}
     >
