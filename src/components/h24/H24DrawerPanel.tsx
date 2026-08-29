@@ -51,11 +51,14 @@ export function H24DrawerPanel({
   entries,
   signedIn,
   onOpenBoard,
+  onOpenLog,
 }: {
   entries: RoutingLogEntry[];
   signedIn: boolean;
   /** Navigate to the /mc board — the Rail tab's full-page exit. */
   onOpenBoard: () => void;
+  /** Navigate to /h24/log — the Routing tab's full-page exit (H24_FIX1). */
+  onOpenLog: () => void;
 }) {
   const [tab, setTab] = useState<Tab>('routing');
 
@@ -87,7 +90,9 @@ export function H24DrawerPanel({
         })}
       </div>
 
-      {tab === 'routing' && <RoutingTab entries={entries} signedIn={signedIn} />}
+      {tab === 'routing' && (
+        <RoutingTab entries={entries} signedIn={signedIn} onOpenLog={onOpenLog} />
+      )}
       {tab === 'rail' && <RailTab onOpenBoard={onOpenBoard} />}
       {tab === 'billing' && <BillingTab entries={entries} signedIn={signedIn} />}
     </div>
@@ -95,7 +100,15 @@ export function H24DrawerPanel({
 }
 
 /* ── Routing: last directives — when / provider / cost ──────────────────────*/
-function RoutingTab({ entries, signedIn }: { entries: RoutingLogEntry[]; signedIn: boolean }) {
+function RoutingTab({
+  entries,
+  signedIn,
+  onOpenLog,
+}: {
+  entries: RoutingLogEntry[];
+  signedIn: boolean;
+  onOpenLog: () => void;
+}) {
   const now = Date.now();
   const recent = entries.slice(0, 6);
 
@@ -133,9 +146,14 @@ function RoutingTab({ entries, signedIn }: { entries: RoutingLogEntry[]; signedI
           </div>
         </div>
       ))}
-      <p className="mt-1" style={{ color: 'var(--mute)', fontSize: 10.5 }}>
-        Full routing log on the console below.
-      </p>
+      <button
+        type="button"
+        onClick={onOpenLog}
+        className="mt-1 self-start underline-offset-2 hover:underline"
+        style={{ color: 'var(--body)', fontSize: 10.5 }}
+      >
+        Open the full routing log →
+      </button>
     </div>
   );
 }

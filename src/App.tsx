@@ -91,6 +91,14 @@ const ThreadPage = lazy(() => import('@/pages/intel/ThreadPage').then((m) => ({ 
 // AtlasOracle console (the AI Astra). Distinct from AtlasOraclePage above,
 // which is the DingleBERRY security-copilot demo screen at /dingleberry/oracle.
 const OraclePage = lazy(() => import('@/pages/oracle/OraclePage').then((m) => ({ default: m.OraclePage })));
+// H24_FIX1 defects 8 + 9 — h24's own Vault surface + the promoted routing-log
+// page. Chrome-free like /h24 itself (own UniversalShell, see CHROME_FREE_PATHS).
+const H24VaultPage = lazy(() =>
+  import('@/pages/oracle/H24VaultPage').then((m) => ({ default: m.H24VaultPage })),
+);
+const H24RoutingLogPage = lazy(() =>
+  import('@/pages/oracle/H24RoutingLogPage').then((m) => ({ default: m.H24RoutingLogPage })),
+);
 // /mc — build-progress board (OPS34). Admin-only and READ-ONLY: spawning stays
 // in local mission control. Lazy so the rail types never reach a patron bundle.
 const MissionControlPage = lazy(() => import('@/pages/MissionControlPage'));
@@ -157,7 +165,15 @@ const COMMUNITY_PREFIXES = [
 // FRONTHDR2 (owner ruling 2026-08-19): the shared SiteHeader was rendering on the
 // /mc mission-control board too; /mc now shows only its own board chrome (the
 // "Mission Control — build progress" header + the dispatch-queue board).
-const CHROME_FREE_PATHS = new Set(['/', '/waves', '/miniwaves', '/h24', '/mc']);
+const CHROME_FREE_PATHS = new Set([
+  '/',
+  '/waves',
+  '/miniwaves',
+  '/h24',
+  '/h24/vault',
+  '/h24/log',
+  '/mc',
+]);
 
 // Management allowlist — OG HUMAN only, until the role registries (Lock 8 /
 // 9.6) deploy and real tier checks replace this. Landing gate 2026-07-10.
@@ -262,6 +278,9 @@ function AppContent() {
             rail renders over it; OraclePage carries the h24 toolbar + sidebar +
             console. /oracle and /here24 still redirect here (below). */}
           <Route path="/h24" element={<OraclePage />} />
+          {/* h24 sub-surfaces (H24_FIX1) — same chrome-free posture as /h24. */}
+          <Route path="/h24/vault" element={<H24VaultPage />} />
+          <Route path="/h24/log" element={<H24RoutingLogPage />} />
 
           {/* Mission Control board — chrome-free, owns its own board chrome
             (FRONTHDR2, owner ruling 2026-08-19). Moved OUT of PlatformLayout so no

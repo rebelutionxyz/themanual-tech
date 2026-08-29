@@ -83,6 +83,18 @@ export interface UniversalShellProps {
   nav: ShellNavGroup[];
   /** Live BLiNG! total; null renders an em-dash. Number shows FIRST, gold drop after. */
   bling?: number | null;
+  /**
+   * H24_FIX1 — the CANONICAL rendering of `bling`, pre-formatted by the caller
+   * (e.g. `formatTokens`). When provided, this is what the header total and the
+   * drawer title show INSTEAD OF `bling.toLocaleString()` — the astra that reads
+   * a fractional balance (h24 tokens) must not show two different-looking
+   * numbers for the same balance depending on which corner of the shell reads
+   * it. Omit to keep the plain `toLocaleString()` behavior (whole-number BLiNG!).
+   */
+  blingDisplay?: string;
+  /** Small unit label after the number (e.g. "h24") — the "label the unit" half
+   *  of the same fix, since this balance is not always BLiNG!. */
+  blingUnit?: string;
   /** The signed-in bee's handle WITHOUT @ (own name has no @). null = signed out. */
   handle?: string | null;
   avatarUrl?: string | null;
@@ -107,6 +119,8 @@ export function UniversalShell({
   breadcrumb,
   nav,
   bling = null,
+  blingDisplay,
+  blingUnit,
   handle = null,
   avatarUrl = null,
   onBack,
@@ -242,8 +256,11 @@ export function UniversalShell({
             style={{ color: 'var(--bling-gold)', fontSize: 12.5 }}
           >
             <span className="font-mono font-semibold tabular-nums">
-              {bling === null ? '—' : bling.toLocaleString()}
+              {blingDisplay ?? (bling === null ? '—' : bling.toLocaleString())}
             </span>
+            {blingUnit && (
+              <span style={{ fontSize: 10, color: 'var(--mute)' }}>{blingUnit}</span>
+            )}
             <Droplet size={14} fill="var(--bling-gold)" stroke="var(--bling-gold)" />
           </button>
 
@@ -309,6 +326,8 @@ export function UniversalShell({
             onClose={() => setDrawer(null)}
             render={renderPanel}
             bling={bling}
+            blingDisplay={blingDisplay}
+            blingUnit={blingUnit}
           />
         )}
       </div>
@@ -611,11 +630,15 @@ function IconDrawer({
   onClose,
   render,
   bling,
+  blingDisplay,
+  blingUnit,
 }: {
   slot: ToolbarSlot | 'bling' | 'handle';
   onClose: () => void;
   render?: (slot: ToolbarSlot | 'bling' | 'handle') => ReactNode;
   bling: number | null;
+  blingDisplay?: string;
+  blingUnit?: string;
 }) {
   const panel = render?.(slot);
   // SHELL v1.5.1: any CHROME overlay closes on an outside click (the CONTENT
@@ -646,9 +669,14 @@ function IconDrawer({
       >
         <h2 className="font-mono" style={{ color: 'var(--ink)', fontSize: 13 }}>
           {DRAWER_TITLE[slot]}
-          {slot === 'bling' && bling !== null && (
+          {slot === 'bling' && (blingDisplay !== undefined || bling !== null) && (
             <span className="ml-2" style={{ color: 'var(--bling-gold)' }}>
-              {bling.toLocaleString()}
+              {blingDisplay ?? bling?.toLocaleString()}
+              {blingUnit && (
+                <span className="ml-1" style={{ fontSize: 10, color: 'var(--mute)' }}>
+                  {blingUnit}
+                </span>
+              )}
             </span>
           )}
         </h2>

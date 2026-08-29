@@ -12027,3 +12027,177 @@ here). REPORT.md is now ~726 KB, over the 512 KB threshold: the next SWEEP must
 rotate it (docs/reports/REPORT-archive-NNN.md) BEFORE committing, per R6.
 
 [DONE] H24_DRAWER1 | Routing/Rail/Billing wired to real data, hover-open + outside-click ported, scoped commit 9f5df9c (not pushed), build+biome green
+
+================================================================================
+H24_FIX1 — h24 console + nav fixes (2026-08-29)
+================================================================================
+
+WORKDIR: TheMANUAL.tech (separate repo from honeycomb-workspace, per the dispatch).
+
+=== CONCURRENT-EDIT COLLISION (read this first) ===
+H24_BYOK1 (session a2c7713b) was claimed and actively heartbeating on the SAME
+file (src/pages/oracle/OraclePage.tsx) for the entire duration of this pass,
+building real BYOK (server-validated key submit/revoke, quota tracking,
+"two doors" free-quota banner). Its writes and mine interleaved on the live
+file multiple times — at one point its write reintroduced a dead inline
+`RoutingLog` function using an unimported `Download` icon, a real compile
+error, from a stale snapshot of the file it had read before my extraction
+landed. This was not a hypothetical race: `git status` at claim time already
+showed byok.ts / byokQuota.ts / byokFee.ts / supabase/functions/byok-key/
+uncommitted from that other pass.
+
+Handled by: never using a full-file rewrite once the collision was detected:
+every remaining edit to OraclePage.tsx used small, exact-match string
+replacements so BYOK1's additions (byokStates, quota, ByokDoor, ByokEntry
+validation) were never touched or reverted. Re-verified with `tsc -b --noEmit`
+and `npm run build` AFTER each round of interleaving; both are green as of the
+last write. If BYOK1 writes again after this report is filed, its changes are
+still intact in the file as read — re-check before assuming this report's
+diff is exactly what ships.
+
+An earlier attempt to trim OraclePage.tsx via PowerShell `Get-Content`/
+`Set-Content` corrupted every multi-byte character (·, —, →) into mojibake
+(Â-prefixed garbage) — PowerShell's default encoding round-trip mismatch on a
+BOM-less UTF-8 file. Caught immediately via `grep -c "Â"`, fixed by
+`git checkout --` on that one file and redoing the edits through the Edit tool
+(which preserves UTF-8 correctly) and, once cleanly isolated, POSIX `head`
+(byte-safe) for the one large deletion. No corruption shipped.
+
+=== DEFECTS ADDRESSED ===
+
+1. ROUTING HONESTY (chip vs log mismatch). The composer band sublabel used to
+   read the model name off the legacy `h24_model_rates` row (tokens.ts →
+   fetchTierRates) — a NOMINAL model that the free tier's Groq-then-Haiku
+   fallback ladder does not guarantee. Fixed in OraclePage.tsx: the sublabel
+   now reads this Bee's own routing log for the last actual provider used on
+   that band (`lastProviderForTier`), falling back to honest non-committal
+   wording ("fastest available model" / "h24 picks the best model") only
+   before any directive has run on that band. The chip can no longer name a
+   provider the log disagrees with, because it IS the log.
+
+2. IDENTITY LEAK. supabase/functions/h24-route/canon.ts assembled the system
+   prompt straight from platform_thesis.md / language_firewall.md /
+   categorization.md with no instruction telling the model not to recite them
+   — so "how do you work?" could answer with the retired "AtlasOracle" name,
+   the provider roster, and the master_plan/ canon path. Added
+   IDENTITY_AND_DISCLOSURE, a preamble now prepended (assembleCrossAstraCanon)
+   ahead of the canon sections: names the surface "h24" only, permits stating
+   that it routes and naming the actual provider used for THIS directive, and
+   explicitly forbids reciting the canon, provider list, tier/pricing, or
+   canon paths even under direct or adversarial instruction.
+   NOT DEPLOYED — Edge Function deploys are DEPLOY-AMENDMENT gated (named
+   dispatch required); this dispatch names a fix, not a deploy. The source
+   change is committed to source; deploying supabase/functions/h24-route needs
+   its own ask-gated dispatch before it takes effect live.
+
+3. INPUT DOES NOT CLEAR. `submitDirective` never cleared the composer text.
+   Fixed: the existing response-ready effect now also clears `directive`, so
+   it fires ONLY on a successful send — a failure leaves `state: 'idle'` with
+   `failure` set, which this effect never touches, so a rejected directive is
+   never eaten.
+
+4. DIRECTIVE NOT ECHOED. Added `sentDirective` (captured at send time, since
+   the input clears immediately per #3) and render it as a right-aligned
+   bubble above the answer.
+
+5. BLING RENDERED TWO WAYS. UniversalShell's header total used
+   `bling.toLocaleString()` (JS default, up to 3 fraction digits — a
+   fractional h24-token balance like 10961.848 renders "10,961.848", easy to
+   misread as "10,961,848" at a glance) while the sidebar Wallet hint and the
+   drawer panel used `formatTokens()` (rounds to "10,962" above 1000). Added
+   `blingDisplay` (pre-formatted string) + `blingUnit` (label) props to
+   UniversalShell; OraclePage / the new Vault / routing-log pages all pass
+   `formatTokens(tokens.balance)` + unit "h24", so header, drawer title, and
+   sidebar now render the identical figure.
+
+6. "New directive" / composer-state agreement. Both the sidebar "New" and the
+   inline post-response "new directive" button now go through one
+   `startNewDirective(goHome)` helper (reset + clear directive + clear
+   sentDirective + clear hasSent), instead of two slightly different
+   hand-rolled resets.
+
+7. "NEW" DEAD. Root cause: `docked` stayed permanently true once the routing
+   log had ANY history (`log.entries.length > 0`), so "New" reset internal
+   state but the screen looked identical — no visible effect. Added
+   `forceHome`, set by the sidebar "New" only (not the inline one, which
+   should stay docked), which `docked` now also checks. "New" now visibly
+   returns to the centered-greeting home screen even with history.
+
+8. VAULT NAME COLLISION. Confirmed the collision as described: the h24
+   sidebar's "Vault" pointed at /studio (Creator Studio's content vault —
+   BRANDoSOPHIC/CONCEPTS v3.6, media_assets-backed) and its badge count was
+   literally the ROUTING LOG's entry count, not any real vault data. h24 has
+   NO backing table for "saved directive outputs" — platform_thesis.md is
+   explicit that h24 holds directive content only for the routing duration,
+   and h24_directives carries metadata only (no directive/response text
+   columns — see routingLog.ts). Built /h24/vault (H24VaultPage.tsx) as h24's
+   own honest surface: says plainly that nothing lives there yet and why
+   (no schema for it), links to Creator Studio's actual vault by name so the
+   two are never confused again, and does NOT fabricate content or reuse the
+   routing-log count as a fake badge. A real Vault (a saved-artifacts table +
+   a "save to Vault" action on a response) is db-lane schema work, out of
+   scope here — flagged, not built.
+
+9. ROUTING LOG PROMOTED TO ITS OWN PAGE. Extracted the log table into
+   src/components/h24/RoutingLogTable.tsx (used by both the console's compact
+   inline view, unfiltered, and the new full page). Built /h24/log
+   (H24RoutingLogPage.tsx): same data (fetchRoutingLog), higher limit (200 vs
+   the console's 25), filterable by Band/Kind/Provider/Status, same cost-panel
+   drill-down (H24CostPanel) as the console. Console's Activity sidebar item
+   and the alerts drawer's "Routing" tab now both link through to /h24/log;
+   the console keeps a compact inline log + a "View the full routing log →"
+   link.
+
+=== SHARED PLUMBING ADDED ===
+- src/lib/atlasoracle/h24Nav.ts — buildH24Nav(), the ONE nav-array builder now
+  shared by OraclePage, H24VaultPage, H24RoutingLogPage. This is the direct fix
+  for how Vault drifted in the first place (a per-page hand-typed nav array);
+  a future h24 sub-page wires the same items by construction now.
+- App.tsx — /h24/vault, /h24/log routes added (chrome-free, same posture as
+  /h24 — added to CHROME_FREE_PATHS).
+
+=== VERIFY ===
+- `npx tsc -b --noEmit` — clean (0 errors) after the final interleaving round.
+- `npm run build` — succeeds (dist emitted, only pre-existing >500kB chunk-size
+  warnings, unrelated to this pass).
+- `npm run lint` (biome) — 23 pre-existing errors / 1 warning, ALL in files
+  untouched by this pass (SecurityPage.tsx etc. — verified by grepping the
+  lint output against this pass's file list, zero matches). Zero new lint
+  errors introduced.
+- HEADLESS LAW — no mousemove listeners added; UniversalShell's rail-peek
+  behavior (unchanged) already uses onMouseEnter/onMouseLeave, not mousemove.
+
+=== COULD NOT VERIFY ===
+- No live browser smoke this pass (no dev server run — build + type-check +
+  biome are the gates, per the same posture H24_DRAWER1 recorded). Not
+  clicked in a running app: the band-sublabel honesty fix across an actual
+  free→Groq→Haiku fallback, the directive-echo bubble, the "New" home-return,
+  the Vault page, or the new routing-log page's filters.
+- Whether the identity/disclosure preamble actually changes model behavior in
+  production — it is NOT DEPLOYED (see #2); the source change is unexercised
+  against a live Anthropic/Groq call.
+- H24_BYOK1's own surface (composer BYOK UI, quota banner) — untouched by
+  design, not independently re-tested here since it belongs to that pass.
+
+=== SCOPE NOTE ===
+Dispatch title read "EFFORT: L" (Light — "one object, one file, minutes" per
+the rail's own convention). The body's nine numbered defects span an Edge
+Function system prompt, a shared shell component, two new pages, a new shared
+nav module, and a genuine concurrent-edit collision to navigate — this was a
+STANDARD-or-DEEP pass in the rail's own vocabulary, not Light. Recorded per
+R6 ("every deviation and judgement call with its reason"), not as an excuse —
+all nine numbered defects were addressed or explicitly flagged as out of
+scope (schema work for a real Vault; the edge function deploy).
+
+COMMIT: scoped slice, message H24_FIX1, NO PUSH (per dispatch — GATED: push,
+schema, money). Left uncommitted pending the SWEEP gate, alongside H24_BYOK1's
+own in-flight uncommitted files (byok.ts, byokQuota.ts, byokFee.ts,
+supabase/functions/byok-key/) — NOT staged or touched by this pass's commit.
+
+=== SWEEP NOTE ===
+REPORT.md is now well over the 512 KB rotation threshold (already flagged by
+H24_DRAWER1's own note above, still unresolved) — the next SWEEP must rotate
+to docs/reports/REPORT-archive-NNN.md BEFORE committing, per R6. Not rotated
+here: rotation is a sweep-time action, this is not a SWEEP dispatch.
+
+[DONE] H24_FIX1 | 9 defects addressed (identity fix source-only, not deployed), build+tsc+biome green, scoped commit pending SWEEP, NO PUSH, concurrent H24_BYOK1 edits on the same file navigated without loss

@@ -1,16 +1,21 @@
 import { COMPOSER_MEASURE, Composer, type ComposerBand } from '@/components/composer/Composer';
 import { H24CostPanel } from '@/components/h24/H24CostPanel';
 import { H24DrawerPanel } from '@/components/h24/H24DrawerPanel';
-import { type ShellNavGroup, UniversalShell } from '@/components/shell/UniversalShell';
+import { RoutingLogTable } from '@/components/h24/RoutingLogTable';
+import { UniversalShell } from '@/components/shell/UniversalShell';
 import {
   type ByokProvider,
+  type ByokState,
+  type ByokSubmitResult,
   MODEL_PROVIDER,
   PROVIDER_LABEL,
-  clearByokKey,
-  getByokState,
-  setByokKey,
+  listByokStates,
+  revokeByokKey,
+  submitByokKey,
 } from '@/lib/atlasoracle/byok';
+import { FREE_DIRECTIVE_QUOTA, countFreeDirectives } from '@/lib/atlasoracle/byokQuota';
 import { type DirectiveCategory, type Tier, isMocked } from '@/lib/atlasoracle/client';
+import { buildH24Nav } from '@/lib/atlasoracle/h24Nav';
 import { formatTokensExact } from '@/lib/atlasoracle/reconcile';
 import type { ModelRateRow } from '@/lib/atlasoracle/reconcile';
 import { type RoutingLogEntry, fetchRoutingLog } from '@/lib/atlasoracle/routingLog';
@@ -22,19 +27,7 @@ import { uploadToLibrary } from '@/lib/media';
 import { H24_TOKENS } from '@/lib/shell/astraTokens';
 import { cn } from '@/lib/utils';
 import { useH24Storefront } from '@/stores/useH24Storefront';
-import {
-  Activity,
-  CalendarClock,
-  Download,
-  FolderKanban,
-  Image as ImageIcon,
-  Images,
-  Radio,
-  SlidersHorizontal,
-  SquarePen,
-  Wallet,
-  X,
-} from 'lucide-react';
+import { X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -128,11 +121,40 @@ export function OraclePage() {
   // EFFORT (COMPOSER v1.1) — captured only when a specific model is picked;
   // default high (thorough). Not yet a routed parameter (see the header note).
   const [effort, setEffort] = useState<Effort>('high');
-  // BYOK — `byokTick` forces a re-read of the masked key state after a save or
-  // clear (sessionStorage does not notify React); `byokOpen` toggles the entry
-  // panel. No raw key ever lives in React state.
-  const [byokTick, setByokTick] = useState(0);
+  // BYOK (H24_BYOK1) — real server round trip now, see byok.ts. `byokStates`
+  // holds every provider's MASKED state (never a raw key); `byokOpen` toggles
+  // the model-scoped entry panel; `byokDoorOpen` toggles the quota "door 2"
+  // entry panel (no model picked yet at that point in the flow).
+  const [byokStates, setByokStates] = useState<Record<ByokProvider, ByokState>>(
+    () =>
+      Object.fromEntries(
+        (['anthropic', 'openai', 'xai', 'meta', 'mistral', 'deepseek'] as ByokProvider[]).map(
+          (p) => [p, { present: false, last4: null, status: null }],
+        ),
+      ) as Record<ByokProvider, ByokState>,
+  );
   const [byokOpen, setByokOpen] = useState(false);
+  const [byokDoorOpen, setByokDoorOpen] = useState(false);
+  // COMPOSER v1.2 free-band quota — how many free directives this Bee has
+  // already sent, all-time (see byokQuota.ts for why "all-time"). null = not
+  // loaded yet, not zero.
+  const [freeDirectiveCount, setFreeDirectiveCount] = useState<number | null>(null);
+
+  const loadByok = useCallback(async () => {
+    setByokStates(await listByokStates());
+  }, []);
+
+  useEffect(() => {
+    if (bee) void loadByok();
+  }, [bee, loadByok]);
+
+  useEffect(() => {
+    if (!bee) {
+      setFreeDirectiveCount(null);
+      return;
+    }
+    void countFreeDirectives().then(setFreeDirectiveCount);
+  }, [bee]);
   // KIND (category) is a real router param but is NOT on the ruled composer row
   // (SHELL v1.5: [+][add-to-vault][Band][Model][mic][send]). It stays at its
   // default and is still sent to the router; surfacing it returns in a later
@@ -140,6 +162,12 @@ export function OraclePage() {
   const [category] = useState<DirectiveCategory>('suggest');
   const [attachStatus, setAttachStatus] = useState<string | null>(null);
   const [hasSent, setHasSent] = useState(false);
+  // H24_FIX1 defect 4 — what the Bee actually asked, captured at send time so it
+  // can be echoed above the answer even after the composer input clears.
+  const [sentDirective, setSentDirective] = useState<string | null>(null);
+  // H24_FIX1 defect 7 — "New" needs a visible effect even when the routing log
+  // already has history (which otherwise keeps `docked` permanently true).
+  const [forceHome, setForceHome] = useState(false);
   const attachInputRef = useRef<HTMLInputElement>(null);
 
   const { state, response, preview, failure, send, confirm, cancelConfirm, reset } =
@@ -181,7 +209,14 @@ export function OraclePage() {
     if (state !== 'response-ready') return;
     void loadLog();
     if (response) applyBalanceAfter(response.balanceAfterTokens);
-  }, [state, loadLog, response, applyBalanceAfter]);
+    // COMPOSER v1.2 quota — a free-band send may have just crossed N; re-count
+    // so the two-doors banner appears the moment it should, not on next reload.
+    if (bee) void countFreeDirectives().then(setFreeDirectiveCount);
+    // H24_FIX1 defect 3 — clear the composer only on a SUCCESSFUL send. A
+    // failure leaves `state` at 'idle' with `failure` set, which this effect
+    // never touches, so a directive is never eaten by an error.
+    setDirective('');
+  }, [state, loadLog, response, applyBalanceAfter, bee]);
 
   // OUT OF TOKENS — Auto costs tokens; a Bee at or below zero gets free only.
   // `balance === null` means "not loaded / no ledger read", NOT zero, so it does
@@ -194,18 +229,35 @@ export function OraclePage() {
     if (noTokens) setBand('free');
   }, [noTokens]);
 
-  // BAND picker — Auto | free. The model each band routes to is read from the
-  // live rate card, so the sublabel is honest about what actually runs. When the
-  // Bee is out of tokens, only free is offered.
+  // BAND picker — Auto | free. H24_FIX1 defect 1 (routing honesty): the sublabel
+  // used to name the tier's model from the legacy h24_model_rates row — a
+  // NOMINAL model that free-tier routing does not guarantee, since the free
+  // ladder falls back off Groq to Haiku under load. That produced exactly the
+  // owner's bug report: chip said "free - llama-3.1", the routing log recorded
+  // claude-haiku-4-5 for the same directive. The chip now names whatever this
+  // Bee's OWN routing log last actually recorded for that band — the same
+  // number the log shows, because it IS the log — and falls back to honest,
+  // non-committal wording only before any directive has run.
+  const lastProviderForTier = useCallback(
+    (tier: Tier) => log.entries.find((e) => e.tier === tier && e.provider)?.provider ?? null,
+    [log.entries],
+  );
   const bands: ComposerBand[] = useMemo(() => {
-    const modelFor = (t: Tier) => tierRates.find((r) => r.tier === t)?.model;
-    const free = { id: 'free', label: 'free', sublabel: modelFor('free') ?? 'save your tokens' };
+    const free = {
+      id: 'free',
+      label: 'free',
+      sublabel: lastProviderForTier('free') ?? 'fastest available model',
+    };
     if (noTokens) return [free];
     return [
-      { id: 'auto', label: 'Auto', sublabel: modelFor('frontier') ?? 'h24 picks best' },
+      {
+        id: 'auto',
+        label: 'Auto',
+        sublabel: lastProviderForTier('frontier') ?? 'h24 picks the best model',
+      },
       free,
     ];
-  }, [tierRates, noTokens]);
+  }, [lastProviderForTier, noTokens]);
 
   // SELECTION STATE MACHINE — model menu shows in the Auto (paid) band; a picked
   // company name unlocks the effort chip and the BYOK slot. `provider` is null on
@@ -213,25 +265,36 @@ export function OraclePage() {
   const showModel = band === 'auto';
   const modelPicked = showModel && model !== 'Auto';
   const provider: ByokProvider | null = MODEL_PROVIDER[model] ?? null;
-  // byokTick is the intentional re-read trigger after a save/clear (sessionStorage
-  // does not notify React); it belongs in the deps precisely because it is not
-  // read in the body.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: byokTick forces the re-read
-  const byokState = useMemo(
-    () => (provider ? getByokState(provider) : { present: false, last4: null }),
-    [provider, byokTick],
-  );
+  const byokState: ByokState = provider
+    ? byokStates[provider]
+    : { present: false, last4: null, status: null };
 
   const tier = bandToTier(band);
   const currentRate = tierRates.find((r) => r.tier === tier);
   const selectedEntry = selectedCostId
     ? (log.entries.find((e) => e.id === selectedCostId) ?? null)
     : null;
+  // COMPOSER v1.2 "TWO DOORS" — at quota (and only then), the out-of-tokens
+  // banner offers Get-tokens + Add-your-key instead of staying clean.
+  const atFreeQuota = freeDirectiveCount !== null && freeDirectiveCount >= FREE_DIRECTIVE_QUOTA;
 
   function submitDirective() {
     if (!bee || directive.trim().length === 0 || state === 'working') return;
     setHasSent(true);
+    setForceHome(false);
+    setSentDirective(directive);
     void send(directive, { tier, category, astraSlug: 'themanual' });
+  }
+
+  // H24_FIX1 defects 6 + 7 — one place that resets the directive state, used by
+  // both the sidebar "New" (which also needs to visibly leave the docked view)
+  // and the inline "new directive" button after a response (which stays docked).
+  function startNewDirective(goHome: boolean) {
+    reset();
+    setDirective('');
+    setSentDirective(null);
+    setHasSent(false);
+    if (goHome) setForceHome(true);
   }
 
   async function handleAttach(file: File) {
@@ -282,85 +345,43 @@ export function OraclePage() {
     URL.revokeObjectURL(url);
   }
 
-  // SIDEBAR NAV (SHELL v1.5: pure nav). Top group = Claude-home shape; astra
-  // group = h24's Vault/Activity/Wallet. Items with a live destination navigate;
-  // the backendless top-group items are shown as structure with a "soon" hint
-  // and no action, per the real-data-only discipline (never a fake control).
-  const vaultCount = useMemo(() => log.entries.length, [log.entries.length]);
-  const nav: ShellNavGroup[] = [
-    {
-      id: 'top',
-      items: [
-        {
-          id: 'new',
-          label: 'New',
-          icon: <SquarePen size={17} />,
-          onClick: () => {
-            reset();
-            setDirective('');
-            setHasSent(false);
-          },
-        },
-        { id: 'projects', label: 'Projects', icon: <FolderKanban size={17} />, hint: 'soon' },
-        {
-          id: 'artifacts',
-          label: 'Artifacts',
-          icon: <Images size={17} />,
-          onClick: () => navigate('/studio'),
-        },
-        { id: 'scheduled', label: 'Scheduled', icon: <CalendarClock size={17} />, hint: 'soon' },
-        {
-          id: 'dispatch',
-          label: 'Dispatch',
-          icon: <Radio size={17} />,
-          onClick: () => navigate('/mc'),
-        },
-        {
-          id: 'customize',
-          label: 'Customize',
-          icon: <SlidersHorizontal size={17} />,
-          onClick: () => navigate('/account'),
-        },
-      ],
-    },
-    {
-      id: 'h24',
-      label: 'h24',
-      items: [
-        {
-          id: 'vault',
-          label: 'Vault',
-          icon: <ImageIcon size={17} />,
-          onClick: () => navigate('/studio'),
-          hint: bee ? vaultCount : undefined,
-        },
-        { id: 'activity', label: 'Activity', icon: <Activity size={17} />, active: true },
-        {
-          id: 'wallet',
-          label: 'Wallet',
-          icon: <Wallet size={17} />,
-          onClick: () => bee && openStore(),
-          hint: tokens.balance === null ? undefined : formatTokens(tokens.balance),
-        },
-      ],
-    },
-  ];
+  // SIDEBAR NAV (SHELL v1.5: pure nav) — shared with the /h24/log and /h24/vault
+  // pages via buildH24Nav so all three surfaces wire the same items to the same
+  // destinations (H24_FIX1 defect 8: a per-page nav array is how Vault drifted).
+  const nav = buildH24Nav({
+    navigate,
+    onNew: () => startNewDirective(true),
+    signedIn: Boolean(bee),
+    tokenBalance: tokens.balance,
+    onOpenWallet: openStore,
+    active: 'console',
+  });
 
   // HOME vs DOCKED — home is the centered greeting + composer biased above
   // center; the composer docks to the bottom once the first directive is sent
-  // (or the log already has history).
-  const docked = Boolean(bee) && (hasSent || log.entries.length > 0 || Boolean(response));
+  // (or the log already has history). `forceHome` (H24_FIX1 defect 7) lets
+  // "New" return here even when the log has history, so the primary action of
+  // the console has a visible effect instead of silently no-opping.
+  const docked =
+    Boolean(bee) && !forceHome && (hasSent || log.entries.length > 0 || Boolean(response));
 
-  // BYOK save/clear — the raw value never re-enters React state; setByokKey
-  // writes it to session storage and we bump the re-read trigger.
-  function saveByok(raw: string) {
-    if (provider) setByokKey(provider, raw);
-    setByokTick((n) => n + 1);
-    setByokOpen(false);
+  // BYOK save/revoke (H24_BYOK1) — submitByokKey validates live + vaults the
+  // key server-side; the raw value passes through this call only and is never
+  // written to any local state here. onSaveByok resolves the validation
+  // outcome back to ByokEntry so it can show a validation error inline rather
+  // than closing on a rejected key.
+  function onSaveByok(raw: string): Promise<ByokSubmitResult> {
+    if (!provider) return Promise.resolve({ valid: false, error: 'Pick a model first.' });
+    return submitByokKey(provider, raw);
   }
-  function removeByok() {
-    if (provider) clearByokKey(provider);
-    setByokTick((n) => n + 1);
+  function onByokSaved() {
+    setByokOpen(false);
+    void loadByok();
+  }
+  async function removeByok() {
+    if (!provider) return;
+    await revokeByokKey(provider);
+    void loadByok();
   }
 
   // "your key" marker on the model chip — only when a specific model is picked
@@ -391,18 +412,40 @@ export function OraclePage() {
           e.target.value = '';
         }}
       />
-      {/* OUT OF TOKENS — green Get-tokens link; the band menu is already free-only. */}
-      {bee && noTokens && (
-        <div className="mb-2 flex items-center gap-2" style={{ fontSize: 12 }}>
-          <span style={{ color: 'var(--mute)' }}>Out of h24 tokens — free band only.</span>
-          <button
-            type="button"
-            onClick={openStore}
-            className="font-semibold underline-offset-2 hover:underline"
-            style={{ color: 'var(--buy-green)' }}
-          >
-            Get h24 tokens
-          </button>
+      {/* COMPOSER v1.2 TWO DOORS — before quota, free stays CLEAN (no nag at
+          all); at quota, offer both doors instead of a wall. freeDirectiveCount
+          === null (not loaded yet) never triggers this — see byokQuota.ts. */}
+      {bee && noTokens && atFreeQuota && (
+        <div className="mb-2 flex flex-col gap-1.5" style={{ fontSize: 12 }}>
+          <span style={{ color: 'var(--mute)' }}>
+            You've used your {FREE_DIRECTIVE_QUOTA} free directives — free band only from here.
+          </span>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={openStore}
+              className="font-semibold underline-offset-2 hover:underline"
+              style={{ color: 'var(--buy-green)' }}
+            >
+              Get h24 tokens
+            </button>
+            <button
+              type="button"
+              onClick={() => setByokDoorOpen((o) => !o)}
+              className="font-semibold underline-offset-2 hover:underline"
+              style={{ color: 'var(--accent, #ef6c2a)' }}
+            >
+              Add your provider API key
+            </button>
+          </div>
+          {byokDoorOpen && (
+            <ByokDoor
+              onSaved={() => {
+                setByokDoorOpen(false);
+                void loadByok();
+              }}
+            />
+          )}
         </div>
       )}
       <Composer
@@ -449,7 +492,7 @@ export function OraclePage() {
               </button>
               <button
                 type="button"
-                onClick={removeByok}
+                onClick={() => void removeByok()}
                 className="underline-offset-2 hover:underline"
                 style={{ color: 'var(--body)' }}
               >
@@ -467,7 +510,12 @@ export function OraclePage() {
             </button>
           )}
           {byokOpen && (
-            <ByokEntry provider={provider} onSave={saveByok} onCancel={() => setByokOpen(false)} />
+            <ByokEntry
+              provider={provider}
+              onSubmit={onSaveByok}
+              onSaved={onByokSaved}
+              onCancel={() => setByokOpen(false)}
+            />
           )}
         </div>
       )}
@@ -484,6 +532,8 @@ export function OraclePage() {
       }
       nav={nav}
       bling={tokens.balance}
+      blingDisplay={tokens.balance === null ? undefined : formatTokens(tokens.balance)}
+      blingUnit="h24"
       handle={bee?.handle ?? null}
       onBack={() => navigate(-1)}
       onForward={() => navigate(1)}
@@ -569,6 +619,7 @@ export function OraclePage() {
               entries={log.entries}
               signedIn={Boolean(bee)}
               onOpenBoard={() => navigate('/mc')}
+              onOpenLog={() => navigate('/h24/log')}
             />
           );
         }
@@ -760,6 +811,22 @@ export function OraclePage() {
 
                   {state === 'response-ready' && response && (
                     <div className="flex flex-col gap-2">
+                      {/* H24_FIX1 defect 4 — echo the directive above the
+                          answer so the transcript reads as a conversation. */}
+                      {sentDirective && (
+                        <div
+                          className="self-end rounded-md px-3 py-2"
+                          style={{
+                            background: 'var(--accent-bg)',
+                            color: 'var(--ink)',
+                            fontSize: 13,
+                            maxWidth: '85%',
+                            whiteSpace: 'pre-wrap',
+                          }}
+                        >
+                          {sentDirective}
+                        </div>
+                      )}
                       <div
                         className="rounded-md p-4 font-mono"
                         style={{
@@ -797,10 +864,7 @@ export function OraclePage() {
                         )}
                         <button
                           type="button"
-                          onClick={() => {
-                            reset();
-                            setDirective('');
-                          }}
+                          onClick={() => startNewDirective(false)}
                           className="ml-auto rounded-md px-2 py-0.5 transition-colors"
                           style={{ border: '1px solid var(--line)', color: 'var(--body)' }}
                         >
@@ -810,7 +874,10 @@ export function OraclePage() {
                     </div>
                   )}
 
-                  <RoutingLog
+                  {/* H24_FIX1 defect 9 — compact inline log; the full,
+                      filterable log lives at /h24/log (also reachable from the
+                      Activity sidebar item and the alerts drawer). */}
+                  <RoutingLogTable
                     log={log}
                     signedIn={Boolean(bee)}
                     selectedCostId={selectedCostId}
@@ -818,6 +885,16 @@ export function OraclePage() {
                     onRefresh={() => void loadLog()}
                     onExport={exportCsv}
                   />
+                  {log.entries.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/h24/log')}
+                      className="self-start underline-offset-2 hover:underline"
+                      style={{ color: 'var(--body)', fontSize: 12 }}
+                    >
+                      View the full routing log →
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -859,22 +936,41 @@ export function OraclePage() {
 }
 
 /**
- * BYOK entry panel. Captures a provider key and hands the raw string UP via
- * onSave exactly once, on submit. The value lives only in this component's local
- * state until then; it is masked (type="password"), never logged, and cleared
- * from local state on save/cancel. Persistence + the never-into-the-model
- * discipline live in byok.ts.
+ * BYOK entry panel (H24_BYOK1 — real validation). Captures a provider key and
+ * hands the raw string UP via onSubmit exactly once, on submit; the value
+ * lives only in this component's local state until then (masked,
+ * type="password", never logged). onSubmit validates the key LIVE against the
+ * provider and vaults it server-side — a rejected key surfaces its reason
+ * inline and the panel stays open; onSaved fires only on a real success.
  */
 function ByokEntry({
   provider,
-  onSave,
+  onSubmit,
+  onSaved,
   onCancel,
 }: {
   provider: ByokProvider;
-  onSave: (raw: string) => void;
+  onSubmit: (raw: string) => Promise<ByokSubmitResult>;
+  onSaved: () => void;
   onCancel: () => void;
 }) {
   const [val, setVal] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSave() {
+    setBusy(true);
+    setError(null);
+    const result = await onSubmit(val);
+    setBusy(false);
+    if (result.valid) {
+      setVal('');
+      onSaved();
+    } else {
+      setError(result.error ?? 'Key validation failed.');
+    }
+  }
+
   return (
     <div
       className="mt-2 rounded-md p-3"
@@ -896,32 +992,129 @@ function ByokEntry({
         autoComplete="off"
         value={val}
         onChange={(e) => setVal(e.target.value)}
-        placeholder="Paste your key — used by the router only, never shown or logged"
+        placeholder="Paste your key — validated live, used by the router only, never shown or logged"
         className="w-full rounded-md border border-border-bright bg-panel-2 px-2 py-1.5 text-text focus:outline-none"
         style={{ fontSize: 12.5 }}
       />
       <div className="mt-2 flex items-center gap-2">
         <button
           type="button"
-          onClick={() => onSave(val)}
-          disabled={val.trim().length === 0}
+          onClick={() => void handleSave()}
+          disabled={busy || val.trim().length === 0}
           className="rounded-md px-3 py-1 font-semibold transition-colors disabled:opacity-40"
           style={{ background: 'var(--accent, #ef6c2a)', color: '#000', fontSize: 12 }}
         >
-          Save key
+          {busy ? 'Validating…' : 'Save key'}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md px-3 py-1 transition-colors"
+          disabled={busy}
+          className="rounded-md px-3 py-1 transition-colors disabled:opacity-40"
           style={{ border: '1px solid var(--line, rgba(248,249,250,0.2))', fontSize: 12 }}
         >
           Cancel
         </button>
       </div>
+      {error && (
+        <p className="mt-2" style={{ color: 'var(--error)', fontSize: 11.5 }} role="alert">
+          {error}
+        </p>
+      )}
       <p className="mt-2" style={{ color: 'var(--mute)', fontSize: 10.5, lineHeight: 1.5 }}>
-        Your key goes to the routing process only — never into the model, never logged, masked here.
-        Kept for this browser session. Routing through your key lands with AUTOTIER1.
+        Your key is validated live against the provider, then goes to the routing process only —
+        never into the model, never logged. Routing through it lands with AUTOTIER1.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * BYOK "door 2" of the COMPOSER v1.2 free-quota two-doors mechanic. Shown
+ * before a model is picked (the Bee is on the free band, out of tokens, and
+ * at quota), so this owns its own provider choice rather than reusing the
+ * model-scoped ByokEntry above.
+ */
+function ByokDoor({ onSaved }: { onSaved: () => void }) {
+  const providers = Object.keys(PROVIDER_LABEL) as ByokProvider[];
+  const [provider, setProvider] = useState<ByokProvider>(providers[0]);
+  const [val, setVal] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedFor, setSavedFor] = useState<ByokProvider | null>(null);
+
+  async function handleSave() {
+    setBusy(true);
+    setError(null);
+    const result = await submitByokKey(provider, val);
+    setBusy(false);
+    if (result.valid) {
+      setVal('');
+      setSavedFor(provider);
+      onSaved();
+    } else {
+      setError(result.error ?? 'Key validation failed.');
+    }
+  }
+
+  if (savedFor) {
+    return (
+      <p style={{ color: 'var(--buy-green)', fontSize: 11.5 }}>
+        {PROVIDER_LABEL[savedFor]} key saved — pick {PROVIDER_LABEL[savedFor]} under Model to use
+        it.
+      </p>
+    );
+  }
+
+  return (
+    <div
+      className="flex flex-col gap-1.5 rounded-md p-3"
+      style={{
+        border: '1px solid var(--hairline, rgba(248,249,250,0.14))',
+        background: 'var(--input, #10141b)',
+      }}
+    >
+      <select
+        value={provider}
+        onChange={(e) => setProvider(e.target.value as ByokProvider)}
+        disabled={busy}
+        className="rounded-md border border-border-bright bg-panel-2 px-2 py-1 text-text"
+        style={{ fontSize: 12 }}
+      >
+        {providers.map((p) => (
+          <option key={p} value={p}>
+            {PROVIDER_LABEL[p]}
+          </option>
+        ))}
+      </select>
+      <input
+        type="password"
+        autoComplete="off"
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        placeholder={`Your ${PROVIDER_LABEL[provider]} API key — validated live, never logged`}
+        className="w-full rounded-md border border-border-bright bg-panel-2 px-2 py-1.5 text-text focus:outline-none"
+        style={{ fontSize: 12.5 }}
+      />
+      <div>
+        <button
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={busy || val.trim().length === 0}
+          className="rounded-md px-3 py-1 font-semibold transition-colors disabled:opacity-40"
+          style={{ background: 'var(--accent, #ef6c2a)', color: '#000', fontSize: 12 }}
+        >
+          {busy ? 'Validating…' : 'Save key'}
+        </button>
+      </div>
+      {error && (
+        <p style={{ color: 'var(--error)', fontSize: 11.5 }} role="alert">
+          {error}
+        </p>
+      )}
+      <p style={{ color: 'var(--mute)', fontSize: 10.5, lineHeight: 1.5 }}>
+        Your key is validated live against the provider, then goes to the routing process only —
+        never into the model, never logged.
       </p>
     </div>
   );
@@ -977,196 +1170,5 @@ function FailureNote({
         </span>
       )}
     </div>
-  );
-}
-
-function RoutingLog({
-  log,
-  signedIn,
-  selectedCostId,
-  onSelectCost,
-  onRefresh,
-  onExport,
-}: {
-  log: {
-    loaded: boolean;
-    error: string | null;
-    entries: RoutingLogEntry[];
-    rates: ModelRateRow[];
-  };
-  signedIn: boolean;
-  selectedCostId: string | null;
-  onSelectCost: (id: string | null) => void;
-  onRefresh: () => void;
-  onExport: () => void;
-}) {
-  return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-center gap-3">
-        <h2 className="astra-display font-semibold" style={{ color: 'var(--ink)', fontSize: 14 }}>
-          Your routing log
-        </h2>
-        <button
-          type="button"
-          onClick={onRefresh}
-          className="rounded-md px-2 py-0.5 transition-colors"
-          style={{ border: '1px solid var(--line)', color: 'var(--body)', fontSize: 11.5 }}
-        >
-          refresh
-        </button>
-        <button
-          type="button"
-          onClick={onExport}
-          disabled={log.entries.length === 0}
-          className="ml-auto flex items-center gap-1 rounded-md px-2 py-0.5 transition-colors disabled:opacity-30"
-          style={{ border: '1px solid var(--line)', color: 'var(--body)', fontSize: 11.5 }}
-          title="Export routing log (CSV)"
-        >
-          <Download size={13} /> export
-        </button>
-      </div>
-
-      {!log.loaded && <p style={{ color: 'var(--body)', fontSize: 12.5 }}>Loading…</p>}
-
-      {log.loaded && log.error && (
-        <p
-          className="rounded-md p-3"
-          style={{
-            border: '1px solid color-mix(in srgb, var(--error) 60%, transparent)',
-            background: 'color-mix(in srgb, var(--error) 10%, transparent)',
-            color: 'var(--ink)',
-            fontSize: 12.5,
-          }}
-          role="alert"
-        >
-          Could not load the routing log: {log.error}
-        </p>
-      )}
-
-      {log.loaded && !log.error && log.entries.length === 0 && (
-        <p
-          className="rounded-md p-3"
-          style={{
-            border: '1px solid var(--line)',
-            background: 'var(--raised)',
-            color: 'var(--body)',
-            fontSize: 12.5,
-          }}
-        >
-          {signedIn ? 'No directives routed yet.' : 'Sign in to see your routing log.'}
-        </p>
-      )}
-
-      {log.loaded && !log.error && log.entries.length > 0 && (
-        <div className="overflow-x-auto rounded-lg" style={{ border: '1px solid var(--line)' }}>
-          <table className="w-full" style={{ fontSize: 12 }}>
-            <thead style={{ background: 'var(--raised)', color: 'var(--body)' }}>
-              <tr>
-                <th className="px-3 py-2 text-left font-medium">When</th>
-                {/* SHELL v1.5: the "Tier" column is renamed to Band. */}
-                <th className="px-3 py-2 text-left font-medium">Band</th>
-                <th className="px-3 py-2 text-left font-medium">Kind</th>
-                <th className="px-3 py-2 text-left font-medium">Provider</th>
-                <th className="px-3 py-2 text-left font-medium">Status</th>
-                <th className="px-3 py-2 text-left font-medium">
-                  Tokens
-                  <span className="ml-1 font-normal opacity-70">in / out / cached</span>
-                </th>
-                <th className="px-3 py-2 text-left font-medium">Cost</th>
-                <th className="px-3 py-2 text-left font-medium">Latency</th>
-              </tr>
-            </thead>
-            <tbody style={{ color: 'var(--ink)' }}>
-              {log.entries.map((e) => (
-                <tr
-                  key={e.id}
-                  style={{
-                    borderTop: '1px solid var(--hairline)',
-                    background:
-                      selectedCostId === e.id
-                        ? 'color-mix(in srgb, var(--accent) 6%, transparent)'
-                        : undefined,
-                    verticalAlign: 'top',
-                  }}
-                >
-                  <td className="whitespace-nowrap px-3 py-2" style={{ color: 'var(--body)' }}>
-                    {new Date(e.createdAt).toLocaleString()}
-                  </td>
-                  {/* Band vocabulary: free stays free; everything else is Auto. */}
-                  <td className="px-3 py-2 font-mono">{e.tier === 'free' ? 'free' : 'Auto'}</td>
-                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--body)' }}>
-                    {e.category}
-                  </td>
-                  <td className="px-3 py-2 font-mono" style={{ color: 'var(--body)' }}>
-                    {e.provider ?? '—'}
-                  </td>
-                  <td className="px-3 py-2">
-                    <span
-                      className="font-mono"
-                      style={{
-                        color:
-                          e.success === true
-                            ? 'var(--buy-green)'
-                            : e.success === false
-                              ? 'var(--error)'
-                              : undefined,
-                      }}
-                      title={e.errorMessage ?? undefined}
-                    >
-                      {e.status}
-                    </span>
-                  </td>
-                  <td
-                    className="whitespace-nowrap px-3 py-2 font-mono"
-                    style={{ color: 'var(--body)' }}
-                  >
-                    {e.inputTokens === null && e.outputTokens === null && e.cachedTokens === null
-                      ? '—'
-                      : `${(e.inputTokens ?? 0).toLocaleString()} / ${(e.outputTokens ?? 0).toLocaleString()} / ${(e.cachedTokens ?? 0).toLocaleString()}`}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 font-mono">
-                    {e.costTokens === null ? (
-                      <span
-                        style={{ color: 'var(--body)' }}
-                        title={
-                          e.tier === 'free'
-                            ? 'The free tier never debits.'
-                            : 'No debit was written for this directive.'
-                        }
-                      >
-                        {e.tier === 'free' ? 'FREE' : '—'}
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => onSelectCost(selectedCostId === e.id ? null : e.id)}
-                        aria-expanded={selectedCostId === e.id}
-                        className="underline decoration-dotted underline-offset-2 transition-colors"
-                        style={{ color: 'var(--bling-gold)' }}
-                        title="Open the cost breakdown in the side panel"
-                      >
-                        {formatTokensExact(e.costTokens)}
-                      </button>
-                    )}
-                  </td>
-                  <td
-                    className="whitespace-nowrap px-3 py-2 font-mono"
-                    style={{ color: 'var(--body)' }}
-                  >
-                    {e.latencyMs === null ? '—' : `${e.latencyMs}ms`}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <p style={{ color: 'var(--mute)', fontSize: 11 }}>
-        Metadata only. Directive text and routed responses are never stored — the columns do not
-        exist. Click a cost to open its breakdown: each leg, its rate, and the subtotals adding up
-        to the amount debited.
-      </p>
-    </section>
   );
 }
