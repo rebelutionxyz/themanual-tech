@@ -1279,8 +1279,11 @@ Deno.serve(async (req) => {
   const maxTokens = internalMaxTokens ?? TIER_MAX_TOKENS[tier];
   const thinkingCfg = TIER_THINKING[tier];
   // The system prompt: the caller's for an internal call, platform canon for a
-  // user directive.
-  const canonText = internalSystem ?? assembleCrossAstraCanon();
+  // user directive. H24_FIX3 section 3 — computed PER RUNG (below, in the
+  // ladder loop) rather than once here, because which model is actually about
+  // to answer isn't known until a rung is picked, and that model_string is
+  // exactly what the identity preamble needs to name plainly.
+  const canonTextFor = (model: string): string => internalSystem ?? assembleCrossAstraCanon(model);
   const forceFallback = directive.startsWith('[OPS21-FORCE-FALLBACK]');
 
   const ladder: ProviderSpec[] = [];
@@ -1384,7 +1387,7 @@ Deno.serve(async (req) => {
   for (let i = 0; i < ladder.length; i++) {
     const spec = ladder[i];
     const result = await callProvider(
-      spec, canonText, directive, maxTokens, thinkingCfg,
+      spec, canonTextFor(spec.model), directive, maxTokens, thinkingCfg,
     );
     providerModel = spec.model;
     latencyMs = result.latencyMs;

@@ -12245,3 +12245,200 @@ to docs/reports/REPORT-archive-NNN.md BEFORE committing, per R6. Not rotated
 here: rotation is a sweep-time action, this is not a SWEEP dispatch.
 
 [DONE] H24_FIX1 | 9 defects addressed (identity fix source-only, not deployed), build+tsc+biome green, scoped commit pending SWEEP, NO PUSH, concurrent H24_BYOK1 edits on the same file navigated without loss
+
+================================================================================
+H24_FIX3 — model selection wiring + billing investigation + identity wording (2026-08-29)
+================================================================================
+
+WORKDIR: TheMANUAL.tech.
+
+=== SECTION 1 — MODEL SELECTION WAS FULLY DECORATIVE (not just the free band) ===
+
+TRACED END TO END: composer → InvokeArgs → request body → h24-route → provider
+call.
+
+- OraclePage's composer captures a `model` state (company display name:
+  Claude/GPT/Grok/Llama/Mistral/DeepSeek) whenever band === 'auto'.
+- `submitDirective` called `send(directive, { tier, category, astraSlug })` —
+  `model` was NEVER included.
+- `client.ts`'s `InvokeArgs` interface had no `model` field at all, so even if
+  a caller had tried to pass one, `invokeDirective`'s request body builder
+  (`{ directive, tier, category, astra_slug?, confirm_cost? }`) had nowhere to
+  put it.
+- h24-route (index.ts) DOES have a real, working named-model path: if
+  `body.model` is a string, `loadModelCard()` looks it up in the `models`/
+  `providers` catalog and dispatches to that exact provider (ROUTEREPOINT1,
+  already shipped, already billed correctly — see `userTargetCard`). This
+  machinery has existed since ROUTEREPOINT1 and was simply never fed by any
+  client. Because `body.model` was always absent, EVERY Auto-band directive
+  fell through to the `else` branch and ran `TIER_PROVIDER_MODEL['frontier']`
+  = claude-opus-5, no matter which company was shown "selected" in the UI.
+
+RULING: (a) — selection SHOULD be honored, and now mostly IS. Verified the
+catalog has an active frontier-band model for 5 of the 6 composer options
+(`h24_route_model_card` / `models` JOIN `providers`, queried live 2026-08-29):
+  Claude → claude-opus-5 (already the default; now explicit)
+  GPT → gpt-5
+  Grok → grok-4.6
+  Mistral → mistral-large-latest
+  DeepSeek → deepseek-v4-pro
+`Llama` has NO active frontier-band entry — it only exists at band='free' via
+Groq, which is a router-internal fallback ladder, not a client-selectable
+destination even in the free band (no Model picker is shown there at all).
+
+FIXED:
+- `client.ts`: added `InvokeArgs.model?: string` (a catalog model_string, not
+  a display name), threaded into the request body as `body.model` when
+  present. Added `MODEL_TO_CATALOG_STRING`, the display-name → model_string
+  map for the 5 real ones, with Llama deliberately absent (see below).
+- `useOracleDirective.ts`: `SendOpts.model?` threaded through `send()` → `run()`.
+- `OraclePage.tsx`: `catalogModel = modelPicked ? MODEL_TO_CATALOG_STRING[model] : undefined`,
+  sent as `model` on submit. `modelUnavailable = modelPicked && !catalogModel`
+  (true only for Llama today) — submitDirective refuses to send while true,
+  and the composer shows a visible red note explaining why + what to do,
+  rather than silently routing Llama's pick to Opus. That "silent-override"
+  path is exactly the class of dishonesty this whole pass exists to remove —
+  ruling (b) applies to the ONE case ruling (a) can't reach.
+- `Composer.tsx`: added `submitDisabled?: boolean`, ANDed into `canSubmit`
+  separately from `disabled` — `disabled` also freezes the band/model/effort
+  pickers (right for signed-out), which would trap a Bee on the very
+  selection (Llama) that needs changing. `submitDisabled` blocks only the
+  send button.
+- Mock mode (`client.ts`'s `mockResult`) now honors `args.model` too (echoes
+  it as the mock "provider"), so this exact bug is reproducible against the
+  harness without live provider keys.
+
+NOT FIXED / flagged: no schema change this pass (GATED — schema apply). If
+Llama should be selectable in Auto, that needs an active frontier-band
+`models` row for it — db-lane work, not this pass. `Auto` (no company picked)
+is unaffected — still runs claude-opus-5 by default, unchanged.
+
+REQUIRES for live use: each of the 5 wired providers' API key SECRET
+(OPENAI_API_KEY, XAI_API_KEY, MISTRAL_API_KEY, DEEPSEEK_API_KEY; Anthropic's
+is already configured) must be present in the Edge Function's environment —
+`specFromCard` fails closed (503 `provider_key_absent`, already handled by
+the existing client error path) if a secret is absent. Whether those secrets
+are actually set was NOT checked (no access to Edge Function env from this
+session) — flagged, not verified.
+
+=== SECTION 2 — CLOSED PER THE OWNER'S UPDATE. NOT REWORKED. ===
+Owner confirmed (post hard-refresh) that H24_FIX1's clear-on-success and
+directive-echo both work. Nothing touched here. Lesson carried forward: a
+dev server was run this pass (see VERIFY) before calling anything done.
+
+=== SECTION 3 — "NAME THE PROVIDER, DON'T OFFER TO." ===
+The old IDENTITY_AND_DISCLOSURE said the model "may name the specific
+provider... if asked" — permissive wording that let the model answer
+"I could tell you which provider answered" instead of just saying it, which
+reads as gatekeeping when the provider is already printed on screen.
+
+FIXED (canon.ts): `assembleCrossAstraCanon` now takes an optional
+`servingModel` and, when given one, the identity preamble states plainly:
+"For THIS directive, you are running as {servingModel}... say so plainly and
+specifically... Never say you could tell them or offer to look it up." This
+required the serving model to be KNOWN before the system prompt is built,
+which it previously wasn't — `canonText` used to be computed ONCE before the
+provider ladder ran. Restructured `index.ts` so the canon (for non-internal,
+non-`internalSystem` calls) is assembled PER RUNG inside the ladder loop via
+a `canonTextFor(model)` closure, using that rung's actual `spec.model`. The
+free-tier ladder's Groq→Haiku fallback therefore now correctly tells whichever
+model actually answers to name itself — not a model decided before the
+fallback happened.
+
+SOURCE ONLY — NOT DEPLOYED (Edge Function deploys are DEPLOY-AMENDMENT gated;
+this names a fix, not a deploy). `deno check` on both changed files in
+supabase/functions/h24-route is clean.
+
+=== BILLING INVESTIGATION (read-only; no balance/ledger rows touched) ===
+
+QUESTION: does paid-tier usage actually debit the balance, or does the meter
+record a cost that's never subtracted?
+
+FINDING: THE METER WORKS. Every non-free, successful directive in
+h24_directives has a matching h24_token_ledger debit row — checked ALL of
+them (10 directives, LEFT JOIN, zero orphans):
+
+  standard/claude-sonnet-5   -0.1064, -0.9604  (two rows, one directive — a
+                                                 recorded correction, per the
+                                                 append-only reversing-entry
+                                                 convention already documented
+                                                 in index.ts's comments)
+  frontier/claude-opus-5     -0.267, -2.409    (same directive, same pattern)
+  standard/claude-sonnet-5   -1.0668
+  frontier/claude-opus-5     -58.446
+  standard/claude-sonnet-5   -6.2468
+  standard/claude-sonnet-5   -25.72425
+  frontier/deepseek-v4-pro   -5.511
+  standard/mistral-small-latest -0.67005       (the exact directive named in
+                                                 the dispatch)
+
+For the mistral directive specifically: its bee's full ledger (7 rows,
+2026-07-27 through 2026-08-19) sums to exactly 10,961.8489 h24 tokens, which
+IS the balance the app currently shows that bee (confirmed against
+H24_FIX1's own BLiNG-formatting investigation, which independently arrived at
+~10,961.85 while fixing a DIFFERENT bug). The debit is not just present — the
+running total is provably correct against every grant and every charge.
+
+SO NEITHER OF THE DISPATCH'S TWO HYPOTHESES IS RIGHT AS STATED:
+  (a) "the $0.67005 figure is wrong, nothing was owed" — the figure is
+      correctly computed off the live rate card (h24_route_model_card for
+      mistral-small-latest: 450 h24-tok/1M input, 1800/1M output; 1481 in + 2
+      out ≈ 0.6665, logged as 0.67005 — a ~0.5% gap most likely from a rate
+      retune since 2026-08-19, not a bug worth chasing further this pass).
+  (b) "metered spend never debits" — FALSE. It debits every time, verified
+      with zero exceptions across every paid directive in the table.
+
+THE ACTUAL FINDING IS A UNIT/SCALE MISREADING, not a code bug: 0.67005 h24
+TOKENS is $0.00067 at the DB79 anchor (1000 h24 tokens = $1) — not $0.67. A
+balance in the thousands of h24 tokens (worth single-digit dollars) will not
+visibly move from a charge two to three orders of magnitude smaller than "a
+cent." If the owner read the routing log's Cost column as dollars, that's an
+entirely reasonable misreading and not evidence of a broken meter — it's a
+LABELING gap.
+
+PROPOSED FIX (not implemented — investigation was read-only, and this is a UI
+change outside this pass's numbered scope): show a secondary "≈ $X.XX" USD-
+equivalent wherever an h24-token figure appears (balance, per-directive cost,
+routing-log Cost column), computed client-side as tokens / 1000, so no one
+has to do that division in their head. This directly matters for FEE_SCHEDULE
+v1.0 (BYOK 10%, managed 3x) landing soon — every fee is a multiplier on this
+same figure, and a human auditing "does the fee look right" needs the dollar
+figure, not the token figure, to sanity-check it at a glance.
+
+=== VERIFY ===
+- `npx tsc -b --noEmit` — clean.
+- `deno check supabase/functions/h24-route/index.ts` — clean (canon.ts is
+  imported by it, so this also checks canon.ts).
+- `npm run build` — not re-run this pass (tsc clean + prior H24_FIX1/FIX2
+  passes already proved the build pipeline; front-end diff here is small and
+  fully typed). `npm run lint` — zero new errors in any file this pass touched
+  (grepped against the full lint run's file list).
+- RAN A DEV SERVER (`VITE_ATLASORACLE_MOCK=1 npm run dev`, per the dispatch's
+  explicit instruction and section 2's lesson) — booted clean on :3006 (ports
+  3000-3005 already held by other concurrent sessions), `/h24` returned 200
+  via a headless fetch.
+- COULD NOT interactively click through it: the Chrome browser-automation
+  extension was not connected in this session ("Browser extension is not
+  connected"). Per the dispatch's own words, a headless 200 is NOT a
+  verification of interactive behavior — recorded honestly as unverified
+  rather than claimed. No synthetic auth was created to work around this
+  (standing rule: never paste a bearer token or create a throwaway auth user
+  to test an auth-gated flow).
+- The 5 newly-wired providers' actual live routing (a real Auto+GPT directive
+  reaching gpt-5, etc.) is UNVERIFIED — needs either a live browser session
+  signed in as a real Bee, or confirmation that OPENAI_API_KEY / XAI_API_KEY /
+  MISTRAL_API_KEY / DEEPSEEK_API_KEY are configured in the Edge Function env
+  (not checked from this session) plus a live directive.
+
+=== COULD NOT VERIFY (honest list) ===
+- Interactive browser click-through of the composer's model picker (browser
+  extension unavailable this session).
+- Whether the 4 non-Anthropic provider secrets are actually configured in the
+  deployed Edge Function's environment.
+- Whether the canon.ts change, once deployed, actually changes the model's
+  answer to "what are you" in practice — source-only this pass, not deployed.
+
+COMMIT: scoped slice, message H24_FIX3, NO PUSH. GATED: push, schema apply,
+Edge Function deploy, money — none of those crossed.
+
+[DONE] H24_FIX3 | model selection now genuinely reaches the router for 5/6 companies (Llama visibly blocked, not silently substituted); billing investigation found the meter works correctly (a unit/scale misreading, not a debit bug) — proposed a USD-equivalent display fix, not implemented (out of scope, read-only ask); canon.ts identity wording fixed to state the provider plainly (source only, not deployed); tsc+deno check+lint clean; dev server run and booted clean, interactive click-through unverified (no browser extension this session)

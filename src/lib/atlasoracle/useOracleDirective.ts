@@ -35,6 +35,8 @@ export interface SendOpts {
   tier: Tier;
   category: DirectiveCategory;
   astraSlug?: string;
+  /** H24_FIX3 — a specific catalog model_string; see client.ts. */
+  model?: string;
 }
 
 export function useOracleDirective(): UseOracleDirective {
@@ -76,6 +78,7 @@ export function useOracleDirective(): UseOracleDirective {
         tier: opts.tier,
         category: opts.category,
         astraSlug: opts.astraSlug,
+        model: opts.model,
       });
     },
     [run],

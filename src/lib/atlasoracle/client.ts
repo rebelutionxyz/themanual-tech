@@ -121,7 +121,38 @@ export interface InvokeArgs {
   category: DirectiveCategory;
   astraSlug?: string;
   confirmCost?: boolean;
+  /**
+   * H24_FIX3 — a specific catalog model_string (e.g. 'gpt-5'), NOT a company
+   * display name. h24-route already has a `body.model` path (ROUTEREPOINT1's
+   * userTargetCard / loadModelCard) that looks this up in the `models` catalog
+   * and dispatches to it — this field is what was missing to actually reach
+   * it. Composer wiring lives in OraclePage's MODEL_TO_CATALOG_STRING map.
+   */
+  model?: string;
 }
+
+/**
+ * H24_FIX3 — company display name (the composer's Model menu, Auto band
+ * only) → the exact active `models.model_string` in the catalog, verified
+ * live against `h24_route_model_card` 2026-08-29. Before this pass NOTHING
+ * in the client ever sent `model` to the router at all — picking "GPT" or
+ * "Grok" in the composer had zero effect; every Auto-band directive always
+ * ran claude-opus-5 (TIER_PROVIDER_MODEL['frontier']) regardless of what was
+ * shown selected. That was the H24_FIX3 finding: the switcher was decorative,
+ * not that the router refused a real selection.
+ *
+ * `Llama` has NO active frontier-band catalog entry (it only exists at
+ * band='free', via Groq) and is deliberately NOT in this map — OraclePage
+ * blocks sending rather than silently falling back to Opus when it's picked,
+ * per the same "never a fake control" rule this fix exists to restore.
+ */
+export const MODEL_TO_CATALOG_STRING: Record<string, string> = {
+  Claude: 'claude-opus-5',
+  GPT: 'gpt-5',
+  Grok: 'grok-4.6',
+  Mistral: 'mistral-large-latest',
+  DeepSeek: 'deepseek-v4-pro',
+};
 
 /**
  * Dev mock. When on, NO request leaves the browser and NO provider is billed.
@@ -179,13 +210,16 @@ function mockResult(args: InvokeArgs): RouteResult {
   return {
     kind: 'response',
     directiveId: `mock-${Math.random().toString(36).slice(2, 10)}`,
-    response: `[MOCK — no provider was called]\n\ntier: ${args.tier} · category: ${args.category}\n\nEcho of your directive:\n${args.directive}`,
+    response: `[MOCK — no provider was called]\n\ntier: ${args.tier} · category: ${args.category}${args.model ? ` · model: ${args.model}` : ''}\n\nEcho of your directive:\n${args.directive}`,
+    // H24_FIX3 — a named model wins in the mock too, so this bug (model picked,
+    // provider ignored) is reproducible against the mock without live keys.
     provider:
-      args.tier === 'free'
+      args.model ??
+      (args.tier === 'free'
         ? 'claude-haiku-4-5'
         : args.tier === 'standard'
           ? 'claude-sonnet-5'
-          : 'claude-opus-5',
+          : 'claude-opus-5'),
     tier: args.tier,
     costTokens: args.tier === 'free' ? 0 : args.tier === 'standard' ? 1.0668 : 2.667,
     balanceAfterTokens: args.tier === 'free' ? null : 498.9332,
@@ -268,6 +302,11 @@ export async function invokeDirective(args: InvokeArgs): Promise<RouteResult> {
   };
   if (args.astraSlug) body.astra_slug = args.astraSlug;
   if (args.confirmCost) body.confirm_cost = true;
+  // H24_FIX3 — the field that was missing end-to-end. h24-route's band-drives
+  // -tier rule means this can also change `tier` on the response (a model's
+  // catalog band wins over the requested tier); the response's own `tier`
+  // field is what the UI should trust, not the tier this call sent.
+  if (args.model) body.model = args.model;
 
   const { data, error } = await supabase.functions.invoke('h24-route', { body });
 

@@ -76,6 +76,14 @@ export interface ComposerProps {
   busy?: boolean;
   /** True when the surface cannot accept input at all (e.g. signed out). */
   disabled?: boolean;
+  /**
+   * H24_FIX3 — blocks SEND only, leaving typing and the band/option/effort
+   * pickers live. `disabled` deliberately also freezes those (signed-out has
+   * nothing to pick between); this is for "you can change your mind" cases —
+   * e.g. a picked model with no real route yet — where locking the whole
+   * composer would trap the Bee on the very selection that needs changing.
+   */
+  submitDisabled?: boolean;
   placeholder?: string;
 
   /** [+] attach. Omitted entirely when `onAttach` is not given. */
@@ -137,6 +145,7 @@ export function Composer({
   onSubmit,
   busy = false,
   disabled = false,
+  submitDisabled = false,
   placeholder = 'Type a directive…',
   onAttach,
   attachments = [],
@@ -182,7 +191,7 @@ export function Composer({
     return () => recRef.current?.stop();
   }, []);
 
-  const canSubmit = !disabled && !busy && value.trim().length > 0;
+  const canSubmit = !disabled && !submitDisabled && !busy && value.trim().length > 0;
 
   function submit() {
     if (!canSubmit) return;

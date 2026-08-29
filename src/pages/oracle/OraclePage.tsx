@@ -15,7 +15,12 @@ import {
   submitByokKey,
 } from '@/lib/atlasoracle/byok';
 import { FREE_DIRECTIVE_QUOTA, countFreeDirectives } from '@/lib/atlasoracle/byokQuota';
-import { type DirectiveCategory, type Tier, isMocked } from '@/lib/atlasoracle/client';
+import {
+  type DirectiveCategory,
+  MODEL_TO_CATALOG_STRING,
+  type Tier,
+  isMocked,
+} from '@/lib/atlasoracle/client';
 import { buildH24Nav } from '@/lib/atlasoracle/h24Nav';
 import { formatTokensExact } from '@/lib/atlasoracle/reconcile';
 import type { ModelRateRow } from '@/lib/atlasoracle/reconcile';
@@ -269,6 +274,19 @@ export function OraclePage() {
   const byokState: ByokState = provider
     ? byokStates[provider]
     : { present: false, last4: null, status: null };
+  // H24_FIX3 — THE REAL FIX. Before this, `model` was captured in state and
+  // shown in the composer but never left the browser: send() only ever
+  // carried { directive, tier, category, astra_slug }, so every Auto-band
+  // directive ran claude-opus-5 (TIER_PROVIDER_MODEL['frontier']) regardless
+  // of which company was "selected". `catalogModel` is the exact
+  // models.model_string h24-route's existing userTargetCard/loadModelCard
+  // path expects; sending it is what actually changes which provider runs.
+  const catalogModel = modelPicked ? MODEL_TO_CATALOG_STRING[model] : undefined;
+  // Llama has no active frontier-band catalog entry (free-tier only, via
+  // Groq) — see MODEL_TO_CATALOG_STRING's comment. Rather than silently
+  // falling back to Opus (the exact dishonesty this pass exists to remove),
+  // picking it in Auto blocks sending with a visible reason (below).
+  const modelUnavailable = modelPicked && !catalogModel;
 
   const tier = bandToTier(band);
   const currentRate = tierRates.find((r) => r.tier === tier);
@@ -281,10 +299,11 @@ export function OraclePage() {
 
   function submitDirective() {
     if (!bee || directive.trim().length === 0 || state === 'working') return;
+    if (modelUnavailable) return;
     setHasSent(true);
     setForceHome(false);
     setSentDirective(directive);
-    void send(directive, { tier, category, astraSlug: 'themanual' });
+    void send(directive, { tier, category, astraSlug: 'themanual', model: catalogModel });
   }
 
   // H24_FIX1 defects 6 + 7 — one place that resets the directive state, used by
@@ -455,13 +474,17 @@ export function OraclePage() {
         onSubmit={submitDirective}
         busy={state === 'working'}
         disabled={!bee}
+        // H24_FIX3 — Llama has no live frontier route (see MODEL_TO_CATALOG_STRING);
+        // block send rather than silently routing it to Opus.
+        submitDisabled={modelUnavailable}
         placeholder={bee ? 'Type a directive…' : 'Sign in to send a directive'}
         onAttach={() => attachInputRef.current?.click()}
         bands={bands}
         bandId={band}
         onBandChange={(id) => setBand(id as Band)}
-        // MODEL menu shows only in the Auto (paid) band. Display-only until
-        // AUTOTIER1 — selecting a company name does not re-route yet.
+        // MODEL menu shows only in the Auto (paid) band. H24_FIX3 — picking a
+        // company name now genuinely re-routes there (catalogModel, sent as
+        // request `model`); this was display-only before this pass.
         options={showModel ? MODEL_OPTIONS : []}
         optionId={model}
         onOptionChange={setModel}
@@ -474,6 +497,14 @@ export function OraclePage() {
         effortLabel="Effort"
         enableMic
       />
+      {/* H24_FIX3 — visible, not silent: Llama has no frontier route today. */}
+      {modelUnavailable && (
+        <p className="mt-2" style={{ color: 'var(--error)', fontSize: 11.5 }} role="alert">
+          {model} has no route in Auto — h24 won't silently send this to a different model
+          instead. It only ever runs via the free band's own automatic routing (not
+          selectable there either). Pick a different model to send this directive.
+        </p>
+      )}
       {/* BYOK affordance — only when a specific model is picked. */}
       {modelPicked && provider && (
         <div className="mt-2" style={{ fontSize: 11.5 }}>
