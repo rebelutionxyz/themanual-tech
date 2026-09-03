@@ -13,7 +13,7 @@ import { DINGLEBERRY_COLOR, STATUS_BLUE } from './tone';
  * Re-skin: JUSTICE navy/gold sidebar → repo dark tokens + red identity accent.
  */
 
-interface NavItem {
+export interface NavItem {
   key: string;
   icon: string; // artifact icon-name → dbIcon()
   label: string;
@@ -23,7 +23,8 @@ interface NavItem {
   to: string;
 }
 
-const NAV: NavItem[] = [
+/** ONE_SHELL2: the shell's RoofLayout reads this list; the sidebar below is retired. */
+export const DINGLEBERRY_NAV: NavItem[] = [
   { key: 'overview', icon: 'radar', label: 'Command center', count: '', to: '/dingleberry' },
   // FRONT28. Count is deliberately blank: the neighbours carry static mock
   // numbers, and this surface is real — a fake count beside real data is worse
@@ -140,7 +141,7 @@ export function DingleberrySidebar() {
 
       <nav className="flex-1 overflow-y-auto py-2">
         <ul className="space-y-0.5 px-1.5">
-          {NAV.map((item) => (
+          {DINGLEBERRY_NAV.map((item) => (
             <li key={item.key}>
               <SidebarItem
                 icon={dbIcon(item.icon)}

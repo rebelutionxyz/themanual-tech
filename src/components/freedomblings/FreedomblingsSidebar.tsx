@@ -6,14 +6,15 @@ import { useAuth } from '@/lib/auth';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { LauncherGlyph, Mark } from './marks';
 
-interface NavDef {
+export interface NavDef {
   id: string;
   label: string;
   path?: string; // present = live route
   tag?: string;
 }
 
-const LEDGER_NAV: NavDef[] = [
+/** ONE_SHELL2: RoofLayout reads these; the sidebar below is retired. */
+export const LEDGER_NAV: NavDef[] = [
   { id: 'balance', label: 'Balance', path: '/freedomblings' },
   { id: 'earning', label: 'Earning', path: '/freedomblings/earning' },
   { id: 'circulation', label: 'Circulation', path: '/freedomblings/circulation' },
@@ -25,7 +26,7 @@ const LEDGER_NAV: NavDef[] = [
   // { id: 'escrow', label: 'Escrow', path: '/freedomblings/escrow' },
 ];
 
-const MEMBER_NAV: NavDef[] = [
+export const MEMBER_NAV: NavDef[] = [
   { id: 'standing', label: 'Standing', path: '/freedomblings/standing' },
   { id: 'gradations', label: 'Gradations', path: '/freedomblings/gradations' },
   { id: 'lineage', label: 'Lineage', path: '/freedomblings/lineage' },

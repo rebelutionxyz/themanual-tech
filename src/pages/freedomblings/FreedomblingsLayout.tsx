@@ -1,5 +1,4 @@
 import { ConstellationOverlay } from '@/components/freedomblings/ConstellationOverlay';
-import { FreedomblingsSidebar } from '@/components/freedomblings/FreedomblingsSidebar';
 /* FreedomBLiNGS — shared layout (mirrors the DingleBERRY layout pattern).
    The design's left Sidebar + a main column. The whole subtree is wrapped in a
    [data-surface='freedomblings'] element so the warm-paper/white+gold Aurora
@@ -15,7 +14,10 @@ export function FreedomblingsLayout() {
 
   return (
     <div data-surface="freedomblings" className="relative flex h-full overflow-hidden">
-      <FreedomblingsSidebar onLaunch={() => setConstellationOpen(true)} />
+      {/* ONE_SHELL2: the ledger/member nav is the shell's left sidebar now
+          (RoofLayout reads LEDGER_NAV / MEMBER_NAV); the in-surface sidebar is
+          retired. The Constellation launcher it carried is parked until the
+          shell grows a per-astra action slot. */}
       <Outlet />
       {constellationOpen && <ConstellationOverlay onClose={() => setConstellationOpen(false)} />}
     </div>

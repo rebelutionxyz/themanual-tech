@@ -1,12 +1,9 @@
 import { CallProvider } from '@/components/comms/CallProvider';
 import { HQControlRoom } from '@/components/hq/HQControlRoom';
-import { PlatformLayout } from '@/components/layout/PlatformLayout';
-import { SiteHeader } from '@/components/layout/SiteHeader';
-import { TopTickerSlot } from '@/components/promotions/TopTickerSlot';
+import { RoofLayout } from '@/components/layout/RoofLayout';
 import { PopupRoute } from '@/components/shell/PopupShell';
 import {
   CartPlaceholder,
-  ManualGroupsPlaceholder,
   OpenAPIDocs,
   StatusPage,
 } from '@/components/universal/UniversalPlaceholders';
@@ -30,9 +27,6 @@ const AstraStubPage = lazy(() =>
 );
 const ConstellationPage = lazy(() =>
   import('@/pages/ConstellationPage').then((m) => ({ default: m.ConstellationPage })),
-);
-const BlingsPage = lazy(() =>
-  import('@/pages/BlingsPage').then((m) => ({ default: m.BlingsPage })),
 );
 const BookmarksPage = lazy(() =>
   import('@/pages/BookmarksPage').then((m) => ({ default: m.BookmarksPage })),
@@ -297,52 +291,11 @@ export default function App() {
   );
 }
 
-const ADMIN_SURFACE_PATHS = new Set(['/myhex', '/nexus', '/nucleus']);
-
-// Community surfaces own the white X-style shell (logo + lens controls live in
-// the GlobalSidebar), so the global SiteHeader / ticker / toolbar are suppressed
-// here — the shell renders its own ticker. Other surfaces keep the legacy chrome.
-const COMMUNITY_PREFIXES = [
-  '/brand',
-  '/intel',
-  '/unite',
-  '/rule',
-  // FUND (was GiVE) — the surface moved to /fund per FUND_MF v0.1. '/give' is
-  // NOT listed: it no longer renders a page, it redirects to /fund.
-  '/fund',
-  '/pulse',
-  '/bazaar',
-  '/comms',
-  '/security',
-  // Sidebar utility-tail surfaces — same white shell, no skin switch.
-  '/account',
-  '/bookmarks',
-  '/notifications',
-  '/studio',
-  '/premium',
-  '/business',
-  '/promotion',
-  '/settings',
-];
-
-// Chrome-free paths — the front door (login / coming-soon), MiniWaves (V77),
-// /h24, and /mc, which wear their OWN shell. No shared Manual SiteHeader / ticker.
-// FRONTHDR1 (ORACLE_MF v1.61 R2): the pre-h24 Manual SiteHeader was rendering on
-// /h24 in addition to the h24 chrome; /h24 now shows only its own toolbar +
-// sidebar + console (the Rooms button moved into the h24 toolbar).
-// FRONTHDR2 (owner ruling 2026-08-19): the shared SiteHeader was rendering on the
-// /mc mission-control board too; /mc now shows only its own board chrome (the
-// "Mission Control — build progress" header + the dispatch-queue board).
-const CHROME_FREE_PATHS = new Set([
-  '/',
-  '/waves',
-  '/miniwaves',
-  '/h24',
-  '/h24/vault',
-  '/h24/log',
-  '/h24/customize',
-  '/mc',
-]);
+// ONE_SHELL2 (ONE_ROOF v1, owner 2026-09-03): the old TheMANUAL.tech
+// SiteHeader / ticker / promo rail are DELETED. UniversalShell is the only
+// shell and the only header. Every route wears it through a layout route
+// (RoofLayout, CommunityLayout, the h24 pages) except the named chrome-free
+// doors: / (front door), /login, /n/:slug.
 
 // Management allowlist — OG HUMAN only, until the role registries (Lock 8 /
 // 9.6) deploy and real tier checks replace this. Landing gate 2026-07-10.
@@ -375,30 +328,13 @@ function AppContent() {
   // renders in an overlay (RouteModal) — every popup keeps a shareable
   // canonical URL; a direct hit renders the same route full-page.
   const background = (location.state as { background?: Location } | null)?.background ?? null;
-  // Chrome flags follow the SURFACE THE BEE SEES (the background when a
-  // popup is open), not the popup's own path.
-  const pathname = background?.pathname ?? location.pathname;
-
   // Platform branding (HQ-editable): one load per session; also swaps the
   // favicon to the configured mark.
   useEffect(() => {
     void useBranding.getState().load();
   }, []);
-  const isAdminSurface = ADMIN_SURFACE_PATHS.has(pathname);
-  const isCommunitySurface = COMMUNITY_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  );
-  // /n/:slug Nova portals are chrome-free — each renders its own skinned world.
-  const isChromeFree = CHROME_FREE_PATHS.has(pathname) || pathname.startsWith('/n/');
-  const hideGlobalChrome = isAdminSurface || isCommunitySurface || isChromeFree;
-
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-bg text-text">
-      {!isCommunitySurface && !isChromeFree && <SiteHeader />}
-      {/* Phase C Component D: top-ticker promotion slot below header.
-          Hides itself when no DB match + no astra fallback (D-4).
-          Suppressed on admin + community surfaces — they own their own chrome. */}
-      {!hideGlobalChrome && <TopTickerSlot />}
       {/* Top Top toolbar (Search/Location/Time/Realm + breadcrumb strip)
           removed from the black shell 2026-07-16 (Butch) — component file
           kept (src/components/layout/TopToolbar.tsx); re-add the render here
@@ -426,56 +362,16 @@ function AppContent() {
                 )
               }
             />
-            {/* Old anonymous homepage — parked, reachable, off the front door. */}
-            <Route path="/home" element={<HomePage />} />
-
-            {/* Admin tier surfaces (My Hex / Nexus / Nucleus) — outside
-            PlatformLayout because they own their own chrome. */}
-            <Route path="/myhex" element={<MyHexPage />} />
-            <Route path="/nexus" element={<NexusPage />} />
-            <Route path="/nucleus" element={<NucleusPage />} />
-
-            {/* MiniWaves (V77) — chrome-free, owns its own shell. No SiteHeader,
-            no toolbar, no breadcrumbs. /miniwaves is the Astra-named path,
-            /waves the legacy alias; also reachable via the Tasks launcher
-            popup in the community bottom toolbar. */}
-            <Route path="/waves" element={<WavesPage />} />
-            <Route path="/miniwaves" element={<WavesPage />} />
-
-            {/* h24 — chrome-free, owns its own shell (FRONTHDR1, ORACLE_MF v1.61 R2).
-            Moved OUT of PlatformLayout so no shared Manual SiteHeader/ticker/promo
-            rail renders over it; OraclePage carries the h24 toolbar + sidebar +
-            console. /oracle and /here24 still redirect here (below). */}
+            {/* h24 — mounts UniversalShell itself (the reference implementation) (FRONTHDR1, ORACLE_MF v1.61 R2).
+            OraclePage mounts the shell itself (toolbar + sidebar + console). /oracle and /here24 still redirect here (below). */}
             <Route path="/h24" element={<OraclePage />} />
             {/* h24 sub-surfaces (H24_FIX1) — same chrome-free posture as /h24. */}
             <Route path="/h24/vault" element={<H24VaultPage />} />
             <Route path="/h24/log" element={<H24RoutingLogPage />} />
             <Route path="/h24/customize" element={<H24CustomizePage />} />
 
-            {/* Mission Control board — chrome-free, owns its own board chrome
-            (FRONTHDR2, owner ruling 2026-08-19). Moved OUT of PlatformLayout so no
-            shared Manual SiteHeader / ticker / promo rail renders over it; the page
-            carries its own "build progress" header + the dispatch-queue board.
-            Gates on bees.is_admin, with the real enforcement being RLS on the ops_
-            tables. A static path always out-ranks the PlatformLayout /:slug route,
-            so this stays ahead of SurfacePage without living inside that group. */}
-            <Route path="/mc" element={<MissionControlPage />} />
-
-            {/* Auth */}
+            {/* Auth — chrome-free door (ONE_ROOF v1). */}
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            {/* Premium handle claims (SINK 1) moved into the community shell —
-            see the utility-tail routes inside CommunityLayout below. */}
-            {/* /bees/me — owner-profile alias → canonical /profile. Public Bee
-            profiles now live at /@handle (PROFILE2), served by PublicProfilePage
-            via the SurfacePage `/:slug` catch-all — the bees_public_read /
-            bee_profiles_select_public policies it reads are already deployed, so
-            the old "deferred pending a bees-RLS migration" note is retired.
-            (Open item, propose-first: bees_public_read is USING(true) over ALL
-            columns, so email + balance are anon-readable at the row level; the
-            profile UI selects only public fields, but the policy itself wants
-            narrowing to a public column set in a future schema pass.) */}
-            <Route path="/bees/me" element={<Navigate to="/profile" replace />} />
 
             {/* Nova portals — /n/:slug, chrome-free, each wearing its own skin.
             Public resolution via nova_resolve (SECDEF); Birth Certificate in
@@ -578,7 +474,28 @@ function AppContent() {
             </Route>
 
             {/* Platform surfaces (right rail + utility chrome) */}
-            <Route element={<PlatformLayout />}>
+            {/* THE ROOF (ONE_SHELL2) — every non-community, non-h24 surface wears
+            UniversalShell through RoofLayout: the old bare routes (/home, /profile,
+            /mc, /myhex, /nexus, /nucleus, /waves) and the former PlatformLayout set. */}
+            <Route element={<RoofLayout />}>
+              <Route path="/home" element={<HomePage />} />
+              <Route path="/myhex" element={<MyHexPage />} />
+              <Route path="/nexus" element={<NexusPage />} />
+              <Route path="/nucleus" element={<NucleusPage />} />
+              <Route path="/waves" element={<WavesPage />} />
+              <Route path="/miniwaves" element={<WavesPage />} />
+              <Route path="/mc" element={<MissionControlPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              {/* /bees/me — owner-profile alias → canonical /profile. Public Bee
+              profiles now live at /@handle (PROFILE2), served by PublicProfilePage
+              via the SurfacePage `/:slug` catch-all — the bees_public_read /
+              bee_profiles_select_public policies it reads are already deployed, so
+              the old "deferred pending a bees-RLS migration" note is retired.
+              (Open item, propose-first: bees_public_read is USING(true) over ALL
+              columns, so email + balance are anon-readable at the row level; the
+              profile UI selects only public fields, but the policy itself wants
+              narrowing to a public column set in a future schema pass.) */}
+              <Route path="/bees/me" element={<Navigate to="/profile" replace />} />
               {/* Manual surface */}
               <Route path="/manual" element={<ManualPage />} />
 
@@ -640,7 +557,7 @@ function AppContent() {
               with a placeholder would regress functionality. When
               FreedomBLiNGs ships as a first-class registered Astra, a real
               BlingWallet component replaces the iframe here. */}
-              <Route path="/bling" element={<BlingsPage />} />
+              <Route path="/bling" element={<Navigate to="/freedomblings" replace />} />
 
               {/* Cross-Astra universal utility routes (per manual-spine-api-v1.md §3).
               These resolve identically from any host; AstraConfig provides
@@ -691,7 +608,7 @@ function AppContent() {
               {/* Mission Control (/mc) moved OUT of this group to a top-level
               chrome-free route (FRONTHDR2) — see near /h24 above. A static path
               out-ranks /:slug, so it still wins over SurfacePage from up there. */}
-              <Route path="/groups" element={<ManualGroupsPlaceholder />} />
+              <Route path="/groups" element={<Navigate to="/unite" replace />} />
               <Route path="/cart" element={<CartPlaceholder />} />
               <Route path="/api/docs" element={<OpenAPIDocs />} />
               <Route path="/status" element={<StatusPage />} />

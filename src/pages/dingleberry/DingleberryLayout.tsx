@@ -1,4 +1,3 @@
-import { DingleberrySidebar } from '@/components/dingleberry/DingleberrySidebar';
 import { PostureSwitcher } from '@/components/dingleberry/PostureSwitcher';
 import { dbIcon } from '@/components/dingleberry/icons';
 import { DINGLEBERRY_COLOR, TONE } from '@/components/dingleberry/tone';
@@ -92,7 +91,8 @@ export function DingleberryLayout() {
 
   return (
     <div className="flex h-full overflow-hidden">
-      <DingleberrySidebar />
+      {/* ONE_SHELL2: nav lives in the shell's left sidebar (RoofLayout reads
+          DINGLEBERRY_NAV); the in-surface sidebar is retired. */}
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-bg">
         {/* Shared header — the mock-demo posture switcher is hoisted here so it
             drives every drill page from one shared state (was overview-only). */}
@@ -130,7 +130,6 @@ export function DingleberryLayout() {
 function GateShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-full overflow-hidden">
-      <DingleberrySidebar />
       <main className="flex min-w-0 flex-1 items-center justify-center overflow-y-auto bg-bg p-8">
         {children}
       </main>
