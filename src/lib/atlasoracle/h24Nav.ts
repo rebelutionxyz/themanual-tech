@@ -6,11 +6,11 @@
 
 import type { ShellNavGroup } from '@/components/shell/UniversalShell';
 import { formatTokens } from '@/lib/atlasoracle/tokens';
-import type { NavigateFunction } from 'react-router-dom';
 import {
   Activity,
   CalendarClock,
   FolderKanban,
+  History,
   Images,
   type LucideIcon,
   Radio,
@@ -19,6 +19,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { createElement } from 'react';
+import type { NavigateFunction } from 'react-router-dom';
 
 /** Which h24 surface is currently mounted — drives the sidebar's `active` dot. */
 export type H24ActiveSurface = 'console' | 'log' | 'vault' | 'customize';
@@ -35,8 +36,18 @@ export function buildH24Nav(opts: {
   tokenBalance: number | null;
   onOpenWallet: () => void;
   active: H24ActiveSurface;
+  /**
+   * SHELL v1.7 s1 (owner ruling 2026-09-03) — some left-sidebar entries open
+   * the shell's right-sidebar panel surface instead of navigating. "Recent
+   * activity" is the first one: opens the same live log inline, at table
+   * width, rather than leaving the console. Only the console page passes
+   * this (it owns the panel state); other h24 surfaces omit it and the item
+   * does not render there, since they already show the log as their main
+   * content.
+   */
+  onOpenActivity?: () => void;
 }): ShellNavGroup[] {
-  const { navigate, onNew, signedIn, tokenBalance, onOpenWallet, active } = opts;
+  const { navigate, onNew, signedIn, tokenBalance, onOpenWallet, active, onOpenActivity } = opts;
 
   return [
     {
@@ -88,6 +99,16 @@ export function buildH24Nav(opts: {
           onClick: () => navigate('/h24/log'),
           active: active === 'log',
         },
+        ...(onOpenActivity
+          ? [
+              {
+                id: 'recent',
+                label: 'Recent activity',
+                icon: icon(History),
+                onClick: onOpenActivity,
+              },
+            ]
+          : []),
         {
           id: 'wallet',
           label: 'Wallet',

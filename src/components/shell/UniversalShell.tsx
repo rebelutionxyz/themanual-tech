@@ -34,6 +34,8 @@
 import { AstraMark } from '@/components/shell/marks/AstraMark';
 import type { AstraTokens } from '@/lib/shell/astraTokens';
 import { ASTRA_TOKENS, astraCssVars } from '@/lib/shell/astraTokens';
+import type { ShellVisibility } from '@/lib/shell/shellPatchboard';
+import { ALL_VISIBLE, SHELL_SWITCH } from '@/lib/shell/shellPatchboard';
 import { cn } from '@/lib/utils';
 import {
   ArrowLeft,
@@ -81,6 +83,40 @@ const SLOT_HOVER: Record<ToolbarSlot, string> = {
   notifications: '#a983f0', // violet
 };
 
+/* ── THE RIGHT SIDEBAR AS ONE SURFACE (owner ruling 2026-09-03) ─────────────
+ * "Every icon in the tool bar and some from the left sidebar will use that
+ * right sidebar area for their information so it needs to change size based on
+ * the icon clicked."
+ *
+ * So the drawer is no longer a fixed 320px chrome strip that only the toolbar
+ * can address. It is ONE surface, keyed by a panel id, and the panel declares
+ * its own width. Any caller — a toolbar icon, a left-sidebar entry, a page —
+ * opens it by id.
+ *
+ * WHY THIS EXISTS AT ALL: h24's Recent activity panel put the 8-column routing
+ * log inside 320px, which produced a horizontal scrollbar along the bottom of
+ * the panel. A table does not get narrower because the container is; it just
+ * hides itself behind a scrollbar. The fix is that the panel says how wide it
+ * needs to be.
+ *
+ * Widths are a SET, not free numbers, so panels stay visually consistent:
+ *   compact — a list you skim (notifications, alerts, wallet, your stuff)
+ *   wide    — a list with structure (tasks, security findings)
+ *   table   — a real table that must not scroll sideways (the routing log)
+ * Every width is capped at 92vw so no panel can exceed a phone.
+ */
+export const DRAWER_WIDTH = { compact: 320, wide: 480, table: 760 } as const;
+export type DrawerWidth = keyof typeof DRAWER_WIDTH;
+
+/** A panel the right sidebar can show. `width` defaults to compact. */
+export interface PanelSpec {
+  title: string;
+  width?: DrawerWidth;
+}
+
+/** Panel id — the four toolbar slots, bling/handle, or any id a page registers. */
+export type PanelKey = string;
+
 export interface UniversalShellProps {
   tokens: AstraTokens;
   /** Breadcrumb node, rendered in the CONTENT top-left under the header. */
@@ -116,7 +152,30 @@ export interface UniversalShellProps {
    * render an honest "nothing here yet" note instead of a fabricated panel
    * (real-data-only). Slots: the four ToolbarSlot values plus 'bling' and 'handle'.
    */
-  renderPanel?: (slot: ToolbarSlot | 'bling' | 'handle') => ReactNode;
+  renderPanel?: (slot: PanelKey) => ReactNode;
+  /**
+   * Extra panels this astra registers on the right sidebar, keyed by panel id
+   * (owner ruling 2026-09-03 — the sidebar is one surface, not the toolbar's).
+   * Merged over the built-in toolbar panels; a page may also override a
+   * built-in's title or width here.
+   */
+  panels?: Record<PanelKey, PanelSpec>;
+  /** Controlled panel id. Omit to let the shell own the state internally. */
+  openPanel?: PanelKey | null;
+  /** Controlled setter — required for a left-sidebar entry to open a panel. */
+  onOpenPanel?: (key: PanelKey | null) => void;
+  /**
+   * PATCHBOARD VISIBILITY (owner ruling 2026-09-03): every toolbar icon, every
+   * sidebar entry and every astra-switcher row is a Patchboard switch resolving
+   * Master -> Astra -> Bee. The page resolves once (loadShellVisibility) and
+   * passes the predicate down, so this component stays a pure synchronous
+   * render and NOTHING inside it is special-cased per astra — SHELL v1.6 §2
+   * holds: hiding is data, never a conditional in here.
+   *
+   * Omitted = everything visible, which is also the floor when the patchboard
+   * has no rows or is unreachable.
+   */
+  visibility?: ShellVisibility;
   children: ReactNode;
 }
 
@@ -135,6 +194,10 @@ export function UniversalShell({
   onAvatar,
   onSelectAstra,
   renderPanel,
+  panels,
+  openPanel,
+  onOpenPanel,
+  visibility = ALL_VISIBLE,
   children,
 }: UniversalShellProps) {
   // Sidebar resting state — the collapser sets it. Default open on desktop,
@@ -144,7 +207,19 @@ export function UniversalShell({
   );
   const [peek, setPeek] = useState(false); // hover peek over content
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [drawer, setDrawer] = useState<ToolbarSlot | 'bling' | 'handle' | null>(null);
+  const [ownDrawer, setOwnDrawer] = useState<PanelKey | null>(null);
+  // Controlled when the page passes both halves; otherwise the shell owns it.
+  const controlled = openPanel !== undefined && Boolean(onOpenPanel);
+  const drawer = controlled ? (openPanel ?? null) : ownDrawer;
+  const setDrawer = useCallback(
+    (key: PanelKey | null) => {
+      if (controlled) onOpenPanel?.(key);
+      else setOwnDrawer(key);
+    },
+    [controlled, onOpenPanel],
+  );
+  /** Built-in panels + whatever this astra registered. Registered wins. */
+  const panelSpecs: Record<PanelKey, PanelSpec> = { ...BUILTIN_PANELS, ...(panels ?? {}) };
 
   const signedIn = Boolean(handle);
   const rootStyle = astraCssVars(tokens);
@@ -152,7 +227,7 @@ export function UniversalShell({
   const closeAll = useCallback(() => {
     setDrawer(null);
     setPickerOpen(false);
-  }, []);
+  }, [setDrawer]);
 
   // Esc closes the drawer / picker.
   useEffect(() => {
@@ -210,6 +285,7 @@ export function UniversalShell({
                   onSelectAstra?.(k);
                 }}
                 onClose={() => setPickerOpen(false)}
+                visibility={visibility}
               />
             )}
           </div>
@@ -235,48 +311,60 @@ export function UniversalShell({
 
         {/* RIGHT TOOLBAR — astra, tasks, security, alerts, notifications, BLiNG, handle, avatar */}
         <div className="flex items-center gap-0.5">
-          <span
-            className="flex items-center px-1.5"
-            style={{ color: 'var(--accent)' }}
-            title={tokens.tld}
-          >
-            <AstraMark logo={tokens.logo} size={17} title={tokens.tld} />
-          </span>
-          <ToolbarIcon slot="tasks" label="Tasks" onClick={() => setDrawer('tasks')}>
-            <Calendar size={17} />
-          </ToolbarIcon>
-          <ToolbarIcon slot="security" label="Security" onClick={() => setDrawer('security')}>
-            <Shield size={17} />
-          </ToolbarIcon>
-          <ToolbarIcon slot="alerts" label="Alerts" onClick={() => setDrawer('alerts')}>
-            <TriangleAlert size={17} />
-          </ToolbarIcon>
-          <ToolbarIcon
-            slot="notifications"
-            label="Notifications"
-            onClick={() => setDrawer('notifications')}
-          >
-            <Bell size={17} />
-          </ToolbarIcon>
+          {visibility(SHELL_SWITCH.icon('h24')) && (
+            <span
+              className="flex items-center px-1.5"
+              style={{ color: 'var(--accent)' }}
+              title={tokens.tld}
+            >
+              <AstraMark logo={tokens.logo} size={17} title={tokens.tld} />
+            </span>
+          )}
+          {visibility(SHELL_SWITCH.icon('tasks')) && (
+            <ToolbarIcon slot="tasks" label="Tasks" onClick={() => setDrawer('tasks')}>
+              <Calendar size={17} />
+            </ToolbarIcon>
+          )}
+          {visibility(SHELL_SWITCH.icon('security')) && (
+            <ToolbarIcon slot="security" label="Security" onClick={() => setDrawer('security')}>
+              <Shield size={17} />
+            </ToolbarIcon>
+          )}
+          {visibility(SHELL_SWITCH.icon('alerts')) && (
+            <ToolbarIcon slot="alerts" label="Alerts" onClick={() => setDrawer('alerts')}>
+              <TriangleAlert size={17} />
+            </ToolbarIcon>
+          )}
+          {visibility(SHELL_SWITCH.icon('notifications')) && (
+            <ToolbarIcon
+              slot="notifications"
+              label="Notifications"
+              onClick={() => setDrawer('notifications')}
+            >
+              <Bell size={17} />
+            </ToolbarIcon>
+          )}
 
           {/* BLiNG total + gold drop — number FIRST, drop after, always gold. */}
-          <button
-            type="button"
-            onClick={() => setDrawer('bling')}
-            title="BLiNG! balance"
-            aria-label="BLiNG balance"
-            className="ml-1 flex items-center gap-1 rounded-md px-2 py-1"
-            style={{ color: 'var(--bling-gold)', fontSize: 12.5 }}
-          >
-            <span className="font-mono font-semibold tabular-nums">
-              {blingDisplay ?? (bling === null ? '—' : bling.toLocaleString())}
-            </span>
-            {blingUnit && <span style={{ fontSize: 10, color: 'var(--mute)' }}>{blingUnit}</span>}
-            <Droplet size={14} fill="var(--bling-gold)" stroke="var(--bling-gold)" />
-          </button>
+          {visibility(SHELL_SWITCH.icon('bling')) && (
+            <button
+              type="button"
+              onClick={() => setDrawer('bling')}
+              title="BLiNG! balance"
+              aria-label="BLiNG balance"
+              className="ml-1 flex items-center gap-1 rounded-md px-2 py-1"
+              style={{ color: 'var(--bling-gold)', fontSize: 12.5 }}
+            >
+              <span className="font-mono font-semibold tabular-nums">
+                {blingDisplay ?? (bling === null ? '—' : bling.toLocaleString())}
+              </span>
+              {blingUnit && <span style={{ fontSize: 10, color: 'var(--mute)' }}>{blingUnit}</span>}
+              <Droplet size={14} fill="var(--bling-gold)" stroke="var(--bling-gold)" />
+            </button>
+          )}
 
           {/* handle — own name has NO @; opens the your-stuff drawer. */}
-          {signedIn && (
+          {signedIn && visibility(SHELL_SWITCH.icon('handle')) && (
             <button
               type="button"
               onClick={() => setDrawer('handle')}
@@ -289,31 +377,39 @@ export function UniversalShell({
           )}
 
           {/* avatar — goes to the profile PAGE, not the drawer. */}
-          <button
-            type="button"
-            onClick={onAvatar}
-            title="Profile"
-            aria-label="Profile"
-            className="ml-0.5 flex h-7 w-7 items-center justify-center overflow-hidden rounded-full"
-            style={{ background: 'var(--accent-bg)', border: '1px solid var(--line)' }}
-          >
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <span
-                className="font-mono uppercase"
-                style={{ color: 'var(--accent)', fontSize: 11 }}
-              >
-                {(handle ?? '·').slice(0, 1)}
-              </span>
-            )}
-          </button>
+          {visibility(SHELL_SWITCH.icon('avatar')) && (
+            <button
+              type="button"
+              onClick={onAvatar}
+              title="Profile"
+              aria-label="Profile"
+              className="ml-0.5 flex h-7 w-7 items-center justify-center overflow-hidden rounded-full"
+              style={{ background: 'var(--accent-bg)', border: '1px solid var(--line)' }}
+            >
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span
+                  className="font-mono uppercase"
+                  style={{ color: 'var(--accent)', fontSize: 11 }}
+                >
+                  {(handle ?? '·').slice(0, 1)}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </header>
 
       {/* ── BODY: sidebar (below header) + content + icon drawer ──────────── */}
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        <Sidebar nav={nav} railResting={railResting} peek={peek} onPeek={setPeek} />
+        <Sidebar
+          nav={nav}
+          railResting={railResting}
+          peek={peek}
+          onPeek={setPeek}
+          visibility={visibility}
+        />
 
         {/* CONTENT — breadcrumbs top-left, then the page. */}
         <main
@@ -334,6 +430,7 @@ export function UniversalShell({
         {drawer && (
           <IconDrawer
             slot={drawer}
+            spec={panelSpecs[drawer] ?? { title: drawer }}
             onClose={() => setDrawer(null)}
             render={renderPanel}
             bling={bling}
@@ -453,10 +550,12 @@ function AstraPicker({
   currentTld,
   onSelect,
   onClose,
+  visibility,
 }: {
   currentTld: string;
   onSelect: (key: string) => void;
   onClose: () => void;
+  visibility: ShellVisibility;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -476,42 +575,47 @@ function AstraPicker({
         border: '1px solid var(--line)',
       }}
     >
-      {Object.entries(ASTRA_TOKENS).map(([key, t]) => {
-        const current = t.tld === currentTld;
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onSelect(key)}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors"
-            style={{ color: current ? 'var(--ink)' : 'var(--body)', fontSize: 12.5 }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background =
-                'color-mix(in srgb, var(--accent) 12%, transparent)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-            }}
-          >
-            <span style={{ color: t.accent }}>
-              <AstraMark logo={t.logo} size={15} title={t.tld} />
-            </span>
-            <span className="font-mono" style={{ color: t.accent }}>
-              {t.tld}
-            </span>
-            {current && (
-              <span className="ml-auto" style={{ color: 'var(--mute)', fontSize: 10 }}>
-                here
+      {/* PATCHBOARD (owner 2026-09-03): "Every astra in the astra menu."
+          A row hidden here is hidden from the switcher only — it does not
+          un-publish the astra, and the astra's own door still works. */}
+      {Object.entries(ASTRA_TOKENS)
+        .filter(([, t]) => visibility(SHELL_SWITCH.astra(t.slug)))
+        .map(([key, t]) => {
+          const current = t.tld === currentTld;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onSelect(key)}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors"
+              style={{ color: current ? 'var(--ink)' : 'var(--body)', fontSize: 12.5 }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background =
+                  'color-mix(in srgb, var(--accent) 12%, transparent)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              <span style={{ color: t.accent }}>
+                <AstraMark logo={t.logo} size={15} title={t.tld} />
               </span>
-            )}
-            {t.proposed && !current && (
-              <span className="ml-auto" style={{ color: 'var(--mute)', fontSize: 10 }}>
-                soon
+              <span className="font-mono" style={{ color: t.accent }}>
+                {t.tld}
               </span>
-            )}
-          </button>
-        );
-      })}
+              {current && (
+                <span className="ml-auto" style={{ color: 'var(--mute)', fontSize: 10 }}>
+                  here
+                </span>
+              )}
+              {t.proposed && !current && (
+                <span className="ml-auto" style={{ color: 'var(--mute)', fontSize: 10 }}>
+                  soon
+                </span>
+              )}
+            </button>
+          );
+        })}
     </div>
   );
 }
@@ -526,12 +630,21 @@ function Sidebar({
   railResting,
   peek,
   onPeek,
+  visibility,
 }: {
   nav: ShellNavGroup[];
   railResting: boolean;
   peek: boolean;
   onPeek: (v: boolean) => void;
+  visibility: ShellVisibility;
 }) {
+  // PATCHBOARD (owner 2026-09-03): "Every menu item." Each entry resolves its
+  // own shell.nav.<id> switch; a group whose entries all resolve off drops out
+  // rather than leaving a labelled empty section behind.
+  const groups = nav
+    .map((g) => ({ ...g, items: g.items.filter((it) => visibility(SHELL_SWITCH.nav(it.id))) }))
+    .filter((g) => g.items.length > 0);
+
   const fullPanel = (floating: boolean) => (
     <nav
       aria-label="sidebar"
@@ -541,7 +654,7 @@ function Sidebar({
       )}
       style={{ width: 240, background: 'var(--raised)', borderRight: '1px solid var(--hairline)' }}
     >
-      {nav.map((g) => (
+      {groups.map((g) => (
         <section key={g.id} className="flex flex-col gap-0.5 px-2">
           {g.label && (
             <h3
@@ -639,26 +752,28 @@ function Sidebar({
 }
 
 /* ── icon drawer — right chrome, tinted, no page load ───────────────────────*/
-const DRAWER_TITLE: Record<ToolbarSlot | 'bling' | 'handle', string> = {
-  tasks: 'Tasks',
-  security: 'Security',
-  alerts: 'Alerts',
-  notifications: 'Notifications',
-  bling: 'BLiNG!',
-  handle: 'Your stuff',
+const BUILTIN_PANELS: Record<PanelKey, PanelSpec> = {
+  tasks: { title: 'Tasks', width: 'wide' },
+  security: { title: 'Security', width: 'wide' },
+  alerts: { title: 'Alerts' },
+  notifications: { title: 'Notifications' },
+  bling: { title: 'BLiNG!' },
+  handle: { title: 'Your stuff' },
 };
 
 function IconDrawer({
   slot,
+  spec,
   onClose,
   render,
   bling,
   blingDisplay,
   blingUnit,
 }: {
-  slot: ToolbarSlot | 'bling' | 'handle';
+  slot: PanelKey;
+  spec: PanelSpec;
   onClose: () => void;
-  render?: (slot: ToolbarSlot | 'bling' | 'handle') => ReactNode;
+  render?: (slot: PanelKey) => ReactNode;
   bling: number | null;
   blingDisplay?: string;
   blingUnit?: string;
@@ -680,8 +795,10 @@ function IconDrawer({
   return (
     <aside
       ref={ref}
-      className="absolute right-0 top-0 z-40 flex h-full w-[320px] max-w-[85vw] flex-col shadow-2xl"
+      className="absolute right-0 top-0 z-40 flex h-full max-w-[92vw] flex-col shadow-2xl"
       style={{
+        // Per-panel width (owner ruling): the surface sizes to what it holds.
+        width: DRAWER_WIDTH[spec.width ?? 'compact'],
         background: 'color-mix(in srgb, var(--accent) 10%, #06070a)',
         borderLeft: '1px solid var(--line)',
       }}
@@ -691,7 +808,7 @@ function IconDrawer({
         style={{ height: 44, borderBottom: '1px solid var(--hairline)' }}
       >
         <h2 className="font-mono" style={{ color: 'var(--ink)', fontSize: 13 }}>
-          {DRAWER_TITLE[slot]}
+          {spec.title}
           {slot === 'bling' && (blingDisplay !== undefined || bling !== null) && (
             <span className="ml-2" style={{ color: 'var(--bling-gold)' }}>
               {blingDisplay ?? bling?.toLocaleString()}

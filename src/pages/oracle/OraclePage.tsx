@@ -2,8 +2,8 @@ import { COMPOSER_MEASURE, Composer, type ComposerBand } from '@/components/comp
 import { ByokKeyEntry } from '@/components/h24/ByokKeyEntry';
 import { H24CostPanel } from '@/components/h24/H24CostPanel';
 import { H24DrawerPanel } from '@/components/h24/H24DrawerPanel';
-import { HomeActivityPanel } from '@/components/h24/HomeActivityPanel';
 import { RoutingLogTable } from '@/components/h24/RoutingLogTable';
+import type { PanelKey } from '@/components/shell/UniversalShell';
 import { UniversalShell } from '@/components/shell/UniversalShell';
 import {
   type ByokProvider,
@@ -189,6 +189,11 @@ export function OraclePage() {
   }>({ loaded: false, error: null, entries: [], rates: [] });
 
   const [selectedCostId, setSelectedCostId] = useState<string | null>(null);
+
+  // SHELL v1.7 s1 — the right sidebar is ONE surface; "Recent activity" is
+  // the first left-nav entry that addresses it (SHELL_DRAWER2, folding
+  // HomeActivityPanel's old second-aside into this shared panel).
+  const [shellPanel, setShellPanel] = useState<PanelKey | null>(null);
 
   const loadLog = useCallback(async () => {
     if (!bee) {
@@ -376,6 +381,7 @@ export function OraclePage() {
     tokenBalance: tokens.balance,
     onOpenWallet: openStore,
     active: 'console',
+    onOpenActivity: () => setShellPanel('activity'),
   });
 
   // HOME vs DOCKED — home is the centered greeting + composer biased above
@@ -564,9 +570,9 @@ export function OraclePage() {
       {/* H24_FIX3 — visible, not silent: Llama has no frontier route today. */}
       {modelUnavailable && (
         <p className="mt-2" style={{ color: 'var(--error)', fontSize: 11.5 }} role="alert">
-          {model} has no route in Auto — h24 won't silently send this to a different model
-          instead. It only ever runs via the free band's own automatic routing (not
-          selectable there either). Pick a different model to send this directive.
+          {model} has no route in Auto — h24 won't silently send this to a different model instead.
+          It only ever runs via the free band's own automatic routing (not selectable there either).
+          Pick a different model to send this directive.
         </p>
       )}
       {/* BYOK affordance — only when a specific model is picked. */}
@@ -639,7 +645,25 @@ export function OraclePage() {
         if (k === 'h24') navigate('/h24');
         else navigate(`/${k}`);
       }}
+      panels={{ activity: { title: 'Recent activity', width: 'table' } }}
+      openPanel={shellPanel}
+      onOpenPanel={setShellPanel}
       renderPanel={(slot) => {
+        if (slot === 'activity') {
+          return (
+            <RoutingLogTable
+              log={log}
+              signedIn={Boolean(bee)}
+              selectedCostId={null}
+              // Quick-Look Law: any cost drill-down exits to the full page,
+              // which already owns the H24CostPanel side-by-side breakdown.
+              onSelectCost={() => navigate('/h24/log')}
+              onRefresh={() => void loadLog()}
+              onExport={exportCsv}
+              title="Recent"
+            />
+          );
+        }
         if (slot === 'bling') {
           return (
             <div className="flex flex-col gap-3">
@@ -813,12 +837,10 @@ export function OraclePage() {
           </div>
         ) : !docked ? (
           // HOME — centered greeting + one-line promise + composer, biased ~16vh
-          // above center. First send flips `docked`. H24_FIX2 — the routing
-          // log's THIRD surface (HomeActivityPanel) floats over this container
-          // (`relative` + the panel's own `absolute`) so a returning Bee sees
-          // their record before typing anything, per SHELL v1.5.1 chrome-overlay
-          // law (closes on outside click, minimizes rather than vanishing).
-          <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-5 md:px-8">
+          // above center. First send flips `docked`. The routing log's own
+          // surface is the "Recent activity" shell panel (left nav), not a
+          // second aside here (SHELL_DRAWER2).
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-5 md:px-8">
             <div
               className={cn(COMPOSER_MEASURE, 'flex flex-col items-stretch gap-5')}
               style={{ marginTop: '-16vh' }}
@@ -844,13 +866,6 @@ export function OraclePage() {
               )}
               {composerEl}
             </div>
-            <HomeActivityPanel
-              log={log}
-              signedIn={Boolean(bee)}
-              onOpenLog={() => navigate('/h24/log')}
-              onRefresh={() => void loadLog()}
-              onExport={exportCsv}
-            />
           </div>
         ) : (
           // DOCKED — conversation scrolls above, composer pinned at the bottom.
