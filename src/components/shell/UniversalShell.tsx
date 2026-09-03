@@ -20,8 +20,9 @@
  *    Notifications, BLiNG total + gold drop (number first), handle, avatar.
  *    SHELL v1.8: the BLiNG slot shows BLiNG — the astra's OWN balance (h24
  *    tokens) lives at the top of the left sidebar via `sidebarTop`, so the two
- *    currencies are never adjacent (CURRENCY_LAW v1.6 s1). Icons rest at
- *    --icon; each lights ITS OWN color on hover. BLiNG is always gold.
+ *    currencies are never adjacent (CURRENCY_LAW v1.6 s1). Icons rest WHITE
+ *    (--ink) and turn the ASTRA ACCENT on hover (owner 2026-09-03, supersedes
+ *    v1.5's per-icon colours). BLiNG is always gold.
  *  - Own name has NO @ (butch); other users are always @name. Handle opens the
  *    your-stuff DRAWER; avatar goes to the profile page.
  *  - ICON DRAWER (right chrome): every toolbar icon opens its quick panel there
@@ -36,6 +37,7 @@
  *    ready for ASTRA_COLORS v1 without touching this file again.
  */
 
+import { BlingDrawerPanel } from '@/components/shell/BlingDrawerPanel';
 import { AstraMark } from '@/components/shell/marks/AstraMark';
 import type { AstraTokens } from '@/lib/shell/astraTokens';
 import { ASTRA_TOKENS, astraCssVars } from '@/lib/shell/astraTokens';
@@ -80,13 +82,12 @@ export type ToolbarSlot = 'tasks' | 'security' | 'alerts' | 'notifications';
 /** Desktop hover-open intent delay for toolbar icons (SHELL mock, H24_DRAWER1). */
 const HOVER_OPEN_MS = 140;
 
-/** Per-slot hover color (SHELL v1.5): each icon lights its OWN color on hover. */
-const SLOT_HOVER: Record<ToolbarSlot, string> = {
-  tasks: '#3fbf6a', // green
-  security: '#3fb6b6', // teal
-  alerts: '#e0a23a', // amber
-  notifications: '#a983f0', // violet
-};
+/* ICON COLOUR LAW — owner 2026-09-03, supersedes SHELL v1.5's per-icon hover
+ * colours: "the icons are all white except bling drop, when you hover over them
+ * they turn the astra specific color." Rest = --ink, hover = --accent, for every
+ * strip and toolbar icon. BLiNG! keeps gold in every state (currency != astra). */
+const ICON_REST = 'var(--ink)';
+const ICON_HOVER = 'var(--accent)';
 
 /* ── THE RIGHT SIDEBAR AS ONE SURFACE (owner ruling 2026-09-03) ─────────────
  * "Every icon in the tool bar and some from the left sidebar will use that
@@ -177,6 +178,13 @@ export interface UniversalShellProps {
   /** Controlled setter — required for a left-sidebar entry to open a panel. */
   onOpenPanel?: (key: PanelKey | null) => void;
   /**
+   * Door out of the BLiNG! drawer to the full wallet page. The drawer itself is
+   * SHELL-LEVEL (owner 2026-09-03: balance, escrows, latest transactions —
+   * "just shortcuts to main info") and renders on every astra unless the page's
+   * renderPanel returns something for 'bling'.
+   */
+  onOpenLedger?: () => void;
+  /**
    * PATCHBOARD VISIBILITY (owner ruling 2026-09-03): every toolbar icon, every
    * sidebar entry and every astra-switcher row is a Patchboard switch resolving
    * Master -> Astra -> Bee. The page resolves once (loadShellVisibility) and
@@ -210,6 +218,7 @@ export function UniversalShell({
   panels,
   openPanel,
   onOpenPanel,
+  onOpenLedger,
   visibility = ALL_VISIBLE,
   children,
 }: UniversalShellProps) {
@@ -452,6 +461,8 @@ export function UniversalShell({
             spec={panelSpecs[drawer] ?? { title: drawer }}
             onClose={() => setDrawer(null)}
             render={renderPanel}
+            signedIn={signedIn}
+            onOpenLedger={onOpenLedger}
             bling={bling}
             blingDisplay={blingDisplay}
             blingUnit={blingUnit}
@@ -473,7 +484,7 @@ function StripButton({
   onClick,
   children,
   className,
-  iconColor = 'var(--icon)',
+  iconColor = ICON_REST,
   ...rest
 }: {
   label: string;
@@ -494,7 +505,7 @@ function StripButton({
       )}
       style={{ color: iconColor }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.color = 'var(--ink)';
+        e.currentTarget.style.color = ICON_HOVER;
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.color = iconColor;
@@ -506,7 +517,7 @@ function StripButton({
   );
 }
 
-/* ── right-toolbar icon — rests at --icon, lights its OWN color on hover ─────
+/* ── right-toolbar icon — rests WHITE, turns the astra accent on hover ───────
    DESKTOP HOVER-OPEN (SHELL mock, H24_DRAWER1): hovering the icon opens its
    drawer after a 140ms intent delay, so a quick sweep across the row does not
    fire every panel. Touch devices report (hover: none) and never arm the timer;
@@ -518,12 +529,13 @@ function ToolbarIcon({
   onClick,
   children,
 }: {
+  /** Kept for callers; colour no longer varies per slot (owner 2026-09-03). */
   slot: ToolbarSlot;
   label: string;
   onClick: () => void;
   children: ReactNode;
 }) {
-  const hover = SLOT_HOVER[slot];
+  void slot;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clear = () => {
     if (timer.current !== null) {
@@ -546,16 +558,16 @@ function ToolbarIcon({
       }}
       aria-label={label}
       className="flex h-8 w-8 items-center justify-center rounded-md transition-colors"
-      style={{ color: 'var(--icon)' }}
+      style={{ color: ICON_REST }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.color = hover;
+        e.currentTarget.style.color = ICON_HOVER;
         if (canHover()) {
           clear();
           timer.current = setTimeout(onClick, HOVER_OPEN_MS);
         }
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.color = 'var(--icon)';
+        e.currentTarget.style.color = ICON_REST;
         clear();
       }}
     >
@@ -789,6 +801,8 @@ function IconDrawer({
   spec,
   onClose,
   render,
+  signedIn,
+  onOpenLedger,
   bling,
   blingDisplay,
   blingUnit,
@@ -797,11 +811,22 @@ function IconDrawer({
   spec: PanelSpec;
   onClose: () => void;
   render?: (slot: PanelKey) => ReactNode;
+  signedIn: boolean;
+  onOpenLedger?: () => void;
   bling: number | null;
   blingDisplay?: string;
   blingUnit?: string;
 }) {
-  const panel = render?.(slot);
+  // The BLiNG! drawer is the shell's own unless the page overrides it.
+  const panel =
+    render?.(slot) ??
+    (slot === 'bling' ? (
+      <BlingDrawerPanel
+        balance={bling}
+        signedIn={signedIn}
+        onOpenLedger={onOpenLedger ?? (() => undefined)}
+      />
+    ) : null);
   // SHELL v1.5.1: any CHROME overlay closes on an outside click (the CONTENT
   // WINDOW does not — that is a different component). Mirrors AstraPicker. A
   // click on a toolbar icon lands outside the aside, so it closes this drawer

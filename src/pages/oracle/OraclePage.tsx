@@ -645,6 +645,7 @@ export function OraclePage() {
       onBack={() => navigate(-1)}
       onForward={() => navigate(1)}
       onSearch={() => navigate('/manual')}
+      onOpenLedger={() => navigate('/bling')}
       onAvatar={() => navigate('/profile')}
       onSelectAstra={(k) => {
         if (k === 'h24') navigate('/h24');
@@ -669,34 +670,10 @@ export function OraclePage() {
             />
           );
         }
-        if (slot === 'bling') {
-          return (
-            <div className="flex flex-col gap-3">
-              <div>
-                <div className="font-mono" style={{ color: 'var(--bling-gold)', fontSize: 22 }}>
-                  {tokens.balance === null ? '—' : formatTokens(tokens.balance)}
-                </div>
-                <div style={{ color: 'var(--mute)', fontSize: 11 }}>
-                  {tokens.status === 'live' ? 'h24 tokens' : tokens.reason}
-                </div>
-              </div>
-              {bee && (
-                <button
-                  type="button"
-                  onClick={openStore}
-                  className="rounded-md px-3 py-1.5 font-semibold transition-colors"
-                  style={{
-                    background: 'color-mix(in srgb, var(--buy-green) 16%, transparent)',
-                    color: 'var(--buy-green)',
-                    fontSize: 12.5,
-                  }}
-                >
-                  Get h24 tokens
-                </button>
-              )}
-            </div>
-          );
-        }
+        // 'bling' is deliberately NOT handled here: the BLiNG! drawer is the
+        // shell's own (balance, escrows, latest transactions) on every astra.
+        // h24 tokens live at the top of the left sidebar (H24SidebarTop). Owner
+        // 2026-09-03: "Bling is not h24 tokens. they are totally different things."
         if (slot === 'handle') {
           return (
             <div className="flex flex-col gap-2" style={{ fontSize: 12.5 }}>

@@ -91,6 +91,7 @@ export function H24CustomizePage() {
       }
       nav={nav}
       bling={blingBalance}
+      onOpenLedger={() => navigate('/bling')}
       sidebarTop={
         <H24SidebarTop balance={tokens.balance} signedIn={Boolean(bee)} onOpen={openStore} />
       }
