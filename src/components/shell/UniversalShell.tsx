@@ -8,14 +8,19 @@
  * RULINGS ENCODED (SHELL v1.5 §LAYOUT):
  *  - HEADER spans FULL WIDTH (44px); the sidebar hangs BELOW it. The left strip
  *    NEVER moves regardless of sidebar state.
- *  - Left strip order: [logo][TLD][astra picker][back][fwd][search][collapser].
- *    No dividers. Logo + TLD are ASTRA-COLORED; the controls are grey (--icon).
+ *  - Left strip order: [logo][TLD][astra picker][back][fwd][collapser]. No
+ *    dividers. Logo + TLD are ASTRA-COLORED; the controls are grey (--icon).
+ *    SHELL v1.8 (owner 2026-09-03): SEARCH moved to the right toolbar as its
+ *    FIRST icon; back/forward hide below `lg` (mobile AND tablet portrait).
  *  - Breadcrumbs live in the CONTENT top-left (never in the header).
  *  - Sidebar = pure nav. Collapsed = 52px ICON RAIL (never disappears); open =
  *    240px. Hovering the rail = INSTANT peek OVER content (absolute, no reflow);
  *    the collapser sets the resting state.
- *  - Right toolbar order: astra logo, Tasks, Security, Alerts, Notifications,
- *    BLiNG total + gold drop (number first), handle, avatar. Icons rest at
+ *  - Right toolbar order: Search, astra logo, Tasks, Security, Alerts,
+ *    Notifications, BLiNG total + gold drop (number first), handle, avatar.
+ *    SHELL v1.8: the BLiNG slot shows BLiNG — the astra's OWN balance (h24
+ *    tokens) lives at the top of the left sidebar via `sidebarTop`, so the two
+ *    currencies are never adjacent (CURRENCY_LAW v1.6 s1). Icons rest at
  *    --icon; each lights ITS OWN color on hover. BLiNG is always gold.
  *  - Own name has NO @ (butch); other users are always @name. Handle opens the
  *    your-stuff DRAWER; avatar goes to the profile page.
@@ -123,6 +128,13 @@ export interface UniversalShellProps {
   breadcrumb?: ReactNode;
   /** Sidebar nav groups (top group + astra groups). */
   nav: ShellNavGroup[];
+  /**
+   * SHELL v1.8 (owner 2026-09-03): a slot at the TOP of the left sidebar, above
+   * the first nav group. h24 puts its token balance here. This is where an
+   * astra's OWN balance goes; the header BLiNG slot stays BLiNG. Rendered in
+   * the open panel and the hover-peek, not on the 52px rail.
+   */
+  sidebarTop?: ReactNode;
   /** Live BLiNG! total; null renders an em-dash. Number shows FIRST, gold drop after. */
   bling?: number | null;
   /**
@@ -183,6 +195,7 @@ export function UniversalShell({
   tokens,
   breadcrumb,
   nav,
+  sidebarTop,
   bling = null,
   blingDisplay,
   blingUnit,
@@ -290,14 +303,13 @@ export function UniversalShell({
             )}
           </div>
 
-          <StripButton label="Back" onClick={onBack} className="hidden md:flex">
+          {/* SHELL v1.8: hidden below `lg` — mobile AND tablet portrait have
+              OS-level back; only tablet landscape and desktop show these. */}
+          <StripButton label="Back" onClick={onBack} className="hidden lg:flex">
             <ArrowLeft size={16} />
           </StripButton>
-          <StripButton label="Forward" onClick={onForward} className="hidden md:flex">
+          <StripButton label="Forward" onClick={onForward} className="hidden lg:flex">
             <ArrowRight size={16} />
-          </StripButton>
-          <StripButton label="Search" onClick={onSearch}>
-            <Search size={16} />
           </StripButton>
           <StripButton
             label={railResting ? 'Pin sidebar open' : 'Collapse sidebar to rail'}
@@ -309,8 +321,14 @@ export function UniversalShell({
 
         <div className="flex-1" />
 
-        {/* RIGHT TOOLBAR — astra, tasks, security, alerts, notifications, BLiNG, handle, avatar */}
+        {/* RIGHT TOOLBAR — search, astra, tasks, security, alerts, notifications, BLiNG, handle, avatar */}
         <div className="flex items-center gap-0.5">
+          {/* SHELL v1.8: Search is the FIRST right-toolbar icon (was in the left strip). */}
+          {visibility(SHELL_SWITCH.icon('search')) && (
+            <StripButton label="Search" onClick={onSearch}>
+              <Search size={16} />
+            </StripButton>
+          )}
           {visibility(SHELL_SWITCH.icon('h24')) && (
             <span
               className="flex items-center px-1.5"
@@ -405,6 +423,7 @@ export function UniversalShell({
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <Sidebar
           nav={nav}
+          top={sidebarTop}
           railResting={railResting}
           peek={peek}
           onPeek={setPeek}
@@ -627,12 +646,14 @@ function AstraPicker({
    hover container so moving rail→panel does not trip mouseleave — no flicker. */
 function Sidebar({
   nav,
+  top,
   railResting,
   peek,
   onPeek,
   visibility,
 }: {
   nav: ShellNavGroup[];
+  top?: ReactNode;
   railResting: boolean;
   peek: boolean;
   onPeek: (v: boolean) => void;
@@ -654,6 +675,8 @@ function Sidebar({
       )}
       style={{ width: 240, background: 'var(--raised)', borderRight: '1px solid var(--hairline)' }}
     >
+      {/* SHELL v1.8: the astra's own balance sits above the first nav group. */}
+      {top && <div className="px-2">{top}</div>}
       {groups.map((g) => (
         <section key={g.id} className="flex flex-col gap-0.5 px-2">
           {g.label && (

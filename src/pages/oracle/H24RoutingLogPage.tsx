@@ -11,9 +11,10 @@ import { buildH24Nav } from '@/lib/atlasoracle/h24Nav';
 import type { ModelRateRow } from '@/lib/atlasoracle/reconcile';
 import { formatTokensExact } from '@/lib/atlasoracle/reconcile';
 import { type RoutingLogEntry, fetchRoutingLog } from '@/lib/atlasoracle/routingLog';
-import { formatTokens } from '@/lib/atlasoracle/tokens';
 import { useOracleTokens } from '@/lib/atlasoracle/useOracleTokens';
+import { H24SidebarTop } from '@/components/h24/H24SidebarTop';
 import { useAuth } from '@/lib/auth';
+import { useBlingBalance } from '@/lib/useBlingBalance';
 import { H24_TOKENS } from '@/lib/shell/astraTokens';
 import { useH24Storefront } from '@/stores/useH24Storefront';
 import { useCallback, useEffect, useState } from 'react';
@@ -25,6 +26,8 @@ const FULL_LOG_LIMIT = 200;
 
 export function H24RoutingLogPage() {
   const { bee } = useAuth();
+  // SHELL v1.8: the header BLiNG slot shows BLiNG; h24 tokens go to the sidebar top.
+  const { balance: blingBalance } = useBlingBalance(Boolean(bee));
   const navigate = useNavigate();
   const openStore = useH24Storefront((s) => s.openStore);
   const { balance: tokens } = useOracleTokens(bee?.id ?? null);
@@ -117,9 +120,10 @@ export function H24RoutingLogPage() {
         </span>
       }
       nav={nav}
-      bling={tokens.balance}
-      blingDisplay={tokens.balance === null ? undefined : formatTokens(tokens.balance)}
-      blingUnit="h24"
+      bling={blingBalance}
+      sidebarTop={
+        <H24SidebarTop balance={tokens.balance} signedIn={Boolean(bee)} onOpen={openStore} />
+      }
       handle={bee?.handle ?? null}
       onBack={() => navigate(-1)}
       onForward={() => navigate(1)}
