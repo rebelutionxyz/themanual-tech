@@ -316,7 +316,7 @@ export function UniversalShell({
             </StripButton>
             {pickerOpen && (
               <AstraPicker
-                currentTld={tokens.tld}
+                currentSlug={tokens.slug}
                 onSelect={(k) => {
                   setPickerOpen(false);
                   onSelectAstra?.(k);
@@ -609,12 +609,12 @@ function ToolbarIcon({
 
 /* ── astra picker menu — tinted 16% (SHELL v1.5) ────────────────────────────*/
 function AstraPicker({
-  currentTld,
+  currentSlug,
   onSelect,
   onClose,
   visibility,
 }: {
-  currentTld: string;
+  currentSlug: string;
   onSelect: (key: string) => void;
   onClose: () => void;
   visibility: ShellVisibility;
@@ -648,8 +648,11 @@ function AstraPicker({
           if (Boolean(a.path) !== Boolean(b.path)) return a.path ? -1 : 1;
           return a.tld.localeCompare(b.tld, undefined, { sensitivity: 'base' });
         })
-        .map(([key, t]) => {
-          const current = t.tld === currentTld;
+        .map(([key, t], _i, rows) => {
+          // Owner 2026-09-03: "there are two .app in the astra menu, same with
+          // .tech." Same-TLD rows are different astras — say which.
+          const current = t.slug === currentSlug;
+          const shared = rows.filter(([, o]) => o.tld === t.tld).length > 1;
           return (
             <button
               key={key}
@@ -671,6 +674,11 @@ function AstraPicker({
               <span className="font-mono" style={{ color: t.accent }}>
                 {t.tld}
               </span>
+              {shared && (
+                <span className="font-mono" style={{ color: 'var(--mute)', fontSize: 10.5 }}>
+                  {t.slug}
+                </span>
+              )}
               {current && (
                 <span className="ml-auto" style={{ color: 'var(--mute)', fontSize: 10 }}>
                   here

@@ -45,10 +45,14 @@ const BLING_TOKENS: AstraTokens = {
   logo: 'fist',
 };
 
+/** The roof itself. FLAGSHIP's neutral frame, but the strip says where you are
+ *  the way h24's does — by name, not by a TLD three astras share. */
+const ROOF_TOKENS: AstraTokens = { ...FLAGSHIP_TOKENS, slug: 'manual', tld: 'TheMANUAL' };
+
 function tokensFor(section: string): AstraTokens {
   if (section === 'freedomblings' || section === 'bling') return BLING_TOKENS;
   if (section === 'dingleberry') return ASTRA_TOKENS.security;
-  return FLAGSHIP_TOKENS;
+  return ROOF_TOKENS;
 }
 
 /* ── nav per section ──────────────────────────────────────────────────────── */
