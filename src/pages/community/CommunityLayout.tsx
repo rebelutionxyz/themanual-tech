@@ -432,55 +432,107 @@ export function CommunityLayout() {
         ]
       : [{ id: surface, items: items.map(toNav) }];
 
-  // REALM1 — Realm nav group, INTEL + UNITE only. The row itself picks the
-  // realm (setRealmId + jump to the surface root, toggling off on repeat
-  // click); its chevron opens the sub-realm browser in the right drawer
-  // instead — the two affordances never fire together (stopPropagation).
+  // REALM2 (owner 2026-09-03): "Realm would be a menu item and open a sidebar
+  // if you click it." ONE row — "Realm", current realm as its hint, in the
+  // realm's own colour — sitting first in the surface's group. Click opens the
+  // right sidebar with the realm list; a row's chevron drills into sub-realms.
   function selectRealm(r: { id: RealmId; name: string }) {
     setRealmId(selectedRealmId === r.id ? null : r.id);
     if (location.pathname !== `/${surface}`) navigate(`/${surface}`);
   }
-  function openRealmDrawer(name: string) {
-    setRealmDrawerRoot(name);
-    setOpenPanel('realm');
-  }
   const showRealmNav = surface === 'intel' || surface === 'unite';
-  const realmNavItems: ShellNavItem[] = realmList.map((r) => {
-    const color = realmColors[r.id] ?? REALM_COLOR_FALLBACK;
-    return {
-      id: `realm-${r.id}`,
-      label: r.name,
-      icon: <Circle size={10} fill={color} stroke={color} />,
-      active: selectedRealmId === r.id,
-      onClick: () => selectRealm(r),
-      hint: (
-        // biome-ignore lint/a11y/useSemanticElements: nested inside the row's own <button> (UniversalShell Sidebar) — a real <button> here is invalid HTML nesting
-        <span
-          role="button"
-          tabIndex={0}
-          aria-label={`Browse ${r.name} sub-realms`}
-          onClick={(e) => {
-            e.stopPropagation();
-            openRealmDrawer(r.name);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.stopPropagation();
-              e.preventDefault();
-              openRealmDrawer(r.name);
-            }
-          }}
-          className="flex h-5 w-5 items-center justify-center rounded"
-          style={{ color: 'var(--icon)' }}
-        >
-          <ChevronRight size={13} />
-        </span>
-      ),
-    };
-  });
-  const nav: ShellNavGroup[] = showRealmNav
-    ? [{ id: 'realm', label: 'Realm', items: realmNavItems }, ...surfaceGroups]
-    : surfaceGroups;
+  const currentRealm = realmList.find((r) => r.id === selectedRealmId) ?? null;
+  const currentRealmColor = currentRealm
+    ? (realmColors[currentRealm.id] ?? REALM_COLOR_FALLBACK)
+    : 'var(--mute)';
+  const realmItem: ShellNavItem = {
+    id: 'realm',
+    label: 'Realm',
+    icon: <Compass size={17} />,
+    active: openPanel === 'realm',
+    hint: (
+      <span className="truncate" style={{ color: currentRealmColor, maxWidth: 96 }}>
+        {currentRealm?.name ?? 'All'}
+      </span>
+    ),
+    onClick: () => {
+      setRealmDrawerRoot(null);
+      setOpenPanel(openPanel === 'realm' ? null : 'realm');
+    },
+  };
+  const nav: ShellNavGroup[] =
+    showRealmNav && surfaceGroups.length > 0
+      ? [
+          { ...surfaceGroups[0], items: [realmItem, ...surfaceGroups[0].items] },
+          ...surfaceGroups.slice(1),
+        ]
+      : surfaceGroups;
+
+  const realmPanel = realmDrawerRoot ? (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => setRealmDrawerRoot(null)}
+        className="flex items-center gap-1 self-start rounded px-1 py-0.5 font-mono"
+        style={{ color: 'var(--body)', fontSize: 11.5 }}
+      >
+        <ChevronRight size={12} style={{ transform: 'rotate(180deg)' }} />
+        All realms
+      </button>
+      <div className="overflow-hidden rounded-md" style={{ background: 'var(--raised)' }}>
+        <RealmTreeContent rootPath={[realmDrawerRoot]} clearLabel={`All ${realmDrawerRoot}`} />
+      </div>
+    </div>
+  ) : (
+    <div className="flex flex-col">
+      <button
+        type="button"
+        onClick={() => {
+          setRealmId(null);
+          if (location.pathname !== `/${surface}`) navigate(`/${surface}`);
+        }}
+        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left"
+        style={{
+          color: selectedRealmId === null ? 'var(--ink)' : 'var(--body)',
+          background: selectedRealmId === null ? 'var(--raised)' : 'transparent',
+          fontSize: 12.5,
+        }}
+      >
+        <Circle size={10} stroke="var(--mute)" />
+        All realms
+      </button>
+      {realmList.map((r) => {
+        const color = realmColors[r.id] ?? REALM_COLOR_FALLBACK;
+        const current = selectedRealmId === r.id;
+        return (
+          <div
+            key={r.id}
+            className="flex items-center rounded-md"
+            style={{ background: current ? 'var(--raised)' : 'transparent' }}
+          >
+            <button
+              type="button"
+              onClick={() => selectRealm(r)}
+              className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left"
+              style={{ color: current ? 'var(--ink)' : 'var(--body)', fontSize: 12.5 }}
+            >
+              <Circle size={10} fill={color} stroke={color} />
+              <span className="truncate">{r.name}</span>
+            </button>
+            <button
+              type="button"
+              aria-label={`Browse ${r.name} sub-realms`}
+              onClick={() => setRealmDrawerRoot(r.name)}
+              className="flex h-7 w-7 items-center justify-center rounded"
+              style={{ color: 'var(--icon)' }}
+            >
+              <ChevronRight size={13} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
 
   return (
     <UniversalShell
@@ -501,16 +553,7 @@ export function CommunityLayout() {
       panels={{ realm: { title: realmDrawerRoot ?? 'Realm', width: 'compact' } }}
       openPanel={openPanel}
       onOpenPanel={setOpenPanel}
-      renderPanel={(slot) =>
-        slot === 'realm' ? (
-          <div className="overflow-hidden rounded-md bg-white">
-            <RealmTreeContent
-              rootPath={realmDrawerRoot ? [realmDrawerRoot] : []}
-              clearLabel={realmDrawerRoot ? `All ${realmDrawerRoot}` : 'All realms'}
-            />
-          </div>
-        ) : undefined
-      }
+      renderPanel={(slot) => (slot === 'realm' ? realmPanel : undefined)}
     >
       <Outlet context={outletCtx} />
 

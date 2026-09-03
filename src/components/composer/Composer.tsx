@@ -254,8 +254,18 @@ export function Composer({
     // ring is driven by JS focus state (CSS focus-within can't reach a custom
     // property swap cleanly across the fallback). Fallbacks keep the composer
     // sane if it is ever mounted outside an `.astra-shell` scope.
+    // biome-ignore lint/a11y/useKeyWithClickEvents: pointer convenience only — the textarea inside is the keyboard target
+    // biome-ignore lint/a11y/noStaticElementInteractions: same — click-anywhere-to-focus, not a control
     <div
       className={cn(COMPOSER_MEASURE, 'rounded-2xl p-2 transition-colors')}
+      // Owner 2026-09-03: "if you click anywhere in the input box it activates
+      // it, not some tiny little spot." Any click on the box that isn't on a
+      // control lands the caret in the textarea.
+      onClick={(e) => {
+        const t = e.target as HTMLElement;
+        if (t.closest('button, select, a, [role="menu"], [role="menuitem"]')) return;
+        taRef.current?.focus();
+      }}
       style={{
         background: 'var(--input, #10141b)',
         border: `1px solid ${focused ? 'var(--accent, #ef6c2a)' : 'rgba(248,249,250,0.22)'}`,

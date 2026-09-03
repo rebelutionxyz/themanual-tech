@@ -393,8 +393,11 @@ export function OraclePage() {
   // (or the log already has history). `forceHome` (H24_FIX1 defect 7) lets
   // "New" return here even when the log has history, so the primary action of
   // the console has a visible effect instead of silently no-opping.
-  const docked =
-    Boolean(bee) && !forceHome && (hasSent || log.entries.length > 0 || Boolean(response));
+  // Owner 2026-09-03: "why is the routing log on the home page. it should just
+  // be." Log HISTORY no longer docks the console — home is the greeting + box
+  // until you actually send something this visit. The log lives at /h24/log
+  // and in the Recent activity panel.
+  const docked = Boolean(bee) && !forceHome && (hasSent || Boolean(response));
 
   // BYOK save/revoke (H24_BYOK1) — submitByokKey validates live + vaults the
   // key server-side; the raw value passes through this call only and is never
@@ -979,27 +982,9 @@ export function OraclePage() {
                     </div>
                   )}
 
-                  {/* H24_FIX1 defect 9 — compact inline log; the full,
-                      filterable log lives at /h24/log (also reachable from the
-                      Activity sidebar item and the alerts drawer). */}
-                  <RoutingLogTable
-                    log={log}
-                    signedIn={Boolean(bee)}
-                    selectedCostId={selectedCostId}
-                    onSelectCost={setSelectedCostId}
-                    onRefresh={() => void loadLog()}
-                    onExport={exportCsv}
-                  />
-                  {log.entries.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => navigate('/h24/log')}
-                      className="self-start underline-offset-2 hover:underline"
-                      style={{ color: 'var(--body)', fontSize: 12 }}
-                    >
-                      View the full routing log →
-                    </button>
-                  )}
+                  {/* Owner 2026-09-03: no inline routing log under the
+                      conversation — the log has its own surface (/h24/log,
+                      Recent activity). */}
                 </div>
               </div>
 
