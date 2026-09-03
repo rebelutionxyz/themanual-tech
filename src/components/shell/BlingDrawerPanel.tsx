@@ -13,7 +13,7 @@
  * section renders its own honest empty state; nothing here invents a row.
  *
  * Language firewall (CURRENCY canon): FREE / GIVE / SEND — never buy, mint,
- * price. The wallet door says "Open the ledger".
+ * price. Doors: "Transfer" (move composer) and "Open BLiNG!" (the house).
  */
 
 import { supabase } from '@/lib/supabase';
@@ -50,11 +50,14 @@ export function BlingDrawerPanel({
   balance,
   signedIn,
   onOpenLedger,
+  onTransfer,
 }: {
   balance: number | null;
   signedIn: boolean;
   /** Door to the full wallet page — the one "exit" this quick panel owns. */
   onOpenLedger: () => void;
+  /** Owner 2026-09-03: "transfer could be an option in the right bling sidebar." */
+  onTransfer?: () => void;
 }) {
   const [escrows, setEscrows] = useState<EscrowRow[] | null>(null);
   const [txs, setTxs] = useState<TxRow[] | null>(null);
@@ -191,24 +194,34 @@ export function BlingDrawerPanel({
               })}
       </div>
 
-      {/* the one exit */}
-      <button
-        type="button"
-        onClick={onOpenLedger}
-        className="flex items-center justify-between rounded-md px-3 py-2 transition-colors"
-        style={{ border: '1px solid var(--line)', color: 'var(--body)', fontSize: 12.5 }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = 'var(--bling-gold)';
-          e.currentTarget.style.color = 'var(--ink)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = 'var(--line)';
-          e.currentTarget.style.color = 'var(--body)';
-        }}
-      >
-        Open the ledger
-        <ArrowRight size={14} />
-      </button>
+      {/* the doors — Transfer (move-value composer) + the BLiNG! house itself.
+          Owner 2026-09-03: "open the ledger should just open bling". */}
+      <div className="flex flex-col gap-1.5">
+        {onTransfer && signedIn && <DrawerDoor label="Transfer" onClick={onTransfer} />}
+        <DrawerDoor label="Open BLiNG!" onClick={onOpenLedger} />
+      </div>
     </div>
+  );
+}
+
+function DrawerDoor({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center justify-between rounded-md px-3 py-2 transition-colors"
+      style={{ border: '1px solid var(--line)', color: 'var(--body)', fontSize: 12.5 }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = 'var(--bling-gold)';
+        e.currentTarget.style.color = 'var(--ink)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'var(--line)';
+        e.currentTarget.style.color = 'var(--body)';
+      }}
+    >
+      {label}
+      <ArrowRight size={14} />
+    </button>
   );
 }

@@ -33,7 +33,7 @@ import { H24SidebarTop } from '@/components/h24/H24SidebarTop';
 import { useAuth } from '@/lib/auth';
 import { useBlingBalance } from '@/lib/useBlingBalance';
 import { uploadToLibrary } from '@/lib/media';
-import { H24_TOKENS } from '@/lib/shell/astraTokens';
+import { H24_TOKENS, astraPath } from '@/lib/shell/astraTokens';
 import { cn } from '@/lib/utils';
 import { useH24Storefront } from '@/stores/useH24Storefront';
 import { X } from 'lucide-react';
@@ -645,11 +645,12 @@ export function OraclePage() {
       onBack={() => navigate(-1)}
       onForward={() => navigate(1)}
       onSearch={() => navigate('/manual')}
-      onOpenLedger={() => navigate('/bling')}
+      onOpenLedger={() => navigate('/freedomblings')}
+      onTransfer={() => navigate('/freedomblings/move')}
       onAvatar={() => navigate('/profile')}
       onSelectAstra={(k) => {
-        if (k === 'h24') navigate('/h24');
-        else navigate(`/${k}`);
+        const to = astraPath(k);
+        if (to) navigate(to);
       }}
       panels={{ activity: { title: 'Recent activity', width: 'table' } }}
       openPanel={shellPanel}

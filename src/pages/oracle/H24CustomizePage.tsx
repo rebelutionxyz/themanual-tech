@@ -26,7 +26,7 @@ import { useOracleTokens } from '@/lib/atlasoracle/useOracleTokens';
 import { H24SidebarTop } from '@/components/h24/H24SidebarTop';
 import { useAuth } from '@/lib/auth';
 import { useBlingBalance } from '@/lib/useBlingBalance';
-import { H24_TOKENS } from '@/lib/shell/astraTokens';
+import { H24_TOKENS, astraPath } from '@/lib/shell/astraTokens';
 import { useH24Storefront } from '@/stores/useH24Storefront';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -91,7 +91,8 @@ export function H24CustomizePage() {
       }
       nav={nav}
       bling={blingBalance}
-      onOpenLedger={() => navigate('/bling')}
+      onOpenLedger={() => navigate('/freedomblings')}
+      onTransfer={() => navigate('/freedomblings/move')}
       sidebarTop={
         <H24SidebarTop balance={tokens.balance} signedIn={Boolean(bee)} onOpen={openStore} />
       }
@@ -101,8 +102,8 @@ export function H24CustomizePage() {
       onSearch={() => navigate('/manual')}
       onAvatar={() => navigate('/profile')}
       onSelectAstra={(k) => {
-        if (k === 'h24') navigate('/h24');
-        else navigate(`/${k}`);
+        const to = astraPath(k);
+        if (to) navigate(to);
       }}
     >
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 md:px-8">

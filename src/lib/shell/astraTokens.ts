@@ -63,11 +63,18 @@ export interface AstraTokens {
   contrast?: number;
   /** PROPOSED rows are not yet ruled — the owner ratifies ASTRA_COLORS. */
   proposed?: boolean;
+  /**
+   * ONE_ROOF v1 — the astra's door INSIDE the roof. Set = the astra is live and
+   * the switcher navigates here; unset = the switcher shows "soon". `proposed`
+   * is about the colour, `path` is about the door — they are independent.
+   */
+  path?: string;
 }
 
 /** h24 — LOCKED (ORACLE_MF v1.46). Burnt orange; BLiNG! stays gold regardless. */
 export const H24_TOKENS: AstraTokens = {
   slug: 'h24',
+  path: '/h24',
   tld: 'h24',
   logo: 'butterfly',
   accent: '#ef6c2a',
@@ -107,8 +114,12 @@ export const FLAGSHIP_TOKENS: AstraTokens = {
 export const ASTRA_TOKENS: Record<string, AstraTokens> = {
   h24: H24_TOKENS,
   flagship: FLAGSHIP_TOKENS,
+  // NOT in the menu (owner 2026-09-03): DingleBERRY IS the .icu security astra
+  // (one row, below); FreedomBLiNGS is the BLiNG! toolbar icon, not an astra;
+  // Brandosophic is unruled. None gets a row here.
   justice: {
     slug: 'justice',
+    path: '/realm/justice',
     tld: '.org',
     logo: 'fist',
     accent: '#6ea2df',
@@ -123,6 +134,7 @@ export const ASTRA_TOKENS: Record<string, AstraTokens> = {
   },
   vote: {
     slug: 'vote',
+    path: '/vote',
     tld: '.vote',
     logo: 'fist',
     accent: '#b1a100',
@@ -137,6 +149,7 @@ export const ASTRA_TOKENS: Record<string, AstraTokens> = {
   },
   events: {
     slug: 'events',
+    path: '/rule',
     tld: '.events',
     logo: 'fist',
     accent: '#c27fdd',
@@ -151,6 +164,7 @@ export const ASTRA_TOKENS: Record<string, AstraTokens> = {
   },
   groups: {
     slug: 'groups',
+    path: '/unite',
     tld: '.group',
     logo: 'fist',
     accent: '#e573a2',
@@ -165,6 +179,7 @@ export const ASTRA_TOKENS: Record<string, AstraTokens> = {
   },
   talk: {
     slug: 'talk',
+    path: '/comms',
     tld: '.talk',
     logo: 'fist',
     accent: '#00b1d7',
@@ -179,6 +194,7 @@ export const ASTRA_TOKENS: Record<string, AstraTokens> = {
   },
   news: {
     slug: 'news',
+    path: '/pulse',
     tld: '.news',
     logo: 'fist',
     accent: '#d28f00',
@@ -207,6 +223,7 @@ export const ASTRA_TOKENS: Record<string, AstraTokens> = {
   },
   bazaar: {
     slug: 'bazaar',
+    path: '/bazaar',
     tld: '.shop',
     logo: 'fist',
     accent: '#00b8a8',
@@ -249,6 +266,7 @@ export const ASTRA_TOKENS: Record<string, AstraTokens> = {
   },
   security: {
     slug: 'security',
+    path: '/security',
     tld: '.icu',
     logo: 'fist',
     accent: '#5faeae',
@@ -291,6 +309,7 @@ export const ASTRA_TOKENS: Record<string, AstraTokens> = {
   },
   intel: {
     slug: 'intel',
+    path: '/intel',
     tld: '.fyi',
     logo: 'fist',
     accent: '#8195fb',
@@ -319,6 +338,7 @@ export const ASTRA_TOKENS: Record<string, AstraTokens> = {
   },
   studio: {
     slug: 'studio',
+    path: '/studio',
     tld: '.studio',
     logo: 'fist',
     accent: '#cc7bd1',
@@ -375,6 +395,7 @@ export const ASTRA_TOKENS: Record<string, AstraTokens> = {
   },
   fund: {
     slug: 'fund',
+    path: '/fund',
     tld: '.fund',
     logo: 'fist',
     accent: '#58b38c',
@@ -441,10 +462,16 @@ export const ASTRA_TOKENS: Record<string, AstraTokens> = {
  * old chrome while ASTRA_COLORS catches up. dim/bg are CSS color-mix
  * expressions — valid values for the custom properties, no color library.
  */
-export function tokensFromAccent(slug: string, tld: string, accent: string): AstraTokens {
+export function tokensFromAccent(
+  slug: string,
+  tld: string,
+  accent: string,
+  path?: string,
+): AstraTokens {
   return {
     slug,
     tld,
+    path,
     logo: 'fist',
     accent,
     accentDim: `color-mix(in srgb, ${accent} 58%, #000)`,
@@ -468,4 +495,9 @@ export function astraCssVars(t: AstraTokens): CSSProperties {
     // so the whole shell's scrollbars are accent-dim at rest, accent on grab.
     '--surface-accent': t.accentDim,
   } as CSSProperties;
+}
+
+/** In-roof door for a switcher key, or null when the astra has no door yet. */
+export function astraPath(key: string): string | null {
+  return ASTRA_TOKENS[key]?.path ?? null;
 }

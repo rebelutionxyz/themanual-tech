@@ -5,7 +5,12 @@ import type { IntelView } from '@/components/intel/IntelSidebar';
 import { type ShellNavGroup, UniversalShell } from '@/components/shell/UniversalShell';
 import { COMMON_TAIL, type SidebarItem } from '@/components/shell/sidebarNav';
 import { useAuth } from '@/lib/auth';
-import { ASTRA_TOKENS, type AstraTokens, tokensFromAccent } from '@/lib/shell/astraTokens';
+import {
+  ASTRA_TOKENS,
+  type AstraTokens,
+  astraPath,
+  tokensFromAccent,
+} from '@/lib/shell/astraTokens';
 import { useBlingBalance } from '@/lib/useBlingBalance';
 import { countMySavesForSurface } from '@/lib/bookmarks';
 import { countMyGoingUpcoming } from '@/lib/events';
@@ -35,7 +40,7 @@ import {
   Ticket,
   Users,
 } from 'lucide-react';
-import { createElement, useCallback, useEffect, useState } from 'react';
+import { createElement, useCallback, useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 type Surface = 'intel' | 'unite' | 'rule' | 'give' | 'pulse' | 'bazaar' | 'comms' | 'security';
@@ -66,21 +71,6 @@ const SURFACE_TLD: Record<Surface, string> = {
   bazaar: '.shop',
   comms: '.talk',
   security: '.icu',
-};
-/** Astra-picker key -> in-roof path. Every door lands inside the one roof. */
-const ASTRA_PATH: Record<string, string> = {
-  h24: '/h24',
-  intel: '/intel',
-  groups: '/unite',
-  events: '/rule',
-  fund: '/fund',
-  news: '/pulse',
-  bazaar: '/bazaar',
-  talk: '/comms',
-  security: '/security',
-  justice: '/realm/justice',
-  vote: '/vote',
-  studio: '/studio',
 };
 
 const ACCENT: Record<Surface, string> = {
@@ -119,7 +109,14 @@ const TAIL_ROUTE_ITEM: [string, string][] = [
 ];
 const UNFILTERED_VIEWS: IntelView[] = ['mythreads', 'saved', 'home'];
 
-function surfaceFromPath(pathname: string): Surface {
+/**
+ * Owner 2026-09-03: "if I am in .shop and hit account it changes to .fyi. It
+ * needs to stay in .shop." Utility-tail routes (/account, /studio, /settings,
+ * /notifications, /bookmarks, ...) belong to NO astra, so they return null and
+ * the layout keeps the astra you came from. Only a real surface path switches.
+ */
+function surfaceFromPath(pathname: string): Surface | null {
+  if (pathname.startsWith('/intel')) return 'intel';
   if (pathname.startsWith('/unite')) return 'unite';
   if (pathname.startsWith('/rule')) return 'rule';
   // FUND lives at /fund now (FUND_MF v0.1); the surface KEY stays 'give'.
@@ -128,6 +125,17 @@ function surfaceFromPath(pathname: string): Surface {
   if (pathname.startsWith('/bazaar')) return 'bazaar';
   if (pathname.startsWith('/comms')) return 'comms';
   if (pathname.startsWith('/security')) return 'security';
+  return null;
+}
+
+const LAST_SURFACE_KEY = 'shell.lastSurface';
+function readLastSurface(): Surface {
+  try {
+    const v = sessionStorage.getItem(LAST_SURFACE_KEY);
+    if (v && v in SURFACE_ASTRA_KEY) return v as Surface;
+  } catch {
+    /* storage unavailable — fall through */
+  }
   return 'intel';
 }
 
@@ -147,7 +155,19 @@ export function CommunityLayout() {
   const shellPath =
     (location.state as { background?: { pathname: string } } | null)?.background?.pathname ??
     location.pathname;
-  const surface = surfaceFromPath(shellPath);
+  // Sticky astra: a tail route keeps the surface you were on (ref survives
+  // navigation because this layout mounts once; sessionStorage survives reload).
+  const lastSurface = useRef<Surface>(readLastSurface());
+  const routed = surfaceFromPath(shellPath);
+  if (routed) {
+    lastSurface.current = routed;
+    try {
+      sessionStorage.setItem(LAST_SURFACE_KEY, routed);
+    } catch {
+      /* ignore */
+    }
+  }
+  const surface = routed ?? lastSurface.current;
 
   // INTEL state lives in its store; UNITE/RULE/GIVE views are local (persist
   // because this layout mounts once).
@@ -384,9 +404,10 @@ export function CommunityLayout() {
       onForward={() => navigate(1)}
       onSearch={() => navigate('/manual')}
       onAvatar={() => navigate('/profile')}
-      onOpenLedger={() => navigate('/bling')}
+      onOpenLedger={() => navigate('/freedomblings')}
+      onTransfer={() => navigate('/freedomblings/move')}
       onSelectAstra={(key) => {
-        const to = ASTRA_PATH[key];
+        const to = astraPath(key);
         if (to) navigate(to);
       }}
     >

@@ -16,7 +16,7 @@
  *  - Sidebar = pure nav. Collapsed = 52px ICON RAIL (never disappears); open =
  *    240px. Hovering the rail = INSTANT peek OVER content (absolute, no reflow);
  *    the collapser sets the resting state.
- *  - Right toolbar order: Search, astra logo, Tasks, Security, Alerts,
+ *  - Right toolbar order: Search, Tasks, Security, Alerts,
  *    Notifications, BLiNG total + gold drop (number first), handle, avatar.
  *    SHELL v1.8: the BLiNG slot shows BLiNG — the astra's OWN balance (h24
  *    tokens) lives at the top of the left sidebar via `sidebarTop`, so the two
@@ -88,6 +88,16 @@ const HOVER_OPEN_MS = 140;
  * strip and toolbar icon. BLiNG! keeps gold in every state (currency != astra). */
 const ICON_REST = 'var(--ink)';
 const ICON_HOVER = 'var(--accent)';
+
+/** SHELL v1.10 — header BLiNG reads compact ("10.9k", "1.2M"); the drawer and
+ *  the ledger show the full figure. Truncates (never rounds up a balance). */
+export function compactAmount(n: number): string {
+  const abs = Math.abs(n);
+  if (abs < 1000) return n.toLocaleString();
+  const trunc = (v: number) => (Math.floor(v * 10) / 10).toString();
+  if (abs < 1_000_000) return `${trunc(n / 1000)}k`;
+  return `${trunc(n / 1_000_000)}M`;
+}
 
 /* ── THE RIGHT SIDEBAR AS ONE SURFACE (owner ruling 2026-09-03) ─────────────
  * "Every icon in the tool bar and some from the left sidebar will use that
@@ -184,6 +194,8 @@ export interface UniversalShellProps {
    * renderPanel returns something for 'bling'.
    */
   onOpenLedger?: () => void;
+  /** BLiNG drawer "Transfer" door (owner 2026-09-03) — the move-value composer. */
+  onTransfer?: () => void;
   /**
    * PATCHBOARD VISIBILITY (owner ruling 2026-09-03): every toolbar icon, every
    * sidebar entry and every astra-switcher row is a Patchboard switch resolving
@@ -219,6 +231,7 @@ export function UniversalShell({
   openPanel,
   onOpenPanel,
   onOpenLedger,
+  onTransfer,
   visibility = ALL_VISIBLE,
   children,
 }: UniversalShellProps) {
@@ -281,7 +294,7 @@ export function UniversalShell({
             <AstraMark logo={tokens.logo} size={20} title={tokens.tld} />
           </span>
           <span
-            className="pr-0.5 font-semibold"
+            className="font-semibold"
             style={{ color: 'var(--accent)', fontSize: 15, letterSpacing: '0.01em' }}
           >
             {tokens.tld}
@@ -289,8 +302,10 @@ export function UniversalShell({
 
           {/* astra picker — chevron takes the astra's own --accent (SHELL v1.6):
               a live cue to which astra you're in, wired to the token so
-              ASTRA_COLORS v1 resolves it later without touching this file. */}
-          <div className="relative">
+              ASTRA_COLORS v1 resolves it later without touching this file.
+              Owner 2026-09-03: sits tight against the TLD (negative margin eats
+              the strip gap + the button's own centring slack). */}
+          <div className="relative -ml-2">
             <StripButton
               label="Switch astra"
               onClick={() => setPickerOpen((v) => !v)}
@@ -330,7 +345,7 @@ export function UniversalShell({
 
         <div className="flex-1" />
 
-        {/* RIGHT TOOLBAR — search, astra, tasks, security, alerts, notifications, BLiNG, handle, avatar */}
+        {/* RIGHT TOOLBAR — search, tasks, security, alerts, notifications, BLiNG, handle, avatar */}
         <div className="flex items-center gap-0.5">
           {/* SHELL v1.8: Search is the FIRST right-toolbar icon (was in the left strip). */}
           {visibility(SHELL_SWITCH.icon('search')) && (
@@ -338,15 +353,8 @@ export function UniversalShell({
               <Search size={16} />
             </StripButton>
           )}
-          {visibility(SHELL_SWITCH.icon('h24')) && (
-            <span
-              className="flex items-center px-1.5"
-              style={{ color: 'var(--accent)' }}
-              title={tokens.tld}
-            >
-              <AstraMark logo={tokens.logo} size={17} title={tokens.tld} />
-            </span>
-          )}
+          {/* SHELL v1.10 (owner 2026-09-03): no current-astra icon here — the
+              left strip [logo][TLD][chevron] already says where you are. */}
           {visibility(SHELL_SWITCH.icon('tasks')) && (
             <ToolbarIcon slot="tasks" label="Tasks" onClick={() => setDrawer('tasks')}>
               <Calendar size={17} />
@@ -383,7 +391,7 @@ export function UniversalShell({
               style={{ color: 'var(--bling-gold)', fontSize: 12.5 }}
             >
               <span className="font-mono font-semibold tabular-nums">
-                {blingDisplay ?? (bling === null ? '—' : bling.toLocaleString())}
+                {blingDisplay ?? (bling === null ? '—' : compactAmount(bling))}
               </span>
               {blingUnit && <span style={{ fontSize: 10, color: 'var(--mute)' }}>{blingUnit}</span>}
               <Droplet size={14} fill="var(--bling-gold)" stroke="var(--bling-gold)" />
@@ -463,6 +471,7 @@ export function UniversalShell({
             render={renderPanel}
             signedIn={signedIn}
             onOpenLedger={onOpenLedger}
+            onTransfer={onTransfer}
             bling={bling}
             blingDisplay={blingDisplay}
             blingUnit={blingUnit}
@@ -498,9 +507,8 @@ function StripButton({
       type="button"
       onClick={onClick}
       aria-label={label}
-      title={label}
       className={cn(
-        'flex h-8 w-8 items-center justify-center rounded-md transition-colors',
+        'group relative flex h-8 w-8 items-center justify-center rounded-md transition-colors',
         className,
       )}
       style={{ color: iconColor }}
@@ -513,7 +521,29 @@ function StripButton({
       {...rest}
     >
       {children}
+      <InstantTip label={label} />
     </button>
+  );
+}
+
+/* ── instant label — owner 2026-09-03: "if you hover an icon in the toolbar the
+   title needs to appear right away, not wait." Native `title` waits ~1s, so every
+   strip/toolbar icon carries this CSS tip instead: visible the instant the
+   button is hovered or focused, gone on leave. Pointer-inert, never a target. */
+function InstantTip({ label }: { label: string }) {
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute left-1/2 top-full z-40 mt-1 -translate-x-1/2 whitespace-nowrap rounded px-1.5 py-0.5 font-mono opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+      style={{
+        fontSize: 10.5,
+        color: 'var(--ink)',
+        background: 'var(--raised)',
+        border: '1px solid var(--line)',
+      }}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -521,8 +551,8 @@ function StripButton({
    DESKTOP HOVER-OPEN (SHELL mock, H24_DRAWER1): hovering the icon opens its
    drawer after a 140ms intent delay, so a quick sweep across the row does not
    fire every panel. Touch devices report (hover: none) and never arm the timer;
-   the click path always works. NO title tooltip here — the panel IS the
-   affordance ("tooltips only on act-only buttons"); aria-label stays for a11y. */
+   the click path always works. The label shows INSTANTLY on hover (InstantTip),
+   owner 2026-09-03; aria-label stays for a11y. */
 function ToolbarIcon({
   slot,
   label,
@@ -557,7 +587,7 @@ function ToolbarIcon({
         onClick();
       }}
       aria-label={label}
-      className="flex h-8 w-8 items-center justify-center rounded-md transition-colors"
+      className="group relative flex h-8 w-8 items-center justify-center rounded-md transition-colors"
       style={{ color: ICON_REST }}
       onMouseEnter={(e) => {
         e.currentTarget.style.color = ICON_HOVER;
@@ -572,6 +602,7 @@ function ToolbarIcon({
       }}
     >
       {children}
+      <InstantTip label={label} />
     </button>
   );
 }
@@ -609,8 +640,14 @@ function AstraPicker({
       {/* PATCHBOARD (owner 2026-09-03): "Every astra in the astra menu."
           A row hidden here is hidden from the switcher only — it does not
           un-publish the astra, and the astra's own door still works. */}
+      {/* Owner 2026-09-03: TLDs alphabetical; the ones with a door first, the
+          "soon" rows below them, alphabetical again. */}
       {Object.entries(ASTRA_TOKENS)
         .filter(([, t]) => visibility(SHELL_SWITCH.astra(t.slug)))
+        .sort(([, a], [, b]) => {
+          if (Boolean(a.path) !== Boolean(b.path)) return a.path ? -1 : 1;
+          return a.tld.localeCompare(b.tld, undefined, { sensitivity: 'base' });
+        })
         .map(([key, t]) => {
           const current = t.tld === currentTld;
           return (
@@ -639,7 +676,7 @@ function AstraPicker({
                   here
                 </span>
               )}
-              {t.proposed && !current && (
+              {!t.path && !current && (
                 <span className="ml-auto" style={{ color: 'var(--mute)', fontSize: 10 }}>
                   soon
                 </span>
@@ -803,6 +840,7 @@ function IconDrawer({
   render,
   signedIn,
   onOpenLedger,
+  onTransfer,
   bling,
   blingDisplay,
   blingUnit,
@@ -813,6 +851,8 @@ function IconDrawer({
   render?: (slot: PanelKey) => ReactNode;
   signedIn: boolean;
   onOpenLedger?: () => void;
+  /** BLiNG drawer "Transfer" door (owner 2026-09-03) — the move-value composer. */
+  onTransfer?: () => void;
   bling: number | null;
   blingDisplay?: string;
   blingUnit?: string;
@@ -825,6 +865,7 @@ function IconDrawer({
         balance={bling}
         signedIn={signedIn}
         onOpenLedger={onOpenLedger ?? (() => undefined)}
+        onTransfer={onTransfer}
       />
     ) : null);
   // SHELL v1.5.1: any CHROME overlay closes on an outside click (the CONTENT
