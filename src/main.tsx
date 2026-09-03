@@ -11,6 +11,8 @@ import { supabase } from '@/lib/supabase';
 // Scoped surface skin — every rule lives under [data-surface='freedomblings'],
 // so these warm-paper/white+gold tokens never touch the dark platform chrome.
 import './styles/freedomblings.css';
+// Light-theme literal remap for pages written against the retired white shell.
+import './styles/dark-remap.css';
 
 setShellSupabase(supabase);
 
