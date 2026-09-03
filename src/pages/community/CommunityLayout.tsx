@@ -2,32 +2,41 @@ import { BAZAAR_ACCENT } from '@/components/bazaar/cards';
 import { CreateEventModal } from '@/components/events/CreateEventModal';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
 import type { IntelView } from '@/components/intel/IntelSidebar';
-import { type ShellNavGroup, UniversalShell } from '@/components/shell/UniversalShell';
+import { RealmTreeContent } from '@/components/shell/RealmTreeSlider';
+import {
+  type PanelKey,
+  type ShellNavGroup,
+  type ShellNavItem,
+  UniversalShell,
+} from '@/components/shell/UniversalShell';
 import { COMMON_TAIL, type SidebarItem } from '@/components/shell/sidebarNav';
 import { useAuth } from '@/lib/auth';
-import {
-  ASTRA_TOKENS,
-  type AstraTokens,
-  astraPath,
-  tokensFromAccent,
-} from '@/lib/shell/astraTokens';
-import { useBlingBalance } from '@/lib/useBlingBalance';
 import { countMySavesForSurface } from '@/lib/bookmarks';
 import { countMyGoingUpcoming } from '@/lib/events';
 import { isForumModerator } from '@/lib/forumMod';
 import { countMyGroups } from '@/lib/groups';
 import { countThreadsByAuthor } from '@/lib/intel';
 import { unreadNotificationsCount } from '@/lib/notifications';
+import {
+  ASTRA_TOKENS,
+  type AstraTokens,
+  astraPath,
+  tokensFromAccent,
+} from '@/lib/shell/astraTokens';
+import { supabase } from '@/lib/supabase';
 import { SURFACE_BY_SLUG } from '@/lib/surfaces';
+import { useBlingBalance } from '@/lib/useBlingBalance';
 import type { EventsOutletCtx, EventsView } from '@/pages/events/EventsLayout';
 import type { GiveOutletCtx, GiveView } from '@/pages/give/GiveLayout';
 import type { GroupsOutletCtx, GroupsView } from '@/pages/groups/GroupsLayout';
 import { useIntelStore } from '@/stores/useIntelStore';
 import { useLensStore } from '@/stores/useLensStore';
-import { useRealmColors } from '@/stores/useRealmColors';
+import { REALM_COLOR_FALLBACK, useRealmColors } from '@/stores/useRealmColors';
 import type { RealmId } from '@/types/manual';
 import {
   Check,
+  ChevronRight,
+  Circle,
   Compass,
   HeartHandshake,
   Megaphone,
@@ -182,6 +191,35 @@ export function CommunityLayout() {
   useEffect(() => {
     void useRealmColors.getState().load();
   }, []);
+
+  // REALM1: the 14 realms in display order, for the sidebar Realm nav group
+  // (INTEL + UNITE only — owner ruling 2026-09-03: sidebar, never the toolbar).
+  const realmColors = useRealmColors((s) => s.colors);
+  const [realmList, setRealmList] = useState<{ id: RealmId; name: string }[]>([]);
+  useEffect(() => {
+    if (!supabase) return;
+    let cancelled = false;
+    supabase
+      .from('realms')
+      .select('id, name, display_order')
+      .order('display_order', { ascending: true })
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        setRealmList(
+          (data as { id: string; name: string }[]).map((r) => ({
+            id: r.id as RealmId,
+            name: r.name,
+          })),
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  // Right-drawer sub-realm browser (RealmTreeContent, scoped to one realm's
+  // subtree) — opened by a row's chevron, not by picking the row itself.
+  const [openPanel, setOpenPanel] = useState<PanelKey | null>(null);
+  const [realmDrawerRoot, setRealmDrawerRoot] = useState<string | null>(null);
 
   const [uniteView, setUniteView] = useState<GroupsView>('discover');
   const [ruleView, setRuleView] = useState<EventsView>('upcoming');
@@ -386,13 +424,63 @@ export function CommunityLayout() {
     hint: it.soon ? 'soon' : it.badge && it.badge > 0 ? it.badge : undefined,
   });
   const tailStart = items.findIndex((it) => it.dividerAbove);
-  const nav: ShellNavGroup[] =
+  const surfaceGroups: ShellNavGroup[] =
     tailStart > 0
       ? [
           { id: surface, items: items.slice(0, tailStart).map(toNav) },
           { id: 'tail', label: 'You', items: items.slice(tailStart).map(toNav) },
         ]
       : [{ id: surface, items: items.map(toNav) }];
+
+  // REALM1 — Realm nav group, INTEL + UNITE only. The row itself picks the
+  // realm (setRealmId + jump to the surface root, toggling off on repeat
+  // click); its chevron opens the sub-realm browser in the right drawer
+  // instead — the two affordances never fire together (stopPropagation).
+  function selectRealm(r: { id: RealmId; name: string }) {
+    setRealmId(selectedRealmId === r.id ? null : r.id);
+    if (location.pathname !== `/${surface}`) navigate(`/${surface}`);
+  }
+  function openRealmDrawer(name: string) {
+    setRealmDrawerRoot(name);
+    setOpenPanel('realm');
+  }
+  const showRealmNav = surface === 'intel' || surface === 'unite';
+  const realmNavItems: ShellNavItem[] = realmList.map((r) => {
+    const color = realmColors[r.id] ?? REALM_COLOR_FALLBACK;
+    return {
+      id: `realm-${r.id}`,
+      label: r.name,
+      icon: <Circle size={10} fill={color} stroke={color} />,
+      active: selectedRealmId === r.id,
+      onClick: () => selectRealm(r),
+      hint: (
+        // biome-ignore lint/a11y/useSemanticElements: nested inside the row's own <button> (UniversalShell Sidebar) — a real <button> here is invalid HTML nesting
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label={`Browse ${r.name} sub-realms`}
+          onClick={(e) => {
+            e.stopPropagation();
+            openRealmDrawer(r.name);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.stopPropagation();
+              e.preventDefault();
+              openRealmDrawer(r.name);
+            }
+          }}
+          className="flex h-5 w-5 items-center justify-center rounded"
+          style={{ color: 'var(--icon)' }}
+        >
+          <ChevronRight size={13} />
+        </span>
+      ),
+    };
+  });
+  const nav: ShellNavGroup[] = showRealmNav
+    ? [{ id: 'realm', label: 'Realm', items: realmNavItems }, ...surfaceGroups]
+    : surfaceGroups;
 
   return (
     <UniversalShell
@@ -410,6 +498,19 @@ export function CommunityLayout() {
         const to = astraPath(key);
         if (to) navigate(to);
       }}
+      panels={{ realm: { title: realmDrawerRoot ?? 'Realm', width: 'compact' } }}
+      openPanel={openPanel}
+      onOpenPanel={setOpenPanel}
+      renderPanel={(slot) =>
+        slot === 'realm' ? (
+          <div className="overflow-hidden rounded-md bg-white">
+            <RealmTreeContent
+              rootPath={realmDrawerRoot ? [realmDrawerRoot] : []}
+              clearLabel={realmDrawerRoot ? `All ${realmDrawerRoot}` : 'All realms'}
+            />
+          </div>
+        ) : undefined
+      }
     >
       <Outlet context={outletCtx} />
 
