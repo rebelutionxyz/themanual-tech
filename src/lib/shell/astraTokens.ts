@@ -434,6 +434,27 @@ export const ASTRA_TOKENS: Record<string, AstraTokens> = {
 };
 
 /**
+ * ONE_SHELL1 (owner 2026-09-03: "One shell. ONE."): every surface in the roof
+ * wears UniversalShell. A surface that already has a ratified/proposed row in
+ * ASTRA_TOKENS uses it; one that does not gets tokens DERIVED from the accent
+ * the surface already carried in the old shell, so nothing is left wearing the
+ * old chrome while ASTRA_COLORS catches up. dim/bg are CSS color-mix
+ * expressions — valid values for the custom properties, no color library.
+ */
+export function tokensFromAccent(slug: string, tld: string, accent: string): AstraTokens {
+  return {
+    slug,
+    tld,
+    logo: 'fist',
+    accent,
+    accentDim: `color-mix(in srgb, ${accent} 58%, #000)`,
+    accentBg: `color-mix(in srgb, ${accent} 12%, #07080a)`,
+    displayFace: "'JetBrains Mono', ui-monospace, monospace",
+    proposed: true,
+  };
+}
+
+/**
  * The CSS custom properties an astra's tokens resolve to, ready to spread onto
  * the shell root's `style`. Fixed tokens are NOT here — they are static in CSS.
  */

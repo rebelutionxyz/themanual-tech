@@ -2,9 +2,11 @@ import { BAZAAR_ACCENT } from '@/components/bazaar/cards';
 import { CreateEventModal } from '@/components/events/CreateEventModal';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
 import type { IntelView } from '@/components/intel/IntelSidebar';
-import { CommunityShell } from '@/components/shell/CommunityShell';
+import { type ShellNavGroup, UniversalShell } from '@/components/shell/UniversalShell';
 import { COMMON_TAIL, type SidebarItem } from '@/components/shell/sidebarNav';
 import { useAuth } from '@/lib/auth';
+import { ASTRA_TOKENS, type AstraTokens, tokensFromAccent } from '@/lib/shell/astraTokens';
+import { useBlingBalance } from '@/lib/useBlingBalance';
 import { countMySavesForSurface } from '@/lib/bookmarks';
 import { countMyGoingUpcoming } from '@/lib/events';
 import { isForumModerator } from '@/lib/forumMod';
@@ -33,10 +35,53 @@ import {
   Ticket,
   Users,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { createElement, useCallback, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 type Surface = 'intel' | 'unite' | 'rule' | 'give' | 'pulse' | 'bazaar' | 'comms' | 'security';
+
+/* ONE_SHELL1 (owner 2026-09-03: "One shell. ONE.") — this layout now mounts
+ * UniversalShell, the same frame h24 wears. CommunityShell is retired. Each
+ * community surface is an astra: it takes its ratified/proposed ASTRA_TOKENS
+ * row where one exists (keyed below), else tokens derived from the accent it
+ * already carried. The nav model is the SidebarItem list it always built,
+ * mapped onto the shell's groups. Nothing about the surfaces' content changed
+ * in this pass — that is the retokenize work, page by page, that follows. */
+const SURFACE_ASTRA_KEY: Record<Surface, string> = {
+  intel: 'intel',
+  unite: 'groups',
+  rule: 'events',
+  give: 'fund',
+  pulse: 'news',
+  bazaar: 'bazaar',
+  comms: 'talk',
+  security: 'security',
+};
+const SURFACE_TLD: Record<Surface, string> = {
+  intel: '.fyi',
+  unite: '.group',
+  rule: '.events',
+  give: '.fund',
+  pulse: '.news',
+  bazaar: '.shop',
+  comms: '.talk',
+  security: '.icu',
+};
+/** Astra-picker key -> in-roof path. Every door lands inside the one roof. */
+const ASTRA_PATH: Record<string, string> = {
+  h24: '/h24',
+  intel: '/intel',
+  groups: '/unite',
+  events: '/rule',
+  fund: '/fund',
+  news: '/pulse',
+  bazaar: '/bazaar',
+  talk: '/comms',
+  security: '/security',
+  justice: '/realm/justice',
+  vote: '/vote',
+  studio: '/studio',
+};
 
 const ACCENT: Record<Surface, string> = {
   intel: '#1D9BF0',
@@ -95,6 +140,7 @@ export function CommunityLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { bee } = useAuth();
+  const { balance: blingBalance } = useBlingBalance(Boolean(bee));
   // Popup-aware surface: when a popup route is open, ModalLink stashed the
   // origin location as `background` — the shell keeps rendering THAT surface
   // (accent, items, outlet) instead of flipping to the popup path's default.
@@ -305,13 +351,44 @@ export function CommunityLayout() {
           ? ({ view: giveView } satisfies GiveOutletCtx)
           : undefined;
 
+  // ONE_SHELL1 — the surface's astra tokens, then the SidebarItem list mapped
+  // onto the shell's nav groups. `dividerAbove` marks where the utility tail
+  // starts; it becomes the second group.
+  const tokens: AstraTokens =
+    ASTRA_TOKENS[SURFACE_ASTRA_KEY[surface]] ??
+    tokensFromAccent(SURFACE_ASTRA_KEY[surface], SURFACE_TLD[surface], accent);
+  const toNav = (it: SidebarItem) => ({
+    id: it.id,
+    label: it.label,
+    icon: createElement(it.icon, { size: 17 }),
+    onClick: it.soon ? undefined : () => (it.to ? navigate(it.to) : handleSelect(it.id)),
+    active: it.id === activeItemId,
+    hint: it.soon ? 'soon' : it.badge && it.badge > 0 ? it.badge : undefined,
+  });
+  const tailStart = items.findIndex((it) => it.dividerAbove);
+  const nav: ShellNavGroup[] =
+    tailStart > 0
+      ? [
+          { id: surface, items: items.slice(0, tailStart).map(toNav) },
+          { id: 'tail', label: 'You', items: items.slice(tailStart).map(toNav) },
+        ]
+      : [{ id: surface, items: items.map(toNav) }];
+
   return (
-    <CommunityShell
-      activeSurface={surface}
-      accent={accent}
-      items={items}
-      activeItemId={activeItemId}
-      onSelect={handleSelect}
+    <UniversalShell
+      tokens={tokens}
+      nav={nav}
+      bling={blingBalance}
+      handle={bee?.handle ?? null}
+      onBack={() => navigate(-1)}
+      onForward={() => navigate(1)}
+      onSearch={() => navigate('/manual')}
+      onAvatar={() => navigate('/profile')}
+      onOpenLedger={() => navigate('/bling')}
+      onSelectAstra={(key) => {
+        const to = ASTRA_PATH[key];
+        if (to) navigate(to);
+      }}
     >
       <Outlet context={outletCtx} />
 
@@ -335,7 +412,7 @@ export function CommunityLayout() {
           }}
         />
       )}
-    </CommunityShell>
+    </UniversalShell>
   );
 }
 
