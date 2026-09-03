@@ -3,9 +3,16 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './index.css';
+// SHELL_PKG1 — the ONE shell (ONE_ROOF v2). Its scoped tokens + the Supabase
+// handle it reads through; the component itself is imported where it's mounted.
+import '@honeycomb/shell/shell.css';
+import { setShellSupabase } from '@honeycomb/shell';
+import { supabase } from '@/lib/supabase';
 // Scoped surface skin — every rule lives under [data-surface='freedomblings'],
 // so these warm-paper/white+gold tokens never touch the dark platform chrome.
 import './styles/freedomblings.css';
+
+setShellSupabase(supabase);
 
 // A mid-session redeploy invalidates the previous build's chunk URLs; a lazy
 // route or dynamic import then 404s and the page dies black. Vite emits this

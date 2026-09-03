@@ -31,43 +31,7 @@
     --honey: #fad15e;
   }
 
-  /* ── SHELL v1.5 — the universal astra shell scope ──────────────────────────
-     Fixed constellation tokens + the JetBrains Mono UI face (owner-confirmed,
-     everywhere). Scoped to `.astra-shell` for the SHELL_PORT1 pass so the port
-     lands on /h24 without repainting the other 40+ Manual surfaces; the pattern
-     is what the other astras copy-port. Per-astra tokens (--accent / -dim / -bg,
-     --display-face, --surface-accent) are set INLINE by astraCssVars(); the
-     values here are the h24 (burnt orange) fallbacks so the shell still renders
-     if the inline vars are ever absent. */
-  .astra-shell {
-    /* fixed constellation tokens (SHELL v1.5 §FIXED COLOR TOKENS) */
-    --ink: #f8f9fa;
-    --body: #c8d1da;
-    --mute: #6b7580;
-    --raised: #090b0d;
-    --input: #10141b;
-    --line: #2a3138;
-    --hairline: #1f252c;
-    --icon: #9aa6b1;
-    --error: #c94c4c;
-    --bling-gold: #fad15e;
-    --buy-green: #3fbf6a;
-    --brand-red: #d43333;
-    /* per-astra fallbacks (h24) — overridden inline by astraCssVars() */
-    --accent: #ef6c2a;
-    --accent-dim: #8a3c14;
-    --accent-bg: #1e100a;
-    --display-face: "JetBrains Mono", ui-monospace, monospace;
-    --surface-accent: #8a3c14;
-
-    font-family: "JetBrains Mono", ui-monospace, monospace;
-    background: var(--bg);
-    color: var(--text);
-  }
-  /* display face (home greeting, headings) swaps per astra; UI face does not */
-  .astra-shell .astra-display {
-    font-family: var(--display-face);
-  }
+  /* The .astra-shell token scope moved to shared/shell/src/shell.css (SHELL_PKG1). */
 
   html {
     -webkit-font-smoothing: antialiased;
