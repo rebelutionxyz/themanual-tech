@@ -23,6 +23,53 @@ trust position. Passes from this file forward go at the top, under the header.
 
 ---
 
+## PATCHBOARD_DB1 — apply the Patchboard schema (pre-flight recorded, apply pending ask-gate) (2026-09-03)
+
+**Pass:** PATCHBOARD_DB1 | lane `db` | workdir re-pointed to TheMANUAL.tech (root's STEP 0 revision — the `TheMANUAL.tech-db` clone was stale and R7 denies every command that could fast-forward it in place) | session `cc-butch-root-20260903` | claimed via auto-pool fallthrough.
+
+**Prior attempts on this pass (context, not repeated here):** eecc8bf6 hit `reconcile.mjs measure` exit 1 (25 apparent orphans), filed `PATCHBOARD_DB1-Q`; `cowork` diagnosed it as a stale `-db` clone and pointed the fix at `git pull`; a second holder found R7 hard-denies every git command that could perform that pull (`git pull`/`merge`/`checkout`/`reset`/`-C` all denied) and correctly refused a plumbing workaround; root LEAD then re-pointed this dispatch's workdir to `TheMANUAL.tech` (current, clean, front lane empty) instead of trying to unblock the pull.
+
+**STEP 0 (revised) — executed this pass:**
+1. `git status --porcelain` in `TheMANUAL.tech` → empty except `.claude-pass` (never committed, expected).
+2. `node scripts/migration-reconcile/reconcile.mjs measure` → **exit 0**, "RECONCILED on/after baseline — freeze-lift criterion MET." The 25 "orphans" seen against the `-db` clone do not exist in this tree — stale-clone explanation confirmed, no real ledger debt.
+
+**Pre-flight for the apply itself (Migration Amendment — dependent objects, routines, rows at risk):**
+- Target migration: `supabase/migrations/_drafts/patchboard1_switch_system_v1.sql` (drafted by the front lane, propose-first). Rollback: `patchboard1_switch_system_v1_rollback.sql`, authored first, drops everything in reverse dependency order, every `DROP` uses `IF EXISTS` (safe on a partial apply).
+- Purely additive: 4 new tables (`patchboard_switches`, `patchboard_settings`, `patchboard_providers`, `connected_accounts`), 1 read RPC (`get_effective_switch_state`), 4 write RPCs (`patchboard_set_bee_switch`, `patchboard_set_master_switch`, `patchboard_set_use`, `patchboard_connect_begin`, `patchboard_disconnect`), RLS on all 4 tables, 13 switch-definition seed rows + 10 provider-registry seed rows. Touches no existing table — no rows at risk.
+- `is_platform_admin()` — confirmed live, no-arg, `SECURITY DEFINER` (`public.patchboard_set_master_switch` calls it with no arguments — signature matches).
+- `public.bees(id)` — confirmed live; FK target for `patchboard_settings.bee_id`, `patchboard_settings.set_by`, `connected_accounts.bee_id`.
+- `astra_id` — bare `uuid`, no FK by design (migration header: "the FK to the Astra registry is added by the db lane once that registry table is confirmed in prod" — deliberate, not a blocker for this apply).
+- Live-DB reconfirm just before apply: zero rows for `table_name ILIKE '%patchboard%'` or `= 'connected_accounts'`, zero rows for matching function names — no naming collisions, clean additive apply.
+- Grants: write RPCs go to `authenticated` only, read RPC to `anon, authenticated`; migration's own footer flags a post-apply `pg_proc.proacl` check (REVOKE-from-role, not FROM PUBLIC, per root README rule) and a post-apply `get_advisors(security)` — both to run after apply, before closing this pass.
+
+**Not yet done — apply is ask-gated, waiting on Butch's click** (`apply_migration` sits in no allow list by design; the human click is the enforcement, not this pre-flight). Attempted the call at 20:07 UTC; it was refused outright by the auto-mode permission classifier (no interactive prompt surfaced — a hard denial, not a pending approval). Migration file already moved out of `_drafts/` to `supabase/migrations/patchboard1_switch_system_v1.sql` (+ rollback alongside it), staged in git, not committed. Dispatch stays `claimed`, awaiting Butch to either approve the `apply_migration` call directly or run it himself.
+
+
+**CORRECTION (cowork, 2026-09-03, before commit).** The promotion out of `_drafts/` landed three
+things wrong; fixed in the same commit as this report:
+
+1. **No timestamp prefix.** The file was moved to `supabase/migrations/patchboard1_switch_system_v1.sql`
+   — the only one of 360 migrations without a `YYYYMMDDHHMMSS_` prefix. The Supabase CLI orders and
+   stamps `schema_migrations` by that prefix, so as named it would have been skipped or errored, and
+   lexically it sorted *after* every timestamped file ("p" > "2"). Renamed to
+   `20260903170000_patchboard1_switch_system_v1.sql`, chosen deliberately EARLIER than
+   `20260903180000_patchboard_values_astra_colors.sql` so PATCHBOARD_DB1 sorts before the
+   astra_colors value table that depends on it.
+2. **Rollback promoted alongside it.** `patchboard1_switch_system_v1_rollback.sql` was moved into
+   `supabase/migrations/` too, where all 44 other rollbacks live in `_drafts/`. A rollback sitting in
+   the live migrations directory gets APPLIED AS A MIGRATION and drops the tables the file before it
+   just created. Moved back to `_drafts/` as `20260903170000_patchboard1_switch_system_v1_rollback.sql`.
+3. **Header contradicted its own location.** It still read "STATUS: DRAFT. NOT APPLIED. Lives in
+   `supabase/migrations/_drafts/` so no apply path ever picks it up by accident" while sitting in the
+   apply path. Rewritten to record the promotion, the passed pre-flight, that the apply is still
+   ask-gated and had not happened, and why the timestamp is what it is.
+
+None of this touches the SQL body. The pre-flight above stands and `reconcile.mjs measure` exit 0 is
+confirmed. **The schema is still NOT applied** — verified against the live DB at commit time: zero
+`patchboard*` tables, zero `patchboard*` functions.
+
+---
+
 ## SHELL_DRAWER2 — fold HomeActivityPanel into the ONE right-sidebar surface (2026-09-03)
 
 **Pass:** SHELL_DRAWER2 | lane `front` | workdir TheMANUAL.tech | session `cfb3f59f` | claimed via auto-pool fallthrough (root session, `TheMANUAL.tech-db` excluded from the claim query because PATCHBOARD_DB1 was actively claimed+heartbeating there — see the note below).

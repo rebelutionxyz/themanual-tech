@@ -1,13 +1,22 @@
 -- ============================================================================
--- PATCHBOARD1 — THE PATCHBOARD switch system   (DRAFT — propose-first)
+-- PATCHBOARD1 — THE PATCHBOARD switch system
 -- MMF §36 + shared/canon/patchboard-pattern.md §8
 -- ----------------------------------------------------------------------------
--- STATUS: DRAFT. NOT APPLIED. Lives in supabase/migrations/_drafts/ so no
---   apply path (rail SWEEP, CLI, apply_migration) ever picks it up by accident.
+-- STATUS: PROMOTED out of _drafts/ by PATCHBOARD_DB1 (2026-09-03) after its
+--   pre-flight passed — reconcile.mjs measure exit 0, is_platform_admin() and
+--   public.bees(id) confirmed live, zero naming collisions. The apply itself is
+--   ask-gated and had NOT happened when this file was promoted; see REPORT.md.
 --   The FRONT lane authored it as the schema PROPOSAL; the DB lane owns the real
 --   apply under the MIGRATION AMENDMENT (named dispatch, recorded pre-flight,
---   rollback-first — the rollback is patchboard1_switch_system_v1_rollback.sql,
---   authored first — and the ask-gated human click).
+--   rollback-first — the rollback stays in _drafts/ as
+--   20260903170000_patchboard1_switch_system_v1_rollback.sql, authored
+--   first — and the ask-gated human click).
+--
+--   TIMESTAMP: promoted initially with NO timestamp prefix, the only such file
+--   among 360 migrations. Renamed to 20260903170000 so the Supabase CLI can
+--   order and stamp it, and deliberately EARLIER than
+--   20260903180000_patchboard_values_astra_colors.sql so PATCHBOARD_DB1 sorts
+--   before the astra_colors value table that depends on it.
 --
 -- WHY THIS EXISTS: the front-lane Patchboard build (resolver, Connected Accounts
 --   data object, provider registry, Bee-scope + HQ UI) reads/writes through the
