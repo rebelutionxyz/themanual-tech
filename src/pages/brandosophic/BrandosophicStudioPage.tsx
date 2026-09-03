@@ -43,8 +43,8 @@ export function BrandosophicStudioPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
-      <h1 className="text-xl font-bold text-zinc-900">Studio</h1>
-      <p className="mt-1 text-sm text-zinc-500">
+      <h1 className="text-xl font-bold text-[var(--ink)]">Studio</h1>
+      <p className="mt-1 text-sm text-[var(--mute)]">
         Pick a preset, make it yours. Your kit skins your Novas, your storefront, your merch.
       </p>
 
@@ -58,7 +58,9 @@ export function BrandosophicStudioPage() {
               type="button"
               onClick={() => setSelected(p)}
               className={`rounded-xl border p-4 text-left transition ${
-                sel ? 'border-zinc-900 shadow-sm' : 'border-zinc-200 hover:border-zinc-400'
+                sel
+                  ? 'border-[var(--accent)] shadow-sm'
+                  : 'border-[var(--line)] hover:border-[var(--mute)]'
               }`}
             >
               <div
@@ -66,15 +68,15 @@ export function BrandosophicStudioPage() {
                 style={{ background: `linear-gradient(135deg, ${accent}, ${accent}55)` }}
               />
               <div className="mt-3 flex items-center justify-between">
-                <span className="text-sm font-semibold text-zinc-900">{p.name}</span>
-                {sel && <Check size={16} className="text-zinc-900" />}
+                <span className="text-sm font-semibold text-[var(--ink)]">{p.name}</span>
+                {sel && <Check size={16} className="text-[var(--ink)]" />}
               </div>
-              <span className="text-xs text-zinc-500">{accent}</span>
+              <span className="text-xs text-[var(--mute)]">{accent}</span>
             </button>
           );
         })}
         {presets.length === 0 && (
-          <div className="col-span-full rounded-xl border border-dashed border-zinc-300 p-6 text-sm text-zinc-500">
+          <div className="col-span-full rounded-xl border border-dashed border-[var(--line)] p-6 text-sm text-[var(--mute)]">
             Presets are loading — or the skin layer is unreachable. The shell stays on the platform
             default either way.
           </div>
@@ -83,15 +85,15 @@ export function BrandosophicStudioPage() {
 
       {/* Preview panel */}
       {selected && (
-        <div className="mt-6 rounded-xl border border-zinc-200 p-5">
+        <div className="mt-6 rounded-xl border border-[var(--line)] p-5">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-lg font-extrabold" style={{ color: previewAccent }}>
                 {selected.branding?.wordmarkPre || 'Your'}
-                <span className="text-zinc-900">{selected.branding?.wordmarkAccent || ''}</span>
+                <span className="text-[var(--ink)]">{selected.branding?.wordmarkAccent || ''}</span>
                 {selected.branding?.wordmarkPost || ' Brand'}
               </div>
-              <div className="text-xs text-zinc-500">
+              <div className="text-xs text-[var(--mute)]">
                 softness {selected.background_softness} · preset · lineage kept on keep
               </div>
             </div>
@@ -100,7 +102,7 @@ export function BrandosophicStudioPage() {
               onClick={() => void keep()}
               disabled={busy || !bee}
               title={bee ? 'Keep a copy as your own kit' : 'Sign in to keep a kit'}
-              className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--bg)] disabled:opacity-40"
             >
               <Copy size={15} />
               {busy ? 'Keeping…' : 'KEEP AS MY KIT'}
@@ -116,16 +118,16 @@ export function BrandosophicStudioPage() {
       )}
 
       {/* AtlasORACLE seam — Oracle day (Mon 7/27) wires this. */}
-      <div className="mt-6 flex items-center gap-3 rounded-xl border border-dashed border-zinc-300 p-4">
+      <div className="mt-6 flex items-center gap-3 rounded-xl border border-dashed border-[var(--line)] p-4">
         <button
           type="button"
           disabled
-          className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-400"
+          className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-[var(--line)] px-4 py-2 text-sm font-semibold text-[var(--mute)]"
         >
           <Sparkles size={15} />
           GENERATE WITH AI
         </button>
-        <span className="text-xs text-zinc-500">
+        <span className="text-xs text-[var(--mute)]">
           Describe your brand, h24 drafts your kit — arrives with h24.
         </span>
       </div>

@@ -1,17 +1,22 @@
-import { CommunityShell } from '@/components/shell/CommunityShell';
+import { type ShellNavGroup, UniversalShell } from '@/components/shell/UniversalShell';
 import type { SidebarItem } from '@/components/shell/sidebarNav';
-import { useAstra } from '@/lib/astras/AstraContext';
+import { useAuth } from '@/lib/auth';
+import { type AstraTokens, astraPath, tokensFromAccent } from '@/lib/shell/astraTokens';
 import { type ResolvedSkin, resolveSkin } from '@/lib/skins';
 import { supabase } from '@/lib/supabase';
+import { useBlingBalance } from '@/lib/useBlingBalance';
 import { Boxes, Hexagon, Lock, Palette, Radio, Store } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { createElement, useCallback, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 // ═════════════════════════════════════════════════════════════════════
 // BRANDoSOPHIC layout — the brand-design Astra's shell (MMF §25).
-// Duplicates the white community shell with its own menu family:
-// STUDIO · BRANDS · NOVAS · STOREFRONT (ETZY slot) · ORDER BOOK (soon).
-// Accent + chrome resolve from the live skin layer (skin_resolve).
+// ONE_SHELL3 (ONE_ROOF v1): wears UniversalShell, same as every other
+// community surface (CommunityLayout) — its own menu family: STUDIO ·
+// BRANDS · NOVAS · STOREFRONT (ETZY slot) · ORDER BOOK (soon). Accent +
+// chrome resolve from the live skin layer (skin_resolve); tokens are
+// DERIVED (tokensFromAccent) since Brandosophic has no ASTRA_TOKENS row
+// yet (astraTokens.ts: "Brandosophic is unruled").
 // ═════════════════════════════════════════════════════════════════════
 
 /** astra_registry.id for slug 'brandosophic' (prod). */
@@ -45,10 +50,8 @@ function itemFromPath(pathname: string): string {
 export function BrandosophicLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  // On brandosophic.com itself the comb's Astra dropdown is hidden — the domain
-  // IS the brand studio. On themanual.tech/brand it stays. (Butch, Jul 24.)
-  const activeAstra = useAstra();
-  const standalone = activeAstra?.slug === 'brandosophic';
+  const { bee } = useAuth();
+  const { balance: blingBalance } = useBlingBalance(Boolean(bee));
   const [skin, setSkin] = useState<ResolvedSkin | null>(null);
 
   const load = useCallback(() => {
@@ -71,25 +74,46 @@ export function BrandosophicLayout() {
     }
   }, [location.pathname]);
 
-  const onSelect = useCallback(
-    (id: string) => {
-      const item = ITEMS.find((i) => i.id === id);
-      if (item?.to) navigate(item.to);
-    },
-    [navigate],
-  );
-
   const accent = skin?.branding.accentHex ?? '#C88A6B';
+  const activeItemId = itemFromPath(location.pathname);
+  const toNav = (it: SidebarItem) => ({
+    id: it.id,
+    label: it.label,
+    icon: createElement(it.icon, { size: 17 }),
+    onClick: it.to ? () => navigate(it.to as string) : undefined,
+    active: it.id === activeItemId,
+    hint: it.soon ? 'soon' : undefined,
+  });
+  const tailStart = ITEMS.findIndex((it) => it.dividerAbove);
+  const nav: ShellNavGroup[] =
+    tailStart > 0
+      ? [
+          { id: 'brand', items: ITEMS.slice(0, tailStart).map(toNav) },
+          { id: 'brand-tail', items: ITEMS.slice(tailStart).map(toNav) },
+        ]
+      : [{ id: 'brand', items: ITEMS.map(toNav) }];
+
+  // Brandosophic has no ASTRA_TOKENS row yet ("unruled") — tokens are derived
+  // from the live skin accent, same fallback CommunityLayout uses for any
+  // surface without a ratified/proposed row.
+  const tokens: AstraTokens = tokensFromAccent('brandosophic', '.com', accent);
 
   return (
-    <CommunityShell
-      activeSurface="brand"
-      accent={accent}
-      branding={skin?.branding}
-      hideAstraSwitcher={standalone}
-      items={ITEMS}
-      activeItemId={itemFromPath(location.pathname)}
-      onSelect={onSelect}
+    <UniversalShell
+      tokens={tokens}
+      nav={nav}
+      bling={blingBalance}
+      handle={bee?.handle ?? null}
+      onBack={() => navigate(-1)}
+      onForward={() => navigate(1)}
+      onSearch={() => navigate('/manual')}
+      onAvatar={() => navigate('/profile')}
+      onOpenLedger={() => navigate('/freedomblings')}
+      onTransfer={() => navigate('/freedomblings/move')}
+      onSelectAstra={(key) => {
+        const to = astraPath(key);
+        if (to) navigate(to);
+      }}
     >
       <Outlet
         context={
@@ -112,6 +136,6 @@ export function BrandosophicLayout() {
           } satisfies BrandosophicOutletCtx
         }
       />
-    </CommunityShell>
+    </UniversalShell>
   );
 }

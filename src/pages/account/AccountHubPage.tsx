@@ -70,7 +70,7 @@ export function AccountHubPage() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="h-7 w-7 animate-spin text-zinc-400" />
+        <Loader2 className="h-7 w-7 animate-spin text-[var(--mute)]" />
       </div>
     );
   }
@@ -98,14 +98,14 @@ export function AccountHubPage() {
           >
             Your account
           </h1>
-          <p className="font-mono text-zinc-500" style={{ fontSize: '12px' }} data-size="meta">
+          <p className="font-mono text-[var(--mute)]" style={{ fontSize: '12px' }} data-size="meta">
             {bee.handle} · everything you are and do, in one place
           </p>
         </div>
       </div>
 
       {/* Tab bar — horizontally scrollable on narrow screens */}
-      <div className="mb-6 flex gap-1 overflow-x-auto border-b border-zinc-200 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mb-6 flex gap-1 overflow-x-auto border-b border-[var(--line)] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TABS.map((t) => {
           const on = t.id === active;
           const Icon = t.icon;
@@ -116,7 +116,7 @@ export function AccountHubPage() {
               onClick={() => select(t.id)}
               className={cn(
                 '-mb-px flex flex-shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 font-medium transition-colors',
-                on ? '' : 'border-transparent text-zinc-500 hover:text-zinc-800',
+                on ? '' : 'border-transparent text-[var(--mute)] hover:text-[var(--ink)]',
               )}
               style={
                 on
@@ -136,7 +136,7 @@ export function AccountHubPage() {
         <button
           type="button"
           onClick={() => void signOut()}
-          className="-mb-px ml-auto flex flex-shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3 py-2 font-medium text-zinc-400 transition-colors hover:text-zinc-700"
+          className="-mb-px ml-auto flex flex-shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3 py-2 font-medium text-[var(--mute)] transition-colors hover:text-[var(--body)]"
           style={{ fontSize: '14px' }}
         >
           <LogOut size={15} />

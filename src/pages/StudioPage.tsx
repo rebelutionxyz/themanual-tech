@@ -58,17 +58,17 @@ export function StudioPage() {
     <div className="safe-pad-x mx-auto w-full max-w-3xl px-4 py-6 md:py-8">
       {/* Workshop context strip */}
       <div
-        className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2"
+        className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-2"
         data-size="meta"
       >
         <Hammer size={14} style={{ color: STUDIO_ACCENT }} />
         <span
-          className="font-mono uppercase tracking-widest text-zinc-500"
+          className="font-mono uppercase tracking-widest text-[var(--mute)]"
           style={{ fontSize: '10.5px' }}
         >
           The Workshop
         </span>
-        <span className="text-zinc-400">·</span>
+        <span className="text-[var(--mute)]">·</span>
         <span
           className="rounded px-1.5 py-0.5 font-mono uppercase tracking-wider"
           style={{ fontSize: '10px', color: STUDIO_ACCENT, background: `${STUDIO_ACCENT}18` }}
@@ -76,14 +76,14 @@ export function StudioPage() {
           Creators Studio
         </span>
         <span
-          className="flex items-center gap-1 font-mono uppercase tracking-wider text-zinc-400"
+          className="flex items-center gap-1 font-mono uppercase tracking-wider text-[var(--mute)]"
           style={{ fontSize: '10px' }}
           title="Create Novas — coming soon"
         >
           <Sparkles size={11} /> Create Novas · soon
         </span>
         <span
-          className="flex items-center gap-1 font-mono uppercase tracking-wider text-zinc-400"
+          className="flex items-center gap-1 font-mono uppercase tracking-wider text-[var(--mute)]"
           style={{ fontSize: '10px' }}
           title="Create Apps — coming soon"
         >
@@ -91,16 +91,16 @@ export function StudioPage() {
         </span>
       </div>
 
-      <h1 className="mb-1 flex items-center gap-2.5 font-display text-2xl font-semibold text-zinc-900">
+      <h1 className="mb-1 flex items-center gap-2.5 font-display text-2xl font-semibold text-[var(--ink)]">
         <Clapperboard size={22} style={{ color: STUDIO_ACCENT }} />
         Creators Studio
       </h1>
-      <p className="mb-5 text-[13px] text-zinc-500">
+      <p className="mb-5 text-[13px] text-[var(--mute)]">
         Create, edit, and manage everything you've posted — across every Astra.
       </p>
 
       {!bee ? (
-        <div className="rounded-lg border-2 border-dashed border-zinc-200 bg-zinc-50/60 p-10 text-center text-[13px] text-zinc-500">
+        <div className="rounded-lg border-2 border-dashed border-[var(--line)] bg-[var(--panel)] p-10 text-center text-[13px] text-[var(--mute)]">
           Sign in to manage your posts.{' '}
           <Link to="/login" className="underline" style={{ color: STUDIO_ACCENT }}>
             Sign in
@@ -108,7 +108,7 @@ export function StudioPage() {
         </div>
       ) : (
         <>
-          <div className="mb-4 inline-flex rounded-md border border-zinc-200 bg-white p-0.5">
+          <div className="mb-4 inline-flex rounded-md border border-[var(--line)] bg-[var(--panel)] p-0.5">
             <TabButton active={tab === 'library'} onClick={() => setTab('library')}>
               <FolderOpen size={13} /> Library
             </TabButton>
@@ -169,27 +169,27 @@ function MyThreadsSection({ beeId }: { beeId: string }) {
         {threads.map((t) => (
           <li
             key={t.id}
-            className="rounded-lg border border-zinc-200 bg-white p-3.5 transition-colors hover:bg-white"
+            className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3.5 transition-colors hover:bg-[var(--panel)]"
           >
             <div className="flex items-start justify-between gap-3">
               <Link
                 to={`/intel/t/${t.id}`}
-                className="min-w-0 flex-1 text-[14px] font-medium text-zinc-900 hover:underline"
+                className="min-w-0 flex-1 text-[14px] font-medium text-[var(--ink)] hover:underline"
               >
                 {t.title}
               </Link>
               <button
                 type="button"
                 onClick={() => setEditing(t)}
-                className="flex flex-shrink-0 items-center gap-1 rounded border border-zinc-200 px-2 py-1 text-[11.5px] text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+                className="flex flex-shrink-0 items-center gap-1 rounded border border-[var(--line)] px-2 py-1 text-[11.5px] text-[var(--body)] hover:bg-[var(--panel-2)] hover:text-[var(--ink)]"
               >
                 <Pencil size={11} /> Edit
               </button>
             </div>
-            <p className="mt-1 line-clamp-2 text-[12.5px] text-zinc-500">{t.body}</p>
-            <p className="mt-1.5 font-mono text-[11px] text-zinc-500" data-size="meta">
+            <p className="mt-1 line-clamp-2 text-[12.5px] text-[var(--mute)]">{t.body}</p>
+            <p className="mt-1.5 font-mono text-[11px] text-[var(--mute)]" data-size="meta">
               {t.primaryRealm && (
-                <span className="mr-2 rounded bg-zinc-100 px-1.5 py-0.5 uppercase tracking-wider">
+                <span className="mr-2 rounded bg-[var(--panel-2)] px-1.5 py-0.5 uppercase tracking-wider">
                   {t.primaryRealm}
                 </span>
               )}
@@ -245,7 +245,7 @@ function EditThreadModal({
     <ModalShell title="Edit thread" onClose={onClose}>
       <label
         htmlFor="studio-field-1"
-        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-[var(--mute)]"
       >
         Title
       </label>
@@ -253,11 +253,11 @@ function EditThreadModal({
         id="studio-field-1"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        className="mb-3 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[14px] text-zinc-900 outline-none focus:border-honey/60"
+        className="mb-3 w-full rounded-md border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[14px] text-[var(--ink)] outline-none focus:border-honey/60"
       />
       <label
         htmlFor="studio-field-2"
-        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-[var(--mute)]"
       >
         Body
       </label>
@@ -266,7 +266,7 @@ function EditThreadModal({
         value={body}
         onChange={(e) => setBody(e.target.value)}
         rows={7}
-        className="mb-3 w-full resize-y rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13.5px] leading-relaxed text-zinc-900 outline-none focus:border-honey/60"
+        className="mb-3 w-full resize-y rounded-md border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[13.5px] leading-relaxed text-[var(--ink)] outline-none focus:border-honey/60"
       />
       {error && <p className="mb-2 text-[12px] text-red-600">{error}</p>}
       <ModalActions busy={busy} disabled={!title.trim()} onCancel={onClose} onSave={save} />
@@ -301,12 +301,12 @@ function MyRepliesSection({ beeId }: { beeId: string }) {
         {replies.map((r) => (
           <li
             key={r.id}
-            className="rounded-lg border border-zinc-200 bg-white p-3.5 transition-colors hover:bg-white"
+            className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3.5 transition-colors hover:bg-[var(--panel)]"
           >
             <div className="flex items-start justify-between gap-3">
               <Link
                 to={`/intel/t/${r.threadId}`}
-                className="min-w-0 flex-1 font-mono text-[11.5px] text-zinc-500 hover:underline"
+                className="min-w-0 flex-1 font-mono text-[11.5px] text-[var(--mute)] hover:underline"
                 data-size="meta"
               >
                 in “{r.threadTitle ?? 'Untitled thread'}”
@@ -314,13 +314,13 @@ function MyRepliesSection({ beeId }: { beeId: string }) {
               <button
                 type="button"
                 onClick={() => setEditing(r)}
-                className="flex flex-shrink-0 items-center gap-1 rounded border border-zinc-200 px-2 py-1 text-[11.5px] text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+                className="flex flex-shrink-0 items-center gap-1 rounded border border-[var(--line)] px-2 py-1 text-[11.5px] text-[var(--body)] hover:bg-[var(--panel-2)] hover:text-[var(--ink)]"
               >
                 <Pencil size={11} /> Edit
               </button>
             </div>
-            <p className="mt-1 line-clamp-3 text-[13px] text-zinc-900">{r.body}</p>
-            <p className="mt-1.5 font-mono text-[11px] text-zinc-500" data-size="meta">
+            <p className="mt-1 line-clamp-3 text-[13px] text-[var(--ink)]">{r.body}</p>
+            <p className="mt-1.5 font-mono text-[11px] text-[var(--mute)]" data-size="meta">
               ▲ {r.upvotes} · ▼ {r.downvotes} · {relativeTime(r.createdAt)}
               {r.editedAt && ' · edited'}
             </p>
@@ -374,7 +374,7 @@ function EditReplyModal({
         value={body}
         onChange={(e) => setBody(e.target.value)}
         rows={6}
-        className="mb-3 w-full resize-y rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13.5px] leading-relaxed text-zinc-900 outline-none focus:border-honey/60"
+        className="mb-3 w-full resize-y rounded-md border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[13.5px] leading-relaxed text-[var(--ink)] outline-none focus:border-honey/60"
       />
       {error && <p className="mb-2 text-[12px] text-red-600">{error}</p>}
       <ModalActions busy={busy} disabled={!body.trim()} onCancel={onClose} onSave={save} />
@@ -420,13 +420,13 @@ function MyVideoSection({ beeId }: { beeId: string }) {
 
   return (
     <>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white p-3.5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3.5">
         <div className="min-w-0">
-          <p className="text-[14.5px] font-medium text-zinc-900">
+          <p className="text-[14.5px] font-medium text-[var(--ink)]">
             {channel.name}{' '}
-            <span className="font-mono text-[12px] text-zinc-500">@{channel.handle}</span>
+            <span className="font-mono text-[12px] text-[var(--mute)]">@{channel.handle}</span>
           </p>
-          <p className="mt-0.5 font-mono text-[11px] text-zinc-500" data-size="meta">
+          <p className="mt-0.5 font-mono text-[11px] text-[var(--mute)]" data-size="meta">
             {channel.followerCount} {channel.followerCount === 1 ? 'follower' : 'followers'}
             {channel.isVerified && ' · verified'}
           </p>
@@ -435,7 +435,7 @@ function MyVideoSection({ beeId }: { beeId: string }) {
           <button
             type="button"
             onClick={() => setModal('schedule')}
-            className="flex items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 py-1.5 text-[12px] text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+            className="flex items-center gap-1.5 rounded-md border border-[var(--line)] px-2.5 py-1.5 text-[12px] text-[var(--body)] hover:bg-[var(--panel-2)] hover:text-[var(--ink)]"
           >
             <Plus size={13} /> Schedule
           </button>
@@ -459,19 +459,21 @@ function MyVideoSection({ beeId }: { beeId: string }) {
           {broadcasts.map((b) => (
             <li
               key={b.id}
-              className="flex items-start justify-between gap-3 rounded-lg border border-zinc-200 bg-white p-3.5"
+              className="flex items-start justify-between gap-3 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3.5"
             >
               <div className="min-w-0 flex-1">
                 <Link
                   to={`/pulse/watch/${b.id}`}
-                  className="text-[14px] font-medium text-zinc-900 hover:underline"
+                  className="text-[14px] font-medium text-[var(--ink)] hover:underline"
                 >
                   {b.title}
                 </Link>
                 {b.summary && (
-                  <p className="mt-0.5 line-clamp-2 text-[12.5px] text-zinc-500">{b.summary}</p>
+                  <p className="mt-0.5 line-clamp-2 text-[12.5px] text-[var(--mute)]">
+                    {b.summary}
+                  </p>
                 )}
-                <p className="mt-1 font-mono text-[11px] text-zinc-500" data-size="meta">
+                <p className="mt-1 font-mono text-[11px] text-[var(--mute)]" data-size="meta">
                   {b.viewCount} views ·{' '}
                   {b.publishedAt
                     ? `published ${relativeTime(b.publishedAt)}`
@@ -531,9 +533,9 @@ function CreateChannelCard({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-5">
-      <p className="mb-1 text-[15px] font-medium text-zinc-900">Open your channel</p>
-      <p className="mb-4 text-[12.5px] text-zinc-500">
+    <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-5">
+      <p className="mb-1 text-[15px] font-medium text-[var(--ink)]">Open your channel</p>
+      <p className="mb-4 text-[12.5px] text-[var(--mute)]">
         Video posts live on your channel. Pick a handle and a name — you can add art and details
         later.
       </p>
@@ -541,7 +543,7 @@ function CreateChannelCard({ onCreated }: { onCreated: () => void }) {
         <div>
           <label
             htmlFor="studio-field-3"
-            className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+            className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-[var(--mute)]"
           >
             Handle
           </label>
@@ -550,7 +552,7 @@ function CreateChannelCard({ onCreated }: { onCreated: () => void }) {
             value={handle}
             onChange={(e) => setHandle(e.target.value.toLowerCase())}
             placeholder="my-channel"
-            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[14px] text-zinc-900 outline-none focus:border-honey/60"
+            className="w-full rounded-md border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[14px] text-[var(--ink)] outline-none focus:border-honey/60"
           />
           {handle && !handleOk && (
             <p className="mt-1 text-[11px] text-red-600">2–30 chars: a–z, 0–9, _ or -</p>
@@ -559,7 +561,7 @@ function CreateChannelCard({ onCreated }: { onCreated: () => void }) {
         <div>
           <label
             htmlFor="studio-field-4"
-            className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+            className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-[var(--mute)]"
           >
             Name
           </label>
@@ -568,13 +570,13 @@ function CreateChannelCard({ onCreated }: { onCreated: () => void }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="My Channel"
-            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[14px] text-zinc-900 outline-none focus:border-honey/60"
+            className="w-full rounded-md border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[14px] text-[var(--ink)] outline-none focus:border-honey/60"
           />
         </div>
       </div>
       <label
         htmlFor="studio-field-5"
-        className="mb-1 mt-3 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+        className="mb-1 mt-3 block font-mono text-[11px] uppercase tracking-wider text-[var(--mute)]"
       >
         Tagline (optional)
       </label>
@@ -582,7 +584,7 @@ function CreateChannelCard({ onCreated }: { onCreated: () => void }) {
         id="studio-field-5"
         value={tagline}
         onChange={(e) => setTagline(e.target.value)}
-        className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[14px] text-zinc-900 outline-none focus:border-honey/60"
+        className="w-full rounded-md border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[14px] text-[var(--ink)] outline-none focus:border-honey/60"
       />
       {error && <p className="mt-2 text-[12px] text-red-600">{error}</p>}
       <button
@@ -626,7 +628,7 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
     <ModalShell title="Schedule a video post" onClose={onClose}>
       <label
         htmlFor="studio-field-6"
-        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-[var(--mute)]"
       >
         Title
       </label>
@@ -634,11 +636,11 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
         id="studio-field-6"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        className="mb-3 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[14px] text-zinc-900 outline-none focus:border-honey/60"
+        className="mb-3 w-full rounded-md border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[14px] text-[var(--ink)] outline-none focus:border-honey/60"
       />
       <label
         htmlFor="studio-field-7"
-        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-[var(--mute)]"
       >
         When
       </label>
@@ -647,11 +649,11 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
         type="datetime-local"
         value={when}
         onChange={(e) => setWhen(e.target.value)}
-        className="mb-3 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[14px] text-zinc-900 outline-none focus:border-honey/60"
+        className="mb-3 w-full rounded-md border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[14px] text-[var(--ink)] outline-none focus:border-honey/60"
       />
       <label
         htmlFor="studio-field-8"
-        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-[var(--mute)]"
       >
         Summary (optional)
       </label>
@@ -660,7 +662,7 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
         value={summary}
         onChange={(e) => setSummary(e.target.value)}
         rows={3}
-        className="mb-3 w-full resize-y rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13.5px] text-zinc-900 outline-none focus:border-honey/60"
+        className="mb-3 w-full resize-y rounded-md border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[13.5px] text-[var(--ink)] outline-none focus:border-honey/60"
       />
       {error && <p className="mb-2 text-[12px] text-red-600">{error}</p>}
       <ModalActions
@@ -701,7 +703,7 @@ function PublishVodModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
     <ModalShell title="Publish a video post" onClose={onClose}>
       <label
         htmlFor="studio-field-9"
-        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-[var(--mute)]"
       >
         Title
       </label>
@@ -709,11 +711,11 @@ function PublishVodModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
         id="studio-field-9"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        className="mb-3 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-[14px] text-zinc-900 outline-none focus:border-honey/60"
+        className="mb-3 w-full rounded-md border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[14px] text-[var(--ink)] outline-none focus:border-honey/60"
       />
       <label
         htmlFor="studio-field-10"
-        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-[var(--mute)]"
       >
         Recording URL
       </label>
@@ -723,12 +725,12 @@ function PublishVodModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://…"
-          className="min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-[14px] text-zinc-900 outline-none focus:border-honey/60"
+          className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[14px] text-[var(--ink)] outline-none focus:border-honey/60"
         />
         <button
           type="button"
           onClick={() => setPickerOpen(true)}
-          className="flex flex-shrink-0 items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 py-2 text-[12px] text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+          className="flex flex-shrink-0 items-center gap-1.5 rounded-md border border-[var(--line)] px-2.5 py-2 text-[12px] text-[var(--body)] hover:bg-[var(--panel-2)] hover:text-[var(--ink)]"
         >
           <FolderOpen size={13} /> From Library
         </button>
@@ -747,7 +749,7 @@ function PublishVodModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
       )}
       <label
         htmlFor="studio-field-11"
-        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-zinc-500"
+        className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-[var(--mute)]"
       >
         Summary (optional)
       </label>
@@ -756,7 +758,7 @@ function PublishVodModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
         value={summary}
         onChange={(e) => setSummary(e.target.value)}
         rows={3}
-        className="mb-3 w-full resize-y rounded-md border border-zinc-300 bg-white px-3 py-2 text-[13.5px] text-zinc-900 outline-none focus:border-honey/60"
+        className="mb-3 w-full resize-y rounded-md border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-[13.5px] text-[var(--ink)] outline-none focus:border-honey/60"
       />
       {error && <p className="mb-2 text-[12px] text-red-600">{error}</p>}
       <ModalActions
@@ -787,7 +789,7 @@ function TabButton({
       onClick={onClick}
       className={cn(
         'flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[13px] font-medium transition-all',
-        !active && 'text-zinc-500 hover:text-zinc-900',
+        !active && 'text-[var(--mute)] hover:text-[var(--ink)]',
       )}
       style={
         active
@@ -809,7 +811,7 @@ function StatusPill({ status }: { status: string }) {
         ? { color: '#2563EB', bg: '#DBEAFE' }
         : s === 'published' || s === 'ended'
           ? { color: '#15803D', bg: '#DCFCE7' }
-          : { color: '#52525B', bg: '#F4F4F5' };
+          : { color: 'var(--mute)', bg: 'var(--panel-2)' };
   return (
     <span
       className="flex-shrink-0 rounded-full px-2 py-0.5 font-mono text-[10.5px] font-semibold uppercase tracking-wider"
@@ -838,14 +840,14 @@ function ModalShell({
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="relative w-full max-w-lg rounded-lg border border-zinc-200 bg-white p-5 shadow-xl">
+      <div className="relative w-full max-w-lg rounded-lg border border-[var(--line)] bg-[var(--panel)] p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-[17px] font-semibold text-zinc-900">{title}</h2>
+          <h2 className="font-display text-[17px] font-semibold text-[var(--ink)]">{title}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+            className="rounded p-1 text-[var(--mute)] hover:bg-[var(--panel-2)] hover:text-[var(--ink)]"
           >
             <X size={16} />
           </button>
@@ -874,7 +876,7 @@ function ModalActions({
       <button
         type="button"
         onClick={onCancel}
-        className="rounded-md border border-zinc-200 px-3.5 py-1.5 text-[13px] text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+        className="rounded-md border border-[var(--line)] px-3.5 py-1.5 text-[13px] text-[var(--body)] hover:bg-[var(--panel-2)] hover:text-[var(--ink)]"
       >
         Cancel
       </button>
@@ -893,7 +895,7 @@ function ModalActions({
 
 function LoadingCard() {
   return (
-    <div className="rounded-lg border-2 border-dashed border-zinc-200 bg-zinc-50/60 p-10 text-center text-[13px] text-zinc-500">
+    <div className="rounded-lg border-2 border-dashed border-[var(--line)] bg-[var(--panel)] p-10 text-center text-[13px] text-[var(--mute)]">
       Loading…
     </div>
   );
@@ -901,7 +903,7 @@ function LoadingCard() {
 
 function EmptyCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border-2 border-dashed border-zinc-200 bg-zinc-50/60 p-10 text-center text-[13px] text-zinc-500">
+    <div className="rounded-lg border-2 border-dashed border-[var(--line)] bg-[var(--panel)] p-10 text-center text-[13px] text-[var(--mute)]">
       {children}
     </div>
   );
