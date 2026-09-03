@@ -4,8 +4,11 @@
 -- ----------------------------------------------------------------------------
 -- STATUS: PROMOTED out of _drafts/ by PATCHBOARD_DB1 (2026-09-03) after its
 --   pre-flight passed — reconcile.mjs measure exit 0, is_platform_admin() and
---   public.bees(id) confirmed live, zero naming collisions. The apply itself is
---   ask-gated and had NOT happened when this file was promoted; see REPORT.md.
+--   public.bees(id) confirmed live, zero naming collisions.
+--   APPLIED 2026-09-03 20:20:47 UTC on owner authorisation, stamped in
+--   supabase_migrations.schema_migrations as version 20260903202047. Post-apply
+--   verification in REPORT.md; the anon-grant deviation it found is corrected by
+--   20260903202124_patchboard1_revoke_anon_from_write_rpcs.sql.
 --   The FRONT lane authored it as the schema PROPOSAL; the DB lane owns the real
 --   apply under the MIGRATION AMENDMENT (named dispatch, recorded pre-flight,
 --   rollback-first — the rollback stays in _drafts/ as
@@ -13,10 +16,11 @@
 --   first — and the ask-gated human click).
 --
 --   TIMESTAMP: promoted initially with NO timestamp prefix, the only such file
---   among 360 migrations. Renamed to 20260903170000 so the Supabase CLI can
---   order and stamp it, and deliberately EARLIER than
---   20260903180000_patchboard_values_astra_colors.sql so PATCHBOARD_DB1 sorts
---   before the astra_colors value table that depends on it.
+--   among 360 migrations. It now carries 20260903202047 — the version the
+--   ledger actually stamped at apply time — so the repo file and
+--   schema_migrations agree exactly and reconcile.mjs stays green. The
+--   astra_colors value table that depends on this one was moved to
+--   20260903210000 to stay after it.
 --
 -- WHY THIS EXISTS: the front-lane Patchboard build (resolver, Connected Accounts
 --   data object, provider registry, Bee-scope + HQ UI) reads/writes through the

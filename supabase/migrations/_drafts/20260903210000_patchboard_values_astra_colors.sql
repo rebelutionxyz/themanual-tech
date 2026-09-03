@@ -61,9 +61,13 @@ alter table public.patchboard_values enable row level security;
 -- READ: a Bee reads the non-Bee scopes (Astra + Master defaults) and their own
 -- rows, and nobody else's. Colour is not secret, but a Bee's personal overrides
 -- are theirs; there is no reason for one Bee's palette to be readable by another.
+-- CORRECTED 2026-09-03: this draft originally called public.current_bee_id(),
+-- which DOES NOT EXIST in this project — verified against pg_proc. The live
+-- convention is bee_id = auth.uid() (see bee_profiles_update_self and
+-- patchboard_settings_read, both applied). Caught before apply, not after.
 create policy patchboard_values_read_scoped on public.patchboard_values
   for select to authenticated
-  using (bee_id is null or bee_id = public.current_bee_id());
+  using (bee_id is null or bee_id = auth.uid());
 
 -- READ (anon): the shared scopes only, so a logged-out visitor still gets the
 -- astra's real colours rather than the code floor.
