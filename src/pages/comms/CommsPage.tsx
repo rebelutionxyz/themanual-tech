@@ -1,9 +1,8 @@
-import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useCall } from '@/components/comms/CallProvider';
-import { RouletteView } from '@/components/comms/RouletteView';
 import { RoomsView } from '@/components/comms/RoomsView';
+import { RouletteView } from '@/components/comms/RouletteView';
+import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useAuth } from '@/lib/auth';
-import { enablePush, pushPermission } from '@/lib/push';
 import {
   type CommsMediaPayload,
   type CommsMessage,
@@ -22,11 +21,11 @@ import {
   decryptMediaToObjectUrl,
   editMessage,
   fetchMessagesPage,
+  findBeeByHandle,
   getLastSeen,
   getMessagesByIds,
   getMyPresenceVisibility,
   getVerifiedSafetyNumber,
-  findBeeByHandle,
   hasUnread,
   initComms,
   joinOnlinePresence,
@@ -39,20 +38,20 @@ import {
   listPins,
   markRead,
   notifyMentions,
-  presencePing,
   parseMediaPayload,
   pinMessage,
-  sendMediaMessage,
+  presencePing,
   removeGroupMember,
-  resetConversationEncryption,
-  sendMessage,
   reportBee,
+  resetConversationEncryption,
   searchBees,
+  sendMediaMessage,
+  sendMessage,
   sendVoiceMessage,
   setConversationMuted,
   setDisappearing,
-  setPresenceVisibility,
   setGroupAddPolicy,
+  setPresenceVisibility,
   startDirect,
   storeVerifiedSafetyNumber,
   subscribeConversation,
@@ -64,6 +63,7 @@ import {
   unsendMessage,
 } from '@/lib/comms';
 import { assetUrl } from '@/lib/media';
+import { enablePush, pushPermission } from '@/lib/push';
 import { cn } from '@/lib/utils';
 import {
   ArrowLeft,
@@ -130,7 +130,9 @@ export function CommsPage() {
   const [composerOpen, setComposerOpen] = useState<'dm' | 'group' | null>(null);
   const [showRoulette, setShowRoulette] = useState(false);
   const [showRooms, setShowRooms] = useState(false);
-  const [pushPerm, setPushPerm] = useState<ReturnType<typeof pushPermission>>(() => pushPermission());
+  const [pushPerm, setPushPerm] = useState<ReturnType<typeof pushPermission>>(() =>
+    pushPermission(),
+  );
   const [filter, setFilter] = useState<'all' | 'dm' | 'group' | 'following'>('all');
   const [follows, setFollows] = useState<Follow[] | null>(null);
   const [myBlocks, setMyBlocks] = useState<Set<string>>(new Set());
@@ -243,7 +245,9 @@ export function CommsPage() {
   }, [bee]);
 
   const reloadBlocks = useCallback(() => {
-    listMyBlocks().then(setMyBlocks).catch(() => {});
+    listMyBlocks()
+      .then(setMyBlocks)
+      .catch(() => {});
   }, []);
   useEffect(() => {
     if (bee) reloadBlocks();
@@ -282,7 +286,10 @@ export function CommsPage() {
           .filter((x): x is string => !!x),
       ),
     );
-    if (peers.length) getLastSeen(peers).then(setLastSeen).catch(() => {});
+    if (peers.length)
+      getLastSeen(peers)
+        .then(setLastSeen)
+        .catch(() => {});
   }, [bee, convos]);
 
   const togglePresenceVisibility = async () => {
@@ -298,7 +305,10 @@ export function CommsPage() {
   // When a thread opens, make sure its encryption key is set up, then refresh.
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the open conversation
   useEffect(() => {
-    if (active) syncConversationKey(active).then(loadMessages).catch(() => {});
+    if (active)
+      syncConversationKey(active)
+        .then(loadMessages)
+        .catch(() => {});
   }, [active?.id, loadMessages]);
 
   const openConversation = (id: string) => navigate(`/comms/${id}`);
@@ -347,7 +357,8 @@ export function CommsPage() {
           onClick={async () => setPushPerm(await enablePush())}
           className="mb-3 w-full rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-left font-semibold text-[12px] text-cyan-800 transition-colors hover:bg-cyan-100"
         >
-          🔔 Enable call alerts on this device — get notified when someone calls while the app's in the background.
+          🔔 Enable call alerts on this device — get notified when someone calls while the app's in
+          the background.
         </button>
       )}
 
@@ -409,7 +420,9 @@ export function CommsPage() {
                 onClick={() => setFilter(f)}
                 className={cn(
                   'flex-1 rounded-md px-1 py-1 font-semibold text-[11px] transition-colors',
-                  filter === f ? 'text-white' : 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700',
+                  filter === f
+                    ? 'text-white'
+                    : 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700',
                 )}
                 style={filter === f ? { background: COMMS_COLOR } : undefined}
               >
@@ -451,66 +464,66 @@ export function CommsPage() {
             )}
             {filter !== 'following' &&
               shown.map((c) => {
-              const unread = hasUnread(c, bee.id);
-              const isActive = c.id === conversationId;
-              return (
-                <div key={c.id} className="group relative">
-                <button
-                  type="button"
-                  onClick={() => openConversation(c.id)}
-                  className={cn(
-                    'flex w-full items-center gap-2.5 border-b border-zinc-50 px-3 py-2.5 pr-9 text-left transition-colors hover:bg-zinc-50',
-                    isActive && 'bg-cyan-50/60',
-                  )}
-                >
-                  <span
-                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-white"
-                    style={{ background: COMMS_COLOR }}
-                  >
-                    {c.kind === 'group' ? (
-                      <Users size={14} />
-                    ) : (
-                      conversationTitle(c, bee.id).slice(1, 2).toUpperCase()
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span
+                const unread = hasUnread(c, bee.id);
+                const isActive = c.id === conversationId;
+                return (
+                  <div key={c.id} className="group relative">
+                    <button
+                      type="button"
+                      onClick={() => openConversation(c.id)}
                       className={cn(
-                        'flex items-center gap-1.5 truncate text-[14px]',
-                        unread ? 'font-bold text-zinc-900' : 'font-medium text-zinc-600',
+                        'flex w-full items-center gap-2.5 border-b border-zinc-50 px-3 py-2.5 pr-9 text-left transition-colors hover:bg-zinc-50',
+                        isActive && 'bg-cyan-50/60',
                       )}
                     >
-                      {c.kind === 'direct' &&
-                        online.has(
-                          c.participants.find((pp) => pp.beeId !== bee.id)?.beeId ?? '',
-                        ) && (
-                          <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" />
+                      <span
+                        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-white"
+                        style={{ background: COMMS_COLOR }}
+                      >
+                        {c.kind === 'group' ? (
+                          <Users size={14} />
+                        ) : (
+                          conversationTitle(c, bee.id).slice(1, 2).toUpperCase()
                         )}
-                      {conversationTitle(c, bee.id)}
-                    </span>
-                    <span className="block text-[11px] text-zinc-400">
-                      {c.lastMessageAt ? timeAgo(c.lastMessageAt) : 'new'}
-                    </span>
-                  </span>
-                  {unread && (
-                    <span
-                      className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
-                      style={{ background: COMMS_COLOR }}
-                    />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => deleteConversation(c.id)}
-                  title="Delete this conversation"
-                  aria-label="Delete this conversation"
-                  className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-zinc-500 transition hover:bg-red-50 hover:text-red-600"
-                >
-                  <Trash2 size={14} />
-                </button>
-                </div>
-              );
-            })}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={cn(
+                            'flex items-center gap-1.5 truncate text-[14px]',
+                            unread ? 'font-bold text-zinc-900' : 'font-medium text-zinc-600',
+                          )}
+                        >
+                          {c.kind === 'direct' &&
+                            online.has(
+                              c.participants.find((pp) => pp.beeId !== bee.id)?.beeId ?? '',
+                            ) && (
+                              <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" />
+                            )}
+                          {conversationTitle(c, bee.id)}
+                        </span>
+                        <span className="block text-[11px] text-zinc-400">
+                          {c.lastMessageAt ? timeAgo(c.lastMessageAt) : 'new'}
+                        </span>
+                      </span>
+                      {unread && (
+                        <span
+                          className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                          style={{ background: COMMS_COLOR }}
+                        />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteConversation(c.id)}
+                      title="Delete this conversation"
+                      aria-label="Delete this conversation"
+                      className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-zinc-500 transition hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                );
+              })}
           </div>
 
           {/* Rooms + Roulette — voice layer, gated on LiveKit */}
@@ -654,7 +667,9 @@ function Thread({
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [safetyNum, setSafetyNum] = useState<string | null>(null);
   const [reactingId, setReactingId] = useState<string | null>(null);
-  const [pins, setPins] = useState<{ messageId: string; pinnedBy: string; createdAt: string }[]>([]);
+  const [pins, setPins] = useState<{ messageId: string; pinnedBy: string; createdAt: string }[]>(
+    [],
+  );
   const [pinsOpen, setPinsOpen] = useState(false);
   const [pinnedMsgs, setPinnedMsgs] = useState<CommsMessage[] | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -730,8 +745,7 @@ function Thread({
     ? conversation.participants
         .filter(
           (p) =>
-            p.beeId !== myBeeId &&
-            p.handle.toLowerCase().startsWith(mentionMatch[1].toLowerCase()),
+            p.beeId !== myBeeId && p.handle.toLowerCase().startsWith(mentionMatch[1].toLowerCase()),
         )
         .slice(0, 5)
     : [];
@@ -767,9 +781,7 @@ function Thread({
         ? await getMessagesByIds(conversation.id, missing).catch(() => [])
         : [];
       for (const m of fetched) have.set(m.id, m);
-      const list = wanted
-        .map((id) => have.get(id))
-        .filter((m): m is CommsMessage => !!m);
+      const list = wanted.map((id) => have.get(id)).filter((m): m is CommsMessage => !!m);
       if (live) setPinnedMsgs(list);
     })();
     return () => {
@@ -844,7 +856,8 @@ function Thread({
   // Ephemeral typing channel for this conversation.
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the conversation
   useEffect(() => {
-    const myHandle = conversation.participants.find((p) => p.beeId === myBeeId)?.handle ?? 'someone';
+    const myHandle =
+      conversation.participants.find((p) => p.beeId === myBeeId)?.handle ?? 'someone';
     const chan = joinTyping(conversation.id, { beeId: myBeeId, handle: myHandle }, (who) => {
       setTyping({ handle: who.handle, at: Date.now() });
     });
@@ -1353,9 +1366,9 @@ function Thread({
             )}
           </div>
           <p className="text-[11px] leading-relaxed text-zinc-500">
-            Compare this with {conversationTitle(conversation, myBeeId)} — read it aloud or hold your
-            screens side by side. If it matches, no one is intercepting your keys. Mark it verified
-            and this device will warn you if it ever changes.
+            Compare this with {conversationTitle(conversation, myBeeId)} — read it aloud or hold
+            your screens side by side. If it matches, no one is intercepting your keys. Mark it
+            verified and this device will warn you if it ever changes.
           </p>
         </div>
       )}
@@ -1479,7 +1492,9 @@ function Thread({
                 onClick={() => jumpTo(m.id)}
                 className="flex min-w-0 flex-1 items-baseline gap-2 text-left transition-colors hover:text-cyan-800"
               >
-                <span className="flex-shrink-0 text-[10px] text-zinc-400">{timeAgo(m.createdAt)}</span>
+                <span className="flex-shrink-0 text-[10px] text-zinc-400">
+                  {timeAgo(m.createdAt)}
+                </span>
                 <span className="min-w-0 flex-1 truncate text-[12px] text-zinc-700">
                   <span className="font-semibold text-zinc-500">@{handleFor(m.senderBeeId)}</span>{' '}
                   {m.deletedAt ? 'message removed' : m.contentType === 'text' ? m.body : '📎 media'}
@@ -1722,7 +1737,11 @@ function Thread({
                   >
                     Remove
                   </button>
-                  <button type="button" onClick={() => setConfirmDelId(null)} className="text-zinc-400">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelId(null)}
+                    className="text-zinc-400"
+                  >
                     Cancel
                   </button>
                 </div>
@@ -1779,7 +1798,9 @@ function Thread({
           <div className="min-w-0 flex-1 border-l-2 border-cyan-400 pl-2">
             <div className="text-[11px] font-semibold text-cyan-700">
               Replying to{' '}
-              {replyingTo.senderBeeId === myBeeId ? 'yourself' : `@${handleFor(replyingTo.senderBeeId)}`}
+              {replyingTo.senderBeeId === myBeeId
+                ? 'yourself'
+                : `@${handleFor(replyingTo.senderBeeId)}`}
             </div>
             <div className="truncate text-[11px] text-zinc-500">{quoteSnippet(replyingTo)}</div>
           </div>
@@ -1828,85 +1849,85 @@ function Thread({
         </div>
       )}
       {!peerBlocked && (
-      <form onSubmit={submit} className="flex items-center gap-2 border-t border-zinc-100 p-2.5">
-        {recState === 'idle' ? (
-          <>
-            <button
-              type="button"
-              onClick={() => setAttachOpen(true)}
-              disabled={sending}
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-zinc-200 text-zinc-500 transition-colors hover:border-cyan-300 hover:text-cyan-700 disabled:opacity-40"
-              aria-label="Attach from your Library"
-              title="Attach from your Library"
-            >
-              <Paperclip size={15} />
-            </button>
-            <input
-              value={draft}
-              onChange={(e) => {
-                setDraft(e.target.value);
-                typingChanRef.current?.sendTyping();
-              }}
-              placeholder="Write it…"
-              className="min-w-0 flex-1 rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 text-[14px] text-zinc-800 outline-none transition-colors placeholder:text-zinc-400 focus:border-cyan-400 focus:bg-white"
-            />
-            {draft.trim() ? (
+        <form onSubmit={submit} className="flex items-center gap-2 border-t border-zinc-100 p-2.5">
+          {recState === 'idle' ? (
+            <>
               <button
-                type="submit"
+                type="button"
+                onClick={() => setAttachOpen(true)}
                 disabled={sending}
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-zinc-200 text-zinc-500 transition-colors hover:border-cyan-300 hover:text-cyan-700 disabled:opacity-40"
+                aria-label="Attach from your Library"
+                title="Attach from your Library"
+              >
+                <Paperclip size={15} />
+              </button>
+              <input
+                value={draft}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  typingChanRef.current?.sendTyping();
+                }}
+                placeholder="Write it…"
+                className="min-w-0 flex-1 rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 text-[14px] text-zinc-800 outline-none transition-colors placeholder:text-zinc-400 focus:border-cyan-400 focus:bg-white"
+              />
+              {draft.trim() ? (
+                <button
+                  type="submit"
+                  disabled={sending}
+                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40"
+                  style={{ background: COMMS_COLOR }}
+                  aria-label="Send"
+                >
+                  <Send size={15} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startRecording}
+                  disabled={sending}
+                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40"
+                  style={{ background: COMMS_COLOR }}
+                  aria-label="Record a voice message"
+                  title="Record a voice message"
+                >
+                  <Mic size={15} />
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => stopRecording(false)}
+                disabled={recState === 'uploading'}
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-zinc-200 text-zinc-500 transition-colors hover:border-red-300 hover:text-red-600 disabled:opacity-40"
+                aria-label="Cancel recording"
+                title="Cancel recording"
+              >
+                <X size={15} />
+              </button>
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-[13px] text-red-700">
+                <span className="h-2 w-2 flex-shrink-0 animate-pulse rounded-full bg-red-500" />
+                <span className="font-semibold tabular-nums">{fmtClock(recElapsed)}</span>
+                <span className="truncate text-red-500">
+                  {recState === 'uploading' ? 'Sending…' : 'Recording…'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => stopRecording(true)}
+                disabled={recState === 'uploading'}
                 className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40"
                 style={{ background: COMMS_COLOR }}
-                aria-label="Send"
+                aria-label="Send voice message"
+                title="Send voice message"
               >
                 <Send size={15} />
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={startRecording}
-                disabled={sending}
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40"
-                style={{ background: COMMS_COLOR }}
-                aria-label="Record a voice message"
-                title="Record a voice message"
-              >
-                <Mic size={15} />
-              </button>
-            )}
-          </>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={() => stopRecording(false)}
-              disabled={recState === 'uploading'}
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-zinc-200 text-zinc-500 transition-colors hover:border-red-300 hover:text-red-600 disabled:opacity-40"
-              aria-label="Cancel recording"
-              title="Cancel recording"
-            >
-              <X size={15} />
-            </button>
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-[13px] text-red-700">
-              <span className="h-2 w-2 flex-shrink-0 animate-pulse rounded-full bg-red-500" />
-              <span className="font-semibold tabular-nums">{fmtClock(recElapsed)}</span>
-              <span className="truncate text-red-500">
-                {recState === 'uploading' ? 'Sending…' : 'Recording…'}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => stopRecording(true)}
-              disabled={recState === 'uploading'}
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40"
-              style={{ background: COMMS_COLOR }}
-              aria-label="Send voice message"
-              title="Send voice message"
-            >
-              <Send size={15} />
-            </button>
-          </>
-        )}
-      </form>
+            </>
+          )}
+        </form>
       )}
 
       {attachOpen && (
@@ -2263,7 +2284,9 @@ function FollowingList({
             {f.handle.slice(0, 1).toUpperCase()}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-medium text-[14px] text-zinc-700">@{f.handle}</span>
+            <span className="block truncate font-medium text-[14px] text-zinc-700">
+              @{f.handle}
+            </span>
             {f.name && <span className="block truncate text-[11px] text-zinc-400">{f.name}</span>}
           </span>
         </button>
@@ -2478,8 +2501,8 @@ function AppleInstallBanner() {
       <div className="flex-1 leading-relaxed">
         <span className="font-semibold">Add COMMS to your Home Screen</span> to get call alerts and
         ringing on this device: tap <span className="font-semibold">Share</span> →{' '}
-        <span className="font-semibold">Add to Home Screen</span>, open COMMS from that icon, then tap
-        “Enable call alerts.” Apple only allows call notifications for installed web apps.
+        <span className="font-semibold">Add to Home Screen</span>, open COMMS from that icon, then
+        tap “Enable call alerts.” Apple only allows call notifications for installed web apps.
       </div>
       <button
         type="button"

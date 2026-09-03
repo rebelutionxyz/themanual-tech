@@ -3,17 +3,19 @@
 // Snapshot) + stubs for future actions that need their own dedicated
 // dispatches (especially red-zone economy bootstrap).
 
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { RefreshCw, ShieldCheck, FileText, Copy, Check, SlidersHorizontal } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { Check, Copy, FileText, RefreshCw, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 export function AdminActions() {
   return (
     <div>
       <header className="mb-4">
-        <h2 className="font-display text-2xl font-semibold text-text-silver-bright">Admin Actions</h2>
+        <h2 className="font-display text-2xl font-semibold text-text-silver-bright">
+          Admin Actions
+        </h2>
         <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }}>
           repeated operational actions · 4 live + 4 stubbed
         </p>
@@ -65,9 +67,17 @@ function RefreshMatviewsAction() {
     const elapsed = Date.now() - startedAt;
     setRunning(false);
     if (error) {
-      setResult({ ok: false, message: `Refresh failed: ${error.message}`, ts: new Date().toISOString() });
+      setResult({
+        ok: false,
+        message: `Refresh failed: ${error.message}`,
+        ts: new Date().toISOString(),
+      });
     } else {
-      setResult({ ok: true, message: `Refreshed 3 matviews in ${elapsed}ms`, ts: new Date().toISOString() });
+      setResult({
+        ok: true,
+        message: `Refreshed 3 matviews in ${elapsed}ms`,
+        ts: new Date().toISOString(),
+      });
     }
   };
 
@@ -106,7 +116,9 @@ function RefreshMatviewsAction() {
 // Action B — Verify is_admin
 // ───────────────────────────────────────────────────────────────────────
 function VerifyIsAdminAction() {
-  const [result, setResult] = useState<{ id: string; handle: string; is_admin: boolean } | null>(null);
+  const [result, setResult] = useState<{ id: string; handle: string; is_admin: boolean } | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
@@ -202,32 +214,57 @@ function SystemHealthSnapshotAction() {
     // accept PromiseLike here so this wraps both .from(...).select() chains
     // and .rpc() calls.
     const safe = async <T,>(p: PromiseLike<T>): Promise<T | { __err: string }> => {
-      try { return await p; } catch (e) { return { __err: e instanceof Error ? e.message : 'unknown' }; }
+      try {
+        return await p;
+      } catch (e) {
+        return { __err: e instanceof Error ? e.message : 'unknown' };
+      }
     };
 
     const [bees, atoms, votes, state, treasury, failed, pageviews] = await Promise.all([
       safe(supabase.from('bees').select('id', { head: true, count: 'exact' })),
       safe(supabase.from('atoms').select('id', { head: true, count: 'exact' })),
       safe(supabase.from('atom_kettle_votes').select('id', { head: true, count: 'exact' })),
-      safe(supabase.from('bling_system_state').select('total_supply, freedom_price').order('updated_at', { ascending: false }).limit(1).maybeSingle()),
+      safe(
+        supabase
+          .from('bling_system_state')
+          .select('total_supply, freedom_price')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ),
       safe(supabase.rpc('get_treasury_pots')),
-      safe(supabase.from('failed_login_events').select('id', { head: true, count: 'exact' }).gte('attempted_at', day_ago)),
-      safe(supabase.from('page_view_events').select('id', { head: true, count: 'exact' }).gte('viewed_at', day_ago)),
+      safe(
+        supabase
+          .from('failed_login_events')
+          .select('id', { head: true, count: 'exact' })
+          .gte('attempted_at', day_ago),
+      ),
+      safe(
+        supabase
+          .from('page_view_events')
+          .select('id', { head: true, count: 'exact' })
+          .gte('viewed_at', day_ago),
+      ),
     ]);
 
     const cnt = (r: unknown): number | string => {
-      if (r && typeof r === 'object' && '__err' in r) return `ERR: ${(r as { __err: string }).__err}`;
+      if (r && typeof r === 'object' && '__err' in r)
+        return `ERR: ${(r as { __err: string }).__err}`;
       const c = (r as { count?: number | null })?.count;
       return c ?? 0;
     };
 
-    const stateData = !state || ('__err' in (state as object))
-      ? null
-      : (state as { data?: { total_supply: number | string; freedom_price: number | string } }).data ?? null;
+    const stateData =
+      !state || '__err' in (state as object)
+        ? null
+        : ((state as { data?: { total_supply: number | string; freedom_price: number | string } })
+            .data ?? null);
 
-    const treasuryRows = !treasury || ('__err' in (treasury as object))
-      ? []
-      : ((treasury as { data?: Array<{ balance: number | string }> }).data ?? []);
+    const treasuryRows =
+      !treasury || '__err' in (treasury as object)
+        ? []
+        : ((treasury as { data?: Array<{ balance: number | string }> }).data ?? []);
     const treasuryTotal = treasuryRows.reduce((s, r) => s + Number(r.balance), 0);
 
     setSnapshot({
@@ -345,7 +382,10 @@ function OpenPatchboardAction() {
 // Reusable action card + stub
 // ───────────────────────────────────────────────────────────────────────
 function ActionCard({
-  icon, title, description, children,
+  icon,
+  title,
+  description,
+  children,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -355,10 +395,14 @@ function ActionCard({
   return (
     <div className="rounded-md border border-border bg-bg-elevated/30 px-4 py-3">
       <div className="mb-1 flex items-center gap-2">
-        <span className="text-text-silver-bright" aria-hidden>{icon}</span>
+        <span className="text-text-silver-bright" aria-hidden>
+          {icon}
+        </span>
         <h3 className="font-display text-base font-semibold text-text-silver-bright">{title}</h3>
       </div>
-      <p className="mb-3 text-text-dim" style={{ fontSize: '12px' }}>{description}</p>
+      <p className="mb-3 text-text-dim" style={{ fontSize: '12px' }}>
+        {description}
+      </p>
       {children}
     </div>
   );
@@ -376,8 +420,9 @@ function StubAction({ title, description }: { title: string; description: string
           soon
         </span>
       </div>
-      <p className="text-text-dim" style={{ fontSize: '12px' }}>{description}</p>
+      <p className="text-text-dim" style={{ fontSize: '12px' }}>
+        {description}
+      </p>
     </div>
   );
 }
-

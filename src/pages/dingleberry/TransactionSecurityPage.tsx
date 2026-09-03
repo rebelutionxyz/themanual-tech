@@ -35,12 +35,7 @@ const STATUS_BADGE: Record<string, { tone: Tone; label: string }> = {
   watching: { tone: 'watch', label: 'Watching' },
 };
 
-const SANCTIONED_PATHS = [
-  'Drops / Drips',
-  'Affiliate distribution',
-  'h24 credit',
-  'HoneyPOT',
-];
+const SANCTIONED_PATHS = ['Drops / Drips', 'Affiliate distribution', 'h24 credit', 'HoneyPOT'];
 
 /* Worst-first ordering for the anomaly list. Lower rank = shown first.
    The list is intentionally NOT gated by posture (Butch's call): every open

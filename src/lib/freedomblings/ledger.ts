@@ -203,11 +203,7 @@ export interface TxnRow {
  * The current Bee's transactions, newest first, paged for infinite scroll
  * (bling_transactions.bee_id, ordered id desc). Owner-read under RLS.
  */
-export async function listMyTransactions(
-  beeId: string,
-  limit = 25,
-  offset = 0,
-): Promise<TxnRow[]> {
+export async function listMyTransactions(beeId: string, limit = 25, offset = 0): Promise<TxnRow[]> {
   if (!supabase || !beeId) return [];
   const { data, error } = await supabase
     .from('bling_transactions')

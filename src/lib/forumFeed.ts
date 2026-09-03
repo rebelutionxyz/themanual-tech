@@ -1,6 +1,6 @@
-import { supabase } from './supabase';
 import { REALM_ID_BY_NAME } from '@/lib/constants';
 import type { RealmId } from '@/types/manual';
+import { supabase } from './supabase';
 
 // ═════════════════════════════════════════════════════════════════════
 // forum_thread_feed — unified ranked thread feed (trending / top / new).

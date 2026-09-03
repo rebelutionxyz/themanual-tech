@@ -1,16 +1,16 @@
-import { useState } from 'react';
-import { Search, LayoutList, TreePine, X, Filter } from 'lucide-react';
-import { useManualData } from '@/lib/useManualData';
-import { useAtomCount } from '@/lib/useAtomCount';
-import { useManualStore } from '@/stores/useManualStore';
-import { RealmSidebar } from '@/components/manual/RealmSidebar';
-import { OutlookView } from '@/components/manual/OutlookView';
-import { ListView } from '@/components/manual/ListView';
-import { GraphView } from '@/components/manual/GraphView';
 import { AtomDetailPanel } from '@/components/manual/AtomDetailPanel';
+import { GraphView } from '@/components/manual/GraphView';
+import { ListView } from '@/components/manual/ListView';
+import { OutlookView } from '@/components/manual/OutlookView';
+import { RealmSidebar } from '@/components/manual/RealmSidebar';
+import { KETTLE_ABBREV, KETTLE_STATES } from '@/lib/constants';
+import { useAtomCount } from '@/lib/useAtomCount';
+import { useManualData } from '@/lib/useManualData';
 import { cn } from '@/lib/utils';
-import { KETTLE_STATES, KETTLE_ABBREV } from '@/lib/constants';
+import { useManualStore } from '@/stores/useManualStore';
 import type { KettleState } from '@/types/manual';
+import { Filter, LayoutList, Search, TreePine, X } from 'lucide-react';
+import { useState } from 'react';
 
 export function ManualPage() {
   const { loaded, error, tree } = useManualData();
@@ -53,7 +53,9 @@ export function ManualPage() {
             style={{ fontSize: '11px' }}
             data-size="meta"
           >
-            {atomCount != null ? `loading ${atomCount.toLocaleString()} atoms...` : 'Loading The Manual…'}
+            {atomCount != null
+              ? `loading ${atomCount.toLocaleString()} atoms...`
+              : 'Loading The Manual…'}
           </p>
         </div>
       </div>

@@ -151,8 +151,8 @@ export function AdvertisePage() {
           </p>
           <p className="font-mono text-[11.5px] leading-relaxed text-zinc-500" data-size="meta">
             Targeting is contextual only — realm, branch, atom, chosen geo-lens. No behavioral
-            profiles, no retargeting, no demographics. We report where your promotion ran, never
-            who saw it.
+            profiles, no retargeting, no demographics. We report where your promotion ran, never who
+            saw it.
           </p>
         </div>
         <div className="rounded-lg border border-zinc-200 bg-zinc-50/60 p-4">
@@ -161,8 +161,8 @@ export function AdvertisePage() {
             Review before live
           </p>
           <p className="font-mono text-[11.5px] leading-relaxed text-zinc-500" data-size="meta">
-            Verified identity, KYC at payment, and creative that fits the realm it runs in.
-            89% of revenue flows back to Bees; 11% to R&D.
+            Verified identity, KYC at payment, and creative that fits the realm it runs in. 89% of
+            revenue flows back to Bees; 11% to R&D.
           </p>
         </div>
       </div>

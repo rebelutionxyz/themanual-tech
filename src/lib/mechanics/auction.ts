@@ -13,12 +13,7 @@
    only proposed.
    ============================================================ */
 
-import {
-  proposeSettlement,
-  roundMoney,
-  type Rail,
-  type SettlementProposal,
-} from './rails';
+import { type Rail, type SettlementProposal, proposeSettlement, roundMoney } from './rails';
 
 export type AuctionStatus = 'open' | 'closed';
 
@@ -147,7 +142,10 @@ export interface AuctionOutcome {
 }
 
 /** Close the auction and read its outcome. Pure; does not settle money. */
-export function closeAuction(state: AuctionState): { state: AuctionState; outcome: AuctionOutcome } {
+export function closeAuction(state: AuctionState): {
+  state: AuctionState;
+  outcome: AuctionOutcome;
+} {
   const high = highBid(state);
   const reserve = state.config.reserve ?? 0;
   const reserveMet = high != null && high.amount >= reserve;

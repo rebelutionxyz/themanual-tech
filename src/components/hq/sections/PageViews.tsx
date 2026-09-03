@@ -4,8 +4,8 @@
 // dispatch + an RPC — the table is empty in production (FE instrumentation
 // pending), so v1 ships the raw-events view.
 
-import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
 
 interface Row {
   id: number;
@@ -52,7 +52,9 @@ export function PageViews() {
       }
       setRows((data ?? []) as Row[]);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [range]);
 
   return (
@@ -65,13 +67,19 @@ export function PageViews() {
       </header>
 
       <label className="inline-flex items-center gap-2 text-sm text-text-silver">
-        <span className="font-mono uppercase text-text-muted" style={{ fontSize: '11px' }}>range:</span>
+        <span className="font-mono uppercase text-text-muted" style={{ fontSize: '11px' }}>
+          range:
+        </span>
         <select
           value={range}
           onChange={(e) => setRange(e.target.value as Range)}
           className="rounded-md border border-border bg-bg px-2 py-1 text-sm text-text focus:border-text-silver/50 focus:outline-none"
         >
-          {RANGES.map((r) => <option key={r} value={r}>{r}</option>)}
+          {RANGES.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
         </select>
       </label>
 
@@ -83,7 +91,10 @@ export function PageViews() {
         </div>
       )}
       {rows !== null && rows.length === 0 && (
-        <div className="mt-4 rounded-md border border-border bg-bg-elevated/40 px-4 py-6 text-center text-text-dim" style={{ fontSize: '13px' }}>
+        <div
+          className="mt-4 rounded-md border border-border bg-bg-elevated/40 px-4 py-6 text-center text-text-dim"
+          style={{ fontSize: '13px' }}
+        >
           {error
             ? `Could not load page views: ${error}`
             : 'No page views logged yet. (Page view tracking pending integration with frontend.)'}

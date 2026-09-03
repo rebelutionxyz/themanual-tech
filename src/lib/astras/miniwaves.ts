@@ -22,7 +22,7 @@
 // NOTE: astra-catalog.ts marks miniwaves status 'live'; task says pre-launch /
 // scaffolded. AstraConfig has no status field, so nothing is set here.
 
-import { DEFAULT_PROMOTION_SLOTS, type AstraConfig } from './astra.types';
+import { type AstraConfig, DEFAULT_PROMOTION_SLOTS } from './astra.types';
 
 export const miniwavesAstra: AstraConfig = {
   slug: 'miniwaves',

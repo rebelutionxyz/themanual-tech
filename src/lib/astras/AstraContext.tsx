@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode, createContext, useContext, useEffect, useState } from 'react';
 import type { AstraConfig } from './astra.types';
 import { resolveAstraByHost } from './registry';
 
@@ -12,9 +12,7 @@ const AstraContext = createContext<AstraConfig | null | undefined>(undefined);
 const FOUNDATION_SITE_TITLE = 'The Manual';
 
 function setMetaProperty(property: string, content: string): void {
-  let el = document.head.querySelector<HTMLMetaElement>(
-    `meta[property="${property}"]`,
-  );
+  let el = document.head.querySelector<HTMLMetaElement>(`meta[property="${property}"]`);
   if (!el) {
     el = document.createElement('meta');
     el.setAttribute('property', property);
@@ -24,9 +22,7 @@ function setMetaProperty(property: string, content: string): void {
 }
 
 export function AstraProvider({ children }: { children: ReactNode }) {
-  const [astra] = useState<AstraConfig | null>(() =>
-    resolveAstraByHost(window.location.hostname),
-  );
+  const [astra] = useState<AstraConfig | null>(() => resolveAstraByHost(window.location.hostname));
 
   useEffect(() => {
     if (astra?.constellation) {

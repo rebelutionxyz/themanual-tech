@@ -1,17 +1,17 @@
-import { Link } from 'react-router-dom';
-import { BadgeCheck, Radio } from 'lucide-react';
 import { relativeTime } from '@/lib/intel';
 import {
-  formatDuration,
-  formatScheduled,
+  type PulseChannelRef,
+  type PulseLibraryItem,
   type PulseLive,
   type PulseUpcoming,
-  type PulseLibraryItem,
-  type PulseChannelRef,
+  formatDuration,
+  formatScheduled,
 } from '@/lib/pulse';
 import { CARD_INK, cardChipStyle, realmCardStyle } from '@/lib/realmCardStyle';
 import { SURFACE_BY_SLUG } from '@/lib/surfaces';
 import { cn, formatCount } from '@/lib/utils';
+import { BadgeCheck, Radio } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 /**
  * PULSE / media accent — the single sanctioned red, sourced from the surface
@@ -91,7 +91,11 @@ function PremiumBadge() {
 
 function RealmTag({ realm }: { realm: string }) {
   return (
-    <span className="rounded px-1.5 py-0.5 font-mono" style={{ fontSize: '10px', ...cardChipStyle }} data-size="meta">
+    <span
+      className="rounded px-1.5 py-0.5 font-mono"
+      style={{ fontSize: '10px', ...cardChipStyle }}
+      data-size="meta"
+    >
       {realm}
     </span>
   );
@@ -151,8 +155,7 @@ function Avatar({ channel, size }: { channel: PulseChannelRef; size: number }) {
   );
 }
 
-const CARD_CLASS =
-  'group block overflow-hidden rounded-lg transition-shadow hover:shadow-md';
+const CARD_CLASS = 'group block overflow-hidden rounded-lg transition-shadow hover:shadow-md';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Live now (grid card)
@@ -278,7 +281,11 @@ export function LibraryCard({
         <div className="mt-2">
           <ChannelByline channel={item.channel} />
         </div>
-        <div className="mt-1.5 font-mono" style={{ fontSize: '11px', color: CARD_INK.meta }} data-size="meta">
+        <div
+          className="mt-1.5 font-mono"
+          style={{ fontSize: '11px', color: CARD_INK.meta }}
+          data-size="meta"
+        >
           {formatCount(item.viewCount)} views
           {item.publishedAt && <> · {relativeTime(item.publishedAt)}</>}
         </div>

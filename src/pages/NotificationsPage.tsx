@@ -206,10 +206,7 @@ export function NotificationsPage() {
 
   return (
     <div
-      className={cn(
-        'safe-pad-x mx-auto w-full max-w-2xl px-4',
-        inPopup ? 'py-4' : 'py-6 md:py-8',
-      )}
+      className={cn('safe-pad-x mx-auto w-full max-w-2xl px-4', inPopup ? 'py-4' : 'py-6 md:py-8')}
     >
       {/* In a popup, PopupShell's chrome IS the title — the page renders only
           the actions row (when there is anything to act on). */}

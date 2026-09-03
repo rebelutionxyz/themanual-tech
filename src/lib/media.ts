@@ -36,7 +36,13 @@ export interface MediaAsset {
   altText: string | null;
   description: string | null;
   tags: string[];
-  source: 'upload' | 'image_editor' | 'video_editor' | 'response_recorder' | 'import' | 'compare_lab';
+  source:
+    | 'upload'
+    | 'image_editor'
+    | 'video_editor'
+    | 'response_recorder'
+    | 'import'
+    | 'compare_lab';
   editOf: string | null;
   trashedAt: string | null;
   createdAt: string;

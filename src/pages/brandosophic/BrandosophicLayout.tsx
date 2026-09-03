@@ -1,6 +1,6 @@
 import { CommunityShell } from '@/components/shell/CommunityShell';
-import { useAstra } from '@/lib/astras/AstraContext';
 import type { SidebarItem } from '@/components/shell/sidebarNav';
+import { useAstra } from '@/lib/astras/AstraContext';
 import { type ResolvedSkin, resolveSkin } from '@/lib/skins';
 import { supabase } from '@/lib/supabase';
 import { Boxes, Hexagon, Lock, Palette, Radio, Store } from 'lucide-react';

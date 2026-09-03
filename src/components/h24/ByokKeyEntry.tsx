@@ -103,9 +103,12 @@ export function ByokKeyEntry({
         </p>
       )}
       <p className="mt-2" style={{ color: 'var(--mute)', fontSize: 10.5, lineHeight: 1.5 }}>
-        Your key {formatCheckOnly ? 'is format-checked, then' : 'is validated live against the provider, then'} goes to
-        the routing process only — never into the model, never logged. Routing through it lands
-        with AUTOTIER1.
+        Your key{' '}
+        {formatCheckOnly
+          ? 'is format-checked, then'
+          : 'is validated live against the provider, then'}{' '}
+        goes to the routing process only — never into the model, never logged. Routing through it
+        lands with AUTOTIER1.
       </p>
     </div>
   );

@@ -1,26 +1,26 @@
-import { useMemo } from 'react';
+import { REALM_NAMES } from '@/lib/constants';
+import { useManualData } from '@/lib/useManualData';
+import { cn, formatCount } from '@/lib/utils';
+import { useManualStore } from '@/stores/useManualStore';
+import type { RealmId } from '@/types/manual';
 import {
-  Scale,
   BookOpen,
-  Hammer,
-  User,
-  Globe2,
-  HeartPulse,
-  Users,
-  Sigma,
-  FlaskConical,
   Brain,
   Cpu,
+  FlaskConical,
+  Globe2,
+  Hammer,
+  HeartPulse,
   Hourglass,
   Palette,
+  Scale,
+  Sigma,
   Sparkles,
+  User,
+  Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { RealmId } from '@/types/manual';
-import { useManualStore } from '@/stores/useManualStore';
-import { useManualData } from '@/lib/useManualData';
-import { REALM_NAMES } from '@/lib/constants';
-import { cn, formatCount } from '@/lib/utils';
+import { useMemo } from 'react';
 
 const REALM_ICONS: Record<RealmId, LucideIcon> = {
   justice: Scale,

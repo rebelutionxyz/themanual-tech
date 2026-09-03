@@ -39,8 +39,8 @@ export function CirculationPage() {
           <h1>Circulation</h1>
           <div className="sub">
             BLiNG! is meant to flow, not sit. Idle BLiNG! gently melts back to the well — so the
-            platform stays alive and value keeps reaching the people doing the work. Here's exactly how,
-            in the open.
+            platform stays alive and value keeps reaching the people doing the work. Here's exactly
+            how, in the open.
           </div>
         </div>
       </div>
@@ -91,8 +91,8 @@ export function CirculationPage() {
             paying your way out of circulation.
           </p>
           <div className="og-line">
-            <BMark /> OG Founders rest at <b>{c.ogRate}%</b> — for being early, not for
-            holding more.
+            <BMark /> OG Founders rest at <b>{c.ogRate}%</b> — for being early, not for holding
+            more.
           </div>
         </div>
 
@@ -130,8 +130,8 @@ export function CirculationPage() {
 
       <div className="ledger-foot">
         <span className="seal" />
-        The melt is not a fee and never leaves the platform. A flat 3% for every Bee (OG Founders 2.5%),
-        Patchboard-tunable.
+        The melt is not a fee and never leaves the platform. A flat 3% for every Bee (OG Founders
+        2.5%), Patchboard-tunable.
       </div>
     </main>
   );

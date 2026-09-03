@@ -1,3 +1,7 @@
+import { dbIcon } from '@/components/dingleberry/icons';
+import { ActionButton, ActionCaption, DbCard, Eyebrow } from '@/components/dingleberry/primitives';
+import { DINGLEBERRY_COLOR, STATUS_BLUE, TONE } from '@/components/dingleberry/tone';
+import type { Tone } from '@/lib/dingleberry/contract';
 /* DingleBERRY — Surface 04 · Shill / Abuse Detection (drill-in).
    ------------------------------------------------------------
    Cross-Astra pattern recognition: coordinated inauthentic behavior caught
@@ -10,10 +14,6 @@
    posture-independent (the S02 lesson): every ring renders, sorted worst-first
    by its own severity; nothing is gated by secure/degraded/go-dark. */
 import { useState } from 'react';
-import { dbIcon } from '@/components/dingleberry/icons';
-import { ActionButton, ActionCaption, DbCard, Eyebrow } from '@/components/dingleberry/primitives';
-import { DINGLEBERRY_COLOR, STATUS_BLUE, TONE } from '@/components/dingleberry/tone';
-import type { Tone } from '@/lib/dingleberry/contract';
 import { useDingleberry } from './DingleberryLayout';
 
 /* The mock rings carry richer fields than the contract's ShillRing subset
@@ -51,7 +51,16 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span
       className="inline-flex items-center font-mono font-semibold uppercase"
-      style={{ height: 19, padding: '0 8px', fontSize: 9.5, letterSpacing: '0.06em', borderRadius: 999, color: k.c, background: k.tint, border: `1px solid ${k.border}` }}
+      style={{
+        height: 19,
+        padding: '0 8px',
+        fontSize: 9.5,
+        letterSpacing: '0.06em',
+        borderRadius: 999,
+        color: k.c,
+        background: k.tint,
+        border: `1px solid ${k.border}`,
+      }}
     >
       {b.label}
     </span>
@@ -76,15 +85,38 @@ function Cluster({ count, tone, seedBase }: { count: number; tone: Tone; seedBas
     sats.push({ x: cx + Math.cos(ang) * rad, y: cy + Math.sin(ang) * rad });
   }
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="coordinated ring cluster" style={{ width: '100%', height: 'auto', display: 'block' }}>
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      role="img"
+      aria-label="coordinated ring cluster"
+      style={{ width: '100%', height: 'auto', display: 'block' }}
+    >
       {sats.map((p, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: positional generated cluster node, no stable id; list never reorders
-        <line key={`l${i}`} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke={k.c} strokeWidth={1 + rnd() * 1.4} opacity="0.35" />
+        <line
+          key={`l${i}`}
+          x1={cx}
+          y1={cy}
+          x2={p.x}
+          y2={p.y}
+          stroke={k.c}
+          strokeWidth={1 + rnd() * 1.4}
+          opacity="0.35"
+        />
       ))}
       {sats.map((p, i) =>
         i % 3 === 0 ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: positional generated cluster node, no stable id; list never reorders
-          <line key={`r${i}`} x1={p.x} y1={p.y} x2={sats[(i + 1) % n].x} y2={sats[(i + 1) % n].y} stroke={k.c} strokeWidth="1" opacity="0.2" />
+          <line
+            key={`r${i}`}
+            x1={p.x}
+            y1={p.y}
+            x2={sats[(i + 1) % n].x}
+            y2={sats[(i + 1) % n].y}
+            stroke={k.c}
+            strokeWidth="1"
+            opacity="0.2"
+          />
         ) : null,
       )}
       {sats.map((p, i) => (
@@ -96,7 +128,15 @@ function Cluster({ count, tone, seedBase }: { count: number; tone: Tone; seedBas
         <animate attributeName="r" from="14" to="24" dur="1.6s" repeatCount="indefinite" />
         <animate attributeName="opacity" from="0.3" to="0" dur="1.6s" repeatCount="indefinite" />
       </circle>
-      <text x={cx} y={cy + 3.5} textAnchor="middle" fontFamily="var(--font-mono)" fontSize="9" fontWeight="700" fill="#fff">
+      <text
+        x={cx}
+        y={cy + 3.5}
+        textAnchor="middle"
+        fontFamily="var(--font-mono)"
+        fontSize="9"
+        fontWeight="700"
+        fill="#fff"
+      >
         RING
       </text>
     </svg>
@@ -115,10 +155,17 @@ function RingRow({ r, active, onClick }: { r: S4Ring; active: boolean; onClick: 
         padding: '12px 14px',
         border: active ? `1.5px solid ${DINGLEBERRY_COLOR}` : '1px solid var(--border, #1F252C)',
         borderLeft: `3px solid ${k.c}`,
-        background: active ? 'rgba(220,38,38,0.08)' : r.sev === 'critical' ? k.tint : 'var(--bg-panel, #0F1217)',
+        background: active
+          ? 'rgba(220,38,38,0.08)'
+          : r.sev === 'critical'
+            ? k.tint
+            : 'var(--bg-panel, #0F1217)',
       }}
     >
-      <div className="flex flex-none items-center justify-center rounded-md" style={{ width: 36, height: 36, background: k.tint, color: k.c }}>
+      <div
+        className="flex flex-none items-center justify-center rounded-md"
+        style={{ width: 36, height: 36, background: k.tint, color: k.c }}
+      >
         <Users size={18} />
       </div>
       <div className="min-w-0 flex-1">
@@ -175,25 +222,42 @@ export function ShillDetectionPage() {
       {/* header */}
       <DbCard className="mb-[18px] p-5">
         <div className="flex flex-wrap items-start gap-[18px]">
-          <div className="flex flex-none items-center justify-center rounded-md" style={{ width: 46, height: 46, background: 'rgba(220,38,38,0.12)', color: '#DC2626' }}>
+          <div
+            className="flex flex-none items-center justify-center rounded-md"
+            style={{ width: 46, height: 46, background: 'rgba(220,38,38,0.12)', color: '#DC2626' }}
+          >
             <Users size={23} />
           </div>
           <div className="min-w-[280px] flex-1">
             <Eyebrow>Surface 04 · cross-Astra pattern recognition</Eyebrow>
-            <h1 className="font-serif font-bold text-text" style={{ fontSize: 30, lineHeight: 1.05, margin: '3px 0 4px' }}>
+            <h1
+              className="font-serif font-bold text-text"
+              style={{ fontSize: 30, lineHeight: 1.05, margin: '3px 0 4px' }}
+            >
               Shill &amp; abuse detection
             </h1>
             <div className="text-text-silver" style={{ fontSize: 14.5, maxWidth: 540 }}>
-              Coordinated inauthentic behavior, caught across the whole platform — not one Astra at a time.
+              Coordinated inauthentic behavior, caught across the whole platform — not one Astra at
+              a time.
             </div>
           </div>
           <div className="flex flex-wrap gap-[10px]">
             {headerStats.map(([cap, n, c]) => (
-              <div key={cap} className="rounded-md border border-border bg-bg-elevated" style={{ padding: '10px 14px', minWidth: 96 }}>
-                <div className="mb-1 font-mono uppercase text-text-muted" style={{ fontSize: 9.5, letterSpacing: '0.08em' }}>
+              <div
+                key={cap}
+                className="rounded-md border border-border bg-bg-elevated"
+                style={{ padding: '10px 14px', minWidth: 96 }}
+              >
+                <div
+                  className="mb-1 font-mono uppercase text-text-muted"
+                  style={{ fontSize: 9.5, letterSpacing: '0.08em' }}
+                >
                   {cap}
                 </div>
-                <div className="font-serif font-bold" style={{ fontSize: 24, lineHeight: 1, color: c }}>
+                <div
+                  className="font-serif font-bold"
+                  style={{ fontSize: 24, lineHeight: 1, color: c }}
+                >
                   {n}
                 </div>
               </div>
@@ -211,7 +275,12 @@ export function ShillDetectionPage() {
           </div>
           <div className="flex flex-col gap-[9px]">
             {rings.map((x) => (
-              <RingRow key={x.id} r={x} active={!!r && x.id === r.id} onClick={() => setSelId(x.id)} />
+              <RingRow
+                key={x.id}
+                r={x}
+                active={!!r && x.id === r.id}
+                onClick={() => setSelId(x.id)}
+              />
             ))}
           </div>
         </div>
@@ -223,7 +292,12 @@ export function ShillDetectionPage() {
               <div className="mb-[10px] flex flex-wrap items-center gap-[9px]">
                 <span
                   className={r.sev === 'critical' ? 'animate-pulse' : ''}
-                  style={{ width: 11, height: 11, borderRadius: 99, background: TONE[toneOf(r.sev)].c }}
+                  style={{
+                    width: 11,
+                    height: 11,
+                    borderRadius: 99,
+                    background: TONE[toneOf(r.sev)].c,
+                  }}
                 />
                 <StatusBadge status={r.status} />
                 <span className="flex-1" />
@@ -231,17 +305,30 @@ export function ShillDetectionPage() {
                   {r.id}
                 </span>
               </div>
-              <h2 className="font-serif font-bold text-text" style={{ fontSize: 20, lineHeight: 1.1, margin: '0 0 3px' }}>
+              <h2
+                className="font-serif font-bold text-text"
+                style={{ fontSize: 20, lineHeight: 1.1, margin: '0 0 3px' }}
+              >
                 {r.name}
               </h2>
               <div className="mb-2 text-text-silver" style={{ fontSize: 13 }}>
                 {r.target}
               </div>
 
-              <div className="mb-2 rounded-md border border-border bg-bg-elevated" style={{ padding: '6px 6px 2px' }}>
-                <Cluster count={r.actors} tone={toneOf(r.sev)} seedBase={Number.parseInt(r.id.slice(-4), 10) || 7} />
+              <div
+                className="mb-2 rounded-md border border-border bg-bg-elevated"
+                style={{ padding: '6px 6px 2px' }}
+              >
+                <Cluster
+                  count={r.actors}
+                  tone={toneOf(r.sev)}
+                  seedBase={Number.parseInt(r.id.slice(-4), 10) || 7}
+                />
               </div>
-              <div className="mb-[14px] flex justify-between font-mono text-text-muted" style={{ fontSize: 11 }}>
+              <div
+                className="mb-[14px] flex justify-between font-mono text-text-muted"
+                style={{ fontSize: 11 }}
+              >
                 <span>
                   <b className="text-text">{r.actors}</b> actors
                 </span>
@@ -256,13 +343,18 @@ export function ShillDetectionPage() {
               {r.payout && (
                 <div
                   className="mb-[14px] flex items-start gap-[9px] rounded-md"
-                  style={{ padding: '10px 12px', background: TONE.critical.tint, border: `1px solid ${TONE.critical.border}` }}
+                  style={{
+                    padding: '10px 12px',
+                    background: TONE.critical.tint,
+                    border: `1px solid ${TONE.critical.border}`,
+                  }}
                 >
                   <Ban size={15} style={{ color: TONE.critical.c, flex: 'none', marginTop: 1 }} />
                   <span className="text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.35 }}>
-                    <b>Frozen upstream of</b> <span className="font-mono font-bold text-text">affiliate_distribute</span> — the
-                    pool never frees from the Well for this chain. No standing gate; this freeze <i>is</i> the
-                    affiliate-integrity layer.
+                    <b>Frozen upstream of</b>{' '}
+                    <span className="font-mono font-bold text-text">affiliate_distribute</span> —
+                    the pool never frees from the Well for this chain. No standing gate; this freeze{' '}
+                    <i>is</i> the affiliate-integrity layer.
                   </span>
                 </div>
               )}
@@ -282,11 +374,15 @@ export function ShillDetectionPage() {
                         className="block h-full"
                         style={{
                           width: `${Math.round(v * 100)}%`,
-                          background: v > 0.85 ? DINGLEBERRY_COLOR : v > 0.7 ? STATUS_BLUE : '#8A94A0',
+                          background:
+                            v > 0.85 ? DINGLEBERRY_COLOR : v > 0.7 ? STATUS_BLUE : '#8A94A0',
                         }}
                       />
                     </span>
-                    <span className="font-mono font-bold tabular-nums text-text" style={{ fontSize: 11, width: 30, textAlign: 'right' }}>
+                    <span
+                      className="font-mono font-bold tabular-nums text-text"
+                      style={{ fontSize: 11, width: 30, textAlign: 'right' }}
+                    >
                       {v.toFixed(2)}
                     </span>
                   </div>
@@ -295,16 +391,27 @@ export function ShillDetectionPage() {
 
               <div
                 className="mb-[13px] flex gap-[11px] rounded-md"
-                style={{ padding: '12px 13px', background: 'var(--bg-elevated, #0C0E12)', border: '1px solid var(--border, #1F252C)' }}
+                style={{
+                  padding: '12px 13px',
+                  background: 'var(--bg-elevated, #0C0E12)',
+                  border: '1px solid var(--border, #1F252C)',
+                }}
               >
                 <div
                   className="flex flex-none items-center justify-center rounded-md"
-                  style={{ width: 30, height: 30, background: `linear-gradient(135deg, ${DINGLEBERRY_COLOR}, #7F1D1D)` }}
+                  style={{
+                    width: 30,
+                    height: 30,
+                    background: `linear-gradient(135deg, ${DINGLEBERRY_COLOR}, #7F1D1D)`,
+                  }}
                 >
                   <Sparkle size={15} style={{ color: '#fff' }} />
                 </div>
                 <div>
-                  <div className="mb-[3px] font-mono uppercase" style={{ fontSize: 9, letterSpacing: '0.1em', color: STATUS_BLUE }}>
+                  <div
+                    className="mb-[3px] font-mono uppercase"
+                    style={{ fontSize: 9, letterSpacing: '0.1em', color: STATUS_BLUE }}
+                  >
                     h24 · read
                   </div>
                   <div className="text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
@@ -315,11 +422,19 @@ export function ShillDetectionPage() {
 
               <div className="flex flex-col gap-2">
                 <ActionButton variant="primary" icon={r.status === 'frozen' ? 'ban' : 'activity'}>
-                  {r.status === 'frozen' ? 'Keep frozen · block payout' : r.status === 'throttled' ? 'Quarantine the ring' : 'Throttle reach'}
+                  {r.status === 'frozen'
+                    ? 'Keep frozen · block payout'
+                    : r.status === 'throttled'
+                      ? 'Quarantine the ring'
+                      : 'Throttle reach'}
                 </ActionButton>
                 <div className="flex gap-2">
-                  <ActionButton variant="secondary">Inspect {r.status === 'frozen' ? 'chain' : 'actors'}</ActionButton>
-                  <ActionButton variant="ghost">{r.status === 'frozen' ? 'Release to payout' : 'Dismiss'}</ActionButton>
+                  <ActionButton variant="secondary">
+                    Inspect {r.status === 'frozen' ? 'chain' : 'actors'}
+                  </ActionButton>
+                  <ActionButton variant="ghost">
+                    {r.status === 'frozen' ? 'Release to payout' : 'Dismiss'}
+                  </ActionButton>
                 </div>
                 <ActionCaption />
               </div>
@@ -333,10 +448,14 @@ export function ShillDetectionPage() {
                     This targets a named party
                   </span>
                 </div>
-                <div className="mb-[11px] text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
-                  Coordinated abuse aimed at accountability isn’t just moderation — it’s evidence. Security packages the
-                  ring, its signals and its timeline into a <b>class-action Docket</b> carried by AtlasADVOCATE; affected
-                  members are pointed to it and each opts in.
+                <div
+                  className="mb-[11px] text-text-silver"
+                  style={{ fontSize: 12.5, lineHeight: 1.4 }}
+                >
+                  Coordinated abuse aimed at accountability isn’t just moderation — it’s evidence.
+                  Security packages the ring, its signals and its timeline into a{' '}
+                  <b>class-action Docket</b> carried by AtlasADVOCATE; affected members are pointed
+                  to it and each opts in.
                 </div>
                 <ActionButton variant="danger" icon="scale">
                   Open class-action Docket

@@ -1,4 +1,5 @@
 import '@livekit/components-styles';
+import { getRoomToken, leaveRoom } from '@/lib/comms';
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -13,7 +14,6 @@ import {
   type VideoCaptureOptions,
 } from 'livekit-client';
 import { useEffect, useRef, useState } from 'react';
-import { getRoomToken, leaveRoom } from '@/lib/comms';
 
 // H.264 so iPadOS/iOS Safari can hardware-decode remote video and encode its own
 // (VP8/VP9 often render as a black frame / freeze on Safari), and simulcast OFF
@@ -301,7 +301,9 @@ function AudioStage({ peerName }: { peerName?: string }) {
         type="button"
         onClick={toggleMute}
         className={`rounded-full px-6 py-2.5 font-bold text-sm transition-colors ${
-          muted ? 'bg-white text-black hover:bg-white/90' : 'bg-white/15 text-white hover:bg-white/25'
+          muted
+            ? 'bg-white text-black hover:bg-white/90'
+            : 'bg-white/15 text-white hover:bg-white/25'
         }`}
       >
         {muted ? 'Unmute' : 'Mute'}
@@ -312,6 +314,8 @@ function AudioStage({ peerName }: { peerName?: string }) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">{children}</div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
+      {children}
+    </div>
   );
 }

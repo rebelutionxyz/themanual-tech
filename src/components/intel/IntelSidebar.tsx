@@ -1,27 +1,27 @@
-import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '@/lib/auth';
+import { BEE_COLOR, REALM_COLORS } from '@/lib/constants';
+import { type RealmCategory, listRealmCategories } from '@/lib/forumFeed';
+import { isForumModerator } from '@/lib/forumMod';
+import { countThreadsByAuthor } from '@/lib/intel';
+import { countSavedThreads } from '@/lib/reactions';
+import { cn } from '@/lib/utils';
 import {
+  Bookmark,
+  Clock,
+  Home,
+  type LucideIcon,
+  MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
-  Home,
-  TrendingUp,
-  Clock,
-  Bookmark,
-  MessageSquare,
   Plus,
-  Users,
   Settings,
-  Sparkles,
   ShieldAlert,
-  type LucideIcon,
+  Sparkles,
+  TrendingUp,
+  Users,
 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { cn } from '@/lib/utils';
-import { useAuth } from '@/lib/auth';
-import { countSavedThreads } from '@/lib/reactions';
-import { countThreadsByAuthor } from '@/lib/intel';
-import { isForumModerator } from '@/lib/forumMod';
-import { listRealmCategories, type RealmCategory } from '@/lib/forumFeed';
-import { BEE_COLOR, REALM_COLORS } from '@/lib/constants';
 
 export type IntelView =
   | 'home'
@@ -52,13 +52,27 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'forme', label: 'For Me', icon: Sparkles, group: 'primary', comingSoon: true, comingSoonHint: 'Personalized feed — pick atoms, realms, and astras to follow' },
+  {
+    id: 'forme',
+    label: 'For Me',
+    icon: Sparkles,
+    group: 'primary',
+    comingSoon: true,
+    comingSoonHint: 'Personalized feed — pick atoms, realms, and astras to follow',
+  },
   { id: 'home', label: 'Home', icon: Home, group: 'primary' },
   { id: 'trending', label: 'Trending', icon: TrendingUp, group: 'primary' },
   { id: 'new', label: 'Breaking', icon: Clock, group: 'primary' },
   { id: 'create', label: 'Thread', icon: Plus, group: 'primary', isAction: true },
   { id: 'mythreads', label: 'My Threads', icon: MessageSquare, group: 'personal' },
-  { id: 'following', label: 'Following', icon: Users, group: 'personal', comingSoon: true, comingSoonHint: 'Threads from Bees you follow' },
+  {
+    id: 'following',
+    label: 'Following',
+    icon: Users,
+    group: 'personal',
+    comingSoon: true,
+    comingSoonHint: 'Threads from Bees you follow',
+  },
   { id: 'saved', label: 'Saved', icon: Bookmark, group: 'personal' },
 ];
 
@@ -265,112 +279,116 @@ export function IntelSidebar({ activeView, onSelectView }: IntelSidebarProps) {
         // Accent tint painted over the elevated panel — the Astra color (legible).
         style={{ backgroundImage: `linear-gradient(${INTEL_COLOR}1F, ${INTEL_COLOR}1F)` }}
       >
-      {/* Toggle */}
-      <button
-        type="button"
-        onClick={() => {
-          setPinned((p) => !p);
-          setHovered(false);
-        }}
-        aria-label={pinned ? 'Collapse INTEL menu' : 'Expand INTEL menu'}
-        className={cn(
-          'flex h-11 flex-shrink-0 items-center border-b border-border text-text-silver hover:bg-bg hover:text-text',
-          expanded ? 'justify-between px-3' : 'justify-center',
-        )}
-      >
-        {expanded && (
-          <span
-            className="font-mono uppercase tracking-widest"
-            style={{ fontSize: '11px', color: INTEL_COLOR }}
-            data-size="meta"
-          >
-            INTEL
-          </span>
-        )}
-        {expanded ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
-      </button>
-
-      <nav className="flex-1 overflow-y-auto py-2">
-        <SidebarGroup
-          items={primaryItems}
-          activeView={activeView}
-          expanded={expanded}
-          onSelect={handleSelect}
-          badgeMap={badgeMap}
-        />
-        <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
-        <SidebarGroup
-          items={personalItems}
-          activeView={activeView}
-          expanded={expanded}
-          onSelect={handleSelect}
-          badgeMap={badgeMap}
-        />
-        {modItems.length > 0 && (
-          <>
-            <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
-            <SidebarGroup
-              items={modItems}
-              activeView={activeView}
-              expanded={expanded}
-              onSelect={handleSelect}
-              badgeMap={badgeMap}
-            />
-          </>
-        )}
-        {futureItems.length > 0 && (
-          <>
-            <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
-            <SidebarGroup
-              items={futureItems}
-              activeView={activeView}
-              expanded={expanded}
-              onSelect={handleSelect}
-              badgeMap={badgeMap}
-            />
-          </>
-        )}
-
-        {/* Realm categories (work order item 2) — top-level realms with posts,
-            each links to its realm page. Lives at the bottom of the rail. */}
-        {realms.length > 0 && (
-          <>
-            <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
-            {expanded && (
-              <div className="px-3 pb-1 font-mono uppercase tracking-wider text-text-muted" style={{ fontSize: '10px' }} data-size="meta">
-                Realms
-              </div>
-            )}
-            <ul className="space-y-0.5 px-1.5">
-              {realms.map((r) => (
-                <li key={r.segment}>
-                  <RealmLink realm={r} expanded={expanded} />
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </nav>
-
-      <div className="mt-auto border-t border-border py-2">
-        <SidebarItem
-          id="settings"
-          label="Settings"
-          icon={Settings}
-          active={false}
-          expanded={expanded}
+        {/* Toggle */}
+        <button
+          type="button"
           onClick={() => {
-            /* future: open intel preferences */
+            setPinned((p) => !p);
+            setHovered(false);
           }}
-        />
-      </div>
-    </aside>
+          aria-label={pinned ? 'Collapse INTEL menu' : 'Expand INTEL menu'}
+          className={cn(
+            'flex h-11 flex-shrink-0 items-center border-b border-border text-text-silver hover:bg-bg hover:text-text',
+            expanded ? 'justify-between px-3' : 'justify-center',
+          )}
+        >
+          {expanded && (
+            <span
+              className="font-mono uppercase tracking-widest"
+              style={{ fontSize: '11px', color: INTEL_COLOR }}
+              data-size="meta"
+            >
+              INTEL
+            </span>
+          )}
+          {expanded ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+        </button>
+
+        <nav className="flex-1 overflow-y-auto py-2">
+          <SidebarGroup
+            items={primaryItems}
+            activeView={activeView}
+            expanded={expanded}
+            onSelect={handleSelect}
+            badgeMap={badgeMap}
+          />
+          <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
+          <SidebarGroup
+            items={personalItems}
+            activeView={activeView}
+            expanded={expanded}
+            onSelect={handleSelect}
+            badgeMap={badgeMap}
+          />
+          {modItems.length > 0 && (
+            <>
+              <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
+              <SidebarGroup
+                items={modItems}
+                activeView={activeView}
+                expanded={expanded}
+                onSelect={handleSelect}
+                badgeMap={badgeMap}
+              />
+            </>
+          )}
+          {futureItems.length > 0 && (
+            <>
+              <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
+              <SidebarGroup
+                items={futureItems}
+                activeView={activeView}
+                expanded={expanded}
+                onSelect={handleSelect}
+                badgeMap={badgeMap}
+              />
+            </>
+          )}
+
+          {/* Realm categories (work order item 2) — top-level realms with posts,
+            each links to its realm page. Lives at the bottom of the rail. */}
+          {realms.length > 0 && (
+            <>
+              <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
+              {expanded && (
+                <div
+                  className="px-3 pb-1 font-mono uppercase tracking-wider text-text-muted"
+                  style={{ fontSize: '10px' }}
+                  data-size="meta"
+                >
+                  Realms
+                </div>
+              )}
+              <ul className="space-y-0.5 px-1.5">
+                {realms.map((r) => (
+                  <li key={r.segment}>
+                    <RealmLink realm={r} expanded={expanded} />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </nav>
+
+        <div className="mt-auto border-t border-border py-2">
+          <SidebarItem
+            id="settings"
+            label="Settings"
+            icon={Settings}
+            active={false}
+            expanded={expanded}
+            onClick={() => {
+              /* future: open intel preferences */
+            }}
+          />
+        </div>
+      </aside>
     </>
   );
 }
 
 function RealmLink({ realm, expanded }: { realm: RealmCategory; expanded: boolean }) {
-  const color = realm.realmId ? REALM_COLORS[realm.realmId] ?? INTEL_COLOR : INTEL_COLOR;
+  const color = realm.realmId ? (REALM_COLORS[realm.realmId] ?? INTEL_COLOR) : INTEL_COLOR;
   const to = realm.realmId ? `/realm/${realm.realmId}` : '/intel';
   return (
     <Link
@@ -383,14 +401,22 @@ function RealmLink({ realm, expanded }: { realm: RealmCategory; expanded: boolea
       style={{ ['--neon' as string]: INTEL_NEON, color: `${INTEL_NEON}B0` }}
     >
       {/* Dot keeps the realm's own color so realms stay visually distinct. */}
-      <span className="block h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ background: color }} aria-hidden="true" />
+      <span
+        className="block h-2.5 w-2.5 flex-shrink-0 rounded-full"
+        style={{ background: color }}
+        aria-hidden="true"
+      />
       {expanded && (
         <span className="truncate tracking-wide" style={{ fontSize: '13px' }}>
           {realm.segment}
         </span>
       )}
       {expanded && (
-        <span className="ml-auto flex-shrink-0 font-mono tabular-nums" style={{ fontSize: '10px', color: `${INTEL_NEON}99` }} data-size="meta">
+        <span
+          className="ml-auto flex-shrink-0 font-mono tabular-nums"
+          style={{ fontSize: '10px', color: `${INTEL_NEON}99` }}
+          data-size="meta"
+        >
           {realm.threadCount}
         </span>
       )}

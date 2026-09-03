@@ -1,19 +1,19 @@
-import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import {
-  REACTION_TYPES,
-  REACTION_LABELS,
   REACTION_HINTS,
+  REACTION_LABELS,
   REACTION_NAMES,
+  REACTION_TYPES,
+  type ReactionSummary,
+  type ReactionType,
   getReactions,
   toggleReaction,
-  type ReactionType,
-  type ReactionSummary,
 } from '@/lib/reactions';
 import { cn } from '@/lib/utils';
+import { useEffect, useState } from 'react';
 
 interface ReactionBarProps {
-  sourceSurface: string;          // 'intel'
+  sourceSurface: string; // 'intel'
   sourceId: string;
   sourceKind: 'thread' | 'post';
   /** Preloaded summary — when provided, skip initial fetch. Useful in lists. */
@@ -25,11 +25,11 @@ interface ReactionBarProps {
 // Per-reaction accent colors — mirrors the semantic intent. When a Bee clicks
 // a reaction, the button glows in that reaction's color, not generic honey.
 const REACTION_COLORS: Record<ReactionType, string> = {
-  honey: '#FAD15E',    // honey gold — appreciation
-  fire: '#E88938',     // orange — hot take
+  honey: '#FAD15E', // honey gold — appreciation
+  fire: '#E88938', // orange — hot take
   thinking: '#B8A8F0', // lavender — questioning
-  warning: '#C94C4C',  // crimson — flag
-  check: '#6FCF8F',    // green — verified
+  warning: '#C94C4C', // crimson — flag
+  check: '#6FCF8F', // green — verified
 };
 
 /**
@@ -142,9 +142,7 @@ export function ReactionBar({
             className={cn(
               'inline-flex items-center rounded-md border transition-all',
               // Bigger tap targets: min 24px height both modes, more padding full mode
-              compact
-                ? 'gap-1 px-2 py-1 min-h-[26px]'
-                : 'gap-1.5 px-2.5 py-1.5 min-h-[32px]',
+              compact ? 'gap-1 px-2 py-1 min-h-[26px]' : 'gap-1.5 px-2.5 py-1.5 min-h-[32px]',
               !reacted &&
                 'border-border bg-bg-elevated text-text-silver hover:border-text-silver/40 hover:bg-bg',
               !bee && 'cursor-not-allowed opacity-50',
@@ -160,9 +158,7 @@ export function ReactionBar({
                 : undefined
             }
           >
-            <span
-              style={{ fontSize: compact ? '14px' : '16px', lineHeight: 1 }}
-            >
+            <span style={{ fontSize: compact ? '14px' : '16px', lineHeight: 1 }}>
               {REACTION_LABELS[r]}
             </span>
             {count > 0 && (

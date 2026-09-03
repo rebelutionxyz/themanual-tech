@@ -1,5 +1,5 @@
-import { create } from 'zustand';
 import type { AtomType, KettleState, RealmId, ViewMode } from '@/types/manual';
+import { create } from 'zustand';
 
 interface ManualState {
   view: ViewMode;

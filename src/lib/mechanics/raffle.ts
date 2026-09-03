@@ -16,8 +16,8 @@
    settlement shape, so both feed the one DEPTH rail rather than a private pot.
    ============================================================ */
 
+import { type Rail, type SettlementProposal, proposeSettlement, roundMoney } from './rails';
 import { seededRandom, weightedDrawWithoutReplacement } from './rng';
-import { proposeSettlement, roundMoney, type Rail, type SettlementProposal } from './rails';
 
 export interface RaffleConfig {
   /** The object being raffled (lot id, campaign id, session id, ...). */
@@ -53,10 +53,7 @@ export interface RaffleState {
   entries: RaffleEntry[];
 }
 
-export type EntryRejection =
-  | 'non-positive-qty'
-  | 'exceeds-total-cap'
-  | 'exceeds-entrant-cap';
+export type EntryRejection = 'non-positive-qty' | 'exceeds-total-cap' | 'exceeds-entrant-cap';
 
 export type EntryResult =
   | { ok: true; state: RaffleState; entrantTickets: number }

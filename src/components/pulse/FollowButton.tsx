@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Check, Plus } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { pulseFollow, pulseUnfollow, pulseMyChannel } from '@/lib/pulse';
+import { pulseFollow, pulseMyChannel, pulseUnfollow } from '@/lib/pulse';
 import { cn } from '@/lib/utils';
+import { Check, Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { PULSE_RED } from './cards';
 
 // Session-cached "my channel" lookup so every FollowButton doesn't re-query.
@@ -71,9 +71,7 @@ export function FollowButton({
     setFollowing(next);
     setPending(true);
     try {
-      const res = next
-        ? await pulseFollow(channelId)
-        : await pulseUnfollow(channelId);
+      const res = next ? await pulseFollow(channelId) : await pulseUnfollow(channelId);
       setFollowing(res.following);
     } catch {
       setFollowing(!next); // rollback

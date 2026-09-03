@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Network } from 'lucide-react';
-import type { Atom } from '@/types/manual';
-import { useManualStore } from '@/stores/useManualStore';
-import { useManualData, getAtomById } from '@/lib/useManualData';
-import { getNeighbors, type EdgeType } from '@/lib/graph-neighbors';
 import { ATOM_TYPE_COLORS, KETTLE_COLORS } from '@/lib/constants';
+import { type EdgeType, getNeighbors } from '@/lib/graph-neighbors';
+import { getAtomById, useManualData } from '@/lib/useManualData';
 import { cn } from '@/lib/utils';
+import { useManualStore } from '@/stores/useManualStore';
+import type { Atom } from '@/types/manual';
+import { Network } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface GraphNode {
   id: string;
@@ -55,14 +55,27 @@ export function GraphView() {
           ? { atomId: selectedAtomId }
           : null;
     if (!center || atoms.length === 0) {
-      return { nodes: [] as GraphNode[], links: [] as GraphLink[], centerId: null as string | null };
+      return {
+        nodes: [] as GraphNode[],
+        links: [] as GraphLink[],
+        centerId: null as string | null,
+      };
     }
-    const { centerKey, centerLabel, neighborIds, edges } = getNeighbors(center, pathIndexes, themeIndex, {
-      hops: 2,
-      cap: 28,
-    });
+    const { centerKey, centerLabel, neighborIds, edges } = getNeighbors(
+      center,
+      pathIndexes,
+      themeIndex,
+      {
+        hops: 2,
+        cap: 28,
+      },
+    );
     if (!centerKey) {
-      return { nodes: [] as GraphNode[], links: [] as GraphLink[], centerId: null as string | null };
+      return {
+        nodes: [] as GraphNode[],
+        links: [] as GraphLink[],
+        centerId: null as string | null,
+      };
     }
 
     const nodeKeys = [centerKey, ...neighborIds];
@@ -172,14 +185,7 @@ export function GraphView() {
       >
         <title>Graph view centered on selected atom</title>
         <defs>
-          <marker
-            id="arrowhead"
-            markerWidth="6"
-            markerHeight="6"
-            refX="6"
-            refY="3"
-            orient="auto"
-          >
+          <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto">
             <polygon points="0 0, 6 3, 0 6" fill="#2A3138" />
           </marker>
         </defs>
@@ -211,7 +217,9 @@ export function GraphView() {
         <g>
           {nodes.map((n) => {
             const isCenter = n.id === centerId;
-            const typeColor = n.synthetic ? '#C8D1DA' : (ATOM_TYPE_COLORS[n.atom.type] ?? '#8A94A0');
+            const typeColor = n.synthetic
+              ? '#C8D1DA'
+              : (ATOM_TYPE_COLORS[n.atom.type] ?? '#8A94A0');
             const radius = isCenter ? 10 : 6;
             return (
               // biome-ignore lint/a11y/useKeyWithClickEvents: SVG graph nodes are visual; per-node tabIndex would create unusable tab-order; keyboard navigation handled by separate atom list UI
@@ -293,10 +301,7 @@ export function GraphView() {
         </p>
         {Object.entries(ATOM_TYPE_COLORS).map(([type, color]) => (
           <div key={type} className="flex items-center gap-2 py-0.5">
-            <span
-              className="h-2 w-2 rounded-full"
-              style={{ backgroundColor: color }}
-            />
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
             <span className="text-text-silver" style={{ fontSize: '11px' }}>
               {type}
             </span>

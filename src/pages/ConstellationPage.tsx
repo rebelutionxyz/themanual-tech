@@ -49,7 +49,11 @@ function AstraCard({ entry }: { entry: AstraCatalogEntry }) {
             {MOUNT_LABEL[entry.mount]}
           </span>
         </span>
-        <span className="mt-0.5 block truncate font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
+        <span
+          className="mt-0.5 block truncate font-mono text-text-muted"
+          style={{ fontSize: '11px' }}
+          data-size="meta"
+        >
           {entry.route} · {status}
         </span>
       </span>
@@ -115,9 +119,9 @@ export function ConstellationPage() {
           The constellation
         </h1>
         <p className="mt-3 max-w-2xl text-lg leading-relaxed text-text-silver">
-          {total} Astras. Every one of them lives here, in the Manual — as a route, not a
-          separate address. Some have surfaces. Some are stubs waiting on their port. None
-          of them is a dead link.
+          {total} Astras. Every one of them lives here, in the Manual — as a route, not a separate
+          address. Some have surfaces. Some are stubs waiting on their port. None of them is a dead
+          link.
         </p>
 
         {groups.map((g) => (

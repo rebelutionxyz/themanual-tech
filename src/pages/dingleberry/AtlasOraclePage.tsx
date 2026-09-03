@@ -1,3 +1,7 @@
+import { dbIcon } from '@/components/dingleberry/icons';
+import { ActionButton, ActionCaption, DbCard, Eyebrow } from '@/components/dingleberry/primitives';
+import { DATA_BLUE, DINGLEBERRY_COLOR, STATUS_BLUE, TONE } from '@/components/dingleberry/tone';
+import type { OracleQueueItem, Posture } from '@/lib/dingleberry/contract';
 /* DingleBERRY — Atlas Oracle (full copilot conversation).
    ------------------------------------------------------------
    The security copilot: explains findings in plain language, ranks fixes,
@@ -13,10 +17,6 @@
    the fix-queue rows do read-only routing to the relevant surface. */
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dbIcon } from '@/components/dingleberry/icons';
-import { ActionButton, ActionCaption, DbCard, Eyebrow } from '@/components/dingleberry/primitives';
-import { DATA_BLUE, DINGLEBERRY_COLOR, STATUS_BLUE, TONE } from '@/components/dingleberry/tone';
-import type { OracleQueueItem, Posture } from '@/lib/dingleberry/contract';
 import { useDingleberry } from './DingleberryLayout';
 
 /* posture greeting — lookup (not a `posture ===` conditional) */
@@ -42,7 +42,11 @@ function AO({ size = 40 }: { size?: number }) {
   return (
     <div
       className="flex flex-none items-center justify-center rounded-md"
-      style={{ width: size, height: size, background: `linear-gradient(135deg, ${DINGLEBERRY_COLOR}, #7F1D1D)` }}
+      style={{
+        width: size,
+        height: size,
+        background: `linear-gradient(135deg, ${DINGLEBERRY_COLOR}, #7F1D1D)`,
+      }}
     >
       <span className="font-serif font-bold text-white" style={{ fontSize: size * 0.4 }}>
         AO
@@ -55,8 +59,14 @@ function OracleMsg({ children }: { children: ReactNode }) {
   return (
     <div className="flex gap-3" style={{ maxWidth: '92%' }}>
       <AO size={36} />
-      <div className="border border-border bg-bg-panel" style={{ borderRadius: '4px 14px 14px 14px', padding: '13px 15px' }}>
-        <div className="mb-[5px] font-mono uppercase" style={{ fontSize: 9.5, letterSpacing: '0.1em', color: STATUS_BLUE }}>
+      <div
+        className="border border-border bg-bg-panel"
+        style={{ borderRadius: '4px 14px 14px 14px', padding: '13px 15px' }}
+      >
+        <div
+          className="mb-[5px] font-mono uppercase"
+          style={{ fontSize: 9.5, letterSpacing: '0.1em', color: STATUS_BLUE }}
+        >
           h24
         </div>
         <div className="text-text-silver" style={{ fontSize: 14, lineHeight: 1.5 }}>
@@ -72,13 +82,27 @@ function UserMsg({ children }: { children: ReactNode }) {
     <div className="flex flex-row-reverse gap-3 self-end" style={{ maxWidth: '88%' }}>
       <div
         className="flex flex-none items-center justify-center rounded-full font-mono font-bold"
-        style={{ width: 36, height: 36, border: `2px solid ${DATA_BLUE}`, background: 'rgba(59,130,246,0.12)', fontSize: 12, color: DATA_BLUE }}
+        style={{
+          width: 36,
+          height: 36,
+          border: `2px solid ${DATA_BLUE}`,
+          background: 'rgba(59,130,246,0.12)',
+          fontSize: 12,
+          color: DATA_BLUE,
+        }}
       >
         OPS
       </div>
       <div
         className="text-text-silver-bright"
-        style={{ borderRadius: '14px 4px 14px 14px', background: 'var(--bg-panel2, #14171C)', border: '1px solid var(--border-bright, #2A3138)', padding: '11px 15px', fontSize: 14, lineHeight: 1.45 }}
+        style={{
+          borderRadius: '14px 4px 14px 14px',
+          background: 'var(--bg-panel2, #14171C)',
+          border: '1px solid var(--border-bright, #2A3138)',
+          padding: '11px 15px',
+          fontSize: 14,
+          lineHeight: 1.45,
+        }}
       >
         {children}
       </div>
@@ -94,13 +118,24 @@ function FixQueueRow({ q, onOpen }: { q: OracleQueueItem; onOpen: () => void }) 
       type="button"
       onClick={onOpen}
       className="flex gap-[10px] rounded-md text-left transition-colors hover:border-border-bright"
-      style={{ padding: '10px 11px', border: '1px solid var(--border, #1F252C)', borderLeft: `3px solid ${k.c}`, background: 'var(--bg-panel, #0F1217)' }}
+      style={{
+        padding: '10px 11px',
+        border: '1px solid var(--border, #1F252C)',
+        borderLeft: `3px solid ${k.c}`,
+        background: 'var(--bg-panel, #0F1217)',
+      }}
     >
       <div className="min-w-0 flex-1">
         <div className="mb-[3px] flex items-center gap-[6px]">
           <span
             className="rounded-full font-mono font-bold uppercase"
-            style={{ fontSize: 9, letterSpacing: '0.08em', padding: '1px 7px', color: k.c, background: k.tint }}
+            style={{
+              fontSize: 9,
+              letterSpacing: '0.08em',
+              padding: '1px 7px',
+              color: k.c,
+              background: k.tint,
+            }}
           >
             {q.tag}
           </span>
@@ -135,7 +170,12 @@ export function AtlasOraclePage() {
 
   const queue = data.atlasOracle.queue;
   const summary = SUMMARY[posture];
-  const suggestions = ['Run the proof sweep', 'Explain the affiliate freeze', 'Why did source #2140 break?', 'Draft the incident note'];
+  const suggestions = [
+    'Run the proof sweep',
+    'Explain the affiliate freeze',
+    'Why did source #2140 break?',
+    'Draft the incident note',
+  ];
   const scorecard: [string, string, string][] = [
     ['Fixes shipped', '1,240', 'var(--text, #F8F9FA)'],
     ['Auto-resolved overnight', '37', TONE.secure.c],
@@ -150,12 +190,15 @@ export function AtlasOraclePage() {
         <div className="flex flex-wrap items-center gap-4">
           <AO size={54} />
           <div className="min-w-[240px] flex-1">
-            <h1 className="font-serif font-bold text-text" style={{ fontSize: 30, lineHeight: 1, margin: '0 0 5px' }}>
+            <h1
+              className="font-serif font-bold text-text"
+              style={{ fontSize: 30, lineHeight: 1, margin: '0 0 5px' }}
+            >
               h24
             </h1>
             <div className="text-text-silver" style={{ fontSize: 14, maxWidth: 540 }}>
-              The platform’s security copilot — explains every finding in plain language, ships the fix it can, and automates
-              the rest across the whole platform.
+              The platform’s security copilot — explains every finding in plain language, ships the
+              fix it can, and automates the rest across the whole platform.
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -179,12 +222,17 @@ export function AtlasOraclePage() {
             <OracleMsg>{summary}</OracleMsg>
 
             <OracleMsg>
-              <b>Mesh node mq-7f3a</b> was serving corrupted storage pieces on the relay tier. I quarantined it the moment
-              the heartbeat hash-check failed, and verified the affected piece-set is intact on two healthy replicas. To
-              fully close it, I’d rebuild its shards onto a fresh device.
+              <b>Mesh node mq-7f3a</b> was serving corrupted storage pieces on the relay tier. I
+              quarantined it the moment the heartbeat hash-check failed, and verified the affected
+              piece-set is intact on two healthy replicas. To fully close it, I’d rebuild its shards
+              onto a fresh device.
               <div
                 className="mt-[11px] rounded-md"
-                style={{ border: `1px solid ${TONE.secure.border}`, background: TONE.secure.tint, padding: '11px 13px' }}
+                style={{
+                  border: `1px solid ${TONE.secure.border}`,
+                  background: TONE.secure.tint,
+                  padding: '11px 13px',
+                }}
               >
                 <div className="mb-[9px] flex items-center gap-[7px]">
                   <Check size={14} style={{ color: TONE.secure.c }} />
@@ -204,9 +252,10 @@ export function AtlasOraclePage() {
             <UserMsg>Did any member data actually get lost?</UserMsg>
 
             <OracleMsg>
-              No. Every piece mq-7f3a held is replicated three times; the other two copies pass their proof-of-storage
-              challenges right now. Nothing was lost, and nothing bad was served downstream — I blocked it before it
-              reached a reader. Want me to schedule a mesh-wide proof sweep tonight?
+              No. Every piece mq-7f3a held is replicated three times; the other two copies pass
+              their proof-of-storage challenges right now. Nothing was lost, and nothing bad was
+              served downstream — I blocked it before it reached a reader. Want me to schedule a
+              mesh-wide proof sweep tonight?
             </OracleMsg>
 
             {/* suggestions (inert) */}
@@ -244,7 +293,10 @@ export function AtlasOraclePage() {
         {/* right rail: fix queue + scorecard */}
         <div className="flex flex-col gap-4 self-start lg:sticky lg:top-4">
           <DbCard className="overflow-hidden p-0">
-            <div className="flex items-center gap-[9px] border-b border-border" style={{ padding: '13px 15px' }}>
+            <div
+              className="flex items-center gap-[9px] border-b border-border"
+              style={{ padding: '13px 15px' }}
+            >
               <span className="font-bold text-text" style={{ fontSize: 14.5 }}>
                 Fix queue
               </span>
@@ -268,25 +320,33 @@ export function AtlasOraclePage() {
           </DbCard>
 
           <DbCard className="p-5" style={{ background: 'var(--bg-elevated, #0C0E12)' }}>
-            <Eyebrow className="mb-3" >
+            <Eyebrow className="mb-3">
               <span style={{ color: STATUS_BLUE }}>h24 · last 30 days</span>
             </Eyebrow>
             {scorecard.map(([capLabel, n, col], idx) => (
               <div
                 key={capLabel}
                 className="flex items-center justify-between"
-                style={{ paddingBottom: 9, marginBottom: 9, borderBottom: idx < 3 ? '1px solid var(--border, #1F252C)' : 'none' }}
+                style={{
+                  paddingBottom: 9,
+                  marginBottom: 9,
+                  borderBottom: idx < 3 ? '1px solid var(--border, #1F252C)' : 'none',
+                }}
               >
                 <span className="text-text-silver" style={{ fontSize: 12.5 }}>
                   {capLabel}
                 </span>
-                <span className="font-mono font-bold tabular-nums" style={{ fontSize: 15, color: col }}>
+                <span
+                  className="font-mono font-bold tabular-nums"
+                  style={{ fontSize: 15, color: col }}
+                >
                   {n}
                 </span>
               </div>
             ))}
             <div className="mt-[2px] text-text-muted" style={{ fontSize: 11.5, lineHeight: 1.4 }}>
-              Every fix Atlas ships is logged, reversible, and attributable — the audit trail the platform runs on.
+              Every fix Atlas ships is logged, reversible, and attributable — the audit trail the
+              platform runs on.
             </div>
           </DbCard>
         </div>

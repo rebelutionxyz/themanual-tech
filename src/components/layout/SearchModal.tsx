@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
-import { Search, X, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ChevronDown, Search, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 type SearchScope = 'everything' | 'threads' | 'atoms' | 'groups' | 'people';
 
@@ -40,9 +40,9 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
       const t = setTimeout(() => inputRef.current?.focus(), 50);
       return () => clearTimeout(t);
     }
-      // Reset state on close
-      setQuery('');
-      setScopeOpen(false);
+    // Reset state on close
+    setQuery('');
+    setScopeOpen(false);
   }, [open]);
 
   // ESC closes
@@ -86,10 +86,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
       role="dialog"
     >
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        aria-hidden="true"
-      />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" aria-hidden="true" />
 
       {/* Panel */}
       <div
@@ -187,7 +184,8 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
                 style={{ fontSize: '10.5px' }}
                 data-size="meta"
               >
-                Press <kbd className="rounded border border-border bg-bg px-1 py-0.5">Esc</kbd> to close
+                Press <kbd className="rounded border border-border bg-bg px-1 py-0.5">Esc</kbd> to
+                close
               </p>
             </div>
           )}
@@ -211,12 +209,9 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
               >
                 Search not yet wired — coming soon.
               </p>
-              <p
-                className="mt-2 text-text-silver"
-                style={{ fontSize: '13px' }}
-              >
-                Scope: <span className="text-text">{SCOPE_LABELS[scope]}</span>{' '}
-                · Query: <span className="font-mono text-text">"{query}"</span>
+              <p className="mt-2 text-text-silver" style={{ fontSize: '13px' }}>
+                Scope: <span className="text-text">{SCOPE_LABELS[scope]}</span> · Query:{' '}
+                <span className="font-mono text-text">"{query}"</span>
               </p>
             </div>
           )}

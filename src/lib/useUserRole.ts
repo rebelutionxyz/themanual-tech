@@ -1,7 +1,7 @@
+import type { UserRole } from '@/admin/types';
 import { useEffect, useState } from 'react';
 import { useAuth } from './auth';
 import { supabase } from './supabase';
-import type { UserRole } from '@/admin/types';
 
 // Schema note: nova_registry and astra_registry are net new per Lock 9.6
 // (federation-tier-1-scoping.md) and have NOT been applied to production.

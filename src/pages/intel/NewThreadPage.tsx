@@ -1,15 +1,15 @@
-import { useState, useMemo, useEffect, type FormEvent } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, MessagesSquare, Send, Sparkles } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
-import { useManualData } from '@/lib/useManualData';
-import { createThread } from '@/lib/intel';
 import { AtomPicker } from '@/components/intel/AtomPicker';
 import { RealmPathPicker } from '@/components/intel/RealmPathPicker';
-import { useIntelStore } from '@/stores/useIntelStore';
-import { REALM_NAMES, REALM_ID_BY_NAME } from '@/lib/constants';
+import { useAuth } from '@/lib/auth';
+import { REALM_ID_BY_NAME, REALM_NAMES } from '@/lib/constants';
+import { createThread } from '@/lib/intel';
+import { useManualData } from '@/lib/useManualData';
 import { cn } from '@/lib/utils';
+import { useIntelStore } from '@/stores/useIntelStore';
 import type { RealmId } from '@/types/manual';
+import { ArrowLeft, MessagesSquare, Send, Sparkles } from 'lucide-react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 /** Build a display-name path from realm + L2. */
 function buildPath(realmId: RealmId | null, l2: string | null): string[] {
@@ -38,7 +38,7 @@ export function NewThreadPage() {
   const [error, setError] = useState<string | null>(null);
 
   const realmId = realmPath[0]
-    ? (REALM_ID_BY_NAME[realmPath[0]] as RealmId | undefined) ?? null
+    ? ((REALM_ID_BY_NAME[realmPath[0]] as RealmId | undefined) ?? null)
     : null;
   const l2 = realmPath[1] ?? null;
 
@@ -84,22 +84,15 @@ export function NewThreadPage() {
   const hasAtoms = atomIds.length > 0;
   const categorizationOk = hasRealm || hasAtoms;
   const canSubmit =
-    title.trim().length >= 2 &&
-    body.trim().length >= 1 &&
-    categorizationOk &&
-    !submitting &&
-    !!bee;
+    title.trim().length >= 2 && body.trim().length >= 1 && categorizationOk && !submitting && !!bee;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!canSubmit || !bee) return;
 
-    const finalPath =
-      realmPath.length > 0
-        ? realmPath
-        : derivedPath ?? [];
+    const finalPath = realmPath.length > 0 ? realmPath : (derivedPath ?? []);
     const finalRealmId =
-      realmId ?? (derivedPath ? REALM_ID_BY_NAME[derivedPath[0]] ?? null : null);
+      realmId ?? (derivedPath ? (REALM_ID_BY_NAME[derivedPath[0]] ?? null) : null);
 
     setSubmitting(true);
     setError(null);
@@ -153,8 +146,7 @@ export function NewThreadPage() {
     );
   }
 
-  const usingDerived =
-    !realmManuallyOverridden && !!derivedPath && hasAtoms;
+  const usingDerived = !realmManuallyOverridden && !!derivedPath && hasAtoms;
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8 md:px-10 md:py-12">

@@ -13,12 +13,32 @@ type Field = keyof BrandingConfig;
 
 const FIELDS: { key: Field; label: string; hint?: string; width?: 'sm' | 'lg' }[] = [
   { key: 'wordmarkPre', label: 'Wordmark — before accent', width: 'sm' },
-  { key: 'wordmarkAccent', label: 'Accent letters', hint: 'renders in the accent color', width: 'sm' },
+  {
+    key: 'wordmarkAccent',
+    label: 'Accent letters',
+    hint: 'renders in the accent color',
+    width: 'sm',
+  },
   { key: 'wordmarkPost', label: 'Wordmark — after accent', width: 'sm' },
-  { key: 'wordmarkSuffix', label: 'Suffix', hint: 'sans face, true lowercase (e.g. .app)', width: 'sm' },
+  {
+    key: 'wordmarkSuffix',
+    label: 'Suffix',
+    hint: 'sans face, true lowercase (e.g. .app)',
+    width: 'sm',
+  },
   { key: 'accentHex', label: 'Accent color (hex)', width: 'sm' },
-  { key: 'logoUrl', label: 'Logo image URL', hint: '/rebelution-logo.png or https://…', width: 'lg' },
-  { key: 'faviconUrl', label: 'Favicon URL', hint: '/rebelution-favicon.png or https://…', width: 'lg' },
+  {
+    key: 'logoUrl',
+    label: 'Logo image URL',
+    hint: '/rebelution-logo.png or https://…',
+    width: 'lg',
+  },
+  {
+    key: 'faviconUrl',
+    label: 'Favicon URL',
+    hint: '/rebelution-favicon.png or https://…',
+    width: 'lg',
+  },
 ];
 
 export function BrandingSection() {
@@ -93,9 +113,7 @@ export function BrandingSection() {
             style={{ fontFamily: "'Norwester', 'Arial Narrow', sans-serif" }}
           >
             {form.wordmarkPre}
-            <span style={{ color: hexOk ? form.accentHex : '#DC2626' }}>
-              {form.wordmarkAccent}
-            </span>
+            <span style={{ color: hexOk ? form.accentHex : '#DC2626' }}>{form.wordmarkAccent}</span>
             {form.wordmarkPost}
             {form.wordmarkSuffix && (
               <span className="font-sans text-[13px] font-semibold text-zinc-500">

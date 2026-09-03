@@ -1,10 +1,10 @@
+import type { Tone } from '@/lib/dingleberry/contract';
+import { cn } from '@/lib/utils';
 /* DingleBERRY — shared primitives, re-skinned to the repo's dark Manual tokens.
    These replace the artifact's window.TLW design-system (Card / Badge / etc.).
    Tone colors come from tone.ts; structure comes from the repo (Tailwind tokens,
    font-serif/sans/mono). */
 import type { CSSProperties, ReactNode } from 'react';
-import { cn } from '@/lib/utils';
-import type { Tone } from '@/lib/dingleberry/contract';
 import { dbIcon } from './icons';
 import { DINGLEBERRY_COLOR, TONE } from './tone';
 
@@ -160,10 +160,26 @@ export function ActionButton({
 }) {
   const Icon = icon ? dbIcon(icon) : null;
   const styles: Record<string, CSSProperties> = {
-    primary: { color: 'var(--text-silver-bright, #E0E6EC)', background: 'var(--bg-panel2, #14171C)', border: '1px solid var(--border-bright, #2A3138)' },
-    danger: { color: DINGLEBERRY_COLOR, background: 'rgba(220,38,38,0.12)', border: `1px solid ${TONE.critical.border}` },
-    secondary: { color: 'var(--text-silver, #C8D1DA)', background: 'transparent', border: '1px solid var(--border-bright, #2A3138)' },
-    ghost: { color: 'var(--text-muted, #6B7580)', background: 'transparent', border: '1px solid transparent' },
+    primary: {
+      color: 'var(--text-silver-bright, #E0E6EC)',
+      background: 'var(--bg-panel2, #14171C)',
+      border: '1px solid var(--border-bright, #2A3138)',
+    },
+    danger: {
+      color: DINGLEBERRY_COLOR,
+      background: 'rgba(220,38,38,0.12)',
+      border: `1px solid ${TONE.critical.border}`,
+    },
+    secondary: {
+      color: 'var(--text-silver, #C8D1DA)',
+      background: 'transparent',
+      border: '1px solid var(--border-bright, #2A3138)',
+    },
+    ghost: {
+      color: 'var(--text-muted, #6B7580)',
+      background: 'transparent',
+      border: '1px solid transparent',
+    },
   };
   return (
     <button
@@ -180,7 +196,10 @@ export function ActionButton({
 /* ---- caption under an inert action group ---- */
 export function ActionCaption() {
   return (
-    <div className="text-center font-mono uppercase text-text-muted" style={{ fontSize: 9, letterSpacing: '0.08em' }}>
+    <div
+      className="text-center font-mono uppercase text-text-muted"
+      style={{ fontSize: 9, letterSpacing: '0.08em' }}
+    >
       Enforcement actions wire in Step 4 · post security audit
     </div>
   );

@@ -23,6 +23,7 @@ import {
   Globe,
   Hexagon,
   Lock,
+  type LucideIcon,
   MessageSquare,
   Network,
   Radar,
@@ -36,7 +37,6 @@ import {
   WifiOff,
   X,
   Zap,
-  type LucideIcon,
 } from 'lucide-react';
 
 export const DB_ICON: Record<string, LucideIcon> = {

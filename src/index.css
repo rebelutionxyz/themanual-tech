@@ -6,11 +6,11 @@
    Caps-only display face; lowercase renders as small caps, which is exactly
    the RebelUtion wordmark treatment (Rebel-U-tion → big R, small EBEL, …). */
 @font-face {
-  font-family: 'Norwester';
+  font-family: "Norwester";
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('/fonts/norwester-latin-400-normal.woff2') format('woff2');
+  src: url("/fonts/norwester-latin-400-normal.woff2") format("woff2");
 }
 
 @layer base {
@@ -57,10 +57,10 @@
     --accent: #ef6c2a;
     --accent-dim: #8a3c14;
     --accent-bg: #1e100a;
-    --display-face: 'JetBrains Mono', ui-monospace, monospace;
+    --display-face: "JetBrains Mono", ui-monospace, monospace;
     --surface-accent: #8a3c14;
 
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
     background: var(--bg);
     color: var(--text);
   }
@@ -99,7 +99,7 @@
   small,
   .text-xxs,
   .kettle-pill,
-  [data-size='meta'] {
+  [data-size="meta"] {
     font-size: 11px !important;
     line-height: 1rem;
   }
@@ -139,13 +139,13 @@
 
   /* Cormorant for serif display */
   .font-display {
-    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-family: "Cormorant Garamond", Georgia, serif;
     letter-spacing: 0.02em;
   }
 
   /* Kettle pills (always 11px, monospace) */
   .kettle-pill {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
     font-size: 11px;
     line-height: 1;
     padding: 2px 6px;
@@ -162,7 +162,7 @@
   }
   .kettle-Accepted {
     background: rgba(234, 179, 8, 0.18);
-    color: #ca8a04;       /* yellow-600 — darker for readability on dark bg */
+    color: #ca8a04; /* yellow-600 — darker for readability on dark bg */
   }
   .kettle-Emerging {
     background: rgba(249, 115, 22, 0.15);
@@ -174,7 +174,7 @@
   }
   .kettle-Unsourced {
     background: rgba(75, 85, 99, 0.25);
-    color: #9ca3af;       /* lighter gray for legibility */
+    color: #9ca3af; /* lighter gray for legibility */
   }
   /* Deprecated 4-tier class — Contested merged into Emerging post-amendment.
      Kept as visual no-op (same color) for any stale references; safe to delete
@@ -186,7 +186,7 @@
 
   /* Monospace path display */
   .path-mono {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
     font-size: 11px;
     color: var(--text-muted);
     letter-spacing: 0.02em;

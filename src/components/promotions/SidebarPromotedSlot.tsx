@@ -1,8 +1,8 @@
 // Phase C Component D — sidebar-promoted slot (Code 24, 2026-05-08).
 // Static block in the right sidebar / rail area. Hides entirely when empty.
 
-import { usePromotionSlot } from '@/lib/promotions/usePromotionSlot';
 import type { SlotContext } from '@/lib/promotions/types';
+import { usePromotionSlot } from '@/lib/promotions/usePromotionSlot';
 
 interface SidebarPromotedSlotProps extends Omit<SlotContext, 'slotKey'> {
   className?: string;

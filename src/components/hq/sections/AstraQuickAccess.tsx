@@ -33,7 +33,9 @@ export function AstraQuickAccess() {
   return (
     <div className="space-y-6">
       <header>
-        <h2 className="font-display text-2xl font-semibold text-text-silver-bright">Quick Access</h2>
+        <h2 className="font-display text-2xl font-semibold text-text-silver-bright">
+          Quick Access
+        </h2>
         <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }}>
           {/* Count derived from what mounts, never hard-coded — grows as astras
               flip from stub to a live surface. */}
@@ -55,10 +57,17 @@ export function AstraQuickAccess() {
               style={{ background: entry.accent }}
             />
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-medium text-text-silver group-hover:text-text" style={{ fontSize: '13px' }}>
+              <span
+                className="block truncate font-medium text-text-silver group-hover:text-text"
+                style={{ fontSize: '13px' }}
+              >
                 {entry.wordmark}
               </span>
-              <span className="block truncate font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
+              <span
+                className="block truncate font-mono text-text-muted"
+                style={{ fontSize: '11px' }}
+                data-size="meta"
+              >
                 {entry.route}
               </span>
             </span>

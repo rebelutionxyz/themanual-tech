@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
 import { type BazaarCategory, bazaarCategories } from '@/lib/bazaar';
+import { useEffect, useMemo, useState } from 'react';
 
 export interface CategoryGroup {
   label: string;

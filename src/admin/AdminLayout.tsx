@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react';
-import * as Icons from 'lucide-react';
 import { cn } from '@/lib/utils';
+import * as Icons from 'lucide-react';
+import { type ReactNode, useState } from 'react';
 import type { AdminSection, AdminTier } from './types';
 import { TIER_ACCENT, TIER_LABEL } from './types';
 
@@ -29,22 +29,14 @@ function getIcon(name: string) {
 
 export function AdminLayout({ tier, sections, emptyState }: AdminLayoutProps) {
   const accent = TIER_ACCENT[tier];
-  const [activeSlug, setActiveSlug] = useState<string | null>(
-    sections[0]?.slug ?? null,
-  );
+  const [activeSlug, setActiveSlug] = useState<string | null>(sections[0]?.slug ?? null);
 
   const active = sections.find((s) => s.slug === activeSlug) ?? null;
   const ActiveComponent = active?.component ?? null;
 
   return (
-    <div
-      className="grid flex-1 grid-cols-[16rem_1fr]"
-      style={{ background: SIDEBAR_BG }}
-    >
-      <aside
-        className="border-r border-white/5 px-4 py-6"
-        style={{ background: SIDEBAR_BG }}
-      >
+    <div className="grid flex-1 grid-cols-[16rem_1fr]" style={{ background: SIDEBAR_BG }}>
+      <aside className="border-r border-white/5 px-4 py-6" style={{ background: SIDEBAR_BG }}>
         <div
           className="mb-4 px-2 text-[11px] font-semibold uppercase tracking-wider"
           style={{ color: SIDEBAR_LABEL }}
@@ -80,15 +72,12 @@ export function AdminLayout({ tier, sections, emptyState }: AdminLayoutProps) {
         </nav>
       </aside>
 
-      <main
-        className="px-6 py-8 md:px-10 md:py-10"
-        style={{ background: accent }}
-      >
-        {sections.length === 0
-          ? emptyState ?? null
-          : ActiveComponent
-            ? <ActiveComponent />
-            : null}
+      <main className="px-6 py-8 md:px-10 md:py-10" style={{ background: accent }}>
+        {sections.length === 0 ? (
+          (emptyState ?? null)
+        ) : ActiveComponent ? (
+          <ActiveComponent />
+        ) : null}
       </main>
     </div>
   );

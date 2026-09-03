@@ -204,7 +204,11 @@ function FilterRow({
       type="button"
       onClick={onClick}
       className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors hover:bg-zinc-50"
-      style={{ color, fontWeight: active ? 700 : 500, background: active ? `${color}14` : undefined }}
+      style={{
+        color,
+        fontWeight: active ? 700 : 500,
+        background: active ? `${color}14` : undefined,
+      }}
     >
       <span
         className="h-1.5 w-1.5 flex-shrink-0 rounded-full"

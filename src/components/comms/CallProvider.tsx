@@ -1,16 +1,18 @@
-import { lazy, Suspense,
+import { useAuth } from '@/lib/auth';
+import { callE2eeKey, joinRoom, leaveRoom } from '@/lib/comms';
+import { clearCallNotifications, registerPush, showCallNotification } from '@/lib/push';
+import { supabase } from '@/lib/supabase';
+import {
+  type ReactNode,
+  Suspense,
   createContext,
+  lazy,
   useCallback,
   useContext,
   useEffect,
   useRef,
   useState,
-  type ReactNode,
 } from 'react';
-import { useAuth } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
-import { callE2eeKey, joinRoom, leaveRoom } from '@/lib/comms';
-import { clearCallNotifications, registerPush, showCallNotification } from '@/lib/push';
 const CallView = lazy(() => import('./CallView').then((m) => ({ default: m.CallView })));
 
 /**
@@ -365,20 +367,20 @@ export function CallProvider({ children }: { children: ReactNode }) {
       {active && (
         <Suspense fallback={null}>
           <CallView
-          key={active.roomId}
-          roomId={active.roomId}
-          video={active.video}
-          e2eeKey={active.e2eeKey}
-          outgoing={active.outgoing}
-          peerName={active.peerName}
-          phone={active.phone}
-          endWhenAlone
-          onClose={(reason) => {
-            const who = active.peerName || 'them';
-            setActive(null);
-            if (reason === 'no-answer') showToast(`No answer from ${who}`);
-          }}
-        />
+            key={active.roomId}
+            roomId={active.roomId}
+            video={active.video}
+            e2eeKey={active.e2eeKey}
+            outgoing={active.outgoing}
+            peerName={active.peerName}
+            phone={active.phone}
+            endWhenAlone
+            onClose={(reason) => {
+              const who = active.peerName || 'them';
+              setActive(null);
+              if (reason === 'no-answer') showToast(`No answer from ${who}`);
+            }}
+          />
         </Suspense>
       )}
 

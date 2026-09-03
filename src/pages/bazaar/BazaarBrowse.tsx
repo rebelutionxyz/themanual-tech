@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
-import { ShoppingBag } from 'lucide-react';
-import { type BazaarListing, type BazaarSort, bazaarBrowse, bazaarSearch } from '@/lib/bazaar';
-import { useLensStore } from '@/stores/useLensStore';
 import { BAZAAR_ACCENT, ListingCard } from '@/components/bazaar/cards';
 import { type CategoryGroup, useCategoryGroups } from '@/components/bazaar/useCategoryGroups';
+import { type BazaarListing, type BazaarSort, bazaarBrowse, bazaarSearch } from '@/lib/bazaar';
+import { useLensStore } from '@/stores/useLensStore';
+import { ShoppingBag } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 const CONDITIONS = ['new', 'used', 'service', 'digital'];
 const LISTING_TYPES = ['offer']; // Phase-1: offer only
@@ -67,7 +67,8 @@ export function BazaarBrowse() {
           style={{ fontSize: '13px' }}
         >
           <span className="min-w-0 truncate text-zinc-700">
-            Searching offers: <span className="font-semibold text-zinc-900">“{searchTerm.trim()}”</span>
+            Searching offers:{' '}
+            <span className="font-semibold text-zinc-900">“{searchTerm.trim()}”</span>
           </span>
         </div>
       ) : (
@@ -90,10 +91,7 @@ export function BazaarBrowse() {
         ) : listings === null ? (
           <Grid>
             {SKELETON_KEYS.map((k) => (
-              <div
-                key={k}
-                className="overflow-hidden rounded-lg border border-zinc-200 bg-white"
-              >
+              <div key={k} className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
                 <div className="aspect-square w-full animate-pulse bg-zinc-100" />
                 <div className="space-y-2 p-3">
                   <div className="h-3.5 w-3/4 animate-pulse rounded bg-zinc-100" />
@@ -130,7 +128,10 @@ function BazaarHeader() {
         <ShoppingBag size={22} style={{ color: BAZAAR_ACCENT }} />
       </div>
       <div>
-        <h1 className="font-display text-3xl font-semibold tracking-wide" style={{ color: BAZAAR_ACCENT }}>
+        <h1
+          className="font-display text-3xl font-semibold tracking-wide"
+          style={{ color: BAZAAR_ACCENT }}
+        >
           BAZAAR
         </h1>
         <p className="font-mono text-zinc-500" style={{ fontSize: '12px' }}>
@@ -142,9 +143,7 @@ function BazaarHeader() {
 }
 
 function Grid({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{children}</div>
-  );
+  return <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{children}</div>;
 }
 
 function FilterBar({
@@ -227,7 +226,10 @@ function Select({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className="rounded-md border bg-white px-2.5 py-1.5 text-[13px] text-zinc-700 outline-none transition-colors focus:border-zinc-400"
-      style={{ borderColor: active ? `${BAZAAR_ACCENT}80` : undefined, color: active ? BAZAAR_ACCENT : undefined }}
+      style={{
+        borderColor: active ? `${BAZAAR_ACCENT}80` : undefined,
+        color: active ? BAZAAR_ACCENT : undefined,
+      }}
     >
       {children}
     </select>

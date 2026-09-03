@@ -1,8 +1,8 @@
 import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useAuth } from '@/lib/auth';
+import type { BrandingConfig } from '@/lib/branding';
 import { type MediaAsset, assetUrl, formatDuration, saveBlobToLibrary } from '@/lib/media';
 import { drawWordmarkStamp, fetchMyKits, mergeBranding, resolveSkin } from '@/lib/skins';
-import type { BrandingConfig } from '@/lib/branding';
 import { cn } from '@/lib/utils';
 import {
   ArrowLeft,
@@ -370,7 +370,9 @@ export function ComparePage() {
           type="button"
           onClick={() => setPortrait((v) => !v)}
           disabled={recording}
-          title={portrait ? 'Vertical 9:16 — tap for landscape' : 'Landscape 16:9 — tap for vertical'}
+          title={
+            portrait ? 'Vertical 9:16 — tap for landscape' : 'Landscape 16:9 — tap for vertical'
+          }
           className={cn(
             'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] disabled:opacity-40',
             portrait

@@ -1,8 +1,8 @@
 import { type RealmTreeRow, fetchRealmChildren } from '@/lib/realmTree';
 import { cn } from '@/lib/utils';
 import { useLensStore } from '@/stores/useLensStore';
-import { useRealmTreeStore } from '@/stores/useRealmTreeStore';
 import { REALM_COLOR_FALLBACK, useRealmColors } from '@/stores/useRealmColors';
+import { useRealmTreeStore } from '@/stores/useRealmTreeStore';
 import { Check, ChevronRight, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -82,17 +82,12 @@ export function RealmTreeContent({
       });
   }, [cacheKey]);
 
-  const selectedKeys = useMemo(
-    () => new Set(selectedRealms.map((r) => r.key)),
-    [selectedRealms],
-  );
+  const selectedKeys = useMemo(() => new Set(selectedRealms.map((r) => r.key)), [selectedRealms]);
   const colorFor = (realmId: string) => colors[realmId] ?? REALM_COLOR_FALLBACK;
 
   // A node is hidden when its path sits at-or-under any excluded path.
   const isHidden = (parts: string[]) =>
-    excludePaths.some(
-      (ex) => parts.length >= ex.length && ex.every((seg, i) => parts[i] === seg),
-    );
+    excludePaths.some((ex) => parts.length >= ex.length && ex.every((seg, i) => parts[i] === seg));
 
   const visibleRoots = (roots ?? []).filter((r) => !isHidden(r.pathParts));
 

@@ -1,6 +1,6 @@
-import type { KettleState } from '@/types/manual';
 import { KETTLE_ABBREV, KETTLE_DESCRIPTIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import type { KettleState } from '@/types/manual';
 
 interface KettlePillProps {
   state: KettleState;

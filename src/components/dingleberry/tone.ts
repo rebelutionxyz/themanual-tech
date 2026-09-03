@@ -31,11 +31,31 @@ export interface ToneSkin {
 }
 
 export const TONE: Record<Tone, ToneSkin> = {
-  secure:   { c: '#6FCF8F', tint: 'rgba(111,207,143,0.12)', border: 'rgba(111,207,143,0.38)', label: 'SECURE' },
-  watch:    { c: '#60A5FA', tint: 'rgba(96,165,250,0.13)', border: 'rgba(96,165,250,0.42)', label: 'WATCH' },
-  critical: { c: '#DC2626', tint: 'rgba(220,38,38,0.15)',   border: 'rgba(220,38,38,0.45)',   label: 'CRITICAL' },
-  info:     { c: '#3B82F6', tint: 'rgba(59,130,246,0.12)',  border: 'rgba(59,130,246,0.38)',  label: 'INFO' },
-  idle:     { c: '#8A94A0', tint: 'rgba(138,148,160,0.10)', border: '#2A3138',                label: 'IDLE' },
+  secure: {
+    c: '#6FCF8F',
+    tint: 'rgba(111,207,143,0.12)',
+    border: 'rgba(111,207,143,0.38)',
+    label: 'SECURE',
+  },
+  watch: {
+    c: '#60A5FA',
+    tint: 'rgba(96,165,250,0.13)',
+    border: 'rgba(96,165,250,0.42)',
+    label: 'WATCH',
+  },
+  critical: {
+    c: '#DC2626',
+    tint: 'rgba(220,38,38,0.15)',
+    border: 'rgba(220,38,38,0.45)',
+    label: 'CRITICAL',
+  },
+  info: {
+    c: '#3B82F6',
+    tint: 'rgba(59,130,246,0.12)',
+    border: 'rgba(59,130,246,0.38)',
+    label: 'INFO',
+  },
+  idle: { c: '#8A94A0', tint: 'rgba(138,148,160,0.10)', border: '#2A3138', label: 'IDLE' },
 };
 
 export type Posture = 'secure' | 'degraded' | 'critical';
@@ -49,9 +69,9 @@ export const POSTURE_TONE: Record<Posture, Tone> = {
 
 /** SourceVerification Discovery-Ladder status → repo kettle token (per dispatch). */
 export const STATUS_KETTLE: Record<string, string> = {
-  sourced: '#6FCF8F',   // kettle.sourced
-  accepted: '#6B94C8',  // kettle.accepted
-  emerging: '#E88938',  // kettle.emerging
-  fringe: '#9B7FC8',    // kettle.fringe
+  sourced: '#6FCF8F', // kettle.sourced
+  accepted: '#6B94C8', // kettle.accepted
+  emerging: '#E88938', // kettle.emerging
+  fringe: '#9B7FC8', // kettle.fringe
   unsourced: '#C94C4C', // kettle.unsourced
 };

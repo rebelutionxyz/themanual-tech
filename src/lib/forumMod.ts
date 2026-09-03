@@ -83,14 +83,14 @@ export async function listOpenFlags(): Promise<ForumFlag[]> {
   return rows.map((r) => {
     const targetKind: 'thread' | 'post' = r.post_id ? 'post' : 'thread';
     const linkThreadId =
-      r.thread_id ?? (r.post_id ? postThread.get(String(r.post_id)) ?? null : null);
+      r.thread_id ?? (r.post_id ? (postThread.get(String(r.post_id)) ?? null) : null);
     return {
       id: Number(r.id),
       targetKind,
       threadId: r.thread_id ? String(r.thread_id) : null,
       postId: r.post_id ? String(r.post_id) : null,
       linkThreadId,
-      threadTitle: linkThreadId ? threadTitle.get(linkThreadId) ?? null : null,
+      threadTitle: linkThreadId ? (threadTitle.get(linkThreadId) ?? null) : null,
       flaggedBy: String(r.flagged_by),
       flaggedByHandle: handle.get(String(r.flagged_by)) ?? null,
       reason: String(r.reason),

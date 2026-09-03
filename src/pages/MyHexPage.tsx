@@ -1,7 +1,7 @@
-import { Navigate } from 'react-router-dom';
 import { AdminLayout } from '@/admin/AdminLayout';
 import { getSectionsForTier } from '@/admin/registry';
 import { useUserRole } from '@/lib/useUserRole';
+import { Navigate } from 'react-router-dom';
 
 export function MyHexPage() {
   const { role, loading } = useUserRole();

@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { Check, Hash, Loader2, Sparkles, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { Check, Hash, Loader2, Sparkles, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 
 // ---------------------------------------------------------------------------
 // Premium handle claims — SINK 1 frontend.
@@ -195,7 +195,10 @@ export function HandleSettingsPage() {
     }
     const res = data as ClaimResult;
     if (res?.ok) {
-      setFlash({ kind: 'ok', msg: `@${handle} is yours — ${fmtBling(res.price ?? 0)} BLiNG! returned to The Source.` });
+      setFlash({
+        kind: 'ok',
+        msg: `@${handle} is yours — ${fmtBling(res.price ?? 0)} BLiNG! returned to The Source.`,
+      });
       setQuery('');
       setTaken(null);
       void refreshBalance();
@@ -211,13 +214,11 @@ export function HandleSettingsPage() {
       <div className="mb-8">
         <div className="flex items-center gap-2 text-amber-600">
           <Hash size={18} />
-          <h1 className="font-display text-3xl font-semibold text-zinc-900">
-            Premium Handles
-          </h1>
+          <h1 className="font-display text-3xl font-semibold text-zinc-900">Premium Handles</h1>
         </div>
         <p className="mt-2 max-w-xl text-zinc-500" style={{ fontSize: '13px' }}>
-          Short handles are scarce. GIVE BLiNG! to claim one — every BLiNG! you give
-          returns to The Source, lifting the faucet for all Bees.
+          Short handles are scarce. GIVE BLiNG! to claim one — every BLiNG! you give returns to The
+          Source, lifting the faucet for all Bees.
         </p>
       </div>
 
@@ -227,9 +228,7 @@ export function HandleSettingsPage() {
           <p className="font-mono text-zinc-500" style={{ fontSize: '11px' }} data-size="meta">
             Current handle
           </p>
-          <p className="mt-2 font-display text-2xl font-semibold text-zinc-900">
-            @{bee.handle}
-          </p>
+          <p className="mt-2 font-display text-2xl font-semibold text-zinc-900">@{bee.handle}</p>
           {/* FRONT32: this handle is now a credential, not only a display name.
               Saying so here is the difference between a member knowing they can
               sign in with it and never discovering the feature. */}
@@ -319,8 +318,7 @@ export function HandleSettingsPage() {
           )}
           {handle && tier && !checking && taken === false && (
             <span className={cn('inline-flex items-center gap-2', TIER_COLOR[tier])}>
-              <Sparkles size={12} />
-              @{handle} is available · {TIER_LABEL[tier]} · DONATE{' '}
+              <Sparkles size={12} />@{handle} is available · {TIER_LABEL[tier]} · DONATE{' '}
               {tierAmount === null ? '…' : fmtBling(tierAmount)} BLiNG!
               {taken === false && !canAfford && balance !== null && (
                 <span className="text-kettle-contested"> · not enough BLiNG!</span>
@@ -370,7 +368,10 @@ export function HandleSettingsPage() {
               <li key={c.handle} className="flex items-center justify-between px-4 py-2.5">
                 <span className="font-display text-zinc-900">@{c.handle}</span>
                 <span
-                  className={cn('font-mono uppercase tracking-wider', TIER_COLOR[(c.tier as Tier)] ?? 'text-zinc-500')}
+                  className={cn(
+                    'font-mono uppercase tracking-wider',
+                    TIER_COLOR[c.tier as Tier] ?? 'text-zinc-500',
+                  )}
                   style={{ fontSize: '10.5px' }}
                   data-size="meta"
                 >
@@ -394,12 +395,11 @@ export function HandleSettingsPage() {
       {confirmOpen && tier && tierAmount !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-sm rounded-lg border border-zinc-300 bg-white p-6">
-            <h3 className="font-display text-xl font-semibold text-zinc-900">
-              Claim @{handle}?
-            </h3>
+            <h3 className="font-display text-xl font-semibold text-zinc-900">Claim @{handle}?</h3>
             <p className="mt-3 text-zinc-500" style={{ fontSize: '13px' }}>
-              This GIVES <span className="font-mono text-amber-600">{fmtBling(tierAmount)} BLiNG!</span>{' '}
-              from your balance to The Source pool, and reserves the{' '}
+              This GIVES{' '}
+              <span className="font-mono text-amber-600">{fmtBling(tierAmount)} BLiNG!</span> from
+              your balance to The Source pool, and reserves the{' '}
               <span className={TIER_COLOR[tier]}>{TIER_LABEL[tier]}</span> handle{' '}
               <span className="text-zinc-900">@{handle}</span> to you.
             </p>

@@ -1,8 +1,8 @@
+import { type PulseSearchResult, pulseSearch } from '@/lib/pulse';
+import { formatCount } from '@/lib/utils';
+import { Radio, Search, Tv, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Radio, Search, Tv, X } from 'lucide-react';
-import { pulseSearch, type PulseSearchResult } from '@/lib/pulse';
-import { formatCount } from '@/lib/utils';
 import { FollowButton } from './FollowButton';
 
 /**

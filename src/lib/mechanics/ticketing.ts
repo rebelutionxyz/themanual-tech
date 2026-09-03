@@ -18,8 +18,8 @@
    is none to embed client-side).
    ============================================================ */
 
+import { type Rail, type SettlementProposal, proposeSettlement, roundMoney } from './rails';
 import { hashSeed } from './rng';
-import { proposeSettlement, roundMoney, type Rail, type SettlementProposal } from './rails';
 
 export interface TicketTier {
   id: string;
@@ -93,11 +93,16 @@ export interface TierAvailability {
 }
 
 /** Availability of a tier at instant `at` (ISO 8601). */
-export function tierAvailability(state: TicketingState, tierId: string, at: string): TierAvailability {
+export function tierAvailability(
+  state: TicketingState,
+  tierId: string,
+  at: string,
+): TierAvailability {
   const tier = tierOf(state, tierId);
   if (!tier) return { tierId, remaining: 0, soldOut: true, onSale: false };
 
-  const remaining = tier.quantity == null ? null : Math.max(0, tier.quantity - soldInTier(state, tierId));
+  const remaining =
+    tier.quantity == null ? null : Math.max(0, tier.quantity - soldInTier(state, tierId));
   const t = Date.parse(at);
   const afterStart = tier.salesStart == null || t >= Date.parse(tier.salesStart);
   const beforeEnd = tier.salesEnd == null || t <= Date.parse(tier.salesEnd);
@@ -133,7 +138,12 @@ export function parseTicketToken(
   return { ref, tierId, serial };
 }
 
-export type IssueRejection = 'unknown-tier' | 'non-positive-qty' | 'off-sale' | 'sold-out' | 'over-buyer-limit';
+export type IssueRejection =
+  | 'unknown-tier'
+  | 'non-positive-qty'
+  | 'off-sale'
+  | 'sold-out'
+  | 'over-buyer-limit';
 
 export interface IssueRequest {
   buyerRef: string;
@@ -144,7 +154,12 @@ export interface IssueRequest {
 }
 
 export type IssueResult =
-  | { ok: true; state: TicketingState; tickets: IssuedTicket[]; settlement: SettlementProposal | null }
+  | {
+      ok: true;
+      state: TicketingState;
+      tickets: IssuedTicket[];
+      settlement: SettlementProposal | null;
+    }
   | { ok: false; reason: IssueRejection };
 
 /**
@@ -164,7 +179,10 @@ export function issueTickets(state: TicketingState, req: IssueRequest): IssueRes
   if (!avail.onSale) return { ok: false, reason: 'off-sale' };
   if (avail.remaining != null && qty > avail.remaining) return { ok: false, reason: 'sold-out' };
 
-  if (tier.perBuyerLimit != null && heldByBuyer(state, req.tierId, req.buyerRef) + qty > tier.perBuyerLimit) {
+  if (
+    tier.perBuyerLimit != null &&
+    heldByBuyer(state, req.tierId, req.buyerRef) + qty > tier.perBuyerLimit
+  ) {
     return { ok: false, reason: 'over-buyer-limit' };
   }
 

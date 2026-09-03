@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
+import type { BeeProfileLocation } from '@/lib/geo/types';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
-import type { BeeProfileLocation } from '@/lib/geo/types';
+import { useEffect, useState } from 'react';
 
 // Local form type: every field is a string (empty when unset). The DB sees
 // nullable text columns; we coerce '' ↔ null at the persistence boundary.
@@ -121,10 +121,7 @@ export function ProfileLocationEditor() {
       location_neighborhood: form.location_neighborhood.trim() || null,
     };
 
-    const { error } = await supabase
-      .from('bee_profiles')
-      .update(payload)
-      .eq('bee_id', bee.id);
+    const { error } = await supabase.from('bee_profiles').update(payload).eq('bee_id', bee.id);
 
     if (error) {
       // eslint-disable-next-line no-console
@@ -157,11 +154,7 @@ export function ProfileLocationEditor() {
       >
         Your location
       </h2>
-      <p
-        className="mt-2 font-mono text-text-muted"
-        style={{ fontSize: '11px' }}
-        data-size="meta"
-      >
+      <p className="mt-2 font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
         Used by the geo lens at the bottom of the screen. Public on your profile.
       </p>
 

@@ -1,9 +1,9 @@
-import { useState, memo, useCallback } from 'react';
-import { ChevronRight } from 'lucide-react';
-import type { Atom, TreeNode } from '@/types/manual';
 import { KETTLE_COLORS } from '@/lib/constants';
 import { realmDepth, realmDepthTone } from '@/lib/spine';
 import { cn, formatCount } from '@/lib/utils';
+import type { Atom, TreeNode } from '@/types/manual';
+import { ChevronRight } from 'lucide-react';
+import { memo, useCallback, useState } from 'react';
 
 export type TreeSelectMode = 'single-path' | 'multi-atom';
 
@@ -92,7 +92,7 @@ export function TaxonomyTree({
             mode={mode}
             selected={
               mode === 'multi-atom'
-                ? selectedAtomIds?.has(atom.id) ?? false
+                ? (selectedAtomIds?.has(atom.id) ?? false)
                 : selectedPath === atom.path
             }
             onSelectPath={onSelectPath}
@@ -252,7 +252,7 @@ const TreeBranch = memo(function TreeBranch({
               mode={mode}
               selected={
                 mode === 'multi-atom'
-                  ? selectedAtomIds?.has(atom.id) ?? false
+                  ? (selectedAtomIds?.has(atom.id) ?? false)
                   : selectedPath === atom.path
               }
               onSelectPath={onSelectPath}
@@ -329,10 +329,7 @@ function Caret({ expanded, hidden }: { expanded: boolean; hidden?: boolean }) {
   return (
     <ChevronRight
       size={12}
-      className={cn(
-        'flex-shrink-0 text-text-muted transition-transform',
-        expanded && 'rotate-90',
-      )}
+      className={cn('flex-shrink-0 text-text-muted transition-transform', expanded && 'rotate-90')}
     />
   );
 }

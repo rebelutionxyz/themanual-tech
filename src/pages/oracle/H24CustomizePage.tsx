@@ -139,7 +139,10 @@ export function H24CustomizePage() {
                             : 'No key set'}
                         </div>
                       </div>
-                      <div className="flex flex-shrink-0 items-center gap-3" style={{ fontSize: 12 }}>
+                      <div
+                        className="flex flex-shrink-0 items-center gap-3"
+                        style={{ fontSize: 12 }}
+                      >
                         {st.present ? (
                           <>
                             <button

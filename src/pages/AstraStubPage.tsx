@@ -74,12 +74,19 @@ export function AstraStubPage({ entry }: { entry: AstraCatalogEntry }) {
           <p className="mt-2 text-text-silver" style={{ fontSize: '14px' }}>
             This Astra has a home here, but no surface yet. {STATUS_COPY[status] ?? status}.
           </p>
-          <p className="mt-2 font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
+          <p
+            className="mt-2 font-mono text-text-muted"
+            style={{ fontSize: '11px' }}
+            data-size="meta"
+          >
             Everything lives in themanual.tech — one home, routes not domains.
           </p>
         </div>
 
-        <dl className="mt-8 grid gap-x-8 gap-y-3 font-mono text-text-muted sm:grid-cols-2" style={{ fontSize: '11px' }}>
+        <dl
+          className="mt-8 grid gap-x-8 gap-y-3 font-mono text-text-muted sm:grid-cols-2"
+          style={{ fontSize: '11px' }}
+        >
           <div>
             <dt className="uppercase tracking-wider">Route</dt>
             <dd className="mt-0.5 text-text-silver">{entry.route}</dd>

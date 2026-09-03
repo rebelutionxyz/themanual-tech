@@ -1,3 +1,4 @@
+import { RouteModal } from '@/components/shell/RouteModal';
 import {
   COMMUNITY_SURFACES,
   type CommunitySurface,
@@ -8,7 +9,6 @@ import {
   resolvePopup,
   surfaceFromPath,
 } from '@/components/shell/popupRegistry';
-import { RouteModal } from '@/components/shell/RouteModal';
 import { useAstraRegistry } from '@/lib/astras/useAstraRegistry';
 import { cn } from '@/lib/utils';
 import { ChevronDown, Maximize2 } from 'lucide-react';
@@ -205,7 +205,11 @@ function MenuRow({
       type="button"
       onClick={onClick}
       className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12.5px] transition-colors hover:bg-zinc-50"
-      style={{ color, fontWeight: active ? 700 : 500, background: active ? `${color}14` : undefined }}
+      style={{
+        color,
+        fontWeight: active ? 700 : 500,
+        background: active ? `${color}14` : undefined,
+      }}
     >
       <span
         className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
@@ -214,7 +218,10 @@ function MenuRow({
       />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {note && (
-        <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-400" data-size="meta">
+        <span
+          className="font-mono text-[9px] uppercase tracking-wider text-zinc-400"
+          data-size="meta"
+        >
           {note}
         </span>
       )}

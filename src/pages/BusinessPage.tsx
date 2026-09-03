@@ -99,7 +99,8 @@ export function BusinessPage() {
           The fastest way to grow
         </h1>
         <p className="mx-auto mb-6 max-w-xl text-[14.5px] leading-relaxed text-zinc-500">
-          A suite of tools for organizations: <strong className="text-zinc-900">grow your reach</strong>,{' '}
+          A suite of tools for organizations:{' '}
+          <strong className="text-zinc-900">grow your reach</strong>,{' '}
           <strong className="text-zinc-900">build credibility</strong>, and see{' '}
           <strong className="text-zinc-900">real-time contextual insights</strong> — all without
           surveilling a single Bee.
@@ -153,7 +154,10 @@ export function BusinessPage() {
 
       {/* Footer principle */}
       <div className="mx-auto mt-8 max-w-2xl rounded-lg border border-zinc-200 bg-zinc-50/60 p-4 text-center">
-        <p className="flex items-center justify-center gap-2 font-mono text-[11.5px] leading-relaxed text-zinc-500" data-size="meta">
+        <p
+          className="flex items-center justify-center gap-2 font-mono text-[11.5px] leading-relaxed text-zinc-500"
+          data-size="meta"
+        >
           <Award size={13} style={{ color: BIZ }} />
           Everything here is a DONATION with benefits — the platform takes nothing it doesn't earn.
         </p>

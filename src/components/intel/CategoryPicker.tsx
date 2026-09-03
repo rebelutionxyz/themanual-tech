@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
-import { Search, X, Plus, Check, Network, FolderTree } from 'lucide-react';
-import { useManualData } from '@/lib/useManualData';
 import { TaxonomyTree } from '@/components/manual/TaxonomyTree';
-import type { TreeNode } from '@/types/manual';
+import { useManualData } from '@/lib/useManualData';
 import { cn } from '@/lib/utils';
+import type { TreeNode } from '@/types/manual';
+import { Check, FolderTree, Network, Plus, Search, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 interface CategoryPickerProps {
   /** Selected category paths (full paths like "Justice / Government / Accountability") */
@@ -235,10 +235,7 @@ export function CategoryPicker({
                   >
                     <FolderTree size={12} className="flex-shrink-0 text-text-muted" />
                     <div className="min-w-0 flex-1">
-                      <div
-                        className="truncate text-text-silver"
-                        style={{ fontSize: '13px' }}
-                      >
+                      <div className="truncate text-text-silver" style={{ fontSize: '13px' }}>
                         {cat.name}
                       </div>
                       <div className="path-mono truncate" style={{ fontSize: '10.5px' }}>

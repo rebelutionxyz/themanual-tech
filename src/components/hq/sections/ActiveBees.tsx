@@ -3,8 +3,8 @@
 // flips on any bee row mutation — bling balance changes, profile edits,
 // etc.) — best available proxy until a dedicated last_active column ships.
 
-import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
 
 interface BeeRow {
   id: string;
@@ -45,15 +45,24 @@ export function ActiveBees() {
       const now = Date.now();
       const cutoffs = {
         '24h': new Date(now - MS['24h']).toISOString(),
-        '7d':  new Date(now - MS['7d']).toISOString(),
+        '7d': new Date(now - MS['7d']).toISOString(),
         '30d': new Date(now - MS['30d']).toISOString(),
       };
 
       const [totalRes, a24Res, a7Res, a30Res] = await Promise.all([
         supabase.from('bees').select('id', { head: true, count: 'exact' }),
-        supabase.from('bees').select('id', { head: true, count: 'exact' }).gte('updated_at', cutoffs['24h']),
-        supabase.from('bees').select('id', { head: true, count: 'exact' }).gte('updated_at', cutoffs['7d']),
-        supabase.from('bees').select('id', { head: true, count: 'exact' }).gte('updated_at', cutoffs['30d']),
+        supabase
+          .from('bees')
+          .select('id', { head: true, count: 'exact' })
+          .gte('updated_at', cutoffs['24h']),
+        supabase
+          .from('bees')
+          .select('id', { head: true, count: 'exact' })
+          .gte('updated_at', cutoffs['7d']),
+        supabase
+          .from('bees')
+          .select('id', { head: true, count: 'exact' })
+          .gte('updated_at', cutoffs['30d']),
       ]);
       if (cancelled) return;
       setCounts({
@@ -78,7 +87,9 @@ export function ActiveBees() {
       }
       setRows((data ?? []) as BeeRow[]);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [range]);
 
   return (
@@ -101,13 +112,19 @@ export function ActiveBees() {
       )}
 
       <label className="inline-flex items-center gap-2 text-sm text-text-silver">
-        <span className="font-mono uppercase text-text-muted" style={{ fontSize: '11px' }}>recent in:</span>
+        <span className="font-mono uppercase text-text-muted" style={{ fontSize: '11px' }}>
+          recent in:
+        </span>
         <select
           value={range}
           onChange={(e) => setRange(e.target.value as Range)}
           className="rounded-md border border-border bg-bg px-2 py-1 text-sm text-text focus:border-text-silver/50 focus:outline-none"
         >
-          {RANGES.map((r) => <option key={r} value={r}>{r}</option>)}
+          {RANGES.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
         </select>
       </label>
 
@@ -119,7 +136,10 @@ export function ActiveBees() {
         </div>
       )}
       {rows !== null && rows.length === 0 && (
-        <div className="mt-4 rounded-md border border-border bg-bg-elevated/40 px-4 py-6 text-center text-text-dim" style={{ fontSize: '13px' }}>
+        <div
+          className="mt-4 rounded-md border border-border bg-bg-elevated/40 px-4 py-6 text-center text-text-dim"
+          style={{ fontSize: '13px' }}
+        >
           {error ? `Could not load Bees: ${error}` : `No Bees active in last ${range}.`}
         </div>
       )}

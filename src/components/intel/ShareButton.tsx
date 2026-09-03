@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { Share2, Check } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { createShareLink } from '@/lib/reactions';
 import { cn } from '@/lib/utils';
+import { Check, Share2 } from 'lucide-react';
+import { useState } from 'react';
 
 interface ShareButtonProps {
   sourceSurface: string;
@@ -18,12 +18,7 @@ interface ShareButtonProps {
  *
  * If not signed in, generates untracked URL.
  */
-export function ShareButton({
-  sourceSurface,
-  sourceId,
-  url,
-  compact = false,
-}: ShareButtonProps) {
+export function ShareButton({ sourceSurface, sourceId, url, compact = false }: ShareButtonProps) {
   const { bee } = useAuth();
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);

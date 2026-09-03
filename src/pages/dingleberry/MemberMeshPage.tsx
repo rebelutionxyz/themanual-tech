@@ -1,3 +1,13 @@
+import { dbIcon } from '@/components/dingleberry/icons';
+import {
+  ActionButton,
+  ActionCaption,
+  DbCard,
+  Eyebrow,
+  StatusPill,
+} from '@/components/dingleberry/primitives';
+import { DATA_BLUE, DINGLEBERRY_COLOR, TONE } from '@/components/dingleberry/tone';
+import type { MeshLayer, MeshNode, Tone } from '@/lib/dingleberry/contract';
 /* DingleBERRY — Member Mesh (drill-in) · zero-trust oversight.
    ------------------------------------------------------------
    The muscle earns no trust. DingleBERRY scores node health per layer, runs
@@ -11,27 +21,39 @@
    worst-first by their own health; posture only recolors the header count. All
    action controls inert + captioned. */
 import { useState } from 'react';
-import { dbIcon } from '@/components/dingleberry/icons';
-import { ActionButton, ActionCaption, DbCard, Eyebrow, StatusPill } from '@/components/dingleberry/primitives';
-import { DATA_BLUE, DINGLEBERRY_COLOR, TONE } from '@/components/dingleberry/tone';
-import type { MeshLayer, MeshNode, Tone } from '@/lib/dingleberry/contract';
 import { useDingleberry } from './DingleberryLayout';
 
 /* the mock relay layer carries goDark beyond the contract MeshLayer; Step-3
    should widen MeshLayer. nodes match MeshNode as-is. */
 type MeshLayerX = MeshLayer & { goDark?: boolean };
 
-const STATUS_LABEL: Record<string, string> = { secure: 'Healthy', watch: 'Watch', critical: 'Quarantined' };
+const STATUS_LABEL: Record<string, string> = {
+  secure: 'Healthy',
+  watch: 'Watch',
+  critical: 'Quarantined',
+};
 const SEV_RANK: Record<string, number> = { critical: 0, watch: 1, secure: 2, info: 3, idle: 4 };
 
 function checksFor(layer: string, n: MeshNode): [string, Tone, string][] {
   const bad = n.st !== 'secure';
   if (layer === 'storage')
     return [
-      ['Proof-of-storage challenge', n.st === 'critical' ? 'critical' : n.st, n.st === 'critical' ? '3 / 5 failed' : n.st === 'watch' ? 'slow (1.8s)' : '5 / 5 passed'],
-      ['Heartbeat hash-check', n.st === 'critical' ? 'critical' : 'secure', n.st === 'critical' ? 'mismatch' : 'matches'],
+      [
+        'Proof-of-storage challenge',
+        n.st === 'critical' ? 'critical' : n.st,
+        n.st === 'critical' ? '3 / 5 failed' : n.st === 'watch' ? 'slow (1.8s)' : '5 / 5 passed',
+      ],
+      [
+        'Heartbeat hash-check',
+        n.st === 'critical' ? 'critical' : 'secure',
+        n.st === 'critical' ? 'mismatch' : 'matches',
+      ],
       ['Replication factor', 'secure', '3× · replicas healthy'],
-      ['Reliability score (90d)', n.st === 'critical' ? 'critical' : n.st, n.st === 'critical' ? '0.41' : n.st === 'watch' ? '0.93' : '0.998'],
+      [
+        'Reliability score (90d)',
+        n.st === 'critical' ? 'critical' : n.st,
+        n.st === 'critical' ? '0.41' : n.st === 'watch' ? '0.93' : '0.998',
+      ],
     ];
   if (layer === 'relay')
     return [
@@ -71,8 +93,20 @@ function Heartbeat({ seed, tone }: { seed: number; tone: Tone }) {
     pts.push(`${((i / (n - 1)) * w).toFixed(1)},${y.toFixed(1)}`);
   }
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label="node heartbeat" preserveAspectRatio="none" style={{ width: '100%', height: h, display: 'block' }}>
-      <polyline points={pts.join(' ')} fill="none" stroke={TONE[tone].c} strokeWidth="1.6" strokeLinejoin="round" />
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      role="img"
+      aria-label="node heartbeat"
+      preserveAspectRatio="none"
+      style={{ width: '100%', height: h, display: 'block' }}
+    >
+      <polyline
+        points={pts.join(' ')}
+        fill="none"
+        stroke={TONE[tone].c}
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -88,7 +122,11 @@ function NodeRow({ n, active, onClick }: { n: MeshNode; active: boolean; onClick
         padding: '11px 13px',
         border: active ? `1.5px solid ${DINGLEBERRY_COLOR}` : '1px solid var(--border, #1F252C)',
         borderLeft: `3px solid ${k.c}`,
-        background: active ? 'rgba(220,38,38,0.08)' : n.st === 'critical' ? k.tint : 'var(--bg-panel, #0F1217)',
+        background: active
+          ? 'rgba(220,38,38,0.08)'
+          : n.st === 'critical'
+            ? k.tint
+            : 'var(--bg-panel, #0F1217)',
       }}
     >
       <span
@@ -107,7 +145,10 @@ function NodeRow({ n, active, onClick }: { n: MeshNode; active: boolean; onClick
         <div className="font-serif font-bold" style={{ fontSize: 18, lineHeight: 1, color: k.c }}>
           {n.score}
         </div>
-        <div className="font-mono uppercase text-text-muted" style={{ fontSize: 9, letterSpacing: '0.06em' }}>
+        <div
+          className="font-mono uppercase text-text-muted"
+          style={{ fontSize: 9, letterSpacing: '0.06em' }}
+        >
           health
         </div>
       </div>
@@ -136,7 +177,9 @@ export function MemberMeshPage() {
   const layers = data.memberMesh.layers as unknown as MeshLayerX[];
   const nodeMap = data.memberMesh.nodes as Record<string, MeshNode[]>;
   const L = layers.find((l) => l.key === layer) ?? layers[0];
-  const list = [...(nodeMap[L.key] ?? [])].sort((a, b) => (SEV_RANK[a.st] ?? 9) - (SEV_RANK[b.st] ?? 9));
+  const list = [...(nodeMap[L.key] ?? [])].sort(
+    (a, b) => (SEV_RANK[a.st] ?? 9) - (SEV_RANK[b.st] ?? 9),
+  );
   const sel = list.find((n) => n.id === selId) ?? list[0] ?? null;
   const checks = sel ? checksFor(L.key, sel) : [];
 
@@ -152,26 +195,42 @@ export function MemberMeshPage() {
       {/* header */}
       <DbCard className="mb-[18px] p-5">
         <div className="flex flex-wrap items-start gap-[18px]">
-          <div className="flex flex-none items-center justify-center rounded-md" style={{ width: 46, height: 46, background: 'rgba(220,38,38,0.12)', color: '#DC2626' }}>
+          <div
+            className="flex flex-none items-center justify-center rounded-md"
+            style={{ width: 46, height: 46, background: 'rgba(220,38,38,0.12)', color: '#DC2626' }}
+          >
             <Network size={23} />
           </div>
           <div className="min-w-[280px] flex-1">
             <Eyebrow>Phase 2 · zero-trust muscle oversight</Eyebrow>
-            <h1 className="font-serif font-bold text-text" style={{ fontSize: 30, lineHeight: 1.05, margin: '3px 0 4px' }}>
+            <h1
+              className="font-serif font-bold text-text"
+              style={{ fontSize: 30, lineHeight: 1.05, margin: '3px 0 4px' }}
+            >
               Member mesh
             </h1>
             <div className="text-text-silver" style={{ fontSize: 14.5, maxWidth: 560 }}>
-              The muscle earns no trust. Security scores every borrowed node, runs proof-of-storage, and{' '}
-              <b>quarantines + self-heals</b> the moment one misbehaves.
+              The muscle earns no trust. Security scores every borrowed node, runs proof-of-storage,
+              and <b>quarantines + self-heals</b> the moment one misbehaves.
             </div>
           </div>
           <div className="flex flex-wrap gap-[10px]">
             {headerStats.map(([cap, n, tn]) => (
-              <div key={cap} className="rounded-md border border-border bg-bg-elevated" style={{ padding: '10px 14px', minWidth: 92 }}>
-                <div className="mb-1 font-mono uppercase text-text-muted" style={{ fontSize: 9.5, letterSpacing: '0.08em' }}>
+              <div
+                key={cap}
+                className="rounded-md border border-border bg-bg-elevated"
+                style={{ padding: '10px 14px', minWidth: 92 }}
+              >
+                <div
+                  className="mb-1 font-mono uppercase text-text-muted"
+                  style={{ fontSize: 9.5, letterSpacing: '0.08em' }}
+                >
                   {cap}
                 </div>
-                <div className="font-serif font-bold" style={{ fontSize: 22, lineHeight: 1, color: TONE[tn].c }}>
+                <div
+                  className="font-serif font-bold"
+                  style={{ fontSize: 22, lineHeight: 1, color: TONE[tn].c }}
+                >
                   {n}
                 </div>
               </div>
@@ -185,7 +244,11 @@ export function MemberMeshPage() {
         {layers.map((l, idx) => {
           const on = l.key === layer;
           const nodes = nodeMap[l.key] ?? [];
-          const worst: Tone = nodes.some((n) => n.st === 'critical') ? 'critical' : nodes.some((n) => n.st === 'watch') ? 'watch' : 'secure';
+          const worst: Tone = nodes.some((n) => n.st === 'critical')
+            ? 'critical'
+            : nodes.some((n) => n.st === 'watch')
+              ? 'watch'
+              : 'secure';
           const Icon = dbIcon(l.icon);
           return (
             <button
@@ -198,15 +261,26 @@ export function MemberMeshPage() {
               className="flex items-center gap-[9px] rounded-md transition-colors"
               style={{
                 padding: '10px 14px',
-                border: on ? `1.5px solid ${DINGLEBERRY_COLOR}` : '1px solid var(--border, #1F252C)',
+                border: on
+                  ? `1.5px solid ${DINGLEBERRY_COLOR}`
+                  : '1px solid var(--border, #1F252C)',
                 background: on ? 'var(--bg-panel2, #14171C)' : 'var(--bg-panel, #0F1217)',
                 color: on ? 'var(--text, #F8F9FA)' : 'var(--text-silver, #C8D1DA)',
               }}
             >
-              <span className="font-mono font-bold" style={{ fontSize: 11, color: on ? DINGLEBERRY_COLOR : 'var(--text-muted, #6B7580)' }}>
+              <span
+                className="font-mono font-bold"
+                style={{
+                  fontSize: 11,
+                  color: on ? DINGLEBERRY_COLOR : 'var(--text-muted, #6B7580)',
+                }}
+              >
                 {idx + 1}
               </span>
-              <Icon size={16} style={{ color: on ? DINGLEBERRY_COLOR : 'var(--text-muted, #6B7580)' }} />
+              <Icon
+                size={16}
+                style={{ color: on ? DINGLEBERRY_COLOR : 'var(--text-muted, #6B7580)' }}
+              />
               <span className="font-bold" style={{ fontSize: 13.5 }}>
                 {l.name}
               </span>
@@ -230,7 +304,14 @@ export function MemberMeshPage() {
             {L.goDark && (
               <span
                 className="rounded-full font-mono font-bold uppercase"
-                style={{ fontSize: 9, letterSpacing: '0.06em', padding: '1px 8px', color: TONE.watch.c, background: TONE.watch.tint, border: `1px solid ${TONE.watch.border}` }}
+                style={{
+                  fontSize: 9,
+                  letterSpacing: '0.06em',
+                  padding: '1px 8px',
+                  color: TONE.watch.c,
+                  background: TONE.watch.tint,
+                  border: `1px solid ${TONE.watch.border}`,
+                }}
               >
                 → Go Dark
               </span>
@@ -239,7 +320,12 @@ export function MemberMeshPage() {
           </div>
           <div className="flex flex-col gap-[9px]">
             {list.map((n) => (
-              <NodeRow key={n.id} n={n} active={!!sel && n.id === sel.id} onClick={() => setSelId(n.id)} />
+              <NodeRow
+                key={n.id}
+                n={n}
+                active={!!sel && n.id === sel.id}
+                onClick={() => setSelId(n.id)}
+              />
             ))}
           </div>
         </div>
@@ -251,12 +337,24 @@ export function MemberMeshPage() {
               <div className="mb-[14px] flex items-center gap-[13px]">
                 <div
                   className="flex flex-none flex-col items-center justify-center rounded-full"
-                  style={{ width: 56, height: 56, border: `2.5px solid ${TONE[sel.st].c}`, background: TONE[sel.st].tint, lineHeight: 1 }}
+                  style={{
+                    width: 56,
+                    height: 56,
+                    border: `2.5px solid ${TONE[sel.st].c}`,
+                    background: TONE[sel.st].tint,
+                    lineHeight: 1,
+                  }}
                 >
-                  <span className="font-serif font-bold" style={{ fontSize: 21, color: TONE[sel.st].c }}>
+                  <span
+                    className="font-serif font-bold"
+                    style={{ fontSize: 21, color: TONE[sel.st].c }}
+                  >
                     {sel.score}
                   </span>
-                  <span className="font-mono uppercase text-text-muted" style={{ fontSize: 7, letterSpacing: '0.06em', marginTop: 1 }}>
+                  <span
+                    className="font-mono uppercase text-text-muted"
+                    style={{ fontSize: 7, letterSpacing: '0.06em', marginTop: 1 }}
+                  >
                     health
                   </span>
                 </div>
@@ -273,11 +371,17 @@ export function MemberMeshPage() {
 
               <div className="mb-[6px] flex justify-between">
                 <Eyebrow>Heartbeat · 40 beats</Eyebrow>
-                <span className="font-mono font-bold" style={{ fontSize: 11, color: TONE[sel.st].c }}>
+                <span
+                  className="font-mono font-bold"
+                  style={{ fontSize: 11, color: TONE[sel.st].c }}
+                >
                   {sel.st === 'critical' ? 'irregular' : sel.st === 'watch' ? 'jittery' : 'steady'}
                 </span>
               </div>
-              <div className="mb-[14px] rounded-md border border-border" style={{ padding: '8px 8px 4px' }}>
+              <div
+                className="mb-[14px] rounded-md border border-border"
+                style={{ padding: '8px 8px 4px' }}
+              >
                 <Heartbeat seed={sel.id.length * 7 + sel.score} tone={sel.st} />
               </div>
 
@@ -287,13 +391,31 @@ export function MemberMeshPage() {
                   <div
                     key={nm}
                     className="flex items-center gap-[9px]"
-                    style={{ padding: '8px 0', borderBottom: idx < checks.length - 1 ? '1px dashed var(--border, #1F252C)' : 'none' }}
+                    style={{
+                      padding: '8px 0',
+                      borderBottom:
+                        idx < checks.length - 1 ? '1px dashed var(--border, #1F252C)' : 'none',
+                    }}
                   >
-                    <span style={{ width: 8, height: 8, flex: 'none', borderRadius: 99, background: TONE[s2].c }} />
+                    <span
+                      style={{
+                        width: 8,
+                        height: 8,
+                        flex: 'none',
+                        borderRadius: 99,
+                        background: TONE[s2].c,
+                      }}
+                    />
                     <span className="flex-1 text-text-silver" style={{ fontSize: 13 }}>
                       {nm}
                     </span>
-                    <span className="font-mono font-semibold" style={{ fontSize: 11.5, color: s2 === 'secure' ? 'var(--text-muted, #6B7580)' : TONE[s2].c }}>
+                    <span
+                      className="font-mono font-semibold"
+                      style={{
+                        fontSize: 11.5,
+                        color: s2 === 'secure' ? 'var(--text-muted, #6B7580)' : TONE[s2].c,
+                      }}
+                    >
                       {v}
                     </span>
                   </div>
@@ -304,12 +426,16 @@ export function MemberMeshPage() {
                 <>
                   <div
                     className="mb-[13px] flex items-start gap-[9px] rounded-md"
-                    style={{ padding: '11px 13px', background: 'rgba(59,130,246,0.12)', border: `1px solid ${TONE.info.border}` }}
+                    style={{
+                      padding: '11px 13px',
+                      background: 'rgba(59,130,246,0.12)',
+                      border: `1px solid ${TONE.info.border}`,
+                    }}
                   >
                     <Activity size={15} style={{ color: DATA_BLUE, flex: 'none', marginTop: 1 }} />
                     <span className="text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.35 }}>
-                      <b>Self-heal running.</b> Quarantined and rebuilding its shards onto a fresh device from the 3×
-                      replicas. Nothing lost.
+                      <b>Self-heal running.</b> Quarantined and rebuilding its shards onto a fresh
+                      device from the 3× replicas. Nothing lost.
                     </span>
                   </div>
                   <div className="flex flex-col gap-2">
@@ -349,8 +475,8 @@ export function MemberMeshPage() {
             >
               <Shield size={15} style={{ color: DATA_BLUE, flex: 'none' }} />
               <span className="text-text-silver" style={{ fontSize: 12, lineHeight: 1.35 }}>
-                <b>Zero-trust:</b> a node’s score never buys it trust — every piece is re-verified, every beat
-                re-checked.
+                <b>Zero-trust:</b> a node’s score never buys it trust — every piece is re-verified,
+                every beat re-checked.
               </span>
             </div>
           </div>

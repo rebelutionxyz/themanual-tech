@@ -1,36 +1,52 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { MessageSquare, Lock, Clock, Bookmark, BookmarkCheck, Share2, Check, X } from 'lucide-react';
-import { listFollowedBeeIds } from '@/lib/follows';
-import { listThreads, listThreadsByIds, listThreadIdsByAuthor, listThreadIdsByAuthors, relativeTime, type ForumThread } from '@/lib/intel';
-import { forumSearch, listThreadFeed, type FeedSort, type ThreadFeedItem } from '@/lib/forumFeed';
-import { timeAfterISO } from '@/lib/timePresets';
-import {
-  listSavedThreadIds,
-  toggleSave,
-  isSavedBatch,
-  getReactionsBatch,
-  createShareLink,
-  type ReactionSummary,
-} from '@/lib/reactions';
 import { ReactionBar } from '@/components/intel/ReactionBar';
-import { useManualData } from '@/lib/useManualData';
-import { useLensStore } from '@/stores/useLensStore';
-import { useAuth } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
 import { FeedInlineSlot } from '@/components/promotions/FeedInlineSlot';
-import { usePromotionSlot } from '@/lib/promotions/usePromotionSlot';
+import { useAuth } from '@/lib/auth';
 import {
+  BEE_COLOR,
   KETTLE_COLORS,
   REALM_COLORS,
-  REALM_NAMES,
   REALM_ID_BY_NAME,
-  BEE_COLOR,
+  REALM_NAMES,
 } from '@/lib/constants';
-import { cn } from '@/lib/utils';
+import { listFollowedBeeIds } from '@/lib/follows';
+import { type FeedSort, type ThreadFeedItem, forumSearch, listThreadFeed } from '@/lib/forumFeed';
+import {
+  type ForumThread,
+  listThreadIdsByAuthor,
+  listThreadIdsByAuthors,
+  listThreads,
+  listThreadsByIds,
+  relativeTime,
+} from '@/lib/intel';
+import { usePromotionSlot } from '@/lib/promotions/usePromotionSlot';
+import {
+  type ReactionSummary,
+  createShareLink,
+  getReactionsBatch,
+  isSavedBatch,
+  listSavedThreadIds,
+  toggleSave,
+} from '@/lib/reactions';
 import { CARD_INK, cardChipStyle, realmCardStyle } from '@/lib/realmCardStyle';
+import { supabase } from '@/lib/supabase';
+import { timeAfterISO } from '@/lib/timePresets';
+import { useManualData } from '@/lib/useManualData';
+import { cn } from '@/lib/utils';
+import { useLensStore } from '@/stores/useLensStore';
 import { REALM_COLOR_FALLBACK, useRealmColors } from '@/stores/useRealmColors';
 import type { RealmId } from '@/types/manual';
+import {
+  Bookmark,
+  BookmarkCheck,
+  Check,
+  Clock,
+  Lock,
+  MessageSquare,
+  Share2,
+  X,
+} from 'lucide-react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 interface ThreadListProps {
   /** Facet-lens prefix (display-name segments on realm_path). [] = all threads. */
@@ -82,9 +98,7 @@ export function ThreadList({
   const { bee } = useAuth();
 
   // Realm slug for promo targeting + accent color, derived from the prefix root.
-  const selectedRealmId: RealmId | null = prefix[0]
-    ? (REALM_ID_BY_NAME[prefix[0]] ?? null)
-    : null;
+  const selectedRealmId: RealmId | null = prefix[0] ? (REALM_ID_BY_NAME[prefix[0]] ?? null) : null;
 
   const personalSortKey = savedMode
     ? 'intel-sort-saved'
@@ -166,7 +180,9 @@ export function ThreadList({
 
   const [threadAtomLinks, setThreadAtomLinks] = useState<Map<string, string[]>>(new Map());
   const [threadCategoryLinks, setThreadCategoryLinks] = useState<Map<string, string[]>>(new Map());
-  const [reactionSummaries, setReactionSummaries] = useState<Map<string, ReactionSummary>>(new Map());
+  const [reactionSummaries, setReactionSummaries] = useState<Map<string, ReactionSummary>>(
+    new Map(),
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: prefixKey + realmKey are the stable serializations of `prefix` / `realmPrefixes`; depending on the array identities would refetch every render
   useEffect(() => {
@@ -286,7 +302,20 @@ export function ThreadList({
     return () => {
       cancelled = true;
     };
-  }, [prefixKey, realmKey, searchTerm, timePreset, sortBy, timeWindowHours, feedSort, savedMode, myThreadsMode, followingMode, personalSortMode, bee?.id]);
+  }, [
+    prefixKey,
+    realmKey,
+    searchTerm,
+    timePreset,
+    sortBy,
+    timeWindowHours,
+    feedSort,
+    savedMode,
+    myThreadsMode,
+    followingMode,
+    personalSortMode,
+    bee?.id,
+  ]);
 
   if (error) {
     return (
@@ -486,7 +515,10 @@ function ThreadCard({
   function handleCategoryClick(e: React.MouseEvent, path: string) {
     e.preventDefault();
     e.stopPropagation();
-    const parts = path.split(' / ').map((s) => s.trim()).filter(Boolean);
+    const parts = path
+      .split(' / ')
+      .map((s) => s.trim())
+      .filter(Boolean);
     if (parts.length === 0 || !REALM_ID_BY_NAME[parts[0]]) return;
     setPrefix(parts);
   }
@@ -499,168 +531,169 @@ function ThreadCard({
         style={realmCardStyle(accentColor)}
       >
         <div className="p-4">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            {primaryRealmName && (
-              <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                <span
-                  className="rounded px-1.5 py-0.5 font-mono"
-                  style={{ fontSize: '10px', ...cardChipStyle }}
-                  data-size="meta"
-                >
-                  {primaryRealmName}
-                </span>
-                {thread.primaryL2 && (
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              {primaryRealmName && (
+                <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                   <span
                     className="rounded px-1.5 py-0.5 font-mono"
                     style={{ fontSize: '10px', ...cardChipStyle }}
                     data-size="meta"
                   >
-                    {thread.primaryL2}
+                    {primaryRealmName}
                   </span>
-                )}
-              </div>
-            )}
-
-            <h3
-              className={cn('font-display text-lg leading-tight', thread.isLocked && 'opacity-70')}
-              style={{ color: CARD_INK.title }}
-            >
-              {thread.title}
-            </h3>
-
-            {thread.body && (
-              <p
-                className="mt-1.5 line-clamp-2"
-                style={{ fontSize: '13px', lineHeight: '1.5', color: CARD_INK.body }}
-              >
-                {thread.body}
-              </p>
-            )}
-
-            {linkedAtoms.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {linkedAtoms.map((a) => (
-                  <button
-                    type="button"
-                    key={a.id}
-                    onClick={(e) => handleAtomClick(e, a)}
-                    className="inline-flex items-center gap-1 rounded border border-white/20 bg-white/10 px-1.5 py-0.5 text-white/85 transition-colors hover:bg-white/20 hover:text-white"
-                    style={{ fontSize: '10.5px' }}
-                    title={`Filter by ${a.realmName}${a.pathParts[1] ? ` · ${a.pathParts[1]}` : ''}${a.pathParts[2] ? ` · ${a.pathParts[2]}` : ''}`}
-                  >
+                  {thread.primaryL2 && (
                     <span
-                      className="h-1 w-1 rounded-full"
-                      style={{
-                        background:
-                          KETTLE_COLORS[a.kettle as keyof typeof KETTLE_COLORS] ?? '#C8D1DA',
-                      }}
-                    />
-                    {a.name}
-                  </button>
-                ))}
-                {atomIds.length > 4 && (
-                  <span
-                    className="font-mono text-white/60"
-                    style={{ fontSize: '10.5px' }}
-                    data-size="meta"
-                  >
-                    +{atomIds.length - 4}
-                  </span>
-                )}
-              </div>
-            )}
+                      className="rounded px-1.5 py-0.5 font-mono"
+                      style={{ fontSize: '10px', ...cardChipStyle }}
+                      data-size="meta"
+                    >
+                      {thread.primaryL2}
+                    </span>
+                  )}
+                </div>
+              )}
 
-            {categoryChips.length > 0 && (
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                {categoryChips.map((path) => {
-                  const leaf = path.split(' / ').pop() ?? path;
-                  return (
+              <h3
+                className={cn(
+                  'font-display text-lg leading-tight',
+                  thread.isLocked && 'opacity-70',
+                )}
+                style={{ color: CARD_INK.title }}
+              >
+                {thread.title}
+              </h3>
+
+              {thread.body && (
+                <p
+                  className="mt-1.5 line-clamp-2"
+                  style={{ fontSize: '13px', lineHeight: '1.5', color: CARD_INK.body }}
+                >
+                  {thread.body}
+                </p>
+              )}
+
+              {linkedAtoms.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {linkedAtoms.map((a) => (
                     <button
                       type="button"
-                      key={path}
-                      onClick={(e) => handleCategoryClick(e, path)}
-                      className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/[0.06] px-1.5 py-0.5 text-white/70 transition-colors hover:bg-white/15 hover:text-white"
-                      style={{ fontSize: '10px' }}
-                      title={`Filter by ${path}`}
+                      key={a.id}
+                      onClick={(e) => handleAtomClick(e, a)}
+                      className="inline-flex items-center gap-1 rounded border border-white/20 bg-white/10 px-1.5 py-0.5 text-white/85 transition-colors hover:bg-white/20 hover:text-white"
+                      style={{ fontSize: '10.5px' }}
+                      title={`Filter by ${a.realmName}${a.pathParts[1] ? ` · ${a.pathParts[1]}` : ''}${a.pathParts[2] ? ` · ${a.pathParts[2]}` : ''}`}
                     >
-                      <span className="text-white/45">#</span>
-                      {leaf}
+                      <span
+                        className="h-1 w-1 rounded-full"
+                        style={{
+                          background:
+                            KETTLE_COLORS[a.kettle as keyof typeof KETTLE_COLORS] ?? '#C8D1DA',
+                        }}
+                      />
+                      {a.name}
                     </button>
-                  );
-                })}
-                {categoryPaths.length > categoryChips.length && (
-                  <span
-                    className="font-mono text-white/60"
-                    style={{ fontSize: '10px' }}
-                    data-size="meta"
-                  >
-                    +{categoryPaths.length - categoryChips.length}
-                  </span>
-                )}
+                  ))}
+                  {atomIds.length > 4 && (
+                    <span
+                      className="font-mono text-white/60"
+                      style={{ fontSize: '10.5px' }}
+                      data-size="meta"
+                    >
+                      +{atomIds.length - 4}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {categoryChips.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {categoryChips.map((path) => {
+                    const leaf = path.split(' / ').pop() ?? path;
+                    return (
+                      <button
+                        type="button"
+                        key={path}
+                        onClick={(e) => handleCategoryClick(e, path)}
+                        className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/[0.06] px-1.5 py-0.5 text-white/70 transition-colors hover:bg-white/15 hover:text-white"
+                        style={{ fontSize: '10px' }}
+                        title={`Filter by ${path}`}
+                      >
+                        <span className="text-white/45">#</span>
+                        {leaf}
+                      </button>
+                    );
+                  })}
+                  {categoryPaths.length > categoryChips.length && (
+                    <span
+                      className="font-mono text-white/60"
+                      style={{ fontSize: '10px' }}
+                      data-size="meta"
+                    >
+                      +{categoryPaths.length - categoryChips.length}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="flex flex-shrink-0 items-start gap-0.5">
+              {thread.isLocked && <Lock size={14} className="mt-1.5 mr-1 text-white/55" />}
+              <CardShareButton threadId={thread.id} />
+              {canSave && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onToggleSave();
+                  }}
+                  className={cn(
+                    'rounded-md p-1.5 transition-colors',
+                    saved
+                      ? 'text-honey hover:bg-honey/10'
+                      : 'text-white/60 hover:bg-white/10 hover:text-white',
+                  )}
+                  title={saved ? 'Remove from Saved' : 'Save for later'}
+                  aria-label={saved ? 'Remove from Saved' : 'Save for later'}
+                >
+                  {saved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {reactionSummary &&
+            (reactionSummary.counts.honey > 0 ||
+              reactionSummary.counts.fire > 0 ||
+              reactionSummary.counts.thinking > 0 ||
+              reactionSummary.counts.warning > 0 ||
+              reactionSummary.counts.check > 0) && (
+              <div className="mt-3">
+                <ReactionBar
+                  sourceSurface="intel"
+                  sourceId={thread.id}
+                  sourceKind="thread"
+                  initialSummary={reactionSummary}
+                  compact
+                />
               </div>
             )}
-          </div>
-          <div className="flex flex-shrink-0 items-start gap-0.5">
-            {thread.isLocked && (
-              <Lock size={14} className="mt-1.5 mr-1 text-white/55" />
-            )}
-            <CardShareButton threadId={thread.id} />
-            {canSave && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onToggleSave();
-                }}
-                className={cn(
-                  'rounded-md p-1.5 transition-colors',
-                  saved
-                    ? 'text-honey hover:bg-honey/10'
-                    : 'text-white/60 hover:bg-white/10 hover:text-white',
-                )}
-                title={saved ? 'Remove from Saved' : 'Save for later'}
-                aria-label={saved ? 'Remove from Saved' : 'Save for later'}
+
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-white/65">
+            <MetaPill icon={<MessageSquare size={11} />}>
+              {thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}
+            </MetaPill>
+            <MetaPill icon={<Clock size={11} />}>{relativeTime(thread.lastActivityAt)}</MetaPill>
+            {thread.authorHandle && (
+              <span
+                className="font-mono text-white/65"
+                style={{ fontSize: '11px' }}
+                data-size="meta"
               >
-                {saved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}
-              </button>
+                @{thread.authorHandle}
+              </span>
             )}
           </div>
-        </div>
-
-        {reactionSummary &&
-          (reactionSummary.counts.honey > 0 ||
-            reactionSummary.counts.fire > 0 ||
-            reactionSummary.counts.thinking > 0 ||
-            reactionSummary.counts.warning > 0 ||
-            reactionSummary.counts.check > 0) && (
-            <div className="mt-3">
-              <ReactionBar
-                sourceSurface="intel"
-                sourceId={thread.id}
-                sourceKind="thread"
-                initialSummary={reactionSummary}
-                compact
-              />
-            </div>
-          )}
-
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-white/65">
-          <MetaPill icon={<MessageSquare size={11} />}>
-            {thread.replyCount} {thread.replyCount === 1 ? 'reply' : 'replies'}
-          </MetaPill>
-          <MetaPill icon={<Clock size={11} />}>{relativeTime(thread.lastActivityAt)}</MetaPill>
-          {thread.authorHandle && (
-            <span
-              className="font-mono text-white/65"
-              style={{ fontSize: '11px' }}
-              data-size="meta"
-            >
-              @{thread.authorHandle}
-            </span>
-          )}
-        </div>
         </div>
       </Link>
     </li>
@@ -874,24 +907,15 @@ function ThreadListSkeleton({
         >
           <div className="p-4">
             <div className="mb-2 flex flex-wrap items-center gap-1.5">
-              <span
-                className="h-3.5 w-14 rounded"
-                style={{ background: `${accentColor}25` }}
-              />
+              <span className="h-3.5 w-14 rounded" style={{ background: `${accentColor}25` }} />
               <span className="h-3.5 w-20 rounded bg-zinc-100" />
             </div>
 
             <div className="h-5 rounded bg-zinc-200" style={{ width: `${c.titleW}%` }} />
 
             <div className="mt-2 space-y-1.5">
-              <div
-                className="h-3 rounded bg-zinc-100"
-                style={{ width: `${c.bodyW1}%` }}
-              />
-              <div
-                className="h-3 rounded bg-zinc-100"
-                style={{ width: `${c.bodyW2}%` }}
-              />
+              <div className="h-3 rounded bg-zinc-100" style={{ width: `${c.bodyW1}%` }} />
+              <div className="h-3 rounded bg-zinc-100" style={{ width: `${c.bodyW2}%` }} />
             </div>
 
             <div className="mt-3 flex flex-wrap gap-1">
@@ -959,10 +983,16 @@ function EmptyThreads({
         >
           FOLLOWING
         </div>
-        <p className="mb-2 font-display text-zinc-900" style={{ fontSize: '17px', fontWeight: 500 }}>
+        <p
+          className="mb-2 font-display text-zinc-900"
+          style={{ fontSize: '17px', fontWeight: 500 }}
+        >
           {headline}
         </p>
-        <p className="mx-auto max-w-md text-zinc-500" style={{ fontSize: '13px', lineHeight: '1.5' }}>
+        <p
+          className="mx-auto max-w-md text-zinc-500"
+          style={{ fontSize: '13px', lineHeight: '1.5' }}
+        >
           {subtext}
         </p>
         <Link
@@ -1183,17 +1213,11 @@ function EmptyThreads({
         </div>
       )}
 
-      <p
-        className="mb-2 font-display text-zinc-900"
-        style={{ fontSize: '17px', fontWeight: 500 }}
-      >
+      <p className="mb-2 font-display text-zinc-900" style={{ fontSize: '17px', fontWeight: 500 }}>
         {headline}
       </p>
 
-      <p
-        className="mx-auto max-w-md text-zinc-500"
-        style={{ fontSize: '13px', lineHeight: '1.5' }}
-      >
+      <p className="mx-auto max-w-md text-zinc-500" style={{ fontSize: '13px', lineHeight: '1.5' }}>
         {subtext}
       </p>
 
@@ -1209,21 +1233,13 @@ function EmptyThreads({
       >
         <span style={{ color: '#FAD15E' }}>✦</span>
         Start a thread
-        <span
-          className="font-mono"
-          style={{ fontSize: '10px', opacity: 0.7 }}
-          data-size="meta"
-        >
+        <span className="font-mono" style={{ fontSize: '10px', opacity: 0.7 }} data-size="meta">
           Earn BLiNG!
         </span>
       </Link>
 
       {realmName && (
-        <p
-          className="mt-4 font-mono text-zinc-500"
-          style={{ fontSize: '10.5px' }}
-          data-size="meta"
-        >
+        <p className="mt-4 font-mono text-zinc-500" style={{ fontSize: '10.5px' }} data-size="meta">
           Or pick "All" at the top to see every INTEL thread
         </p>
       )}

@@ -3,8 +3,8 @@
 // allows a Bee to read THEIR OWN pots; the RPC bypasses RLS after an
 // internal is_admin check, returning @combtreasury's pot breakdown.
 
-import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
 
 interface Pot {
   purpose: string;
@@ -15,13 +15,13 @@ interface Pot {
 // Canonical pot labels + descriptions. Render whatever the RPC returns,
 // fall back to title-cased purpose for any unknown pot.
 const POT_META: Record<string, { label: string; description: string }> = {
-  operational: { label: 'Operational',  description: 'Day-to-day platform operating budget' },
-  reserve:     { label: 'Reserve',      description: 'Long-term Treasury Council disbursement reserve' },
-  defense:     { label: 'Defense',      description: 'Legal + counter-narrative defense fund' },
-  campaign:    { label: 'Campaign',     description: 'Astra Director campaign allocations' },
-  promotions:  { label: 'Promotions',   description: 'Astra Director promotional / marketing budget' },
-  newbee:      { label: 'NewBEE',       description: 'Newcomer Bee onboarding pool' },
-  honeypot:    { label: 'HoneyPOT',     description: 'Threat-detection bounty pool' },
+  operational: { label: 'Operational', description: 'Day-to-day platform operating budget' },
+  reserve: { label: 'Reserve', description: 'Long-term Treasury Council disbursement reserve' },
+  defense: { label: 'Defense', description: 'Legal + counter-narrative defense fund' },
+  campaign: { label: 'Campaign', description: 'Astra Director campaign allocations' },
+  promotions: { label: 'Promotions', description: 'Astra Director promotional / marketing budget' },
+  newbee: { label: 'NewBEE', description: 'Newcomer Bee onboarding pool' },
+  honeypot: { label: 'HoneyPOT', description: 'Threat-detection bounty pool' },
 };
 
 function fmt(n: number): string {
@@ -47,14 +47,22 @@ export function TreasuryBalances() {
         setPots([]);
         return;
       }
-      const rows = (data ?? []) as Array<{ purpose: string; balance: number | string; updated_at: string }>;
-      setPots(rows.map((r) => ({
-        purpose: r.purpose,
-        balance: typeof r.balance === 'string' ? Number(r.balance) : r.balance,
-        updated_at: r.updated_at,
-      })));
+      const rows = (data ?? []) as Array<{
+        purpose: string;
+        balance: number | string;
+        updated_at: string;
+      }>;
+      setPots(
+        rows.map((r) => ({
+          purpose: r.purpose,
+          balance: typeof r.balance === 'string' ? Number(r.balance) : r.balance,
+          updated_at: r.updated_at,
+        })),
+      );
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const total = pots?.reduce((sum, p) => sum + p.balance, 0) ?? 0;
@@ -62,7 +70,9 @@ export function TreasuryBalances() {
   return (
     <div>
       <header className="mb-4">
-        <h2 className="font-display text-2xl font-semibold text-text-silver-bright">Treasury Balances</h2>
+        <h2 className="font-display text-2xl font-semibold text-text-silver-bright">
+          Treasury Balances
+        </h2>
         <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }}>
           @combtreasury · via get_treasury_pots() RPC (admin-only)
         </p>
@@ -71,13 +81,19 @@ export function TreasuryBalances() {
       {pots === null && (
         <div className="space-y-2">
           {['sk-1', 'sk-2', 'sk-3', 'sk-4', 'sk-5'].map((k) => (
-            <div key={k} className="h-16 animate-pulse-slow rounded-md border border-border bg-bg-elevated/40" />
+            <div
+              key={k}
+              className="h-16 animate-pulse-slow rounded-md border border-border bg-bg-elevated/40"
+            />
           ))}
         </div>
       )}
 
       {pots !== null && pots.length === 0 && (
-        <div className="rounded-md border border-border bg-bg-elevated/40 px-4 py-6 text-center text-text-dim" style={{ fontSize: '13px' }}>
+        <div
+          className="rounded-md border border-border bg-bg-elevated/40 px-4 py-6 text-center text-text-dim"
+          style={{ fontSize: '13px' }}
+        >
           {error ? `Could not load Treasury pots: ${error}` : 'No Treasury pots seeded.'}
         </div>
       )}
@@ -122,7 +138,9 @@ export function TreasuryBalances() {
                     </div>
                     <div className="font-display text-xl font-semibold text-text">
                       {fmt(p.balance)}
-                      <span className="ml-1.5 font-sans text-xs font-normal text-text-muted">BLiNG!</span>
+                      <span className="ml-1.5 font-sans text-xs font-normal text-text-muted">
+                        BLiNG!
+                      </span>
                     </div>
                   </div>
                   <div className="mt-2 text-text-dim" style={{ fontSize: '12px' }}>

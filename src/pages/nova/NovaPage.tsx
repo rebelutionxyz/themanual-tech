@@ -25,7 +25,13 @@ interface NovaData {
   } | null;
   /** Doorways-as-lenses v1: the Nova's own OFFERs + INTEL threads (owner-based
       today; nova_id-tagged content joins automatically when tagging ships). */
-  offers: { id: string; title: string; price_bling: number | null; listing_type: string | null; image_url: string | null }[];
+  offers: {
+    id: string;
+    title: string;
+    price_bling: number | null;
+    listing_type: string | null;
+    image_url: string | null;
+  }[];
   threads: { id: string; title: string; created_at: string }[];
 }
 

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
 
 const PANEL_BG = '#0A1628';
 const TEXT_PRIMARY = '#F0F0F5';
@@ -72,35 +72,23 @@ export function MyPropertiesSection() {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
-      <h1
-        className="font-display text-3xl font-semibold"
-        style={{ color: HEADER_TEXT }}
-      >
+      <h1 className="font-display text-3xl font-semibold" style={{ color: HEADER_TEXT }}>
         My Properties
       </h1>
 
       {rows === null ? (
-        <div
-          className="rounded-lg p-5 text-sm"
-          style={{ background: PANEL_BG, color: TEXT_MUTED }}
-        >
+        <div className="rounded-lg p-5 text-sm" style={{ background: PANEL_BG, color: TEXT_MUTED }}>
           Loading…
         </div>
       ) : rows.length === 0 ? (
-        <div
-          className="rounded-lg p-6"
-          style={{ background: PANEL_BG, color: TEXT_PRIMARY }}
-        >
+        <div className="rounded-lg p-6" style={{ background: PANEL_BG, color: TEXT_PRIMARY }}>
           <p className="text-sm">
-            You don't own any properties yet. Visit the Workshop to clone an
-            Astra into your first Nova.
+            You don't own any properties yet. Visit the Workshop to clone an Astra into your first
+            Nova.
           </p>
         </div>
       ) : (
-        <div
-          className="overflow-hidden rounded-lg"
-          style={{ background: PANEL_BG }}
-        >
+        <div className="overflow-hidden rounded-lg" style={{ background: PANEL_BG }}>
           <table className="w-full text-sm">
             <thead>
               <tr
@@ -121,10 +109,7 @@ export function MyPropertiesSection() {
                   style={{ color: TEXT_PRIMARY }}
                 >
                   <td className="px-4 py-3 font-medium">{r.name}</td>
-                  <td
-                    className="px-4 py-3 font-mono text-xs"
-                    style={{ color: TEXT_MUTED }}
-                  >
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: TEXT_MUTED }}>
                     {r.slug}
                   </td>
                   <td className="px-4 py-3 capitalize">{r.type}</td>

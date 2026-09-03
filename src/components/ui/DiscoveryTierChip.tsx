@@ -3,10 +3,7 @@
 // Single source of truth for tier visual: src/lib/discovery-ladder/colors.ts.
 // Hover tooltip surfaces the tier description (per amendment §2.1).
 
-import {
-  DISCOVERY_TIER_COLORS,
-  type DiscoveryTier,
-} from '@/lib/discovery-ladder/colors';
+import { DISCOVERY_TIER_COLORS, type DiscoveryTier } from '@/lib/discovery-ladder/colors';
 import { cn } from '@/lib/utils';
 
 interface DiscoveryTierChipProps {
@@ -16,11 +13,7 @@ interface DiscoveryTierChipProps {
   className?: string;
 }
 
-export function DiscoveryTierChip({
-  tier,
-  compact = false,
-  className,
-}: DiscoveryTierChipProps) {
+export function DiscoveryTierChip({ tier, compact = false, className }: DiscoveryTierChipProps) {
   const style = DISCOVERY_TIER_COLORS[tier];
   const label = compact ? tier.slice(0, 3).toUpperCase() : tier;
 

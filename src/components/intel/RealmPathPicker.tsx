@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
-import { REALM_NAMES, REALM_ID_BY_NAME } from '@/lib/constants';
+import { REALM_ID_BY_NAME, REALM_NAMES } from '@/lib/constants';
 import { useManualData } from '@/lib/useManualData';
 import { cn } from '@/lib/utils';
 import type { RealmId, TreeNode } from '@/types/manual';
+import { useMemo } from 'react';
 
 interface RealmPathPickerProps {
   /** Selected taxonomy path as display names, e.g. ['Justice','Courts','Appeals']. */
@@ -53,9 +53,9 @@ export function RealmPathPicker({
 
   const realmNodes = useMemo(
     () =>
-      realmOrder.map((id) => tree.children.find((c) => c.realmId === id)).filter(
-        (n): n is TreeNode => Boolean(n),
-      ),
+      realmOrder
+        .map((id) => tree.children.find((c) => c.realmId === id))
+        .filter((n): n is TreeNode => Boolean(n)),
     [tree, realmOrder],
   );
 
@@ -73,7 +73,8 @@ export function RealmPathPicker({
 
   function pickChild(parentDepth: number, node: TreeNode) {
     const idx = parentDepth + 1; // child sits at this path index
-    if (value[idx] === node.name) onChange(value.slice(0, idx)); // toggle off → drill up
+    if (value[idx] === node.name)
+      onChange(value.slice(0, idx)); // toggle off → drill up
     else onChange(value.slice(0, idx).concat(node.name));
   }
 

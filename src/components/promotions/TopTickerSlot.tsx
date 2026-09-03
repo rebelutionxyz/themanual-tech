@@ -3,11 +3,10 @@
 // individual promotions can override via the row's `behavior` field.
 // Hides entirely when no DB match and no fallbackContent (D-4).
 
-import { usePromotionSlot } from '@/lib/promotions/usePromotionSlot';
 import type { SlotContext } from '@/lib/promotions/types';
+import { usePromotionSlot } from '@/lib/promotions/usePromotionSlot';
 
-interface TopTickerSlotProps
-  extends Omit<SlotContext, 'slotKey'> {
+interface TopTickerSlotProps extends Omit<SlotContext, 'slotKey'> {
   className?: string;
 }
 

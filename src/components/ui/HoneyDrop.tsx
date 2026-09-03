@@ -16,12 +16,7 @@ interface HoneyDropProps {
  * Custom honey drop SVG — replaces the blue water 💧 emoji everywhere.
  * Gold, luminescent. BLiNG! signature mark.
  */
-export function HoneyDrop({
-  size = 14,
-  className,
-  style,
-  animate = false,
-}: HoneyDropProps) {
+export function HoneyDrop({ size = 14, className, style, animate = false }: HoneyDropProps) {
   const animClass = animate ? 'animate-honey-drop' : '';
   return (
     <svg

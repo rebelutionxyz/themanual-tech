@@ -39,20 +39,20 @@ export const REALM_NAMES: Record<RealmId, string> = {
  * Override individual realms by editing this map. UI re-renders automatically.
  */
 export const REALM_COLORS: Record<RealmId, string> = {
-  justice: '#C94C4C',           // crimson — authority, gravity
-  reference: '#8A94A0',         // gunmetal — neutral, lookup
-  human_activities: '#E8A868',  // terracotta — making, doing
-  self: '#E88AB8',              // rose — personal, vitality
-  geography: '#9AC97A',         // sage — global, place
-  health: '#6FCF8F',            // green — wellness
-  society: '#7AA8D4',           // steel blue — collective
-  math: '#B8A8F0',              // lavender — abstraction
-  science: '#4FC3E8',           // cyan — discovery
-  philosophy: '#F0C878',        // gold — wisdom
-  tech: '#6B94C8',              // cool blue — digital
-  history: '#D4A574',           // warm tan — antiquity
-  culture: '#F78FB3',           // coral — expression
-  religion: '#9B7FC8',          // violet — sacred
+  justice: '#C94C4C', // crimson — authority, gravity
+  reference: '#8A94A0', // gunmetal — neutral, lookup
+  human_activities: '#E8A868', // terracotta — making, doing
+  self: '#E88AB8', // rose — personal, vitality
+  geography: '#9AC97A', // sage — global, place
+  health: '#6FCF8F', // green — wellness
+  society: '#7AA8D4', // steel blue — collective
+  math: '#B8A8F0', // lavender — abstraction
+  science: '#4FC3E8', // cyan — discovery
+  philosophy: '#F0C878', // gold — wisdom
+  tech: '#6B94C8', // cool blue — digital
+  history: '#D4A574', // warm tan — antiquity
+  culture: '#F78FB3', // coral — expression
+  religion: '#9B7FC8', // violet — sacred
 };
 
 /**
@@ -99,34 +99,31 @@ export const BEE_COLOR = '#E8B86E';
  * are kept as re-exports for back-compat with OutlookView + GraphView +
  * the ManualPage filter chip array.
  */
-import {
-  DISCOVERY_TIER_COLORS,
-  DISCOVERY_TIERS_ORDERED,
-} from '@/lib/discovery-ladder/colors';
+import { DISCOVERY_TIERS_ORDERED, DISCOVERY_TIER_COLORS } from '@/lib/discovery-ladder/colors';
 
 export const KETTLE_STATES: KettleState[] = [...DISCOVERY_TIERS_ORDERED];
 
 export const KETTLE_COLORS: Record<KettleState, string> = {
-  Sourced:   DISCOVERY_TIER_COLORS.Sourced.bg,
-  Accepted:  DISCOVERY_TIER_COLORS.Accepted.bg,
-  Emerging:  DISCOVERY_TIER_COLORS.Emerging.bg,
-  Fringe:    DISCOVERY_TIER_COLORS.Fringe.bg,
+  Sourced: DISCOVERY_TIER_COLORS.Sourced.bg,
+  Accepted: DISCOVERY_TIER_COLORS.Accepted.bg,
+  Emerging: DISCOVERY_TIER_COLORS.Emerging.bg,
+  Fringe: DISCOVERY_TIER_COLORS.Fringe.bg,
   Unsourced: DISCOVERY_TIER_COLORS.Unsourced.bg,
 };
 
 export const KETTLE_ABBREV: Record<KettleState, string> = {
-  Sourced:   'SOU',
-  Accepted:  'ACC',
-  Emerging:  'EME',
-  Fringe:    'FRI',
+  Sourced: 'SOU',
+  Accepted: 'ACC',
+  Emerging: 'EME',
+  Fringe: 'FRI',
   Unsourced: 'UNS',
 };
 
 export const KETTLE_DESCRIPTIONS: Record<KettleState, string> = {
-  Sourced:   DISCOVERY_TIER_COLORS.Sourced.description,
-  Accepted:  DISCOVERY_TIER_COLORS.Accepted.description,
-  Emerging:  DISCOVERY_TIER_COLORS.Emerging.description,
-  Fringe:    DISCOVERY_TIER_COLORS.Fringe.description,
+  Sourced: DISCOVERY_TIER_COLORS.Sourced.description,
+  Accepted: DISCOVERY_TIER_COLORS.Accepted.description,
+  Emerging: DISCOVERY_TIER_COLORS.Emerging.description,
+  Fringe: DISCOVERY_TIER_COLORS.Fringe.description,
   Unsourced: DISCOVERY_TIER_COLORS.Unsourced.description,
 };
 

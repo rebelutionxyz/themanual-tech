@@ -1,6 +1,6 @@
-import { supabase } from './supabase';
 import { REALM_NAMES } from '@/lib/constants';
 import type { RealmId } from '@/types/manual';
+import { supabase } from './supabase';
 
 // ═════════════════════════════════════════════════════════════════════
 // Types mirroring the forum_threads / forum_posts tables
@@ -212,10 +212,7 @@ export async function listThreads(
   const linkedIds = new Set<string>();
 
   // Query 1 — direct primary_realm match (also filter by l2 if set)
-  let q = supabase
-    .from('forum_threads')
-    .select('id')
-    .eq('primary_realm', filter.realmId);
+  let q = supabase.from('forum_threads').select('id').eq('primary_realm', filter.realmId);
   if (filter.l2) q = q.eq('primary_l2', filter.l2);
   const { data: direct } = await q;
   for (const r of direct ?? []) directIds.add(String(r.id));
@@ -349,18 +346,13 @@ export async function countThreadsByAuthor(beeId: string): Promise<number> {
  */
 export async function listThreadsByIds(threadIds: string[]): Promise<ForumThread[]> {
   if (!supabase || threadIds.length === 0) return [];
-  const { data } = await supabase
-    .from('forum_threads')
-    .select('*')
-    .in('id', threadIds);
+  const { data } = await supabase.from('forum_threads').select('*').in('id', threadIds);
   if (!data) return [];
 
   const enriched = await enrichWithAuthors(data);
   // Preserve caller's order
   const order = new Map(threadIds.map((id, i) => [id, i]));
-  return enriched.sort(
-    (a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999),
-  );
+  return enriched.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
 }
 
 /**
@@ -406,10 +398,7 @@ export async function getPosts(threadId: string): Promise<ForumPost[]> {
 // Mutations
 // ═════════════════════════════════════════════════════════════════════
 
-export async function createThread(
-  input: CreateThreadInput,
-  authorBeeId: string,
-): Promise<string> {
+export async function createThread(input: CreateThreadInput, authorBeeId: string): Promise<string> {
   if (!supabase) throw new Error('Supabase not configured');
 
   // realm_path = the thread's category (mirrors atoms.path_parts, display names).
@@ -418,9 +407,7 @@ export async function createThread(
     input.realmPath && input.realmPath.length > 0
       ? input.realmPath
       : input.primaryRealm
-        ? [REALM_NAMES[input.primaryRealm], input.primaryL2].filter(
-            (s): s is string => Boolean(s),
-          )
+        ? [REALM_NAMES[input.primaryRealm], input.primaryL2].filter((s): s is string => Boolean(s))
         : null;
 
   const { data: thread, error } = await supabase
@@ -464,9 +451,7 @@ export async function createThread(
       category_key: path,
       created_by: authorBeeId,
     }));
-    const { error: catErr } = await supabase
-      .from('entity_category_links')
-      .insert(catLinks);
+    const { error: catErr } = await supabase.from('entity_category_links').insert(catLinks);
     if (catErr) {
       console.warn('[intel] Category link insert failed (thread was created):', catErr.message);
     }
@@ -510,7 +495,10 @@ export async function searchAtoms(query: string, limit = 20): Promise<AtomHit[]>
  * first is the anchor (p_anchor_atom_id); the rest are tagged via
  * forum_thread_tag_atom. Author is set server-side from auth.uid().
  */
-export async function createIntelPost(text: string, atomIds: string[] = []): Promise<string | null> {
+export async function createIntelPost(
+  text: string,
+  atomIds: string[] = [],
+): Promise<string | null> {
   if (!supabase) throw new Error('Supabase not configured');
   const body = text.trim();
   if (!body) throw new Error('Nothing to post');
@@ -639,10 +627,7 @@ async function enrichWithAuthors(rows: Record<string, unknown>[]): Promise<Forum
   const beeIds = Array.from(new Set(threads.map((t) => t.createdBy).filter(Boolean)));
   if (beeIds.length === 0) return threads;
 
-  const { data: bees } = await supabase
-    .from('bees')
-    .select('id, handle')
-    .in('id', beeIds);
+  const { data: bees } = await supabase.from('bees').select('id, handle').in('id', beeIds);
   const handleMap = new Map((bees ?? []).map((b) => [String(b.id), String(b.handle)]));
 
   return threads.map((t) => ({
@@ -658,10 +643,7 @@ async function enrichPostsWithAuthors(rows: Record<string, unknown>[]): Promise<
   const beeIds = Array.from(new Set(posts.map((p) => p.beeId).filter(Boolean)));
   if (beeIds.length === 0) return posts;
 
-  const { data: bees } = await supabase
-    .from('bees')
-    .select('id, handle')
-    .in('id', beeIds);
+  const { data: bees } = await supabase.from('bees').select('id, handle').in('id', beeIds);
   const handleMap = new Map((bees ?? []).map((b) => [String(b.id), String(b.handle)]));
 
   return posts.map((p) => ({
@@ -685,4 +667,3 @@ export function relativeTime(iso: string): string {
   if (diffSec < 604800) return `${Math.floor(diffSec / 86400)}d ago`;
   return new Date(iso).toLocaleDateString();
 }
-

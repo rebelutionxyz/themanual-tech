@@ -1,9 +1,9 @@
-import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AtSign, Lock } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
 import { ManualLogo } from '@/components/ui/ManualLogo';
+import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
+import { AtSign, Lock } from 'lucide-react';
+import { type FormEvent, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * Sign-in ONLY (landing gate 2026-07-10): no sign-up, no magic link, no

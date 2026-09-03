@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
-import { Search, X, Plus, Check, Network } from 'lucide-react';
-import { useManualData } from '@/lib/useManualData';
-import { KETTLE_COLORS } from '@/lib/constants';
 import { TaxonomyTree } from '@/components/manual/TaxonomyTree';
-import type { Atom, RealmId } from '@/types/manual';
+import { KETTLE_COLORS } from '@/lib/constants';
+import { useManualData } from '@/lib/useManualData';
 import { cn } from '@/lib/utils';
+import type { Atom, RealmId } from '@/types/manual';
+import { Check, Network, Plus, Search, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 interface AtomPickerProps {
   /** Currently-selected atom ids */
@@ -124,10 +124,7 @@ export function AtomPicker({
     onChange(value.filter((id) => id !== atomId));
   }
 
-  const hasContextHint =
-    !searchOnly === false &&
-    realmContext?.realmId &&
-    !query.trim();
+  const hasContextHint = !searchOnly === false && realmContext?.realmId && !query.trim();
 
   return (
     <div className="w-full">
@@ -151,9 +148,7 @@ export function AtomPicker({
               onClick={() => setTreeMode(false)}
               className={cn(
                 'flex items-center gap-1 rounded px-2 py-0.5 transition-colors',
-                !treeMode
-                  ? 'bg-bg text-text'
-                  : 'text-text-muted hover:text-text-silver',
+                !treeMode ? 'bg-bg text-text' : 'text-text-muted hover:text-text-silver',
               )}
               style={{ fontSize: '11px' }}
             >
@@ -165,9 +160,7 @@ export function AtomPicker({
               onClick={() => setTreeMode(true)}
               className={cn(
                 'flex items-center gap-1 rounded px-2 py-0.5 transition-colors',
-                treeMode
-                  ? 'bg-bg text-text'
-                  : 'text-text-muted hover:text-text-silver',
+                treeMode ? 'bg-bg text-text' : 'text-text-muted hover:text-text-silver',
               )}
               style={{ fontSize: '11px' }}
             >
@@ -222,99 +215,99 @@ export function AtomPicker({
               onBlur={() => {
                 setFocused(false);
                 setTimeout(() => setShowSuggestions(false), 150);
-          }}
-          placeholder={atMax ? `Max ${max} atoms selected` : placeholder}
-          disabled={atMax}
-          className={cn(
-            'w-full rounded-md border bg-bg py-2 pl-8 pr-3 text-sm text-text placeholder:text-text-muted',
-            'focus:outline-none focus:ring-1',
-            error
-              ? 'border-kettle-unsourced/50 focus:border-kettle-unsourced/70 focus:ring-kettle-unsourced/40'
-              : 'border-border focus:border-text-silver/50 focus:ring-text-silver/30',
-            atMax && 'cursor-not-allowed opacity-60',
+              }}
+              placeholder={atMax ? `Max ${max} atoms selected` : placeholder}
+              disabled={atMax}
+              className={cn(
+                'w-full rounded-md border bg-bg py-2 pl-8 pr-3 text-sm text-text placeholder:text-text-muted',
+                'focus:outline-none focus:ring-1',
+                error
+                  ? 'border-kettle-unsourced/50 focus:border-kettle-unsourced/70 focus:ring-kettle-unsourced/40'
+                  : 'border-border focus:border-text-silver/50 focus:ring-text-silver/30',
+                atMax && 'cursor-not-allowed opacity-60',
+              )}
+            />
+          </div>
+
+          {hasContextHint && (
+            <p
+              className="mt-1 font-mono text-text-dim"
+              style={{ fontSize: '11px' }}
+              data-size="meta"
+            >
+              Showing atoms from{' '}
+              <span className="text-text-silver">
+                {realmContext!.realmId}
+                {realmContext!.l2 && ` · ${realmContext!.l2}`}
+              </span>
+              . Type to search all atoms.
+            </p>
           )}
-        />
-      </div>
 
-      {hasContextHint && (
-        <p
-          className="mt-1 font-mono text-text-dim"
-          style={{ fontSize: '11px' }}
-          data-size="meta"
-        >
-          Showing atoms from{' '}
-          <span className="text-text-silver">
-            {realmContext!.realmId}
-            {realmContext!.l2 && ` · ${realmContext!.l2}`}
-          </span>
-          . Type to search all atoms.
-        </p>
-      )}
+          {searchOnly && !query.trim() && focused && suggestions.length === 0 && !atMax && (
+            <div className="mt-1 rounded-md border border-border bg-bg-elevated px-3 py-2">
+              <p className="text-text-muted" style={{ fontSize: '12px' }}>
+                {loaded && atoms.length > 0
+                  ? `Type to search ${atoms.length.toLocaleString()} Manual atoms`
+                  : 'Type to search Manual atoms'}
+              </p>
+            </div>
+          )}
 
-      {searchOnly && !query.trim() && focused && suggestions.length === 0 && !atMax && (
-        <div className="mt-1 rounded-md border border-border bg-bg-elevated px-3 py-2">
-          <p className="text-text-muted" style={{ fontSize: '12px' }}>
-            {loaded && atoms.length > 0
-              ? `Type to search ${atoms.length.toLocaleString()} Manual atoms`
-              : 'Type to search Manual atoms'}
-          </p>
-        </div>
-      )}
+          {error && (
+            <p className="mt-1 text-kettle-unsourced" style={{ fontSize: '11px' }} data-size="meta">
+              {error}
+            </p>
+          )}
 
-      {error && (
-        <p className="mt-1 text-kettle-unsourced" style={{ fontSize: '11px' }} data-size="meta">
-          {error}
-        </p>
-      )}
+          {showSuggestions && suggestions.length > 0 && !atMax && (
+            <div className="mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-bg-elevated shadow-lg">
+              {suggestions.map((atom) => {
+                const isSelected = value.includes(atom.id);
+                return (
+                  <button
+                    key={atom.id}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      if (!isSelected) addAtom(atom);
+                    }}
+                    className={cn(
+                      'flex w-full items-center gap-2 border-b border-border px-3 py-2 text-left last:border-b-0',
+                      'hover:bg-bg',
+                      isSelected && 'cursor-default opacity-50',
+                    )}
+                  >
+                    <span
+                      className="h-2 w-2 flex-shrink-0 rounded-full"
+                      style={{ background: KETTLE_COLORS[atom.kettle] }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-text-silver" style={{ fontSize: '13px' }}>
+                        {atom.name}
+                      </div>
+                      <div className="path-mono truncate" style={{ fontSize: '10.5px' }}>
+                        {atom.path}
+                      </div>
+                    </div>
+                    {isSelected ? (
+                      <Check size={14} className="flex-shrink-0 text-kettle-sourced" />
+                    ) : (
+                      <Plus size={14} className="flex-shrink-0 text-text-muted" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-      {showSuggestions && suggestions.length > 0 && !atMax && (
-        <div className="mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-bg-elevated shadow-lg">
-          {suggestions.map((atom) => {
-            const isSelected = value.includes(atom.id);
-            return (
-              <button
-                key={atom.id}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  if (!isSelected) addAtom(atom);
-                }}
-                className={cn(
-                  'flex w-full items-center gap-2 border-b border-border px-3 py-2 text-left last:border-b-0',
-                  'hover:bg-bg',
-                  isSelected && 'cursor-default opacity-50',
-                )}
-              >
-                <span
-                  className="h-2 w-2 flex-shrink-0 rounded-full"
-                  style={{ background: KETTLE_COLORS[atom.kettle] }}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-text-silver" style={{ fontSize: '13px' }}>
-                    {atom.name}
-                  </div>
-                  <div className="path-mono truncate" style={{ fontSize: '10.5px' }}>
-                    {atom.path}
-                  </div>
-                </div>
-                {isSelected ? (
-                  <Check size={14} className="flex-shrink-0 text-kettle-sourced" />
-                ) : (
-                  <Plus size={14} className="flex-shrink-0 text-text-muted" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {showSuggestions && query.trim() && suggestions.length === 0 && (
-        <div className="mt-1 rounded-md border border-border bg-bg-elevated px-3 py-2">
-          <p className="text-text-muted" style={{ fontSize: '12px' }}>
-            No atoms match "{query}"
-          </p>
-        </div>
-      )}
+          {showSuggestions && query.trim() && suggestions.length === 0 && (
+            <div className="mt-1 rounded-md border border-border bg-bg-elevated px-3 py-2">
+              <p className="text-text-muted" style={{ fontSize: '12px' }}>
+                No atoms match "{query}"
+              </p>
+            </div>
+          )}
         </>
       )}
 

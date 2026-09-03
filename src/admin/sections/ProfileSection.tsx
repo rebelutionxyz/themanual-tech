@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
 
-const HEX_CLIP =
-  'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)';
+const HEX_CLIP = 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)';
 
 const PANEL_BG = '#0A1628';
 const TEXT_PRIMARY = '#F0F0F5';
@@ -66,10 +65,7 @@ export function ProfileSection() {
   async function save() {
     if (!supabase || !bee || !bioSupported) return;
     setSaving(true);
-    const { error } = await supabase
-      .from('bees')
-      .update({ bio: draft })
-      .eq('id', bee.id);
+    const { error } = await supabase.from('bees').update({ bio: draft }).eq('id', bee.id);
     setSaving(false);
     if (!error) setSavedAt(Date.now());
   }
@@ -79,18 +75,12 @@ export function ProfileSection() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
-      <h1
-        className="font-display text-3xl font-semibold"
-        style={{ color: HEADER_TEXT }}
-      >
+      <h1 className="font-display text-3xl font-semibold" style={{ color: HEADER_TEXT }}>
         Profile
       </h1>
 
       {/* Identity card */}
-      <div
-        className="flex items-center gap-5 rounded-lg p-5"
-        style={{ background: PANEL_BG }}
-      >
+      <div className="flex items-center gap-5 rounded-lg p-5" style={{ background: PANEL_BG }}>
         <div
           className="flex h-20 w-20 items-center justify-center"
           style={{
@@ -106,25 +96,16 @@ export function ProfileSection() {
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           ) : (
-            <span
-              className="font-display text-3xl"
-              style={{ color: TEXT_PRIMARY }}
-            >
+            <span className="font-display text-3xl" style={{ color: TEXT_PRIMARY }}>
               {initial}
             </span>
           )}
         </div>
         <div>
-          <div
-            className="font-display text-2xl font-semibold"
-            style={{ color: TEXT_PRIMARY }}
-          >
+          <div className="font-display text-2xl font-semibold" style={{ color: TEXT_PRIMARY }}>
             {displayName}
           </div>
-          <div
-            className="mt-1 font-mono text-xs"
-            style={{ color: TEXT_MUTED }}
-          >
+          <div className="mt-1 font-mono text-xs" style={{ color: TEXT_MUTED }}>
             @{bee.handle}
           </div>
         </div>
@@ -132,10 +113,7 @@ export function ProfileSection() {
 
       {/* Bio editor (only if column exists) */}
       {bioSupported && (
-        <div
-          className="flex flex-col gap-3 rounded-lg p-5"
-          style={{ background: PANEL_BG }}
-        >
+        <div className="flex flex-col gap-3 rounded-lg p-5" style={{ background: PANEL_BG }}>
           <label
             htmlFor="bio"
             className="text-xs font-semibold uppercase tracking-wider"

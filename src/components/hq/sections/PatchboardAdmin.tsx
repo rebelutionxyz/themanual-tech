@@ -69,8 +69,8 @@ function CryptoNodesBlock() {
       </h3>
       <p className="mb-3 max-w-2xl text-text-dim" style={{ fontSize: '12px' }}>
         Optional external crypto payment rails. Every node is DORMANT until toggled — this is the
-        switch surface, not a wallet integration (no custody, no keys, no funds move). Turning one on
-        is a separate integration pass.
+        switch surface, not a wallet integration (no custody, no keys, no funds move). Turning one
+        on is a separate integration pass.
       </p>
       <div
         className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-bg-elevated/15 px-3 py-2 text-text-dim"
@@ -78,8 +78,8 @@ function CryptoNodesBlock() {
       >
         <ShieldAlert size={13} className="text-text-muted" aria-hidden />
         <span>
-          Architecture law: these are <strong>external, fiat-side gateway methods</strong> — KYC-gated
-          under the hard switch, and <strong>never crypto&nbsp;&rarr;&nbsp;BLiNG</strong>.
+          Architecture law: these are <strong>external, fiat-side gateway methods</strong> —
+          KYC-gated under the hard switch, and <strong>never crypto&nbsp;&rarr;&nbsp;BLiNG</strong>.
           {CRYPTO_GATEWAY_LAW.neverAutoCreditBling ? ' No auto-credit, ever.' : ''}
         </span>
       </div>

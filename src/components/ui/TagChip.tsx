@@ -26,9 +26,7 @@ export function TagChip({ tag, active, onClick, count, className }: TagChipProps
       data-size="meta"
     >
       {tag}
-      {typeof count === 'number' && (
-        <span className="text-text-muted">({count})</span>
-      )}
+      {typeof count === 'number' && <span className="text-text-muted">({count})</span>}
     </Tag>
   );
 }

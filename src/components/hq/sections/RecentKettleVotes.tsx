@@ -2,10 +2,10 @@
 // Last 100 atom_kettle_votes JOIN atoms (name, realm) JOIN bees (handle).
 // All three tables are public-read, so a direct anon-keyed query works.
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import { DiscoveryTierChip } from '@/components/ui/DiscoveryTierChip';
 import type { DiscoveryTier } from '@/lib/discovery-ladder/colors';
+import { supabase } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
 
 interface Row {
   id: number;
@@ -55,7 +55,9 @@ export function RecentKettleVotes() {
       setRows(null);
       let q = supabase
         .from('atom_kettle_votes')
-        .select('id, created_at, weight, kettle, atom_id, bee_id, atoms!inner(name, realm_id), bees(handle)')
+        .select(
+          'id, created_at, weight, kettle, atom_id, bee_id, atoms!inner(name, realm_id), bees(handle)',
+        )
         .order('created_at', { ascending: false })
         .limit(100);
       const cutoff = rangeToCutoff(range);
@@ -70,7 +72,7 @@ export function RecentKettleVotes() {
       const flat: Row[] = ((data ?? []) as unknown as RawRow[])
         .map((r) => {
           const atom = Array.isArray(r.atoms) ? (r.atoms[0] ?? null) : r.atoms;
-          const bee  = Array.isArray(r.bees)  ? (r.bees[0]  ?? null) : r.bees;
+          const bee = Array.isArray(r.bees) ? (r.bees[0] ?? null) : r.bees;
           if (!atom) return null;
           return {
             id: r.id,
@@ -87,26 +89,36 @@ export function RecentKettleVotes() {
         .filter((x): x is Row => x !== null);
       setRows(flat);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [range]);
 
   return (
     <div>
       <header className="mb-4">
-        <h2 className="font-display text-2xl font-semibold text-text-silver-bright">Recent Kettle Votes</h2>
+        <h2 className="font-display text-2xl font-semibold text-text-silver-bright">
+          Recent Kettle Votes
+        </h2>
         <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }}>
           from atom_kettle_votes · last 100 in range
         </p>
       </header>
 
       <label className="inline-flex items-center gap-2 text-sm text-text-silver">
-        <span className="font-mono uppercase text-text-muted" style={{ fontSize: '11px' }}>range:</span>
+        <span className="font-mono uppercase text-text-muted" style={{ fontSize: '11px' }}>
+          range:
+        </span>
         <select
           value={range}
           onChange={(e) => setRange(e.target.value as Range)}
           className="rounded-md border border-border bg-bg px-2 py-1 text-sm text-text focus:border-text-silver/50 focus:outline-none"
         >
-          {RANGES.map((r) => <option key={r} value={r}>{r}</option>)}
+          {RANGES.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
         </select>
       </label>
 
@@ -118,8 +130,13 @@ export function RecentKettleVotes() {
         </div>
       )}
       {rows !== null && rows.length === 0 && (
-        <div className="mt-4 rounded-md border border-border bg-bg-elevated/40 px-4 py-6 text-center text-text-dim" style={{ fontSize: '13px' }}>
-          {error ? `Could not load kettle votes: ${error}` : 'No kettle votes yet — first votes pending.'}
+        <div
+          className="mt-4 rounded-md border border-border bg-bg-elevated/40 px-4 py-6 text-center text-text-dim"
+          style={{ fontSize: '13px' }}
+        >
+          {error
+            ? `Could not load kettle votes: ${error}`
+            : 'No kettle votes yet — first votes pending.'}
         </div>
       )}
       {rows !== null && rows.length > 0 && (

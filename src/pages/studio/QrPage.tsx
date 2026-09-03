@@ -168,12 +168,14 @@ export function QrPage() {
       <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white p-4">
         <canvas ref={canvasRef} className="mx-auto block w-full max-w-sm" />
         {!text.trim() && (
-          <p className="pb-2 text-center text-[12px] text-zinc-400">Type above — the code draws live.</p>
+          <p className="pb-2 text-center text-[12px] text-zinc-400">
+            Type above — the code draws live.
+          </p>
         )}
       </div>
       <p className="mt-2 text-[11px] text-zinc-400">
-        Dark-ink codes scan most reliably; brand ink works when your accent is dark enough.
-        Feeds /press ads, storefront links, and Nova portals.
+        Dark-ink codes scan most reliably; brand ink works when your accent is dark enough. Feeds
+        /press ads, storefront links, and Nova portals.
       </p>
     </div>
   );

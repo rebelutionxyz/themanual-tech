@@ -282,8 +282,12 @@ export function BookmarksPage() {
                   </p>
                   <p className="mt-1 font-mono text-[11px] text-zinc-500" data-size="meta">
                     saved {relativeTime(item.savedAt)}
-                    {item.realmName && <span className="ml-2 text-zinc-400">· {item.realmName}</span>}
-                    {!item.resolved && <span className="ml-2 text-zinc-400">source unavailable</span>}
+                    {item.realmName && (
+                      <span className="ml-2 text-zinc-400">· {item.realmName}</span>
+                    )}
+                    {!item.resolved && (
+                      <span className="ml-2 text-zinc-400">source unavailable</span>
+                    )}
                   </p>
                 </div>
                 <span className="flex flex-shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">

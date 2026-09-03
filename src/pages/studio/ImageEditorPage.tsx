@@ -1166,9 +1166,7 @@ export function ImageEditorPage() {
                     </label>
                   </div>
                   <div className="mt-1.5">
-                    <span className="text-[11px] text-zinc-500">
-                      Curve {selected.curve ?? 0}°
-                    </span>
+                    <span className="text-[11px] text-zinc-500">Curve {selected.curve ?? 0}°</span>
                     <input
                       type="range"
                       min={-180}

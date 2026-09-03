@@ -16,8 +16,8 @@
 //
 // or simpler — drop a single <FeedInlineSlot {...ctx} /> after the Nth card.
 
-import { usePromotionSlot } from '@/lib/promotions/usePromotionSlot';
 import type { SlotContext } from '@/lib/promotions/types';
+import { usePromotionSlot } from '@/lib/promotions/usePromotionSlot';
 
 interface FeedInlineSlotProps extends Omit<SlotContext, 'slotKey'> {
   className?: string;

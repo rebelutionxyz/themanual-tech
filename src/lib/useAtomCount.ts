@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
 
 /**
  * Live count of atoms in The Manual — a lightweight HEAD `count(*)` (no rows

@@ -1,5 +1,5 @@
-import type { AdminSection, AdminTier, UserRole } from './types';
 import { coreManifest } from './manifests/core';
+import type { AdminSection, AdminTier, UserRole } from './types';
 
 const ALL_MANIFESTS = [coreManifest];
 
@@ -17,9 +17,9 @@ function meetsRequires(section: AdminSection, role: UserRole): boolean {
 }
 
 export function getSectionsForTier(tier: AdminTier, role: UserRole): AdminSection[] {
-  return ALL_SECTIONS
-    .filter((s) => s.tier === tier && meetsRequires(s, role))
-    .sort((a, b) => a.order - b.order);
+  return ALL_SECTIONS.filter((s) => s.tier === tier && meetsRequires(s, role)).sort(
+    (a, b) => a.order - b.order,
+  );
 }
 
 export function getAllManifests() {

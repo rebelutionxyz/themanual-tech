@@ -26,7 +26,6 @@ window.addEventListener('vite:preloadError', (event) => {
   window.location.reload();
 });
 
-
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>

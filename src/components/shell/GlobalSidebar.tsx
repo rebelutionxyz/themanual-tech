@@ -1,11 +1,11 @@
+import { readableInk } from '@/components/shell/BottomToolbar';
+import { ModalLink } from '@/components/shell/ModalLink';
 import {
   ASTRA_SWITCHER,
   SURFACE_FRIENDLY,
   type SidebarItem,
   astraColor,
 } from '@/components/shell/sidebarNav';
-import { readableInk } from '@/components/shell/BottomToolbar';
-import { ModalLink } from '@/components/shell/ModalLink';
 import { ManualLogo } from '@/components/ui/ManualLogo';
 import { cn } from '@/lib/utils';
 import { useBranding } from '@/stores/useBranding';
@@ -280,7 +280,9 @@ function AstraDropdown({
         style={{ background: accent }}
       >
         <span className="flex min-w-0 items-center gap-2">
-          {CurrentIcon && <CurrentIcon size={17} className="flex-shrink-0" style={{ color: ink }} />}
+          {CurrentIcon && (
+            <CurrentIcon size={17} className="flex-shrink-0" style={{ color: ink }} />
+          )}
           <span
             className="truncate font-display text-[15px] font-bold tracking-wide"
             style={{ color: ink }}

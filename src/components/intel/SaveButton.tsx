@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Bookmark } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { isSaved, toggleSave } from '@/lib/reactions';
 import { cn } from '@/lib/utils';
+import { Bookmark } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface SaveButtonProps {
   sourceSurface: string;
@@ -60,11 +60,7 @@ export function SaveButton({
   }
 
   const label = saved ? 'Saved' : 'Save';
-  const title = !bee
-    ? 'Sign in to save'
-    : saved
-      ? 'Remove from Saved'
-      : 'Save to read later';
+  const title = !bee ? 'Sign in to save' : saved ? 'Remove from Saved' : 'Save to read later';
 
   return (
     <button
@@ -85,10 +81,7 @@ export function SaveButton({
       )}
       style={{ fontSize: compact ? '11px' : '12px' }}
     >
-      <Bookmark
-        size={compact ? 11 : 13}
-        fill={saved ? 'currentColor' : 'none'}
-      />
+      <Bookmark size={compact ? 11 : 13} fill={saved ? 'currentColor' : 'none'} />
       {!compact && <span>{label}</span>}
     </button>
   );

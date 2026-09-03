@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ShieldAlert, MessageSquare, FileText, Check, X, Gavel } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import {
+  type FlagResolution,
+  type ForumFlag,
   isForumModerator,
   listOpenFlags,
   resolveFlag,
-  type ForumFlag,
-  type FlagResolution,
 } from '@/lib/forumMod';
 import { relativeTime } from '@/lib/intel';
 import { cn } from '@/lib/utils';
+import { Check, FileText, Gavel, MessageSquare, ShieldAlert, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 const INTEL_COLOR = '#6B94C8';
 
@@ -73,7 +73,10 @@ export function ReportsQueue() {
     <div className="safe-pad-x mx-auto max-w-3xl px-4 py-6 md:px-8 md:py-8">
       <div className="mb-5 flex items-center gap-2">
         <ShieldAlert size={18} style={{ color: INTEL_COLOR }} />
-        <h1 className="font-display tracking-wide text-text-silver-bright" style={{ fontSize: '22px' }}>
+        <h1
+          className="font-display tracking-wide text-text-silver-bright"
+          style={{ fontSize: '22px' }}
+        >
           Reports
         </h1>
         {flags && flags.length > 0 && (
@@ -94,13 +97,19 @@ export function ReportsQueue() {
       )}
 
       {allowed === false && (
-        <div className="rounded-lg border border-border bg-bg-elevated p-6 text-text-dim" style={{ fontSize: '13px' }}>
+        <div
+          className="rounded-lg border border-border bg-bg-elevated p-6 text-text-dim"
+          style={{ fontSize: '13px' }}
+        >
           This queue is for forum moderators.
         </div>
       )}
 
       {allowed && error && (
-        <div className="mb-3 rounded-lg border border-kettle-unsourced/30 bg-bg-elevated p-4 text-kettle-unsourced" style={{ fontSize: '13px' }}>
+        <div
+          className="mb-3 rounded-lg border border-kettle-unsourced/30 bg-bg-elevated p-4 text-kettle-unsourced"
+          style={{ fontSize: '13px' }}
+        >
           {error}
         </div>
       )}
@@ -155,7 +164,11 @@ function FlagRow({
     <li className="rounded-lg border border-border bg-bg-elevated p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="mb-1 flex items-center gap-1.5 font-mono uppercase tracking-wider text-text-muted" style={{ fontSize: '10px' }} data-size="meta">
+          <div
+            className="mb-1 flex items-center gap-1.5 font-mono uppercase tracking-wider text-text-muted"
+            style={{ fontSize: '10px' }}
+            data-size="meta"
+          >
             <KindIcon size={11} />
             {flag.targetKind}
             <span className="text-text-dim">·</span>
@@ -171,7 +184,10 @@ function FlagRow({
               {flag.threadTitle ?? 'View target'}
             </Link>
           ) : (
-            <span className="font-display tracking-wide text-text-silver" style={{ fontSize: '15px' }}>
+            <span
+              className="font-display tracking-wide text-text-silver"
+              style={{ fontSize: '15px' }}
+            >
               {flag.threadTitle ?? 'Unknown target'}
             </span>
           )}
@@ -181,7 +197,11 @@ function FlagRow({
             {flag.reason}
           </p>
           {flag.flaggedByHandle && (
-            <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
+            <p
+              className="mt-1 font-mono text-text-muted"
+              style={{ fontSize: '11px' }}
+              data-size="meta"
+            >
               reported by @{flag.flaggedByHandle}
             </p>
           )}
@@ -189,8 +209,18 @@ function FlagRow({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        <ResolveButton label="Dismiss" icon={<X size={13} />} onClick={() => onResolve('dismissed')} disabled={busy} />
-        <ResolveButton label="Reviewed" icon={<Check size={13} />} onClick={() => onResolve('reviewed')} disabled={busy} />
+        <ResolveButton
+          label="Dismiss"
+          icon={<X size={13} />}
+          onClick={() => onResolve('dismissed')}
+          disabled={busy}
+        />
+        <ResolveButton
+          label="Reviewed"
+          icon={<Check size={13} />}
+          onClick={() => onResolve('reviewed')}
+          disabled={busy}
+        />
         <ResolveButton
           label="Actioned"
           icon={<Gavel size={13} />}

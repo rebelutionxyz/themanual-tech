@@ -117,9 +117,6 @@ export const DEFAULT_PROMOTION_SLOTS: Record<SlotKey, SlotConfig> = {
  * Falls through to DEFAULT_PROMOTION_SLOTS when the astra does not specify
  * the slot, or when called on the foundation (no astra — themanual.tech itself).
  */
-export function resolveSlotConfig(
-  astra: AstraConfig | null,
-  slotKey: SlotKey,
-): SlotConfig {
+export function resolveSlotConfig(astra: AstraConfig | null, slotKey: SlotKey): SlotConfig {
   return astra?.promotionSlots?.[slotKey] ?? DEFAULT_PROMOTION_SLOTS[slotKey];
 }

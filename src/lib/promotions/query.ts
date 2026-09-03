@@ -33,19 +33,11 @@ function specificity(row: Promotion, ctx: SlotContext): number {
     score += W_ATOM;
     touched = true;
   }
-  if (
-    row.branch_path != null &&
-    ctx.branchPath &&
-    row.branch_path === ctx.branchPath
-  ) {
+  if (row.branch_path != null && ctx.branchPath && row.branch_path === ctx.branchPath) {
     score += W_BRANCH;
     touched = true;
   }
-  if (
-    row.realm_slug != null &&
-    ctx.realmSlug &&
-    row.realm_slug === ctx.realmSlug
-  ) {
+  if (row.realm_slug != null && ctx.realmSlug && row.realm_slug === ctx.realmSlug) {
     score += W_REALM;
     touched = true;
   }
@@ -53,11 +45,7 @@ function specificity(row: Promotion, ctx: SlotContext): number {
     score += W_ASTRA;
     touched = true;
   }
-  if (
-    row.geo_country != null &&
-    ctx.geoCountry &&
-    row.geo_country === ctx.geoCountry
-  ) {
+  if (row.geo_country != null && ctx.geoCountry && row.geo_country === ctx.geoCountry) {
     score += W_GEO;
     touched = true;
   }
@@ -89,14 +77,10 @@ function isCatchAll(row: Promotion): boolean {
  */
 function rowMatchesContext(row: Promotion, ctx: SlotContext): boolean {
   if (row.atom_id != null && row.atom_id !== (ctx.atomId ?? '')) return false;
-  if (row.branch_path != null && row.branch_path !== (ctx.branchPath ?? ''))
-    return false;
-  if (row.realm_slug != null && row.realm_slug !== (ctx.realmSlug ?? ''))
-    return false;
-  if (row.astra_slug != null && row.astra_slug !== (ctx.astra ?? ''))
-    return false;
-  if (row.geo_country != null && row.geo_country !== (ctx.geoCountry ?? ''))
-    return false;
+  if (row.branch_path != null && row.branch_path !== (ctx.branchPath ?? '')) return false;
+  if (row.realm_slug != null && row.realm_slug !== (ctx.realmSlug ?? '')) return false;
+  if (row.astra_slug != null && row.astra_slug !== (ctx.astra ?? '')) return false;
+  if (row.geo_country != null && row.geo_country !== (ctx.geoCountry ?? '')) return false;
   return true;
 }
 
@@ -109,15 +93,10 @@ function rowMatchesContext(row: Promotion, ctx: SlotContext): boolean {
  * for the slot_key and the reader picks the winner in JS. (Promotions table is
  * expected to stay small at v1 — Studio-seeded rows only.)
  */
-export async function queryPromotionForSlot(
-  ctx: SlotContext,
-): Promise<Promotion | null> {
+export async function queryPromotionForSlot(ctx: SlotContext): Promise<Promotion | null> {
   if (!supabase) return null;
 
-  const { data, error } = await supabase
-    .from('promotions')
-    .select('*')
-    .eq('slot_key', ctx.slotKey);
+  const { data, error } = await supabase.from('promotions').select('*').eq('slot_key', ctx.slotKey);
 
   if (error) {
     if (typeof console !== 'undefined') {
@@ -127,9 +106,7 @@ export async function queryPromotionForSlot(
   }
   if (!data || data.length === 0) return null;
 
-  const eligible = (data as Promotion[]).filter((row) =>
-    rowMatchesContext(row, ctx),
-  );
+  const eligible = (data as Promotion[]).filter((row) => rowMatchesContext(row, ctx));
   if (eligible.length === 0) return null;
 
   // Sort: specificity DESC → priority DESC → created_at DESC

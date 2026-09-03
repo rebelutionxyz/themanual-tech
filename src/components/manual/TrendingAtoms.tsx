@@ -6,13 +6,13 @@
 // Until then, refresh is manual via SELECT public.refresh_atom_trending()
 // from a service-role context.
 
-import { useEffect, useState } from 'react';
-import { TrendingUp } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 import { DiscoveryTierChip } from '@/components/ui/DiscoveryTierChip';
 import type { DiscoveryTier } from '@/lib/discovery-ladder/colors';
-import { useManualStore } from '@/stores/useManualStore';
+import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { useManualStore } from '@/stores/useManualStore';
+import { TrendingUp } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface TrendingRow {
   atom_id: string;
@@ -42,7 +42,9 @@ export function TrendingAtoms() {
     (async () => {
       const { data, error: fetchErr } = await supabase
         .from('atom_trending_24h')
-        .select('atom_id, vote_count_24h, total_weight_24h, atoms!inner(name, realm_id, kettle, path)')
+        .select(
+          'atom_id, vote_count_24h, total_weight_24h, atoms!inner(name, realm_id, kettle, path)',
+        )
         .order('vote_count_24h', { ascending: false })
         .limit(LIMIT);
       if (cancelled) return;
@@ -65,9 +67,7 @@ export function TrendingAtoms() {
       };
       const flat: TrendingRow[] = ((data ?? []) as unknown as RawRow[])
         .map((r) => {
-          const atom: AtomRel | null = Array.isArray(r.atoms)
-            ? (r.atoms[0] ?? null)
-            : r.atoms;
+          const atom: AtomRel | null = Array.isArray(r.atoms) ? (r.atoms[0] ?? null) : r.atoms;
           if (!atom) return null;
           return {
             atom_id: r.atom_id,
@@ -98,11 +98,7 @@ export function TrendingAtoms() {
           Trending in The Manual
         </h2>
       </header>
-      <p
-        className="font-mono text-text-muted"
-        style={{ fontSize: '11px' }}
-        data-size="meta"
-      >
+      <p className="font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
         last 24 h · top {LIMIT} by vote activity
       </p>
 

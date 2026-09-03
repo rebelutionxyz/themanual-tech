@@ -17,7 +17,7 @@
         DEPTH_RAILS1 mounts.
    ============================================================ */
 
-import { proposeSettlement, roundMoney, type Rail, type SettlementProposal } from './rails';
+import { type Rail, type SettlementProposal, proposeSettlement, roundMoney } from './rails';
 
 /** The closed lifecycle. Order is the arc; index is the progress rank. */
 export const STREAM_STAGES = [
@@ -42,12 +42,42 @@ export interface StreamStageMeta {
 }
 
 export const STREAM_STAGE_META: Record<StreamStage, StreamStageMeta> = {
-  scheduled: { key: 'scheduled', label: 'Scheduled', blurb: 'Announced, not started yet.', onAir: false, terminal: false },
-  preroll: { key: 'preroll', label: 'Preroll', blurb: 'Host is setting up; audience is gathering.', onAir: false, terminal: false },
+  scheduled: {
+    key: 'scheduled',
+    label: 'Scheduled',
+    blurb: 'Announced, not started yet.',
+    onAir: false,
+    terminal: false,
+  },
+  preroll: {
+    key: 'preroll',
+    label: 'Preroll',
+    blurb: 'Host is setting up; audience is gathering.',
+    onAir: false,
+    terminal: false,
+  },
   live: { key: 'live', label: 'Live', blurb: 'On air.', onAir: true, terminal: false },
-  paused: { key: 'paused', label: 'Paused', blurb: 'Temporarily off air; expected to resume.', onAir: false, terminal: false },
-  ended: { key: 'ended', label: 'Ended', blurb: 'Broadcast finished.', onAir: false, terminal: true },
-  archived: { key: 'archived', label: 'Archived', blurb: 'Filed to the replay/record.', onAir: false, terminal: true },
+  paused: {
+    key: 'paused',
+    label: 'Paused',
+    blurb: 'Temporarily off air; expected to resume.',
+    onAir: false,
+    terminal: false,
+  },
+  ended: {
+    key: 'ended',
+    label: 'Ended',
+    blurb: 'Broadcast finished.',
+    onAir: false,
+    terminal: true,
+  },
+  archived: {
+    key: 'archived',
+    label: 'Archived',
+    blurb: 'Filed to the replay/record.',
+    onAir: false,
+    terminal: true,
+  },
 };
 
 /** Raw surface status strings folded onto the closed stage set. */
@@ -145,9 +175,7 @@ export function setPresence(state: StreamState, count: number): StreamState {
 
 export type TipRejection = 'not-on-air' | 'non-positive';
 
-export type TipResult =
-  | { ok: true; state: StreamState }
-  | { ok: false; reason: TipRejection };
+export type TipResult = { ok: true; state: StreamState } | { ok: false; reason: TipRejection };
 
 /**
  * Record a tip. PROPOSE-FIRST — this only appends to the tip ledger-in-waiting; no
@@ -156,7 +184,10 @@ export type TipResult =
 export function tip(state: StreamState, t: StreamTip): TipResult {
   if (state.stage !== 'live') return { ok: false, reason: 'not-on-air' };
   if (!(t.amount > 0)) return { ok: false, reason: 'non-positive' };
-  return { ok: true, state: { ...state, tips: [...state.tips, { ...t, amount: roundMoney(t.amount) }] } };
+  return {
+    ok: true,
+    state: { ...state, tips: [...state.tips, { ...t, amount: roundMoney(t.amount) }] },
+  };
 }
 
 /** Total tipped so far. */

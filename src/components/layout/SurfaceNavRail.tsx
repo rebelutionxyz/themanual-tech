@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { type LucideIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 export interface NavRailItem {
   id: string;
@@ -37,9 +37,19 @@ interface SurfaceNavRailProps {
  * parameterized by surface accent + items. No realm facet rail — that's
  * INTEL-only. The rail background is tinted with the surface accent.
  */
-export function SurfaceNavRail({ title, accent, neon, items, activeId, onSelect, footer }: SurfaceNavRailProps) {
+export function SurfaceNavRail({
+  title,
+  accent,
+  neon,
+  items,
+  activeId,
+  onSelect,
+  footer,
+}: SurfaceNavRailProps) {
   const neonColor = neon ?? accent;
-  const [pinned, setPinned] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768);
+  const [pinned, setPinned] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 768,
+  );
   const [hovered, setHovered] = useState(false);
   const asideRef = useRef<HTMLElement>(null);
   const expanded = pinned || hovered;
@@ -110,7 +120,11 @@ export function SurfaceNavRail({ title, accent, neon, items, activeId, onSelect,
     <>
       {pinned && (
         // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop scrim is aria-hidden; keyboard users dismiss via Escape
-        <div className="fixed inset-0 z-10 bg-black/40 backdrop-blur-sm md:hidden" onClick={() => setPinned(false)} aria-hidden="true" />
+        <div
+          className="fixed inset-0 z-10 bg-black/40 backdrop-blur-sm md:hidden"
+          onClick={() => setPinned(false)}
+          aria-hidden="true"
+        />
       )}
 
       <aside
@@ -137,7 +151,11 @@ export function SurfaceNavRail({ title, accent, neon, items, activeId, onSelect,
           )}
         >
           {expanded && (
-            <span className="font-mono uppercase tracking-widest" style={{ fontSize: '11px', color: accent }} data-size="meta">
+            <span
+              className="font-mono uppercase tracking-widest"
+              style={{ fontSize: '11px', color: accent }}
+              data-size="meta"
+            >
               {title}
             </span>
           )}
@@ -145,11 +163,23 @@ export function SurfaceNavRail({ title, accent, neon, items, activeId, onSelect,
         </button>
 
         <nav className="flex-1 overflow-y-auto py-2">
-          <RailGroup items={primary} activeId={activeId} expanded={expanded} neon={neonColor} onSelect={handleSelect} />
+          <RailGroup
+            items={primary}
+            activeId={activeId}
+            expanded={expanded}
+            neon={neonColor}
+            onSelect={handleSelect}
+          />
           {personal.length > 0 && (
             <>
               <div className="mx-2 my-2 h-px bg-border" aria-hidden="true" />
-              <RailGroup items={personal} activeId={activeId} expanded={expanded} neon={neonColor} onSelect={handleSelect} />
+              <RailGroup
+                items={personal}
+                activeId={activeId}
+                expanded={expanded}
+                neon={neonColor}
+                onSelect={handleSelect}
+              />
             </>
           )}
         </nav>
@@ -177,7 +207,13 @@ function RailGroup({
     <ul className="space-y-0.5 px-1.5">
       {items.map((item) => (
         <li key={item.id}>
-          <RailItem item={item} active={activeId === item.id} expanded={expanded} neon={neon} onClick={() => onSelect(item.id)} />
+          <RailItem
+            item={item}
+            active={activeId === item.id}
+            expanded={expanded}
+            neon={neon}
+            onClick={() => onSelect(item.id)}
+          />
         </li>
       ))}
     </ul>
@@ -227,14 +263,23 @@ function RailItem({
         )}
       </span>
       {expanded && (
-        <span className={cn('truncate tracking-wide', isAction && 'font-semibold')} style={{ fontSize: '13px' }}>
+        <span
+          className={cn('truncate tracking-wide', isAction && 'font-semibold')}
+          style={{ fontSize: '13px' }}
+        >
           {label}
         </span>
       )}
       {expanded && hasBadge && (
         <span
           className="ml-auto flex-shrink-0 rounded px-1.5 py-0.5 font-mono tabular-nums"
-          style={{ fontSize: '10px', color: neon, background: `${neon}1F`, border: `1px solid ${neon}45`, fontWeight: 600 }}
+          style={{
+            fontSize: '10px',
+            color: neon,
+            background: `${neon}1F`,
+            border: `1px solid ${neon}45`,
+            fontWeight: 600,
+          }}
           data-size="meta"
           aria-label={`${badge} items`}
         >

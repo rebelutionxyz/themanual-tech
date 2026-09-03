@@ -1,5 +1,5 @@
+import { AlertCircle, ExternalLink } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { ExternalLink, AlertCircle } from 'lucide-react';
 
 const BLING_COLOR = '#FAD15E'; // honey gold
 const FREEDOMBLINGS_URL = 'https://freedomblings.com';
@@ -54,24 +54,16 @@ export function BlingsPage() {
             boxShadow: `0 0 0 1px ${BLING_COLOR}25, 0 4px 14px rgba(0,0,0,0.35), 0 0 16px ${BLING_COLOR}20`,
           }}
         >
-          <AlertCircle
-            size={36}
-            className="mx-auto mb-3"
-            style={{ color: BLING_COLOR }}
-          />
+          <AlertCircle size={36} className="mx-auto mb-3" style={{ color: BLING_COLOR }} />
           <h1
             className="mb-2 font-display tracking-wide"
             style={{ fontSize: '22px', color: BLING_COLOR, fontWeight: 600 }}
           >
             FreedomBLiNGs.com
           </h1>
-          <p
-            className="mb-4 text-text-silver"
-            style={{ fontSize: '13px', lineHeight: '1.6' }}
-          >
-            FreedomBLiNGs lives at its own sovereign domain. Click below to
-            enter the live economy — earn, FREE, send, escrow. Your Bee account
-            works there too.
+          <p className="mb-4 text-text-silver" style={{ fontSize: '13px', lineHeight: '1.6' }}>
+            FreedomBLiNGs lives at its own sovereign domain. Click below to enter the live economy —
+            earn, FREE, send, escrow. Your Bee account works there too.
           </p>
           <a
             href={FREEDOMBLINGS_URL}
@@ -93,7 +85,8 @@ export function BlingsPage() {
             style={{ fontSize: '10.5px' }}
             data-size="meta"
           >
-            Native integration coming — shared Bee auth, BLiNG! balance visible platform-wide, and order book imports.
+            Native integration coming — shared Bee auth, BLiNG! balance visible platform-wide, and
+            order book imports.
           </div>
         </div>
       </div>

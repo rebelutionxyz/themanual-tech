@@ -1,3 +1,8 @@
+import { dbIcon } from '@/components/dingleberry/icons';
+import { DbCard, Eyebrow, Spark, StatusPill } from '@/components/dingleberry/primitives';
+import { DATA_BLUE, TONE } from '@/components/dingleberry/tone';
+import type { Posture, Tone } from '@/lib/dingleberry/contract';
+import { ChevronRight } from 'lucide-react';
 /* DingleBERRY — Command Center (overview).
    Ported from the artifact shell's overview: posture banner + the six surface
    tiles + member-mesh oversight + Go Dark strip. The artifact's TopBar and
@@ -5,11 +10,6 @@
    sample-data posture switcher stands in for the TopBar's posture control so
    the surface stays explorable on mock. */
 import type { ReactNode } from 'react';
-import { ChevronRight } from 'lucide-react';
-import { dbIcon } from '@/components/dingleberry/icons';
-import { DbCard, Eyebrow, Spark, StatusPill } from '@/components/dingleberry/primitives';
-import { DATA_BLUE, TONE } from '@/components/dingleberry/tone';
-import type { Posture, Tone } from '@/lib/dingleberry/contract';
 import { useDingleberry } from './DingleberryLayout';
 
 /* ---- presentation constants (shell-baked demo content, not the data seam) ---- */
@@ -30,30 +30,60 @@ interface SurfaceTileDef {
 }
 
 const SURFACES: SurfaceTileDef[] = [
-  { key: 'infra', icon: 'server', eyebrow: 'Surface 01', name: 'Platform & infra health',
+  {
+    key: 'infra',
+    icon: 'server',
+    eyebrow: 'Surface 01',
+    name: 'Platform & infra health',
     secure: { st: 'secure', main: '99.98%', sub: '142 services · all regions' },
     degraded: { st: 'watch', main: '99.41%', sub: '3 services degraded · EU edge' },
-    critical: { st: 'critical', main: '97.2%', sub: '2 core services down · ledger relay' } },
-  { key: 'txn', icon: 'lock', eyebrow: 'Surface 02', name: 'Transaction security',
+    critical: { st: 'critical', main: '97.2%', sub: '2 core services down · ledger relay' },
+  },
+  {
+    key: 'txn',
+    icon: 'lock',
+    eyebrow: 'Surface 02',
+    name: 'Transaction security',
     secure: { st: 'secure', main: '1,284,902', sub: 'secured today · 0 anomalies on BLiNG!' },
     degraded: { st: 'watch', main: '1,051,210', sub: '2 ledger anomalies under review' },
-    critical: { st: 'critical', main: 'HELD', sub: 'writes queued · go-dark reconcile mode' } },
-  { key: 'source', icon: 'fingerprint', eyebrow: 'Surface 03', name: 'Source verification',
+    critical: { st: 'critical', main: 'HELD', sub: 'writes queued · go-dark reconcile mode' },
+  },
+  {
+    key: 'source',
+    icon: 'fingerprint',
+    eyebrow: 'Surface 03',
+    name: 'Source verification',
     secure: { st: 'secure', main: '2,140', sub: 'sources ranked · chain intact' },
     degraded: { st: 'watch', main: '2,140', sub: '3 sources flagged · verification gap' },
-    critical: { st: 'watch', main: '2,140', sub: '6 unverified sources quarantined' } },
-  { key: 'shill', icon: 'users', eyebrow: 'Surface 04', name: 'Shill / abuse detection',
+    critical: { st: 'watch', main: '2,140', sub: '6 unverified sources quarantined' },
+  },
+  {
+    key: 'shill',
+    icon: 'users',
+    eyebrow: 'Surface 04',
+    name: 'Shill / abuse detection',
     secure: { st: 'secure', main: '0', sub: 'active patterns · cross-Astra clean' },
     degraded: { st: 'watch', main: '2', sub: 'coordinated patterns flagged' },
-    critical: { st: 'critical', main: '7', sub: 'brigading surge · 3 realms' } },
-  { key: 'dispatch', icon: 'zap', eyebrow: 'Surface 05', name: 'Dispatch (Waggle) auth',
+    critical: { st: 'critical', main: '7', sub: 'brigading surge · 3 realms' },
+  },
+  {
+    key: 'dispatch',
+    icon: 'zap',
+    eyebrow: 'Surface 05',
+    name: 'Dispatch (Waggle) auth',
     secure: { st: 'secure', main: '3,402', sub: 'dispatches hashed · rank-verified' },
     degraded: { st: 'secure', main: '3,402', sub: 'dispatches hashed · rank-verified' },
-    critical: { st: 'watch', main: '3,388', sub: '14 dispatches failed rank check' } },
-  { key: 'threat', icon: 'shieldCheck', eyebrow: 'Surface 06', name: 'Threat interception',
+    critical: { st: 'watch', main: '3,388', sub: '14 dispatches failed rank check' },
+  },
+  {
+    key: 'threat',
+    icon: 'shieldCheck',
+    eyebrow: 'Surface 06',
+    name: 'Threat interception',
     secure: { st: 'secure', main: '0', sub: 'live threats · 1 intercepted today' },
     degraded: { st: 'watch', main: '1', sub: 'malware intercepted · 1 member device' },
-    critical: { st: 'critical', main: '3', sub: 'active surveillance attempt · mesh' } },
+    critical: { st: 'critical', main: '3', sub: 'active surveillance attempt · mesh' },
+  },
 ];
 
 interface HeaderDef {
@@ -121,22 +151,56 @@ interface MeshLayerDef {
 }
 
 const MESH_LAYERS: MeshLayerDef[] = [
-  { n: 1, key: 'cdn', icon: 'globe', name: 'Edge CDN', watch: 'served bytes vs. content hash', load: 1,
+  {
+    n: 1,
+    key: 'cdn',
+    icon: 'globe',
+    name: 'Edge CDN',
+    watch: 'served bytes vs. content hash',
+    load: 1,
     secure: { st: 'secure', sig: '0 hash mismatches', sub: '1,204 nodes · content verified' },
     degraded: { st: 'secure', sig: '0 hash mismatches', sub: '1,204 nodes · content verified' },
-    critical: { st: 'watch', sig: '2 tampered copies', sub: 'quarantined · re-served from origin' } },
-  { n: 2, key: 'relay', icon: 'network', name: 'Mesh relay', watch: 'drop rate · latency · routing', load: 3, goDark: true,
+    critical: { st: 'watch', sig: '2 tampered copies', sub: 'quarantined · re-served from origin' },
+  },
+  {
+    n: 2,
+    key: 'relay',
+    icon: 'network',
+    name: 'Mesh relay',
+    watch: 'drop rate · latency · routing',
+    load: 3,
+    goDark: true,
     secure: { st: 'secure', sig: 'drop 0.3% · p95 42ms', sub: '988 relays · routing nominal' },
     degraded: { st: 'watch', sig: 'drop 1.9% · p95 180ms', sub: 'spine flaky · Go Dark armed' },
-    critical: { st: 'critical', sig: 'spine unreachable', sub: 'Go Dark engaged · relaying P2P' } },
-  { n: 3, key: 'compute', icon: 'cpu', name: 'Public-good compute', watch: 'sandbox escape · hijack', load: 1,
+    critical: { st: 'critical', sig: 'spine unreachable', sub: 'Go Dark engaged · relaying P2P' },
+  },
+  {
+    n: 3,
+    key: 'compute',
+    icon: 'cpu',
+    name: 'Public-good compute',
+    watch: 'sandbox escape · hijack',
+    load: 1,
     secure: { st: 'secure', sig: '0 escape attempts', sub: '312 jobs · isolated' },
     degraded: { st: 'secure', sig: '0 escape attempts', sub: '312 jobs · isolated' },
-    critical: { st: 'watch', sig: '1 escape blocked', sub: 'job killed · node flagged' } },
-  { n: 4, key: 'storage', icon: 'server', name: 'Member storage', watch: 'proof-of-storage · heartbeat hash', load: 4, heal: true,
+    critical: { st: 'watch', sig: '1 escape blocked', sub: 'job killed · node flagged' },
+  },
+  {
+    n: 4,
+    key: 'storage',
+    icon: 'server',
+    name: 'Member storage',
+    watch: 'proof-of-storage · heartbeat hash',
+    load: 4,
+    heal: true,
     secure: { st: 'secure', sig: '100% pieces verified', sub: '1,678 nodes · reliability 99.4' },
-    degraded: { st: 'critical', sig: '1 node withholding', sub: 'mq-7f3a quarantined · self-heal running' },
-    critical: { st: 'critical', sig: '14 nodes gone dark', sub: 'rebuilding onto fresh devices' } },
+    degraded: {
+      st: 'critical',
+      sig: '1 node withholding',
+      sub: 'mq-7f3a quarantined · self-heal running',
+    },
+    critical: { st: 'critical', sig: '14 nodes gone dark', sub: 'rebuilding onto fresh devices' },
+  },
 ];
 
 /* ---- small pieces ---- */
@@ -161,7 +225,10 @@ function PostureBanner({ posture }: { posture: Posture }) {
   return (
     <DbCard
       className="mb-[18px] p-5"
-      style={{ borderLeft: `3px solid ${k.c}`, background: posture === 'secure' ? undefined : k.tint }}
+      style={{
+        borderLeft: `3px solid ${k.c}`,
+        background: posture === 'secure' ? undefined : k.tint,
+      }}
     >
       <div className="flex flex-wrap items-start gap-[18px]">
         <div className="min-w-[280px] flex-1">
@@ -183,16 +250,26 @@ function PostureBanner({ posture }: { posture: Posture }) {
             {h.sub}
           </div>
         </div>
-        <div className="grid gap-[10px]" style={{ gridTemplateColumns: 'repeat(2, minmax(140px, 1fr))' }}>
+        <div
+          className="grid gap-[10px]"
+          style={{ gridTemplateColumns: 'repeat(2, minmax(140px, 1fr))' }}
+        >
           {h.stats.map(([cap, num, tone]) => (
-            <div key={cap} className="rounded-md border border-border bg-bg-elevated" style={{ padding: '10px 13px' }}>
+            <div
+              key={cap}
+              className="rounded-md border border-border bg-bg-elevated"
+              style={{ padding: '10px 13px' }}
+            >
               <div
                 className="mb-1 font-mono uppercase text-text-muted"
                 style={{ fontSize: 9.5, letterSpacing: '0.08em' }}
               >
                 {cap}
               </div>
-              <div className="font-serif font-bold" style={{ fontSize: 24, lineHeight: 1, color: TONE[tone].c }}>
+              <div
+                className="font-serif font-bold"
+                style={{ fontSize: 24, lineHeight: 1, color: TONE[tone].c }}
+              >
                 {num}
               </div>
             </div>
@@ -220,7 +297,10 @@ function SurfaceTile({ s, posture }: { s: SurfaceTileDef; posture: Posture }) {
           </div>
           <div className="min-w-0 flex-1">
             <Eyebrow>{s.eyebrow}</Eyebrow>
-            <div className="font-sans font-bold text-text" style={{ fontSize: 14.5, lineHeight: 1.1, marginTop: 2 }}>
+            <div
+              className="font-sans font-bold text-text"
+              style={{ fontSize: 14.5, lineHeight: 1.1, marginTop: 2 }}
+            >
               {s.name}
             </div>
           </div>
@@ -262,8 +342,8 @@ function MeshOversight({ posture }: { posture: Posture }) {
         {quarantined > 0 && <StatusPill tone="critical">{quarantined} quarantined</StatusPill>}
       </div>
       <div className="mb-[14px] text-text-silver" style={{ fontSize: 12.5 }}>
-        Each muscle layer adds one surface to watch — and load scales in build order, so the watchtower grows one
-        manageable layer at a time.
+        Each muscle layer adds one surface to watch — and load scales in build order, so the
+        watchtower grows one manageable layer at a time.
       </div>
       <div className="flex flex-col gap-[9px]">
         {MESH_LAYERS.map((L) => (
@@ -281,7 +361,11 @@ function LayerRow({ L, posture }: { L: MeshLayerDef; posture: Posture }) {
   return (
     <div
       className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-bg-elevated"
-      style={{ padding: '12px 14px', borderLeft: `3px solid ${k.c}`, background: d.st === 'critical' ? k.tint : undefined }}
+      style={{
+        padding: '12px 14px',
+        borderLeft: `3px solid ${k.c}`,
+        background: d.st === 'critical' ? k.tint : undefined,
+      }}
     >
       <div className="flex flex-none items-center gap-[11px]">
         <span className="font-mono font-bold text-text-muted" style={{ fontSize: 11 }}>
@@ -334,8 +418,14 @@ function LayerRow({ L, posture }: { L: MeshLayerDef; posture: Posture }) {
           watches: {L.watch}
         </div>
       </div>
-      <div className="flex min-w-0 flex-1 flex-col items-end gap-[3px] text-right" style={{ flexBasis: 140 }}>
-        <span className="font-serif font-bold" style={{ fontSize: 16, lineHeight: 1.05, color: k.c }}>
+      <div
+        className="flex min-w-0 flex-1 flex-col items-end gap-[3px] text-right"
+        style={{ flexBasis: 140 }}
+      >
+        <span
+          className="font-serif font-bold"
+          style={{ fontSize: 16, lineHeight: 1.05, color: k.c }}
+        >
           {d.sig}
         </span>
         <span className="text-text-silver" style={{ fontSize: 11.5 }}>
@@ -345,7 +435,10 @@ function LayerRow({ L, posture }: { L: MeshLayerDef; posture: Posture }) {
       <div className="flex flex-none flex-col items-end gap-[6px]" style={{ width: 88 }}>
         <StatusPill tone={d.st} pulse={d.st === 'critical'} />
         <span className="flex items-center gap-[6px]">
-          <span className="font-mono uppercase text-text-muted" style={{ fontSize: 9, letterSpacing: '0.06em' }}>
+          <span
+            className="font-mono uppercase text-text-muted"
+            style={{ fontSize: 9, letterSpacing: '0.06em' }}
+          >
             load
           </span>
           <LoadDots load={L.load} />
@@ -360,7 +453,12 @@ function GoDarkStrip({ posture }: { posture: Posture }) {
   const k = dark ? TONE.critical : TONE.secure;
   const Icon = dbIcon(dark ? 'wifiOff' : 'globe');
   return (
-    <DbCard className="p-4" style={dark ? { background: 'var(--bg-elevated, #0C0E12)', borderColor: k.border } : undefined}>
+    <DbCard
+      className="p-4"
+      style={
+        dark ? { background: 'var(--bg-elevated, #0C0E12)', borderColor: k.border } : undefined
+      }
+    >
       <div className="flex items-center gap-[13px]">
         <div
           className="flex flex-none items-center justify-center rounded-md"
@@ -370,7 +468,10 @@ function GoDarkStrip({ posture }: { posture: Posture }) {
         </div>
         <div className="flex-1">
           <Eyebrow>Go Dark monitor</Eyebrow>
-          <div className="font-serif font-bold text-text" style={{ fontSize: 16, lineHeight: 1.15 }}>
+          <div
+            className="font-serif font-bold text-text"
+            style={{ fontSize: 16, lineHeight: 1.15 }}
+          >
             {dark
               ? 'Spine unreachable — mesh in alive-not-transacting mode'
               : 'Spine nominal — mesh ready, reconcile queue empty'}
@@ -414,10 +515,13 @@ export function CommandCenterPage() {
             const Lock = dbIcon('lock');
             return <Lock size={15} style={{ color: TONE.secure.c }} />;
           })()}
-          <span className="font-mono text-text-silver" style={{ fontSize: 11, letterSpacing: '0.04em' }}>
+          <span
+            className="font-mono text-text-silver"
+            style={{ fontSize: 11, letterSpacing: '0.04em' }}
+          >
             <b className="text-text">1,284,902</b> transactions secured ·{' '}
-            <b className="text-text">4,182</b> mesh nodes watched ·{' '}
-            <b className="text-text">0</b> unverified sources trusted
+            <b className="text-text">4,182</b> mesh nodes watched · <b className="text-text">0</b>{' '}
+            unverified sources trusted
           </span>
         </div>
       </div>

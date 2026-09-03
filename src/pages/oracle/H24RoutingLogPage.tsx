@@ -9,8 +9,8 @@ import { RoutingLogTable } from '@/components/h24/RoutingLogTable';
 import { UniversalShell } from '@/components/shell/UniversalShell';
 import { buildH24Nav } from '@/lib/atlasoracle/h24Nav';
 import type { ModelRateRow } from '@/lib/atlasoracle/reconcile';
-import { type RoutingLogEntry, fetchRoutingLog } from '@/lib/atlasoracle/routingLog';
 import { formatTokensExact } from '@/lib/atlasoracle/reconcile';
+import { type RoutingLogEntry, fetchRoutingLog } from '@/lib/atlasoracle/routingLog';
 import { formatTokens } from '@/lib/atlasoracle/tokens';
 import { useOracleTokens } from '@/lib/atlasoracle/useOracleTokens';
 import { useAuth } from '@/lib/auth';
@@ -49,7 +49,12 @@ export function H24RoutingLogPage() {
       const { entries, rates } = await fetchRoutingLog(FULL_LOG_LIMIT);
       setLog({ loaded: true, error: null, entries, rates });
     } catch (e) {
-      setLog({ loaded: true, error: e instanceof Error ? e.message : String(e), entries: [], rates: [] });
+      setLog({
+        loaded: true,
+        error: e instanceof Error ? e.message : String(e),
+        entries: [],
+        rates: [],
+      });
     }
   }, [bee]);
 
@@ -68,8 +73,16 @@ export function H24RoutingLogPage() {
 
   function exportCsv() {
     const header = [
-      'when', 'band', 'kind', 'provider', 'status',
-      'input_tokens', 'output_tokens', 'cached_tokens', 'cost_h24_tokens', 'latency_ms',
+      'when',
+      'band',
+      'kind',
+      'provider',
+      'status',
+      'input_tokens',
+      'output_tokens',
+      'cached_tokens',
+      'cost_h24_tokens',
+      'latency_ms',
     ];
     const rows = log.entries.map((e) => [
       new Date(e.createdAt).toISOString(),

@@ -1,6 +1,6 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { cancelRoulette, enqueueRoulette, getRoomStatus, pollRouletteMatch } from '@/lib/comms';
 import { supabase } from '@/lib/supabase';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 const CallView = lazy(() => import('./CallView').then((m) => ({ default: m.CallView })));
 
 /**
@@ -121,17 +121,17 @@ export function RouletteView({ onClose }: { onClose: () => void }) {
       <div className="fixed inset-0 z-50">
         <Suspense fallback={null}>
           <CallView
-          key={roomId}
-          roomId={roomId}
-          video={mode === 'video'}
-          onClose={() => {
-            // Only MY deliberate exit lands here while in-call; the Next-flow
-            // teardown fires this too, after phase already moved — ignore that.
-            if (phaseRef.current !== 'incall') return;
-            setRoomId(null);
-            setPhase('choose');
-          }}
-        />
+            key={roomId}
+            roomId={roomId}
+            video={mode === 'video'}
+            onClose={() => {
+              // Only MY deliberate exit lands here while in-call; the Next-flow
+              // teardown fires this too, after phase already moved — ignore that.
+              if (phaseRef.current !== 'incall') return;
+              setRoomId(null);
+              setPhase('choose');
+            }}
+          />
         </Suspense>
         <div className="-translate-x-1/2 fixed bottom-24 left-1/2 z-[60] flex gap-2">
           <button
@@ -176,7 +176,11 @@ export function RouletteView({ onClose }: { onClose: () => void }) {
             >
               Voice only
             </button>
-            <button type="button" onClick={onClose} className="w-full py-2 text-sm text-white/50 hover:text-white">
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-2 text-sm text-white/50 hover:text-white"
+            >
               Cancel
             </button>
           </div>

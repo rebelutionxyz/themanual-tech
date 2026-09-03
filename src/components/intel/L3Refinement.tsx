@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, Network } from 'lucide-react';
-import { useManualData } from '@/lib/useManualData';
 import { TaxonomyTree, findNodeByPath } from '@/components/manual/TaxonomyTree';
+import { useManualData } from '@/lib/useManualData';
 import type { RealmId, TreeNode } from '@/types/manual';
+import { ChevronDown, ChevronUp, Network } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 interface L3RefinementProps {
   selectedRealmId: RealmId | null;
@@ -62,10 +62,7 @@ export function L3Refinement({
   }, [tree, selectedRealmId, selectedL2, selectedL3]);
 
   const hasDrillableContent = Boolean(
-    selectedRealmId &&
-      selectedL3 &&
-      treeRoot &&
-      treeRoot.children.length > 0,
+    selectedRealmId && selectedL3 && treeRoot && treeRoot.children.length > 0,
   );
 
   if (!hasDrillableContent || !treeRoot) return null;

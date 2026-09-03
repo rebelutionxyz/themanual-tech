@@ -51,7 +51,8 @@ export const MEMBERSHIP_TIERS: MembershipTier[] = [
     usd: 13,
     name: 'Royal Jelly',
     line: 'Commercial-ad-free',
-    detail: 'Zero commercial advertising, everywhere, on every Astra. The full platform, uninterrupted.',
+    detail:
+      'Zero commercial advertising, everywhere, on every Astra. The full platform, uninterrupted.',
   },
 ];
 

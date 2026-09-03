@@ -8,12 +8,7 @@
 // here; constants.ts KETTLE_COLORS re-exports the bg color for back-compat
 // with the existing OutlookView + GraphView consumers.
 
-export type DiscoveryTier =
-  | 'Sourced'
-  | 'Accepted'
-  | 'Emerging'
-  | 'Fringe'
-  | 'Unsourced';
+export type DiscoveryTier = 'Sourced' | 'Accepted' | 'Emerging' | 'Fringe' | 'Unsourced';
 
 export interface DiscoveryTierStyle {
   bg: string;
@@ -32,9 +27,34 @@ export const DISCOVERY_TIERS_ORDERED: DiscoveryTier[] = [
 ];
 
 export const DISCOVERY_TIER_COLORS: Record<DiscoveryTier, DiscoveryTierStyle> = {
-  Sourced:   { bg: '#16a34a', text: '#ffffff', label: 'Sourced',   description: 'Well-sourced with strong consensus' },
-  Accepted:  { bg: '#eab308', text: '#000000', label: 'Accepted',  description: 'Broadly accepted classification' },
-  Emerging:  { bg: '#f97316', text: '#ffffff', label: 'Emerging',  description: 'Still developing consensus' },
-  Fringe:    { bg: '#9ca3af', text: '#000000', label: 'Fringe',    description: 'Minority view with some sources' },
-  Unsourced: { bg: '#4b5563', text: '#ffffff', label: 'Unsourced', description: 'No sources attached' },
+  Sourced: {
+    bg: '#16a34a',
+    text: '#ffffff',
+    label: 'Sourced',
+    description: 'Well-sourced with strong consensus',
+  },
+  Accepted: {
+    bg: '#eab308',
+    text: '#000000',
+    label: 'Accepted',
+    description: 'Broadly accepted classification',
+  },
+  Emerging: {
+    bg: '#f97316',
+    text: '#ffffff',
+    label: 'Emerging',
+    description: 'Still developing consensus',
+  },
+  Fringe: {
+    bg: '#9ca3af',
+    text: '#000000',
+    label: 'Fringe',
+    description: 'Minority view with some sources',
+  },
+  Unsourced: {
+    bg: '#4b5563',
+    text: '#ffffff',
+    label: 'Unsourced',
+    description: 'No sources attached',
+  },
 };

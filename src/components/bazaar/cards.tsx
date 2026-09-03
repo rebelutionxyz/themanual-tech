@@ -1,7 +1,7 @@
-import { Link } from 'react-router-dom';
-import { ImageOff } from 'lucide-react';
 import { type BazaarListing, formatBling, formatFiat } from '@/lib/bazaar';
 import { CARD_INK, cardChipStyle, realmCardStyle } from '@/lib/realmCardStyle';
+import { ImageOff } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 /**
  * BAZAAR / marketplace accent — the per-surface constant (PULSE's lives in its
@@ -10,18 +10,13 @@ import { CARD_INK, cardChipStyle, realmCardStyle } from '@/lib/realmCardStyle';
  */
 export const BAZAAR_ACCENT = '#9F1239';
 
-const CARD_CLASS =
-  'group block overflow-hidden rounded-lg transition-shadow hover:shadow-md';
+const CARD_CLASS = 'group block overflow-hidden rounded-lg transition-shadow hover:shadow-md';
 
 /** Browse-grid listing card — deep maroon fill (realmCardStyle) + light ink. */
 export function ListingCard({ listing }: { listing: BazaarListing }) {
   const img = listing.imageUrls[0] ?? null;
   return (
-    <Link
-      to={`/bazaar/${listing.id}`}
-      className={CARD_CLASS}
-      style={realmCardStyle(BAZAAR_ACCENT)}
-    >
+    <Link to={`/bazaar/${listing.id}`} className={CARD_CLASS} style={realmCardStyle(BAZAAR_ACCENT)}>
       <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-black/25">
         {img ? (
           <img src={img} alt="" className="h-full w-full object-cover" loading="lazy" />
@@ -49,7 +44,11 @@ export function ListingCard({ listing }: { listing: BazaarListing }) {
               {listing.condition}
             </span>
           )}
-          <span className="font-mono" style={{ fontSize: '11px', color: CARD_INK.meta }} data-size="meta">
+          <span
+            className="font-mono"
+            style={{ fontSize: '11px', color: CARD_INK.meta }}
+            data-size="meta"
+          >
             @{listing.seller.handle}
           </span>
         </div>

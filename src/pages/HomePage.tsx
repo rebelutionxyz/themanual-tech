@@ -1,8 +1,8 @@
-import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
-import { MANIFESTO } from '@/lib/manifesto';
 import { ManualLogo } from '@/components/ui/ManualLogo';
+import { MANIFESTO } from '@/lib/manifesto';
 import { useAtomCount } from '@/lib/useAtomCount';
+import { ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export function HomePage() {
   const atomCount = useAtomCount();
@@ -19,12 +19,9 @@ export function HomePage() {
         <h1 className="font-display text-5xl font-semibold tracking-tight text-text-silver-bright md:text-7xl">
           The Manual
         </h1>
-        <p
-          className="mt-4 font-mono text-text-muted"
-          style={{ fontSize: '13px' }}
-          data-size="meta"
-        >
-          {atomCount != null ? `${atomCount.toLocaleString()} atoms · ` : ''}13 realms · one sovereign record
+        <p className="mt-4 font-mono text-text-muted" style={{ fontSize: '13px' }} data-size="meta">
+          {atomCount != null ? `${atomCount.toLocaleString()} atoms · ` : ''}13 realms · one
+          sovereign record
         </p>
 
         {/* Three-line manifesto */}
@@ -47,16 +44,9 @@ export function HomePage() {
             className="group inline-flex items-center gap-2 rounded-full border border-border-bright bg-bg-elevated px-6 py-3 text-text-silver-bright transition-all hover:border-text-silver hover:bg-panel-2"
           >
             <span className="font-display text-lg tracking-wide">Enter the Manual</span>
-            <ArrowRight
-              size={18}
-              className="transition-transform group-hover:translate-x-0.5"
-            />
+            <ArrowRight size={18} className="transition-transform group-hover:translate-x-0.5" />
           </Link>
-          <p
-            className="font-mono text-text-muted"
-            style={{ fontSize: '11px' }}
-            data-size="meta"
-          >
+          <p className="font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
             No login required to read
           </p>
         </div>
@@ -64,8 +54,8 @@ export function HomePage() {
         {/* Secondary invitation */}
         <div className="mx-auto mt-24 max-w-xl border-t border-border pt-12">
           <p className="text-text-dim" style={{ fontSize: '14px' }}>
-            A research instrument for sovereign Bees. Nothing is deleted. Truth is a shape,
-            not a verdict. Every claim has a kettle state — cold water to whistling fact.
+            A research instrument for sovereign Bees. Nothing is deleted. Truth is a shape, not a
+            verdict. Every claim has a kettle state — cold water to whistling fact.
           </p>
         </div>
 
@@ -80,9 +70,25 @@ export function HomePage() {
           </div>
           <div className="flex flex-wrap justify-center gap-1.5">
             {[
-              'BLiNG!', 'INTEL', 'UNITE', 'RULE', 'COMMS', 'FUND', 'CHAT', 'PULSE',
-              'BAZAAR', 'BRAND', 'PRIZE', 'PROMOTION', 'MANUAL', 'SECURE', 'SAFE',
-              'PRODUCTION', 'EDU', 'VOTE', 'LEGAL',
+              'BLiNG!',
+              'INTEL',
+              'UNITE',
+              'RULE',
+              'COMMS',
+              'FUND',
+              'CHAT',
+              'PULSE',
+              'BAZAAR',
+              'BRAND',
+              'PRIZE',
+              'PROMOTION',
+              'MANUAL',
+              'SECURE',
+              'SAFE',
+              'PRODUCTION',
+              'EDU',
+              'VOTE',
+              'LEGAL',
             ].map((name) => (
               <span
                 key={name}

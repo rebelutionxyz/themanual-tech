@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, ImageOff, Loader2, X } from 'lucide-react';
+import { BAZAAR_ACCENT } from '@/components/bazaar/cards';
+import { useAuth } from '@/lib/auth';
 import {
   type BazaarListing,
   bazaarListingGet,
@@ -8,9 +7,10 @@ import {
   formatBling,
   formatFiat,
 } from '@/lib/bazaar';
-import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
-import { BAZAAR_ACCENT } from '@/components/bazaar/cards';
+import { ArrowLeft, Check, ImageOff, Loader2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 
 export function BazaarListingDetail() {
   const { id } = useParams<{ id: string }>();
@@ -141,7 +141,9 @@ function Details({ listing, viewerBeeId }: { listing: BazaarListing; viewerBeeId
         )}
         {listing.acceptsFiat && listing.priceCents != null && (
           <span className="font-mono text-zinc-500" style={{ fontSize: '13px' }}>
-            {listing.priceBling != null ? `or ${formatFiat(listing.priceCents)}` : formatFiat(listing.priceCents)}
+            {listing.priceBling != null
+              ? `or ${formatFiat(listing.priceCents)}`
+              : formatFiat(listing.priceCents)}
           </span>
         )}
       </div>
@@ -157,7 +159,10 @@ function Details({ listing, viewerBeeId }: { listing: BazaarListing; viewerBeeId
       </div>
 
       {listing.description && (
-        <p className="mt-4 whitespace-pre-wrap text-zinc-700" style={{ fontSize: '14px', lineHeight: 1.6 }}>
+        <p
+          className="mt-4 whitespace-pre-wrap text-zinc-700"
+          style={{ fontSize: '14px', lineHeight: 1.6 }}
+        >
           {listing.description}
         </p>
       )}
@@ -195,7 +200,10 @@ function Chip({
   );
 }
 
-function BuySection({ listing, viewerBeeId }: { listing: BazaarListing; viewerBeeId: string | null }) {
+function BuySection({
+  listing,
+  viewerBeeId,
+}: { listing: BazaarListing; viewerBeeId: string | null }) {
   const [confirming, setConfirming] = useState(false);
 
   const isOwner = viewerBeeId != null && viewerBeeId === listing.seller.offeredBy;
@@ -231,9 +239,7 @@ function BuySection({ listing, viewerBeeId }: { listing: BazaarListing; viewerBe
         >
           GET for {formatBling(listing.priceBling)} BLiNG!
         </button>
-        {confirming && (
-          <PurchaseModal listing={listing} onClose={() => setConfirming(false)} />
-        )}
+        {confirming && <PurchaseModal listing={listing} onClose={() => setConfirming(false)} />}
       </>
     );
   }
@@ -327,7 +333,10 @@ function PurchaseModal({ listing, onClose }: { listing: BazaarListing; onClose: 
               <span className="font-semibold">@{listing.seller.handle}</span> for «{listing.title}»?
             </p>
             {error && (
-              <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-red-600" style={{ fontSize: '13px' }}>
+              <p
+                className="mt-3 rounded-md bg-red-50 px-3 py-2 text-red-600"
+                style={{ fontSize: '13px' }}
+              >
                 {error}
               </p>
             )}

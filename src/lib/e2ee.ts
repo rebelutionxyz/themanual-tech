@@ -92,7 +92,10 @@ export async function getDeviceId(): Promise<string> {
     deviceIdCache = sodium.to_string(existing);
     return deviceIdCache;
   }
-  const did = sodium.to_base64(sodium.randombytes_buf(16), sodium.base64_variants.URLSAFE_NO_PADDING);
+  const did = sodium.to_base64(
+    sodium.randombytes_buf(16),
+    sodium.base64_variants.URLSAFE_NO_PADDING,
+  );
   await idbPut('device_id', sodium.from_string(did));
   deviceIdCache = did;
   return did;
@@ -175,7 +178,10 @@ const ckEpochCache = new Map<string, number>();
  * returns the first that opens. Returns null — never throws — when no copy on
  * this device can be opened (locked out, or not yet keyed here).
  */
-export async function getConversationKey(beeId: string, conversationId: string): Promise<Uint8Array | null> {
+export async function getConversationKey(
+  beeId: string,
+  conversationId: string,
+): Promise<Uint8Array | null> {
   const cached = ckCache.get(conversationId);
   if (cached) return cached;
   const sodium = await S();
@@ -226,7 +232,10 @@ async function sealToMembers(
   const wrapped = deviceKeys.map((k) => ({
     bee_id: k.beeId,
     device_id: k.deviceId,
-    wrapped_key: sodium.to_base64(sodium.crypto_box_seal(ck, k.publicKey), sodium.base64_variants.ORIGINAL),
+    wrapped_key: sodium.to_base64(
+      sodium.crypto_box_seal(ck, k.publicKey),
+      sodium.base64_variants.ORIGINAL,
+    ),
   }));
   if (wrapped.length) {
     await db().rpc('comms_put_conversation_keys', {
@@ -245,12 +254,22 @@ async function sealToMembers(
  * Refuses to mint when key rows exist but can't be opened here — that's a
  * locked-out device, and minting would clobber the CK; use rekeyConversation.
  */
-export async function establishConversationKey(beeId: string, conversationId: string, memberBeeIds: string[]) {
+export async function establishConversationKey(
+  beeId: string,
+  conversationId: string,
+  memberBeeIds: string[],
+) {
   const sodium = await S();
   await ensureIdentity(beeId);
   const existing = await getConversationKey(beeId, conversationId);
   if (existing) {
-    await sealToMembers(beeId, conversationId, memberBeeIds, existing, ckEpochCache.get(conversationId) ?? 1);
+    await sealToMembers(
+      beeId,
+      conversationId,
+      memberBeeIds,
+      existing,
+      ckEpochCache.get(conversationId) ?? 1,
+    );
     return existing;
   }
   if (await haveKeyRow(beeId, conversationId)) {
@@ -262,10 +281,20 @@ export async function establishConversationKey(beeId: string, conversationId: st
 }
 
 /** Re-seal the EXISTING CK to members' devices (new device / late member). Never mints. */
-export async function resealConversationKey(beeId: string, conversationId: string, memberBeeIds: string[]) {
+export async function resealConversationKey(
+  beeId: string,
+  conversationId: string,
+  memberBeeIds: string[],
+) {
   const ck = await getConversationKey(beeId, conversationId);
   if (!ck) throw new Error('no conversation key held; cannot reseal');
-  await sealToMembers(beeId, conversationId, memberBeeIds, ck, ckEpochCache.get(conversationId) ?? 1);
+  await sealToMembers(
+    beeId,
+    conversationId,
+    memberBeeIds,
+    ck,
+    ckEpochCache.get(conversationId) ?? 1,
+  );
   return ck;
 }
 
@@ -324,7 +353,13 @@ export function isEncryptedBody(body: string): boolean {
 export async function encryptBody(ck: Uint8Array, plaintext: string): Promise<string> {
   const sodium = await S();
   const nonce = sodium.randombytes_buf(sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES);
-  const ct = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(sodium.from_string(plaintext), null, null, nonce, ck);
+  const ct = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
+    sodium.from_string(plaintext),
+    null,
+    null,
+    nonce,
+    ck,
+  );
   const packed = new Uint8Array(nonce.length + ct.length);
   packed.set(nonce, 0);
   packed.set(ct, nonce.length);

@@ -11,10 +11,10 @@
 export type GeoLocation =
   | 'Global'
   | {
-      country: string;            // ISO 3166-1 alpha-2 (e.g. 'US', 'GB')
-      region: string | null;      // US state code in v1 (e.g. 'TX'); null for non-US
-      city: string | null;        // schema-only v1 (free-form text via profile editor)
-      neighborhood: string | null;// schema-only v1
+      country: string; // ISO 3166-1 alpha-2 (e.g. 'US', 'GB')
+      region: string | null; // US state code in v1 (e.g. 'TX'); null for non-US
+      city: string | null; // schema-only v1 (free-form text via profile editor)
+      neighborhood: string | null; // schema-only v1
     };
 
 /** localStorage payload shape for honeycomb:geo:search-location. */

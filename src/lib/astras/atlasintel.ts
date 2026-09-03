@@ -4,7 +4,7 @@
 // v3 (Code 24 / 2026-05-08): canonical promotionSlots configuration (Phase C Component D).
 // v4 (Code 23 / 2026-05-08): defaultGeo: 'Global' (Phase C Component C-5).
 
-import { DEFAULT_PROMOTION_SLOTS, type AstraConfig } from './astra.types';
+import { type AstraConfig, DEFAULT_PROMOTION_SLOTS } from './astra.types';
 
 export const atlasintelAstra: AstraConfig = {
   slug: 'atlasintel',

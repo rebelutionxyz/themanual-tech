@@ -9,18 +9,18 @@
 // Per shared/canon/manual-spine-api-v1.md §4.5 + master-master-file.md §19.3
 // INFRA STATUS SLIDER.
 
-import { useMemo, useState } from 'react';
-import { Search, Globe } from 'lucide-react';
 import {
   ASTRA_CATALOG,
   ASTRA_CATEGORY_LABEL,
   ASTRA_STATUS_COLOR,
+  type AstraCatalogEntry,
   CONSTELLATION_HUBS,
   effectiveStatus,
   groupByCategory,
-  type AstraCatalogEntry,
 } from '@/lib/astra-catalog';
 import { cn } from '@/lib/utils';
+import { Globe, Search } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 interface InfraLayer {
   name: string;
@@ -63,8 +63,8 @@ const INFRA_LAYERS: InfraLayer[] = [
 
 const STATUS_INDICATOR_COLOR: Record<InfraLayer['status'], string> = {
   operational: '#16a34a',
-  degraded:    '#eab308',
-  down:        '#dc2626',
+  degraded: '#eab308',
+  down: '#dc2626',
 };
 
 export function AstraStatus() {
@@ -73,14 +73,17 @@ export function AstraStatus() {
   const filtered = useMemo(() => {
     if (!query.trim()) return groupByCategory();
     const q = query.toLowerCase();
-    return groupByCategory().map((g) => ({
-      ...g,
-      entries: g.entries.filter((e) =>
-        e.slug.toLowerCase().includes(q)
-        || e.wordmark.toLowerCase().includes(q)
-        || e.hosts.some((h) => h.toLowerCase().includes(q)),
-      ),
-    })).filter((g) => g.entries.length > 0);
+    return groupByCategory()
+      .map((g) => ({
+        ...g,
+        entries: g.entries.filter(
+          (e) =>
+            e.slug.toLowerCase().includes(q) ||
+            e.wordmark.toLowerCase().includes(q) ||
+            e.hosts.some((h) => h.toLowerCase().includes(q)),
+        ),
+      }))
+      .filter((g) => g.entries.length > 0);
   }, [query]);
 
   const liveCount = ASTRA_CATALOG.filter((e) => effectiveStatus(e) === 'live').length;
@@ -91,7 +94,9 @@ export function AstraStatus() {
   return (
     <div className="space-y-8">
       <header className="mb-4">
-        <h2 className="font-display text-2xl font-semibold text-text-silver-bright">Astra Status</h2>
+        <h2 className="font-display text-2xl font-semibold text-text-silver-bright">
+          Astra Status
+        </h2>
         <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }}>
           {/* Derived, not hard-coded — the catalog grew 38 → 40 in FRONT21 and
               will grow again as Astras are confirmed. */}
@@ -102,15 +107,17 @@ export function AstraStatus() {
 
       {/* Summary stats */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Live"        value={liveCount}        color="#16a34a" />
-        <Stat label="Scaffolded"  value={scaffoldedCount}  color="#eab308" />
-        <Stat label="Deferred"    value={deferredCount}    color="#9ca3af" />
-        <Stat label="Post-Swarm"  value={postSwarmCount}   color="#4b5563" />
+        <Stat label="Live" value={liveCount} color="#16a34a" />
+        <Stat label="Scaffolded" value={scaffoldedCount} color="#eab308" />
+        <Stat label="Deferred" value={deferredCount} color="#9ca3af" />
+        <Stat label="Post-Swarm" value={postSwarmCount} color="#4b5563" />
       </div>
 
       {/* Panel B — Infrastructure layers */}
       <section>
-        <h3 className="font-display text-lg font-semibold text-text-silver-bright">Infrastructure layers</h3>
+        <h3 className="font-display text-lg font-semibold text-text-silver-bright">
+          Infrastructure layers
+        </h3>
         <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }}>
           live status polling pending — v1 shows operator-set status
         </p>
@@ -128,7 +135,9 @@ export function AstraStatus() {
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="font-display font-semibold text-text-silver-bright">{l.name}</span>
+                  <span className="font-display font-semibold text-text-silver-bright">
+                    {l.name}
+                  </span>
                   <span
                     className="font-mono uppercase text-text-muted"
                     style={{ fontSize: '10px' }}
@@ -136,17 +145,13 @@ export function AstraStatus() {
                     {l.status}
                   </span>
                 </div>
-                <div
-                  className="mt-0.5 font-mono text-text-muted"
-                  style={{ fontSize: '11px' }}
-                >
+                <div className="mt-0.5 font-mono text-text-muted" style={{ fontSize: '11px' }}>
                   {l.identifier}
                 </div>
-                <div className="mt-1 text-text-dim" style={{ fontSize: '12px' }}>{l.note}</div>
-                <div
-                  className="mt-1 font-mono text-text-muted"
-                  style={{ fontSize: '10px' }}
-                >
+                <div className="mt-1 text-text-dim" style={{ fontSize: '12px' }}>
+                  {l.note}
+                </div>
+                <div className="mt-1 font-mono text-text-muted" style={{ fontSize: '10px' }}>
                   last verified: {l.last_verified}
                 </div>
               </div>
@@ -158,7 +163,9 @@ export function AstraStatus() {
       {/* Panel A — Astra catalog */}
       <section>
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="font-display text-lg font-semibold text-text-silver-bright">Astra catalog</h3>
+          <h3 className="font-display text-lg font-semibold text-text-silver-bright">
+            Astra catalog
+          </h3>
           <div className="relative">
             <Search
               size={14}
@@ -184,7 +191,10 @@ export function AstraStatus() {
             <CategoryGroup key={g.category} category={g.category} entries={g.entries} />
           ))}
           {filtered.length === 0 && (
-            <div className="rounded-md border border-border bg-bg-elevated/40 px-4 py-6 text-center text-text-dim" style={{ fontSize: '13px' }}>
+            <div
+              className="rounded-md border border-border bg-bg-elevated/40 px-4 py-6 text-center text-text-dim"
+              style={{ fontSize: '13px' }}
+            >
               No Astras match "{query}".
             </div>
           )}
@@ -193,7 +203,9 @@ export function AstraStatus() {
 
       {/* Constellation hubs */}
       <section>
-        <h3 className="font-display text-lg font-semibold text-text-silver-bright">Constellation hubs</h3>
+        <h3 className="font-display text-lg font-semibold text-text-silver-bright">
+          Constellation hubs
+        </h3>
         <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }}>
           navigation surfaces · not Astras
         </p>
@@ -204,10 +216,7 @@ export function AstraStatus() {
               className="rounded-md border border-border bg-bg-elevated/30 px-4 py-3"
             >
               <div className="font-display font-semibold text-text-silver-bright">{h.wordmark}</div>
-              <div
-                className="mt-0.5 font-mono text-text-muted"
-                style={{ fontSize: '11px' }}
-              >
+              <div className="mt-0.5 font-mono text-text-muted" style={{ fontSize: '11px' }}>
                 {h.hub_domain}
               </div>
               <div className="mt-1 text-text-dim" style={{ fontSize: '12px' }}>
@@ -235,14 +244,15 @@ function Stat({ label, value, color }: { label: string; value: number; color: st
         />
         {label}
       </div>
-      <div className="font-display text-2xl font-semibold text-text-silver-bright">
-        {value}
-      </div>
+      <div className="font-display text-2xl font-semibold text-text-silver-bright">{value}</div>
     </div>
   );
 }
 
-function CategoryGroup({ category, entries }: { category: AstraCatalogEntry['category']; entries: AstraCatalogEntry[] }) {
+function CategoryGroup({
+  category,
+  entries,
+}: { category: AstraCatalogEntry['category']; entries: AstraCatalogEntry[] }) {
   const [expanded, setExpanded] = useState(true);
   return (
     <div className="rounded-md border border-border bg-bg-elevated/20">
@@ -280,11 +290,10 @@ function CategoryGroup({ category, entries }: { category: AstraCatalogEntry['cat
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2">
-                      <span className="font-display font-semibold text-text-silver-bright">{e.wordmark}</span>
-                      <span
-                        className="font-mono text-text-muted"
-                        style={{ fontSize: '11px' }}
-                      >
+                      <span className="font-display font-semibold text-text-silver-bright">
+                        {e.wordmark}
+                      </span>
+                      <span className="font-mono text-text-muted" style={{ fontSize: '11px' }}>
                         {e.slug}
                       </span>
                     </div>
@@ -299,7 +308,8 @@ function CategoryGroup({ category, entries }: { category: AstraCatalogEntry['cat
                         <Globe size={10} aria-hidden />
                         {e.hosts.map((h, i) => (
                           <span key={h}>
-                            {h}{i < e.hosts.length - 1 ? ',' : ''}
+                            {h}
+                            {i < e.hosts.length - 1 ? ',' : ''}
                           </span>
                         ))}
                       </div>

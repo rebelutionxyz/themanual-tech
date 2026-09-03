@@ -1,7 +1,7 @@
-import { Navigate } from 'react-router-dom';
 import { AdminLayout } from '@/admin/AdminLayout';
 import { getSectionsForTier } from '@/admin/registry';
 import { useUserRole } from '@/lib/useUserRole';
+import { Navigate } from 'react-router-dom';
 
 const PANEL_BG = '#0A1628';
 const TEXT_PRIMARY = '#F0F0F5';
@@ -34,12 +34,10 @@ export function NexusPage() {
             className="mx-auto max-w-2xl rounded-lg p-6"
             style={{ background: PANEL_BG, color: TEXT_PRIMARY }}
           >
-            <h1 className="font-display text-2xl font-semibold">
-              No properties yet
-            </h1>
+            <h1 className="font-display text-2xl font-semibold">No properties yet</h1>
             <p className="mt-3 text-sm">
-              You don't own any properties yet. Visit the Workshop to clone an
-              Astra into your first Nova.
+              You don't own any properties yet. Visit the Workshop to clone an Astra into your first
+              Nova.
             </p>
           </div>
         }

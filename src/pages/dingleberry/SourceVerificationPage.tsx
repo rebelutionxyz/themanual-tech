@@ -1,3 +1,7 @@
+import { dbIcon } from '@/components/dingleberry/icons';
+import { ActionButton, ActionCaption, DbCard, Eyebrow } from '@/components/dingleberry/primitives';
+import { TONE } from '@/components/dingleberry/tone';
+import type { IntelSource } from '@/lib/dingleberry/contract';
 /* DingleBERRY — Surface 03 · Source Verification (drill-in).
    ------------------------------------------------------------
    Every intel source ranked by its chain-of-verification (the Discovery
@@ -10,10 +14,6 @@
    lesson): all sources render, sorted worst-first by tier; nothing here is
    gated by secure/degraded/go-dark. */
 import { useState } from 'react';
-import { dbIcon } from '@/components/dingleberry/icons';
-import { ActionButton, ActionCaption, DbCard, Eyebrow } from '@/components/dingleberry/primitives';
-import { TONE } from '@/components/dingleberry/tone';
-import type { IntelSource } from '@/lib/dingleberry/contract';
 import { useDingleberry } from './DingleberryLayout';
 
 /* Discovery-Ladder tier → on-palette token. Three credible/watch/alarm color
@@ -35,7 +35,13 @@ const TIER: Record<string, { c: string; tint: string; word: string }> = {
 const tierOf = (status: string) => TIER[status] ?? TIER.unsourced;
 
 /* worst-first ordering (lower = worse = shown first) */
-const TIER_RANK: Record<string, number> = { unsourced: 0, fringe: 1, emerging: 2, accepted: 3, sourced: 4 };
+const TIER_RANK: Record<string, number> = {
+  unsourced: 0,
+  fringe: 1,
+  emerging: 2,
+  accepted: 3,
+  sourced: 4,
+};
 
 interface Hop {
   st: string;
@@ -48,31 +54,108 @@ interface Hop {
 function chainFor(status: string): Hop[] {
   const C: Record<string, Hop[]> = {
     sourced: [
-      { st: 'sourced', label: 'Claim received', detail: 'document ingested into the record', icon: 'fileText' },
-      { st: 'sourced', label: 'Issuer verified', detail: 'signed by issuing-authority key', icon: 'lock' },
-      { st: 'sourced', label: 'Primary document', detail: 'hash matches canonical record', icon: 'fingerprint' },
-      { st: 'sourced', label: 'Independent corroboration', detail: '3 sources cross-confirm', icon: 'users' },
-      { st: 'sourced', label: 'Chain complete', detail: 'full provenance · credibility granted', icon: 'shieldCheck' },
+      {
+        st: 'sourced',
+        label: 'Claim received',
+        detail: 'document ingested into the record',
+        icon: 'fileText',
+      },
+      {
+        st: 'sourced',
+        label: 'Issuer verified',
+        detail: 'signed by issuing-authority key',
+        icon: 'lock',
+      },
+      {
+        st: 'sourced',
+        label: 'Primary document',
+        detail: 'hash matches canonical record',
+        icon: 'fingerprint',
+      },
+      {
+        st: 'sourced',
+        label: 'Independent corroboration',
+        detail: '3 sources cross-confirm',
+        icon: 'users',
+      },
+      {
+        st: 'sourced',
+        label: 'Chain complete',
+        detail: 'full provenance · credibility granted',
+        icon: 'shieldCheck',
+      },
     ],
     accepted: [
       { st: 'sourced', label: 'Claim received', detail: 'report ingested', icon: 'fileText' },
-      { st: 'sourced', label: 'Outlet verified', detail: 'known wire · editorial standards on file', icon: 'lock' },
-      { st: 'accepted', label: 'Corroboration', detail: '2 independent outlets agree', icon: 'users' },
-      { st: 'emerging', label: 'Primary document', detail: 'not yet obtained · corroborated only', icon: 'fingerprint' },
+      {
+        st: 'sourced',
+        label: 'Outlet verified',
+        detail: 'known wire · editorial standards on file',
+        icon: 'lock',
+      },
+      {
+        st: 'accepted',
+        label: 'Corroboration',
+        detail: '2 independent outlets agree',
+        icon: 'users',
+      },
+      {
+        st: 'emerging',
+        label: 'Primary document',
+        detail: 'not yet obtained · corroborated only',
+        icon: 'fingerprint',
+      },
     ],
     emerging: [
       { st: 'sourced', label: 'Claim received', detail: 'analysis ingested', icon: 'fileText' },
-      { st: 'emerging', label: 'Method review', detail: 'reasoning sound · inputs partial', icon: 'activity' },
-      { st: 'emerging', label: 'Corroboration', detail: '1 supporting signal · awaiting second', icon: 'users' },
+      {
+        st: 'emerging',
+        label: 'Method review',
+        detail: 'reasoning sound · inputs partial',
+        icon: 'activity',
+      },
+      {
+        st: 'emerging',
+        label: 'Corroboration',
+        detail: '1 supporting signal · awaiting second',
+        icon: 'users',
+      },
     ],
     fringe: [
-      { st: 'unsourced', label: 'Claim received', detail: 'self-asserted by anonymous source', icon: 'fileText' },
-      { st: 'emerging', label: 'Secondary corroboration', detail: '1 outlet repeated · no independent confirm', icon: 'users' },
-      { st: 'fringe', label: 'Primary document', detail: 'hash mismatch — document not authenticated', icon: 'fingerprint', broken: true },
+      {
+        st: 'unsourced',
+        label: 'Claim received',
+        detail: 'self-asserted by anonymous source',
+        icon: 'fileText',
+      },
+      {
+        st: 'emerging',
+        label: 'Secondary corroboration',
+        detail: '1 outlet repeated · no independent confirm',
+        icon: 'users',
+      },
+      {
+        st: 'fringe',
+        label: 'Primary document',
+        detail: 'hash mismatch — document not authenticated',
+        icon: 'fingerprint',
+        broken: true,
+      },
     ],
     unsourced: [
-      { st: 'unsourced', label: 'Claim received', detail: 'unverified handle · no provenance attached', icon: 'fileText' },
-      { st: 'unsourced', label: 'No chain', detail: 'nothing to verify against', icon: 'ban', broken: true },
+      {
+        st: 'unsourced',
+        label: 'Claim received',
+        detail: 'unverified handle · no provenance attached',
+        icon: 'fileText',
+      },
+      {
+        st: 'unsourced',
+        label: 'No chain',
+        detail: 'nothing to verify against',
+        icon: 'ban',
+        broken: true,
+      },
     ],
   };
   return C[status] ?? C.unsourced;
@@ -83,7 +166,16 @@ function TierPill({ status }: { status: string }) {
   return (
     <span
       className="inline-flex items-center font-mono font-semibold uppercase"
-      style={{ height: 19, padding: '0 8px', fontSize: 9.5, letterSpacing: '0.06em', borderRadius: 999, color: t.c, background: t.tint, border: `1px solid ${t.c}55` }}
+      style={{
+        height: 19,
+        padding: '0 8px',
+        fontSize: 9.5,
+        letterSpacing: '0.06em',
+        borderRadius: 999,
+        color: t.c,
+        background: t.tint,
+        border: `1px solid ${t.c}55`,
+      }}
     >
       {t.word}
     </span>
@@ -95,12 +187,21 @@ function CredBadge({ cred, status, size = 56 }: { cred: number; status: string; 
   return (
     <div
       className="flex flex-none flex-col items-center justify-center rounded-full"
-      style={{ width: size, height: size, border: `2.5px solid ${t.c}`, background: t.tint, lineHeight: 1 }}
+      style={{
+        width: size,
+        height: size,
+        border: `2.5px solid ${t.c}`,
+        background: t.tint,
+        lineHeight: 1,
+      }}
     >
       <span className="font-serif font-bold" style={{ fontSize: size * 0.38, color: t.c }}>
         {cred}
       </span>
-      <span className="font-mono uppercase text-text-muted" style={{ fontSize: 7.5, letterSpacing: '0.06em', marginTop: 1 }}>
+      <span
+        className="font-mono uppercase text-text-muted"
+        style={{ fontSize: 7.5, letterSpacing: '0.06em', marginTop: 1 }}
+      >
         cred
       </span>
     </div>
@@ -108,7 +209,10 @@ function CredBadge({ cred, status, size = 56 }: { cred: number; status: string; 
 }
 
 /* compact evidence meter — three 5-segment bars (primary / corroboration / attestation) */
-function EvidenceMeter({ str, color }: { str: { e: number; f: number; t: number }; color: string }) {
+function EvidenceMeter({
+  str,
+  color,
+}: { str: { e: number; f: number; t: number }; color: string }) {
   const rows: [string, number][] = [
     ['Primary', str.e],
     ['Corrob.', str.f],
@@ -118,7 +222,10 @@ function EvidenceMeter({ str, color }: { str: { e: number; f: number; t: number 
     <div className="flex flex-col gap-[6px]">
       {rows.map(([label, v]) => (
         <div key={label} className="flex items-center gap-2">
-          <span className="font-mono uppercase text-text-muted" style={{ fontSize: 9, width: 54, letterSpacing: '0.04em' }}>
+          <span
+            className="font-mono uppercase text-text-muted"
+            style={{ fontSize: 9, width: 54, letterSpacing: '0.04em' }}
+          >
             {label}
           </span>
           <span className="flex flex-1 gap-[3px]">
@@ -126,11 +233,17 @@ function EvidenceMeter({ str, color }: { str: { e: number; f: number; t: number 
               <span
                 key={i}
                 className="h-[6px] flex-1 rounded-full"
-                style={{ background: i < v ? color : 'var(--bg-panel2, #14171C)', border: i < v ? 'none' : '1px solid var(--border, #1F252C)' }}
+                style={{
+                  background: i < v ? color : 'var(--bg-panel2, #14171C)',
+                  border: i < v ? 'none' : '1px solid var(--border, #1F252C)',
+                }}
               />
             ))}
           </span>
-          <span className="font-mono font-bold tabular-nums text-text-silver" style={{ fontSize: 10, width: 14, textAlign: 'right' }}>
+          <span
+            className="font-mono font-bold tabular-nums text-text-silver"
+            style={{ fontSize: 10, width: 14, textAlign: 'right' }}
+          >
             {v}
           </span>
         </div>
@@ -139,7 +252,11 @@ function EvidenceMeter({ str, color }: { str: { e: number; f: number; t: number 
   );
 }
 
-function SourceRow({ s, active, onClick }: { s: IntelSource; active: boolean; onClick: () => void }) {
+function SourceRow({
+  s,
+  active,
+  onClick,
+}: { s: IntelSource; active: boolean; onClick: () => void }) {
   const t = tierOf(s.status);
   const AlertTriangle = dbIcon('alertTriangle');
   return (
@@ -188,16 +305,32 @@ function Chain({ hops }: { hops: Hop[] }) {
         const last = i === hops.length - 1;
         const Glyph = h.broken ? X : dbIcon(h.icon);
         return (
-          <div key={`${h.label}-${i}`} className="relative flex gap-[13px]" style={{ paddingBottom: last ? 0 : 16 }}>
+          <div
+            key={`${h.label}-${i}`}
+            className="relative flex gap-[13px]"
+            style={{ paddingBottom: last ? 0 : 16 }}
+          >
             {!last && (
               <span
                 className="absolute"
-                style={{ left: 15, top: 32, bottom: 0, width: 2, background: h.broken ? RED.c : 'var(--border-bright, #2A3138)' }}
+                style={{
+                  left: 15,
+                  top: 32,
+                  bottom: 0,
+                  width: 2,
+                  background: h.broken ? RED.c : 'var(--border-bright, #2A3138)',
+                }}
               />
             )}
             <div
               className="z-[1] flex flex-none items-center justify-center rounded-full"
-              style={{ width: 32, height: 32, border: `2.5px solid ${hc}`, background: h.broken ? ht : 'var(--bg-panel, #0F1217)', color: hc }}
+              style={{
+                width: 32,
+                height: 32,
+                border: `2.5px solid ${hc}`,
+                background: h.broken ? ht : 'var(--bg-panel, #0F1217)',
+                color: hc,
+              }}
             >
               <Glyph size={15} />
             </div>
@@ -208,7 +341,10 @@ function Chain({ hops }: { hops: Hop[] }) {
                 </span>
                 <TierPill status={h.st} />
                 {h.broken && (
-                  <span className="font-mono font-bold uppercase" style={{ fontSize: 10, letterSpacing: '0.06em', color: '#C94C4C' }}>
+                  <span
+                    className="font-mono font-bold uppercase"
+                    style={{ fontSize: 10, letterSpacing: '0.06em', color: '#C94C4C' }}
+                  >
                     ✗ link broken
                   </span>
                 )}
@@ -269,20 +405,34 @@ export function SourceVerificationPage() {
           </div>
           <div className="min-w-[280px] flex-1">
             <Eyebrow>Surface 03 · chain-of-verification</Eyebrow>
-            <h1 className="font-serif font-bold text-text" style={{ fontSize: 30, lineHeight: 1.05, margin: '3px 0 4px' }}>
+            <h1
+              className="font-serif font-bold text-text"
+              style={{ fontSize: 30, lineHeight: 1.05, margin: '3px 0 4px' }}
+            >
               Source verification
             </h1>
             <div className="text-text-silver" style={{ fontSize: 14.5, maxWidth: 540 }}>
-              Every intel source ranked by its chain of verification. <b>No verification, no credibility.</b>
+              Every intel source ranked by its chain of verification.{' '}
+              <b>No verification, no credibility.</b>
             </div>
           </div>
           <div className="flex flex-wrap gap-[10px]">
             {headerStats.map(([cap, n, c]) => (
-              <div key={cap} className="rounded-md border border-border bg-bg-elevated" style={{ padding: '10px 14px', minWidth: 96 }}>
-                <div className="mb-1 font-mono uppercase text-text-muted" style={{ fontSize: 9.5, letterSpacing: '0.08em' }}>
+              <div
+                key={cap}
+                className="rounded-md border border-border bg-bg-elevated"
+                style={{ padding: '10px 14px', minWidth: 96 }}
+              >
+                <div
+                  className="mb-1 font-mono uppercase text-text-muted"
+                  style={{ fontSize: 9.5, letterSpacing: '0.08em' }}
+                >
                   {cap}
                 </div>
-                <div className="font-serif font-bold" style={{ fontSize: 24, lineHeight: 1, color: c }}>
+                <div
+                  className="font-serif font-bold"
+                  style={{ fontSize: 24, lineHeight: 1, color: c }}
+                >
                   {n}
                 </div>
               </div>
@@ -300,7 +450,12 @@ export function SourceVerificationPage() {
           </div>
           <div className="flex flex-col gap-[9px]">
             {sources.map((s) => (
-              <SourceRow key={s.id} s={s} active={!!sel && s.id === sel.id} onClick={() => setSelId(s.id)} />
+              <SourceRow
+                key={s.id}
+                s={s}
+                active={!!sel && s.id === sel.id}
+                onClick={() => setSelId(s.id)}
+              />
             ))}
           </div>
         </div>
@@ -345,19 +500,26 @@ export function SourceVerificationPage() {
                 }}
               >
                 {broken ? (
-                  <AlertTriangle size={16} style={{ color: TONE.critical.c, marginTop: 1, flex: 'none' }} />
+                  <AlertTriangle
+                    size={16}
+                    style={{ color: TONE.critical.c, marginTop: 1, flex: 'none' }}
+                  />
                 ) : (
-                  <ShieldCheck size={16} style={{ color: TONE.secure.c, marginTop: 1, flex: 'none' }} />
+                  <ShieldCheck
+                    size={16}
+                    style={{ color: TONE.secure.c, marginTop: 1, flex: 'none' }}
+                  />
                 )}
                 <div className="text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.35 }}>
                   {broken ? (
                     <span>
-                      <b>Credibility withheld.</b> {sel.flag || 'No chain to verify against'} — Security will not let
-                      unverified claims earn standing.
+                      <b>Credibility withheld.</b> {sel.flag || 'No chain to verify against'} —
+                      Security will not let unverified claims earn standing.
                     </span>
                   ) : (
                     <span>
-                      <b>Credibility granted.</b> Full provenance recorded; this source can carry weight on the record.
+                      <b>Credibility granted.</b> Full provenance recorded; this source can carry
+                      weight on the record.
                     </span>
                   )}
                 </div>

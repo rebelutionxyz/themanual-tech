@@ -1,12 +1,12 @@
-import { useState, useRef, useEffect, useMemo, type FormEvent } from 'react';
-import { Send, X, Loader2 } from 'lucide-react';
 import { AtomPicker } from '@/components/intel/AtomPicker';
 import { CategoryPicker } from '@/components/intel/CategoryPicker';
 import { RealmPathPicker } from '@/components/intel/RealmPathPicker';
+import { REALM_ID_BY_NAME, REALM_NAMES } from '@/lib/constants';
 import { useManualData } from '@/lib/useManualData';
 import { cn } from '@/lib/utils';
-import { REALM_NAMES, REALM_ID_BY_NAME } from '@/lib/constants';
 import type { RealmId } from '@/types/manual';
+import { Loader2, Send, X } from 'lucide-react';
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 /** Build a display-name path from realm + L2 (back-compat seed). */
 function buildPath(realmId: RealmId | null | undefined, l2: string | null | undefined): string[] {
@@ -98,7 +98,7 @@ export function InlineComposer({
 
   // Back-compat scalars derived from the full path.
   const realmId = realmPath[0]
-    ? (REALM_ID_BY_NAME[realmPath[0]] as RealmId | undefined) ?? null
+    ? ((REALM_ID_BY_NAME[realmPath[0]] as RealmId | undefined) ?? null)
     : null;
   const l2 = realmPath[1] ?? null;
 
@@ -111,8 +111,7 @@ export function InlineComposer({
   const titleRef = useRef<HTMLInputElement>(null);
 
   const placeholderBodyFinal =
-    placeholderBody ??
-    (mode === 'thread' ? 'Share your thought...' : 'Your reply...');
+    placeholderBody ?? (mode === 'thread' ? 'Share your thought...' : 'Your reply...');
 
   // Auto-derive realm from first linked atom (unless user manually overrode)
   const derivedPath = useMemo(() => {
@@ -134,12 +133,7 @@ export function InlineComposer({
     if (realmManuallyOverridden) return;
     if (atomIds.length > 0) return;
     setRealmPath(buildPath(inheritedContext?.realmId, inheritedContext?.l2));
-  }, [
-    inheritedContext?.realmId,
-    inheritedContext?.l2,
-    realmManuallyOverridden,
-    atomIds.length,
-  ]);
+  }, [inheritedContext?.realmId, inheritedContext?.l2, realmManuallyOverridden, atomIds.length]);
 
   // Restore draft from local storage
   useEffect(() => {
@@ -175,10 +169,7 @@ export function InlineComposer({
   useEffect(() => {
     if (!draftKey) return;
     const hasContent =
-      title.trim() ||
-      body.trim() ||
-      atomIds.length > 0 ||
-      categoryPaths.length > 0;
+      title.trim() || body.trim() || atomIds.length > 0 || categoryPaths.length > 0;
     if (!hasContent) {
       localStorage.removeItem(`draft:${draftKey}`);
       return;
@@ -193,15 +184,7 @@ export function InlineComposer({
     });
     const t = setTimeout(() => localStorage.setItem(`draft:${draftKey}`, snap), 400);
     return () => clearTimeout(t);
-  }, [
-    draftKey,
-    title,
-    body,
-    atomIds,
-    categoryPaths,
-    realmPath,
-    realmManuallyOverridden,
-  ]);
+  }, [draftKey, title, body, atomIds, categoryPaths, realmPath, realmManuallyOverridden]);
 
   // Auto-focus
   useEffect(() => {
@@ -287,8 +270,7 @@ export function InlineComposer({
 
   // Collapsed — a clickable prompt that expands into the full composer
   if (!expanded) {
-    const bodyLine =
-      collapsedBodyLine ?? placeholderBodyFinal ?? 'Share your thought...';
+    const bodyLine = collapsedBodyLine ?? placeholderBodyFinal ?? 'Share your thought...';
 
     const expand = () => {
       setExpanded(true);
@@ -330,17 +312,13 @@ export function InlineComposer({
             {bodyLine}
           </div>
         </button>
-
       </div>
     );
   }
 
   // Expanded — everything visible
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-md border border-border bg-bg-elevated p-4"
-    >
+    <form onSubmit={handleSubmit} className="rounded-md border border-border bg-bg-elevated p-4">
       {/* Header */}
       {(header || subheader) && (
         <div className="mb-3">
@@ -431,11 +409,7 @@ export function InlineComposer({
 
       {/* Category picker — multi-select L2+ branches for additive discovery */}
       <div className="mb-3">
-        <CategoryPicker
-          value={categoryPaths}
-          onChange={setCategoryPaths}
-          max={5}
-        />
+        <CategoryPicker value={categoryPaths} onChange={setCategoryPaths} max={5} />
       </div>
 
       {/* Realm picker — full-tree drill, always visible, defaults from context */}
@@ -460,11 +434,7 @@ export function InlineComposer({
 
       {/* Error */}
       {error && (
-        <p
-          className="mb-2 text-kettle-unsourced"
-          style={{ fontSize: '11px' }}
-          data-size="meta"
-        >
+        <p className="mb-2 text-kettle-unsourced" style={{ fontSize: '11px' }} data-size="meta">
           {error}
         </p>
       )}

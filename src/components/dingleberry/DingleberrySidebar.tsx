@@ -1,7 +1,7 @@
+import { cn } from '@/lib/utils';
+import { type LucideIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { dbIcon } from './icons';
 import { DINGLEBERRY_COLOR, STATUS_BLUE } from './tone';
 
@@ -28,16 +28,46 @@ const NAV: NavItem[] = [
   // FRONT28. Count is deliberately blank: the neighbours carry static mock
   // numbers, and this surface is real — a fake count beside real data is worse
   // than none, and a live one would put a query in shared chrome.
-  { key: 'posture', icon: 'shield', label: 'Database posture', count: '', to: '/dingleberry/posture' },
+  {
+    key: 'posture',
+    icon: 'shield',
+    label: 'Database posture',
+    count: '',
+    to: '/dingleberry/posture',
+  },
   { key: 'infra', icon: 'server', label: 'Infra health', count: '142', to: '/dingleberry/infra' },
   { key: 'txn', icon: 'lock', label: 'Transactions', count: '1.2M', to: '/dingleberry/txn' },
-  { key: 'source', icon: 'fingerprint', label: 'Source verification', count: '2.1k', to: '/dingleberry/source' },
+  {
+    key: 'source',
+    icon: 'fingerprint',
+    label: 'Source verification',
+    count: '2.1k',
+    to: '/dingleberry/source',
+  },
   { key: 'shill', icon: 'users', label: 'Shill / abuse', count: '2', to: '/dingleberry/shill' },
-  { key: 'dispatch', icon: 'zap', label: 'Dispatch auth', count: '3.4k', to: '/dingleberry/dispatch' },
-  { key: 'threat', icon: 'shieldCheck', label: 'Threat interception', count: '1', to: '/dingleberry/threat' },
+  {
+    key: 'dispatch',
+    icon: 'zap',
+    label: 'Dispatch auth',
+    count: '3.4k',
+    to: '/dingleberry/dispatch',
+  },
+  {
+    key: 'threat',
+    icon: 'shieldCheck',
+    label: 'Threat interception',
+    count: '1',
+    to: '/dingleberry/threat',
+  },
   { key: 'mesh', icon: 'network', label: 'Member mesh', count: '4.1k', to: '/dingleberry/mesh' },
   { key: 'karma', icon: 'scale', label: 'Karma Read', count: 'AI', to: '/dingleberry/karma' },
-  { key: 'godark', icon: 'wifiOff', label: 'Go Dark monitor', count: '', to: '/dingleberry/godark' },
+  {
+    key: 'godark',
+    icon: 'wifiOff',
+    label: 'Go Dark monitor',
+    count: '',
+    to: '/dingleberry/godark',
+  },
 ];
 
 export function DingleberrySidebar() {
@@ -133,7 +163,10 @@ export function DingleberrySidebar() {
         {expanded ? (
           <div className="rounded-md border border-border bg-bg-panel px-3 py-2">
             <div className="flex items-center gap-2">
-              <span className="block h-2 w-2 flex-none rounded-full" style={{ background: STATUS_BLUE }} />
+              <span
+                className="block h-2 w-2 flex-none rounded-full"
+                style={{ background: STATUS_BLUE }}
+              />
               <span
                 className="font-mono uppercase text-text-muted"
                 style={{ fontSize: '9px', letterSpacing: '0.08em' }}
@@ -141,7 +174,10 @@ export function DingleberrySidebar() {
                 Platform posture
               </span>
             </div>
-            <div className="mt-1 font-serif font-bold text-text" style={{ fontSize: '15px', lineHeight: 1.1 }}>
+            <div
+              className="mt-1 font-serif font-bold text-text"
+              style={{ fontSize: '15px', lineHeight: 1.1 }}
+            >
               VIGILANT
             </div>
             <div className="text-text-muted" style={{ fontSize: '11px' }}>

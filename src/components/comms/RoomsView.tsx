@@ -1,15 +1,15 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import {
+  type RoomParticipant,
+  type Space,
   createSpace,
   joinRoom,
   listRoomParticipants,
   listSpaces,
   setRoomRole,
   subscribeRoomParticipants,
-  type RoomParticipant,
-  type Space,
 } from '@/lib/comms';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 const CallView = lazy(() => import('./CallView').then((m) => ({ default: m.CallView })));
 
 /**
@@ -188,11 +188,17 @@ export function RoomsView({ onClose }: { onClose: () => void }) {
       <div className="flex max-h-[80vh] w-full max-w-md flex-col rounded-2xl bg-zinc-900 p-6 text-white">
         <div className="mb-1 flex items-center justify-between">
           <h2 className="font-display font-bold text-xl">Rooms</h2>
-          <button type="button" onClick={onClose} className="text-sm text-white/50 hover:text-white">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm text-white/50 hover:text-white"
+          >
             Close
           </button>
         </div>
-        <p className="mb-4 text-sm text-white/50">Drop into a live voice room, or start your own.</p>
+        <p className="mb-4 text-sm text-white/50">
+          Drop into a live voice room, or start your own.
+        </p>
         {error && <p className="mb-3 text-red-300 text-sm">{error}</p>}
 
         <div className="mb-4 flex gap-2">
@@ -215,7 +221,9 @@ export function RoomsView({ onClose }: { onClose: () => void }) {
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
           {rooms === null && <p className="text-sm text-white/40">Loading…</p>}
           {rooms !== null && rooms.length === 0 && (
-            <p className="py-4 text-center text-sm text-white/40">No live rooms — start one above.</p>
+            <p className="py-4 text-center text-sm text-white/40">
+              No live rooms — start one above.
+            </p>
           )}
           {(rooms ?? []).map((r) => (
             <div

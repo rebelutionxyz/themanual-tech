@@ -360,7 +360,10 @@ export function Composer({
             {optionMenuOpen && (
               <div
                 className="absolute bottom-full left-0 z-50 mb-1 w-56 rounded-lg p-1 shadow-xl"
-                style={{ background: 'var(--panel-2, #171b23)', border: '1px solid var(--border-bright, rgba(248,249,250,0.22))' }}
+                style={{
+                  background: 'var(--panel-2, #171b23)',
+                  border: '1px solid var(--border-bright, rgba(248,249,250,0.22))',
+                }}
               >
                 {options.map((o) => (
                   <div
@@ -368,7 +371,9 @@ export function Composer({
                     className="flex items-center gap-2 rounded-md px-2 py-1.5"
                     style={{
                       background:
-                        o.id === optionId ? 'color-mix(in srgb, var(--accent, #ef6c2a) 14%, transparent)' : undefined,
+                        o.id === optionId
+                          ? 'color-mix(in srgb, var(--accent, #ef6c2a) 14%, transparent)'
+                          : undefined,
                     }}
                   >
                     <button

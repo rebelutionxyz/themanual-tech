@@ -28,8 +28,7 @@ export interface H24CostPanelProps {
 }
 
 export function H24CostPanel({ entry, rates, onClose }: H24CostPanelProps) {
-  const rate =
-    entry.provider === null ? null : rateLiveAt(rates, entry.provider, entry.createdAt);
+  const rate = entry.provider === null ? null : rateLiveAt(rates, entry.provider, entry.createdAt);
   const breakdown =
     rate === null || entry.costTokens === null
       ? null
@@ -112,7 +111,9 @@ export function H24CostPanel({ entry, rates, onClose }: H24CostPanelProps) {
                       )}
                     </td>
                     <td className="py-1 text-right">{leg.tokens.toLocaleString()}</td>
-                    <td className="py-1 text-right text-text-silver">{formatTokens(leg.ratePerM)}</td>
+                    <td className="py-1 text-right text-text-silver">
+                      {formatTokens(leg.ratePerM)}
+                    </td>
                     <td className="py-1 text-right">{formatTokensExact(leg.subtotal)}</td>
                   </tr>
                 ))}

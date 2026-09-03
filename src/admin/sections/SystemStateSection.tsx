@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
 
 const PANEL_BG = '#0A1628';
 const TEXT_PRIMARY = '#F0F0F5';
@@ -32,9 +32,7 @@ const INITIAL: State = {
 
 async function safeCount(table: string): Promise<number | null> {
   if (!supabase) return null;
-  const { count, error } = await supabase
-    .from(table)
-    .select('*', { head: true, count: 'exact' });
+  const { count, error } = await supabase.from(table).select('*', { head: true, count: 'exact' });
   if (error) return null;
   return count ?? 0;
 }
@@ -58,9 +56,11 @@ export function SystemStateSection() {
       ]);
 
       if (cancelled) return;
-      const sys = sysRes.data as
-        | { mint_active: boolean; total_supply: string; mint_price: string }
-        | null;
+      const sys = sysRes.data as {
+        mint_active: boolean;
+        total_supply: string;
+        mint_price: string;
+      } | null;
       setState({
         beeCount,
         astraCount,
@@ -77,10 +77,7 @@ export function SystemStateSection() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8">
-      <h1
-        className="font-display text-3xl font-semibold"
-        style={{ color: HEADER_TEXT }}
-      >
+      <h1 className="font-display text-3xl font-semibold" style={{ color: HEADER_TEXT }}>
         System State
       </h1>
 
@@ -98,16 +95,8 @@ export function SystemStateSection() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Metric
             label="FREE active"
-            value={
-              state.mintActive === null
-                ? '—'
-                : state.mintActive
-                  ? 'YES'
-                  : 'PAUSED'
-            }
-            tone={
-              state.mintActive === false ? 'warn' : state.mintActive ? 'ok' : 'neutral'
-            }
+            value={state.mintActive === null ? '—' : state.mintActive ? 'YES' : 'PAUSED'}
+            tone={state.mintActive === false ? 'warn' : state.mintActive ? 'ok' : 'neutral'}
           />
           <Metric label="Total supply" value={fmtAmount(state.totalSupply)} />
           <Metric label="Curve price" value={fmtAmount(state.mintPrice)} />
@@ -138,13 +127,9 @@ function Metric({
   value: string;
   tone?: 'neutral' | 'ok' | 'warn';
 }) {
-  const valueColor =
-    tone === 'warn' ? '#E8A838' : tone === 'ok' ? '#6FCF8F' : TEXT_PRIMARY;
+  const valueColor = tone === 'warn' ? '#E8A838' : tone === 'ok' ? '#6FCF8F' : TEXT_PRIMARY;
   return (
-    <div
-      className="flex flex-col gap-1.5 rounded-lg p-4"
-      style={{ background: PANEL_BG }}
-    >
+    <div className="flex flex-col gap-1.5 rounded-lg p-4" style={{ background: PANEL_BG }}>
       <span
         className="text-[11px] font-semibold uppercase tracking-wider"
         style={{ color: TEXT_MUTED }}

@@ -91,7 +91,12 @@ export function getNeighbors(
     const parent = ppath ? idx.byPath.get(ppath) : undefined;
     if (parent) {
       ids.add(parent.id);
-      edges.push({ source: parent.id, target: centerKey, type: 'parent', strength: STRENGTH.parent });
+      edges.push({
+        source: parent.id,
+        target: centerKey,
+        type: 'parent',
+        strength: STRENGTH.parent,
+      });
     }
     for (const c of idx.childrenByPath.get(centerAtom.path) ?? []) add(c, 'child');
     if (ppath) {

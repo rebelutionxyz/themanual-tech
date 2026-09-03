@@ -1,3 +1,7 @@
+import { dbIcon } from '@/components/dingleberry/icons';
+import { DbCard, Eyebrow } from '@/components/dingleberry/primitives';
+import { DINGLEBERRY_COLOR, TONE } from '@/components/dingleberry/tone';
+import type { KarmaActor, KarmaSignal } from '@/lib/dingleberry/contract';
 /* DingleBERRY — Karma Read · AI soft-verification (drill-in).
    ------------------------------------------------------------
    A "soft pull" on an actor: an AI scores trust live from comb signals, computes
@@ -13,10 +17,6 @@
    would be genuine mutations — and by design this screen has none (it never
    writes standing). 100% local state. */
 import { useEffect, useRef, useState } from 'react';
-import { dbIcon } from '@/components/dingleberry/icons';
-import { DbCard, Eyebrow } from '@/components/dingleberry/primitives';
-import { DINGLEBERRY_COLOR, TONE } from '@/components/dingleberry/tone';
-import type { KarmaActor, KarmaSignal } from '@/lib/dingleberry/contract';
 import { useDingleberry } from './DingleberryLayout';
 
 /* the mock actors carry `note` beyond the contract KarmaActor; Step-3 should
@@ -31,11 +31,24 @@ interface BandDef {
   icon: string;
 }
 const BAND: Record<string, BandDef> = {
-  trusted: { key: 'trusted', label: 'Trusted', c: TONE.secure.c, tint: TONE.secure.tint, icon: 'shieldCheck' },
+  trusted: {
+    key: 'trusted',
+    label: 'Trusted',
+    c: TONE.secure.c,
+    tint: TONE.secure.tint,
+    icon: 'shieldCheck',
+  },
   watch: { key: 'watch', label: 'Watch', c: TONE.watch.c, tint: TONE.watch.tint, icon: 'eye' },
-  highrisk: { key: 'highrisk', label: 'High-risk', c: TONE.critical.c, tint: TONE.critical.tint, icon: 'ban' },
+  highrisk: {
+    key: 'highrisk',
+    label: 'High-risk',
+    c: TONE.critical.c,
+    tint: TONE.critical.tint,
+    icon: 'ban',
+  },
 };
-const bandFor = (s: number): BandDef => (s >= 70 ? BAND.trusted : s >= 45 ? BAND.watch : BAND.highrisk);
+const bandFor = (s: number): BandDef =>
+  s >= 70 ? BAND.trusted : s >= 45 ? BAND.watch : BAND.highrisk;
 
 const scoreOf = (a: KarmaActorX, signals: KarmaSignal[]) =>
   Math.round(signals.reduce((s, sig) => s + sig.w * (a.v[sig.key] ?? 0), 0) * 100);
@@ -73,7 +86,13 @@ function Initials({ id, size = 40 }: { id: string; size?: number }) {
   return (
     <div
       className="flex flex-none items-center justify-center rounded-full font-mono font-bold text-text-silver"
-      style={{ width: size, height: size, background: 'var(--bg-panel2, #14171C)', border: '1px solid var(--border-bright, #2A3138)', fontSize: size * 0.32 }}
+      style={{
+        width: size,
+        height: size,
+        background: 'var(--bg-panel2, #14171C)',
+        border: '1px solid var(--border-bright, #2A3138)',
+        fontSize: size * 0.32,
+      }}
     >
       {letters}
     </div>
@@ -86,7 +105,13 @@ function Dial({ score, band, computing }: { score: number; band: BandDef; comput
   const pct = computing ? 0 : score / 100;
   return (
     <div style={{ position: 'relative', width: 132, height: 132, flex: 'none' }}>
-      <svg width="132" height="132" viewBox="0 0 132 132" role="img" aria-label={computing ? 'computing' : `karma ${score}`}>
+      <svg
+        width="132"
+        height="132"
+        viewBox="0 0 132 132"
+        role="img"
+        aria-label={computing ? 'computing' : `karma ${score}`}
+      >
         <circle cx="66" cy="66" r={R} fill="none" stroke="var(--border, #1F252C)" strokeWidth="9" />
         <circle
           cx="66"
@@ -109,10 +134,16 @@ function Dial({ score, band, computing }: { score: number; band: BandDef; comput
           </span>
         ) : (
           <>
-            <span className="font-serif font-bold" style={{ fontSize: 38, lineHeight: 1, color: band.c }}>
+            <span
+              className="font-serif font-bold"
+              style={{ fontSize: 38, lineHeight: 1, color: band.c }}
+            >
               {score}
             </span>
-            <span className="font-mono uppercase text-text-muted" style={{ fontSize: 8.5, letterSpacing: '0.12em', marginTop: 2 }}>
+            <span
+              className="font-mono uppercase text-text-muted"
+              style={{ fontSize: 8.5, letterSpacing: '0.12em', marginTop: 2 }}
+            >
               / 100 karma
             </span>
           </>
@@ -122,7 +153,12 @@ function Dial({ score, band, computing }: { score: number; band: BandDef; comput
   );
 }
 
-function SignalRow({ sig, val, band, computing }: { sig: KarmaSignal; val: number; band: BandDef; computing: boolean }) {
+function SignalRow({
+  sig,
+  val,
+  band,
+  computing,
+}: { sig: KarmaSignal; val: number; band: BandDef; computing: boolean }) {
   return (
     <div className="flex items-center gap-3 border-b border-border" style={{ padding: '9px 0' }}>
       <div className="min-w-0 flex-1">
@@ -139,7 +175,10 @@ function SignalRow({ sig, val, band, computing }: { sig: KarmaSignal; val: numbe
         </div>
       </div>
       <div className="flex-none" style={{ width: 132 }}>
-        <div className="overflow-hidden rounded-full" style={{ height: 7, background: 'var(--bg-panel2, #14171C)' }}>
+        <div
+          className="overflow-hidden rounded-full"
+          style={{ height: 7, background: 'var(--bg-panel2, #14171C)' }}
+        >
           <div
             className="h-full rounded-full"
             style={{
@@ -156,7 +195,12 @@ function SignalRow({ sig, val, band, computing }: { sig: KarmaSignal; val: numbe
       </div>
       <span
         className="font-mono font-bold tabular-nums"
-        style={{ fontSize: 12, width: 40, textAlign: 'right', color: computing ? 'var(--text-muted, #6B7580)' : 'var(--text, #F8F9FA)' }}
+        style={{
+          fontSize: 12,
+          width: 40,
+          textAlign: 'right',
+          color: computing ? 'var(--text-muted, #6B7580)' : 'var(--text, #F8F9FA)',
+        }}
       >
         {computing ? '••••' : Math.round(val * 100)}
       </span>
@@ -170,7 +214,12 @@ function Guard({ icon, title, sub }: { icon: string; title: string; sub: string 
     <div className="flex items-start gap-[11px]">
       <div
         className="flex flex-none items-center justify-center rounded"
-        style={{ width: 30, height: 30, background: 'rgba(220,38,38,0.14)', border: `1px solid ${TONE.critical.border}` }}
+        style={{
+          width: 30,
+          height: 30,
+          background: 'rgba(220,38,38,0.14)',
+          border: `1px solid ${TONE.critical.border}`,
+        }}
       >
         <Icon size={15} style={{ color: DINGLEBERRY_COLOR }} />
       </div>
@@ -234,7 +283,9 @@ export function KarmaCreditPage() {
   const discard = (toLog: boolean) => {
     clearTimers();
     if (toLog && actor) {
-      setLog((prev) => [{ id: actor.id, score, t: 'now', hash: hashFor(actor.id, salt) }, ...prev].slice(0, 6));
+      setLog((prev) =>
+        [{ id: actor.id, score, t: 'now', hash: hashFor(actor.id, salt) }, ...prev].slice(0, 6),
+      );
     }
     setPhase('idle');
     setTtl(TTL);
@@ -282,25 +333,43 @@ export function KarmaCreditPage() {
         <div className="flex flex-wrap items-center gap-4">
           <div
             className="flex flex-none items-center justify-center rounded-md"
-            style={{ width: 54, height: 54, background: `linear-gradient(135deg, ${DINGLEBERRY_COLOR}, #7F1D1D)` }}
+            style={{
+              width: 54,
+              height: 54,
+              background: `linear-gradient(135deg, ${DINGLEBERRY_COLOR}, #7F1D1D)`,
+            }}
           >
             <Scale size={26} style={{ color: '#fff' }} />
           </div>
           <div className="min-w-[240px] flex-1">
-            <div className="mb-[5px] font-mono uppercase" style={{ fontSize: 10, letterSpacing: '0.16em', color: '#60A5FA' }}>
+            <div
+              className="mb-[5px] font-mono uppercase"
+              style={{ fontSize: 10, letterSpacing: '0.16em', color: '#60A5FA' }}
+            >
               AI soft-verification · encrypted · ephemeral
             </div>
-            <h1 className="font-serif font-bold text-text" style={{ fontSize: 30, lineHeight: 1, margin: '0 0 5px' }}>
+            <h1
+              className="font-serif font-bold text-text"
+              style={{ fontSize: 30, lineHeight: 1, margin: '0 0 5px' }}
+            >
               Karma Read
             </h1>
             <div className="text-text-silver" style={{ fontSize: 14, maxWidth: 560 }}>
-              A soft pull on any actor — like a soft credit check. The model scores trust live from platform signals,{' '}
-              <b className="text-text">computes under encryption</b>, returns a band, and{' '}
-              <b className="text-text">retains nothing</b>. It leaves no mark and doesn’t touch the member’s standing.
+              A soft pull on any actor — like a soft credit check. The model scores trust live from
+              platform signals, <b className="text-text">computes under encryption</b>, returns a
+              band, and <b className="text-text">retains nothing</b>. It leaves no mark and doesn’t
+              touch the member’s standing.
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {([['lock', 'Encrypted'], ['clock', 'Ephemeral'], ['check', 'No mark left'], ['scale', 'Soft pull']] as [string, string][]).map(([ic, c]) => {
+            {(
+              [
+                ['lock', 'Encrypted'],
+                ['clock', 'Ephemeral'],
+                ['check', 'No mark left'],
+                ['scale', 'Soft pull'],
+              ] as [string, string][]
+            ).map(([ic, c]) => {
               const Icon = dbIcon(ic);
               return (
                 <span
@@ -321,7 +390,10 @@ export function KarmaCreditPage() {
         <div className="flex min-w-0 flex-col gap-4">
           {/* actor picker */}
           <DbCard className="overflow-hidden p-0">
-            <div className="flex items-center gap-[9px] border-b border-border" style={{ padding: '13px 16px' }}>
+            <div
+              className="flex items-center gap-[9px] border-b border-border"
+              style={{ padding: '13px 16px' }}
+            >
               {(() => {
                 const Fingerprint = dbIcon('fingerprint');
                 return <Fingerprint size={16} className="text-text-muted" />;
@@ -330,7 +402,10 @@ export function KarmaCreditPage() {
                 Run a soft pull on…
               </span>
             </div>
-            <div className="grid gap-[10px]" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', padding: 14 }}>
+            <div
+              className="grid gap-[10px]"
+              style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', padding: 14 }}
+            >
               {actors.map((a) => {
                 const on = a.id === actor.id;
                 return (
@@ -342,12 +417,17 @@ export function KarmaCreditPage() {
                     style={{
                       padding: '11px 12px',
                       background: on ? 'rgba(220,38,38,0.08)' : 'var(--bg-panel, #0F1217)',
-                      border: on ? `1.5px solid ${DINGLEBERRY_COLOR}` : '1px solid var(--border, #1F252C)',
+                      border: on
+                        ? `1.5px solid ${DINGLEBERRY_COLOR}`
+                        : '1px solid var(--border, #1F252C)',
                     }}
                   >
                     <Initials id={a.id} size={36} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-mono font-bold text-text" style={{ fontSize: 12.5 }}>
+                      <div
+                        className="truncate font-mono font-bold text-text"
+                        style={{ fontSize: 12.5 }}
+                      >
                         {a.id}
                       </div>
                       <div className="truncate text-text-muted" style={{ fontSize: 11 }}>
@@ -387,15 +467,22 @@ export function KarmaCreditPage() {
             {!showResult ? (
               <div
                 className="rounded-md text-center"
-                style={{ border: '1px dashed var(--border-bright, #2A3138)', padding: '26px 18px', background: 'var(--bg-elevated, #0C0E12)' }}
+                style={{
+                  border: '1px dashed var(--border-bright, #2A3138)',
+                  padding: '26px 18px',
+                  background: 'var(--bg-elevated, #0C0E12)',
+                }}
               >
                 <Lock size={22} className="mx-auto text-text-muted" />
                 <div className="font-serif text-text-silver" style={{ fontSize: 17, marginTop: 8 }}>
                   No pull running.
                 </div>
-                <div className="text-text-muted" style={{ fontSize: 12.5, maxWidth: 420, margin: '4px auto 0' }}>
-                  The pull runs over encrypted signals and is discarded the moment you’re done. Nothing about {actor.id}{' '}
-                  is written or kept.
+                <div
+                  className="text-text-muted"
+                  style={{ fontSize: 12.5, maxWidth: 420, margin: '4px auto 0' }}
+                >
+                  The pull runs over encrypted signals and is discarded the moment you’re done.
+                  Nothing about {actor.id} is written or kept.
                 </div>
               </div>
             ) : (
@@ -416,23 +503,36 @@ export function KarmaCreditPage() {
                       <>
                         <div className="mb-[6px] flex items-center gap-2">
                           <Lock size={16} className="text-text-muted" />
-                          <span className="font-mono uppercase text-text-muted" style={{ fontSize: 11, letterSpacing: '0.1em' }}>
+                          <span
+                            className="font-mono uppercase text-text-muted"
+                            style={{ fontSize: 11, letterSpacing: '0.1em' }}
+                          >
                             Computing under encryption…
                           </span>
                         </div>
-                        <div className="font-serif font-bold text-text-muted" style={{ fontSize: 22 }}>
+                        <div
+                          className="font-serif font-bold text-text-muted"
+                          style={{ fontSize: 22 }}
+                        >
                           Scoring sealed signals
                         </div>
                         <div className="text-text-muted" style={{ fontSize: 12.5, marginTop: 4 }}>
-                          Inputs stay encrypted in compute — never decrypted to a readable record, never written to disk.
+                          Inputs stay encrypted in compute — never decrypted to a readable record,
+                          never written to disk.
                         </div>
                       </>
                     ) : (
                       <>
                         <div className="mb-[6px] flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1.5 rounded-full" style={{ padding: '3px 11px', background: band.c }}>
+                          <span
+                            className="inline-flex items-center gap-1.5 rounded-full"
+                            style={{ padding: '3px 11px', background: band.c }}
+                          >
                             <BandIcon size={14} style={{ color: '#fff' }} />
-                            <span className="font-mono font-bold uppercase text-white" style={{ fontSize: 10.5, letterSpacing: '0.08em' }}>
+                            <span
+                              className="font-mono font-bold uppercase text-white"
+                              style={{ fontSize: 10.5, letterSpacing: '0.08em' }}
+                            >
                               {band.label}
                             </span>
                           </span>
@@ -440,7 +540,10 @@ export function KarmaCreditPage() {
                             soft pull · {hashFor(actor.id, salt)}
                           </span>
                         </div>
-                        <div className="font-serif font-bold text-text" style={{ fontSize: 22, lineHeight: 1.15 }}>
+                        <div
+                          className="font-serif font-bold text-text"
+                          style={{ fontSize: 22, lineHeight: 1.15 }}
+                        >
                           {VERDICT[band.key]}
                         </div>
                         <div className="text-text-silver" style={{ fontSize: 13, marginTop: 4 }}>
@@ -455,27 +558,52 @@ export function KarmaCreditPage() {
                 {!computing && (
                   <div
                     className="mt-3 flex items-center gap-3 rounded"
-                    style={{ padding: '9px 14px', background: 'var(--bg-elevated, #0C0E12)', border: '1px solid var(--border, #1F252C)' }}
+                    style={{
+                      padding: '9px 14px',
+                      background: 'var(--bg-elevated, #0C0E12)',
+                      border: '1px solid var(--border, #1F252C)',
+                    }}
                   >
                     <Clock size={15} style={{ color: '#60A5FA' }} />
                     <div className="flex-1">
                       <div className="mb-[5px] flex justify-between">
-                        <span className="font-mono uppercase text-text-muted" style={{ fontSize: 10.5, letterSpacing: '0.06em' }}>
+                        <span
+                          className="font-mono uppercase text-text-muted"
+                          style={{ fontSize: 10.5, letterSpacing: '0.06em' }}
+                        >
                           Ephemeral — auto-discards, retains nothing
                         </span>
-                        <span className="font-mono font-bold" style={{ fontSize: 11, color: '#60A5FA' }}>
+                        <span
+                          className="font-mono font-bold"
+                          style={{ fontSize: 11, color: '#60A5FA' }}
+                        >
                           {ttl}s
                         </span>
                       </div>
-                      <div className="overflow-hidden rounded-full" style={{ height: 4, background: 'var(--border, #1F252C)' }}>
-                        <div className="h-full" style={{ width: `${(ttl / TTL) * 100}%`, background: '#60A5FA', transition: 'width 1s linear' }} />
+                      <div
+                        className="overflow-hidden rounded-full"
+                        style={{ height: 4, background: 'var(--border, #1F252C)' }}
+                      >
+                        <div
+                          className="h-full"
+                          style={{
+                            width: `${(ttl / TTL) * 100}%`,
+                            background: '#60A5FA',
+                            transition: 'width 1s linear',
+                          }}
+                        />
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => discard(true)}
                       className="flex items-center gap-[5px] rounded font-sans font-semibold text-text-silver"
-                      style={{ fontSize: 12, padding: '5px 11px', background: 'var(--bg-panel, #0F1217)', border: '1px solid var(--border-bright, #2A3138)' }}
+                      style={{
+                        fontSize: 12,
+                        padding: '5px 11px',
+                        background: 'var(--bg-panel, #0F1217)',
+                        border: '1px solid var(--border-bright, #2A3138)',
+                      }}
                     >
                       <X size={12} /> Discard now
                     </button>
@@ -492,7 +620,13 @@ export function KarmaCreditPage() {
                     </span>
                   </div>
                   {signals.map((sig) => (
-                    <SignalRow key={sig.key} sig={sig} val={actor.v[sig.key] ?? 0} band={band} computing={computing} />
+                    <SignalRow
+                      key={sig.key}
+                      sig={sig}
+                      val={actor.v[sig.key] ?? 0}
+                      band={band}
+                      computing={computing}
+                    />
                   ))}
                 </div>
 
@@ -503,7 +637,13 @@ export function KarmaCreditPage() {
                       type="button"
                       onClick={run}
                       className="flex items-center justify-center gap-2 rounded-md font-sans font-semibold text-text-silver"
-                      style={{ height: 34, padding: '0 14px', background: 'transparent', border: '1px solid var(--border-bright, #2A3138)', fontSize: 13 }}
+                      style={{
+                        height: 34,
+                        padding: '0 14px',
+                        background: 'transparent',
+                        border: '1px solid var(--border-bright, #2A3138)',
+                        fontSize: 13,
+                      }}
                     >
                       <Activity size={14} /> Re-run (fresh compute)
                     </button>
@@ -525,13 +665,32 @@ export function KarmaCreditPage() {
               <span style={{ color: '#60A5FA' }}>The guarantee</span>
             </Eyebrow>
             <div className="flex flex-col gap-[14px]">
-              <Guard icon="lock" title="Encrypted end to end" sub="Signals are sealed in flight and stay encrypted through compute — never decrypted into a readable record." />
-              <Guard icon="clock" title="Ephemeral by design" sub="The result lives in-session only and auto-discards. No score, no inputs, no log row is persisted." />
-              <Guard icon="check" title="No mark on the member" sub="A soft pull leaves no hard inquiry. The member isn’t notified and isn’t penalized." />
-              <Guard icon="scale" title="Standing untouched" sub="Karma Read reads standing; it never writes it. A pull can’t move anyone’s rank." />
+              <Guard
+                icon="lock"
+                title="Encrypted end to end"
+                sub="Signals are sealed in flight and stay encrypted through compute — never decrypted into a readable record."
+              />
+              <Guard
+                icon="clock"
+                title="Ephemeral by design"
+                sub="The result lives in-session only and auto-discards. No score, no inputs, no log row is persisted."
+              />
+              <Guard
+                icon="check"
+                title="No mark on the member"
+                sub="A soft pull leaves no hard inquiry. The member isn’t notified and isn’t penalized."
+              />
+              <Guard
+                icon="scale"
+                title="Standing untouched"
+                sub="Karma Read reads standing; it never writes it. A pull can’t move anyone’s rank."
+              />
             </div>
             <div className="mt-4 border-t border-border pt-[14px]">
-              <div className="mb-2 font-mono uppercase text-text-muted" style={{ fontSize: 9.5, letterSpacing: '0.1em' }}>
+              <div
+                className="mb-2 font-mono uppercase text-text-muted"
+                style={{ fontSize: 9.5, letterSpacing: '0.1em' }}
+              >
                 We never keep
               </div>
               <div className="flex flex-wrap gap-[6px]">
@@ -550,12 +709,18 @@ export function KarmaCreditPage() {
 
           {/* session-only history (live — discarded pulls land here) */}
           <DbCard className="overflow-hidden p-0">
-            <div className="flex items-center gap-[9px] border-b border-border" style={{ padding: '13px 15px' }}>
+            <div
+              className="flex items-center gap-[9px] border-b border-border"
+              style={{ padding: '13px 15px' }}
+            >
               <span className="font-bold text-text" style={{ fontSize: 14.5 }}>
                 This session’s pulls
               </span>
               <span className="flex-1" />
-              <span className="font-mono uppercase text-text-muted" style={{ fontSize: 9.5, letterSpacing: '0.06em' }}>
+              <span
+                className="font-mono uppercase text-text-muted"
+                style={{ fontSize: 9.5, letterSpacing: '0.06em' }}
+              >
                 discarded
               </span>
             </div>
@@ -566,10 +731,18 @@ export function KarmaCreditPage() {
                   <div
                     key={`${r.id}-${r.hash}`}
                     className="flex items-center gap-[10px] rounded-md"
-                    style={{ padding: '9px 11px', border: '1px solid var(--border, #1F252C)', borderLeft: `3px solid ${b.c}`, background: 'var(--bg-panel, #0F1217)' }}
+                    style={{
+                      padding: '9px 11px',
+                      border: '1px solid var(--border, #1F252C)',
+                      borderLeft: `3px solid ${b.c}`,
+                      background: 'var(--bg-panel, #0F1217)',
+                    }}
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-mono font-bold text-text" style={{ fontSize: 12 }}>
+                      <div
+                        className="truncate font-mono font-bold text-text"
+                        style={{ fontSize: 12 }}
+                      >
                         {r.id}
                       </div>
                       <div className="font-mono text-text-muted" style={{ fontSize: 9.5 }}>
@@ -578,11 +751,21 @@ export function KarmaCreditPage() {
                     </div>
                     <span
                       className="font-mono font-bold uppercase"
-                      style={{ fontSize: 9.5, letterSpacing: '0.06em', color: b.c, background: b.tint, borderRadius: 999, padding: '2px 8px' }}
+                      style={{
+                        fontSize: 9.5,
+                        letterSpacing: '0.06em',
+                        color: b.c,
+                        background: b.tint,
+                        borderRadius: 999,
+                        padding: '2px 8px',
+                      }}
                     >
                       {b.label}
                     </span>
-                    <span className="font-mono text-text-muted" style={{ fontSize: 10, width: 30, textAlign: 'right' }}>
+                    <span
+                      className="font-mono text-text-muted"
+                      style={{ fontSize: 10, width: 30, textAlign: 'right' }}
+                    >
                       {r.t}
                     </span>
                   </div>
@@ -591,8 +774,8 @@ export function KarmaCreditPage() {
             </div>
             <div style={{ padding: '0 14px 13px' }}>
               <div className="text-text-muted" style={{ fontSize: 11, lineHeight: 1.4 }}>
-                Only the band and a salted hash survive — enough to show a pull happened, never enough to reconstruct it.
-                Cleared on sign-out.
+                Only the band and a salted hash survive — enough to show a pull happened, never
+                enough to reconstruct it. Cleared on sign-out.
               </div>
             </div>
           </DbCard>

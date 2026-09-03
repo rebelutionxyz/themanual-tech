@@ -72,8 +72,7 @@ export function H24VaultPage() {
           ) : (
             <>
               <p style={{ color: 'var(--body)', fontSize: 13.5 }}>
-                h24's Vault is for directive outputs you've chosen to keep — nothing lives here
-                yet.
+                h24's Vault is for directive outputs you've chosen to keep — nothing lives here yet.
               </p>
               <p style={{ color: 'var(--mute)', fontSize: 12 }}>
                 h24 does not store directive or response text by default (see the console's

@@ -1,7 +1,7 @@
-import type { AdminManifest } from '../types';
-import { ProfileSection } from '../sections/ProfileSection';
 import { MyPropertiesSection } from '../sections/MyPropertiesSection';
+import { ProfileSection } from '../sections/ProfileSection';
 import { SystemStateSection } from '../sections/SystemStateSection';
+import type { AdminManifest } from '../types';
 
 export const coreManifest: AdminManifest = {
   sections: [

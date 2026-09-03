@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 interface ScrollRowProps {
   className?: string;
@@ -47,11 +47,7 @@ export function ScrollRow({ className, leading, children }: ScrollRowProps) {
 
   return (
     <div className={cn('relative flex items-center', className)}>
-      {leading && (
-        <div className="flex-shrink-0 pl-3 pr-1">
-          {leading}
-        </div>
-      )}
+      {leading && <div className="flex-shrink-0 pl-3 pr-1">{leading}</div>}
 
       {canScrollLeft && (
         <button

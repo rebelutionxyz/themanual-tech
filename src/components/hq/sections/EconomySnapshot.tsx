@@ -7,8 +7,8 @@
 // `bling_system_state.freedom_price` is the authoritative live price; the
 // computed price is shown alongside as a sanity check.
 
-import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
 
 interface SystemState {
   total_supply: number;
@@ -68,10 +68,17 @@ export function EconomySnapshot() {
       if (stateRes.error) {
         setError(stateRes.error.message);
       } else if (stateRes.data) {
-        const d = stateRes.data as { total_supply: number | string; freedom_price: number | string; free_active: boolean; updated_at: string };
+        const d = stateRes.data as {
+          total_supply: number | string;
+          freedom_price: number | string;
+          free_active: boolean;
+          updated_at: string;
+        };
         setState({
-          total_supply: typeof d.total_supply === 'string' ? Number(d.total_supply) : d.total_supply,
-          freedom_price: typeof d.freedom_price === 'string' ? Number(d.freedom_price) : d.freedom_price,
+          total_supply:
+            typeof d.total_supply === 'string' ? Number(d.total_supply) : d.total_supply,
+          freedom_price:
+            typeof d.freedom_price === 'string' ? Number(d.freedom_price) : d.freedom_price,
           free_active: d.free_active,
           updated_at: d.updated_at,
         });
@@ -82,13 +89,17 @@ export function EconomySnapshot() {
         setPots([]);
       } else {
         const rows = (potsRes.data ?? []) as Array<{ purpose: string; balance: number | string }>;
-        setPots(rows.map((r) => ({
-          purpose: r.purpose,
-          balance: typeof r.balance === 'string' ? Number(r.balance) : r.balance,
-        })));
+        setPots(
+          rows.map((r) => ({
+            purpose: r.purpose,
+            balance: typeof r.balance === 'string' ? Number(r.balance) : r.balance,
+          })),
+        );
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const pctFreed = state ? (state.total_supply / Number(HARD_CAP)) * 100 : 0;
@@ -98,7 +109,9 @@ export function EconomySnapshot() {
   return (
     <div>
       <header className="mb-4">
-        <h2 className="font-display text-2xl font-semibold text-text-silver-bright">Economy Snapshot</h2>
+        <h2 className="font-display text-2xl font-semibold text-text-silver-bright">
+          Economy Snapshot
+        </h2>
         <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }}>
           bling_system_state + Treasury pots
         </p>
@@ -107,7 +120,10 @@ export function EconomySnapshot() {
       {state === null && (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           {['sk-1', 'sk-2', 'sk-3', 'sk-4', 'sk-5', 'sk-6'].map((k) => (
-            <div key={k} className="h-20 animate-pulse-slow rounded-md border border-border bg-bg-elevated/40" />
+            <div
+              key={k}
+              className="h-20 animate-pulse-slow rounded-md border border-border bg-bg-elevated/40"
+            />
           ))}
         </div>
       )}
@@ -115,7 +131,10 @@ export function EconomySnapshot() {
       {state !== null && (
         <>
           {error && (
-            <div className="mb-4 rounded-md border border-border bg-bg-elevated/40 px-4 py-2 text-text-dim" style={{ fontSize: '12px' }}>
+            <div
+              className="mb-4 rounded-md border border-border bg-bg-elevated/40 px-4 py-2 text-text-dim"
+              style={{ fontSize: '12px' }}
+            >
               system_state load error: {error}
             </div>
           )}
@@ -127,27 +146,11 @@ export function EconomySnapshot() {
               value={fmt(state.total_supply, { maximumFractionDigits: 0 })}
               suffix="BLiNG!"
             />
-            <Metric
-              label="Hard cap"
-              value={HARD_CAP.toLocaleString()}
-              suffix="BLiNG!"
-            />
-            <Metric
-              label="% of cap freed"
-              value={`${pctFreed.toFixed(4)}%`}
-            />
-            <Metric
-              label="Live price (system)"
-              value={`$${state.freedom_price.toFixed(6)}`}
-            />
-            <Metric
-              label="Computed price (canon)"
-              value={`$${computed.toFixed(6)}`}
-            />
-            <Metric
-              label="Free active"
-              value={state.free_active ? 'YES' : 'NO'}
-            />
+            <Metric label="Hard cap" value={HARD_CAP.toLocaleString()} suffix="BLiNG!" />
+            <Metric label="% of cap freed" value={`${pctFreed.toFixed(4)}%`} />
+            <Metric label="Live price (system)" value={`$${state.freedom_price.toFixed(6)}`} />
+            <Metric label="Computed price (canon)" value={`$${computed.toFixed(6)}`} />
+            <Metric label="Free active" value={state.free_active ? 'YES' : 'NO'} />
           </div>
 
           {/* Treasury sub-section */}
@@ -155,10 +158,7 @@ export function EconomySnapshot() {
             <h3 className="font-display text-lg font-semibold text-text-silver-bright">
               OPS umbrella (Treasury pots)
             </h3>
-            <p
-              className="mt-1 font-mono text-text-muted"
-              style={{ fontSize: '11px' }}
-            >
+            <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }}>
               total: {fmt(treasuryTotal)} BLiNG! across {pots?.length ?? 0} pots
             </p>
             {pots !== null && pots.length > 0 && (
@@ -188,17 +188,18 @@ export function EconomySnapshot() {
               </div>
             )}
             {pots !== null && pots.length === 0 && (
-              <div className="mt-3 rounded-md border border-border bg-bg-elevated/40 px-4 py-3 text-text-dim" style={{ fontSize: '12px' }}>
+              <div
+                className="mt-3 rounded-md border border-border bg-bg-elevated/40 px-4 py-3 text-text-dim"
+                style={{ fontSize: '12px' }}
+              >
                 Treasury pot data unavailable (RPC failed or no admin auth).
               </div>
             )}
           </div>
 
-          <p
-            className="mt-4 font-mono text-text-muted"
-            style={{ fontSize: '10px' }}
-          >
-            system_state updated: {new Date(state.updated_at).toISOString().replace('T', ' ').slice(0, 19)}
+          <p className="mt-4 font-mono text-text-muted" style={{ fontSize: '10px' }}>
+            system_state updated:{' '}
+            {new Date(state.updated_at).toISOString().replace('T', ' ').slice(0, 19)}
           </p>
         </>
       )}
@@ -217,7 +218,9 @@ function Metric({ label, value, suffix }: { label: string; value: string; suffix
       </div>
       <div className="font-display text-xl font-semibold text-text-silver-bright">
         {value}
-        {suffix && <span className="ml-1.5 font-sans text-xs font-normal text-text-muted">{suffix}</span>}
+        {suffix && (
+          <span className="ml-1.5 font-sans text-xs font-normal text-text-muted">{suffix}</span>
+        )}
       </div>
     </div>
   );

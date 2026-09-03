@@ -27,14 +27,7 @@ import {
 // ═════════════════════════════════════════════════════════════════════
 
 /** Community surfaces that host the white shell + utility tail. */
-export type CommunitySurface =
-  | 'intel'
-  | 'unite'
-  | 'rule'
-  | 'give'
-  | 'pulse'
-  | 'bazaar'
-  | 'comms';
+export type CommunitySurface = 'intel' | 'unite' | 'rule' | 'give' | 'pulse' | 'bazaar' | 'comms';
 
 /** Canonical order for scope dropdowns and filters. */
 export const COMMUNITY_SURFACES: CommunitySurface[] = [

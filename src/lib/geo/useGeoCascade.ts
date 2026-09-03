@@ -12,21 +12,17 @@
 // honeycomb:geo:profile-prompt-shown flag). The consuming GeoLensBar shows the
 // discoverable toast: "We've set your location to {label} — change anytime."
 
-import { useCallback, useEffect, useState } from 'react';
-import { useAuth } from '@/lib/auth';
 import { useAstra } from '@/lib/astras/AstraContext';
+import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { useCallback, useEffect, useState } from 'react';
 import {
   getProfilePromptShown,
   getSearchLocation,
   setProfilePromptShown,
   setSearchLocation,
 } from './storage';
-import type {
-  BeeProfileLocation,
-  GeoLocation,
-  GeoSource,
-} from './types';
+import type { BeeProfileLocation, GeoLocation, GeoSource } from './types';
 
 interface CascadeResult {
   geo: GeoLocation;
@@ -78,11 +74,7 @@ export function useGeoCascade(): CascadeResult {
     return astra?.defaultGeo ?? 'Global';
   });
   const [source, setSource] = useState<GeoSource>(() =>
-    getSearchLocation() !== null
-      ? 'storage'
-      : astra?.defaultGeo
-        ? 'astra'
-        : 'global',
+    getSearchLocation() !== null ? 'storage' : astra?.defaultGeo ? 'astra' : 'global',
   );
   const [promotionToastLabel, setPromotionToastLabel] = useState<string | null>(null);
 

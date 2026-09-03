@@ -1,3 +1,6 @@
+import { dbIcon } from '@/components/dingleberry/icons';
+import { ActionButton, ActionCaption, DbCard, Eyebrow } from '@/components/dingleberry/primitives';
+import { DATA_BLUE, DINGLEBERRY_COLOR, TONE } from '@/components/dingleberry/tone';
 /* DingleBERRY — Justice Handoff (detector → venue seam).
    ------------------------------------------------------------
    DingleBERRY surfaces the collective-harm angle, packages the evidence, and
@@ -21,9 +24,6 @@
    gating. The "open class-action Docket" control is a WRITE (creates a
    Justice-realm record) → inert + Step-4 captioned. */
 import { useNavigate } from 'react-router-dom';
-import { dbIcon } from '@/components/dingleberry/icons';
-import { ActionButton, ActionCaption, DbCard, Eyebrow } from '@/components/dingleberry/primitives';
-import { DATA_BLUE, DINGLEBERRY_COLOR, TONE } from '@/components/dingleberry/tone';
 import { useDingleberry } from './DingleberryLayout';
 
 /* DingleBERRY seal — red identity hex (was navy + gold) */
@@ -31,7 +31,13 @@ function DBHex({ size = 36 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 120 120" role="img" aria-label="Security">
       <circle cx="60" cy="60" r="50" fill="#14171C" stroke={DINGLEBERRY_COLOR} strokeWidth="3" />
-      <path d="M60 30 L84 44 L84 72 L60 86 L36 72 L36 44 Z" fill="none" stroke={DINGLEBERRY_COLOR} strokeWidth="3" strokeLinejoin="round" />
+      <path
+        d="M60 30 L84 44 L84 72 L60 86 L36 72 L36 44 Z"
+        fill="none"
+        stroke={DINGLEBERRY_COLOR}
+        strokeWidth="3"
+        strokeLinejoin="round"
+      />
       <circle cx="60" cy="58" r="7" fill="none" stroke={DINGLEBERRY_COLOR} strokeWidth="3" />
       <circle cx="60" cy="58" r="2.4" fill={DINGLEBERRY_COLOR} />
     </svg>
@@ -42,10 +48,16 @@ function DBHex({ size = 36 }: { size?: number }) {
    own EntityHeader + CaseCard components (not available in this repo). */
 function RecordPreview() {
   return (
-    <div className="overflow-hidden rounded-lg" style={{ border: `2px solid ${TONE.critical.border}` }}>
+    <div
+      className="overflow-hidden rounded-lg"
+      style={{ border: `2px solid ${TONE.critical.border}` }}
+    >
       {/* EntityHeader stand-in */}
       <div className="border-b border-border bg-bg-elevated" style={{ padding: '14px 16px' }}>
-        <div className="mb-[6px] flex items-center gap-2 font-mono text-text-muted" style={{ fontSize: 10 }}>
+        <div
+          className="mb-[6px] flex items-center gap-2 font-mono text-text-muted"
+          style={{ fontSize: 10 }}
+        >
           <span>Society</span>
           <span>›</span>
           <span>Software</span>
@@ -56,7 +68,14 @@ function RecordPreview() {
           </h3>
           <span
             className="rounded-full font-mono font-bold uppercase"
-            style={{ fontSize: 9, letterSpacing: '0.06em', padding: '1px 8px', color: TONE.critical.c, background: TONE.critical.tint, border: `1px solid ${TONE.critical.border}` }}
+            style={{
+              fontSize: 9,
+              letterSpacing: '0.06em',
+              padding: '1px 8px',
+              color: TONE.critical.c,
+              background: TONE.critical.tint,
+              border: `1px solid ${TONE.critical.border}`,
+            }}
           >
             Upstream of THR-0884
           </span>
@@ -67,14 +86,24 @@ function RecordPreview() {
       </div>
       {/* CaseCard stand-in */}
       <div className="bg-bg" style={{ padding: 14 }}>
-        <div className="rounded-md border border-border bg-bg-panel" style={{ padding: '13px 14px' }}>
+        <div
+          className="rounded-md border border-border bg-bg-panel"
+          style={{ padding: '13px 14px' }}
+        >
           <div className="mb-[6px] flex flex-wrap items-center gap-2">
             <span className="font-mono text-text-muted" style={{ fontSize: 11 }}>
               DKT-MESHUTILS-001
             </span>
             <span
               className="rounded-full font-mono font-bold uppercase"
-              style={{ fontSize: 9, letterSpacing: '0.06em', padding: '1px 8px', color: TONE.watch.c, background: TONE.watch.tint, border: `1px solid ${TONE.watch.border}` }}
+              style={{
+                fontSize: 9,
+                letterSpacing: '0.06em',
+                padding: '1px 8px',
+                color: TONE.watch.c,
+                background: TONE.watch.tint,
+                border: `1px solid ${TONE.watch.border}`,
+              }}
             >
               Emerging · rung: see
             </span>
@@ -83,10 +112,14 @@ function RecordPreview() {
             Supply-chain malware served to 1,204 member sites
           </div>
           <div className="mt-[5px] text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
-            A maintained dependency was hijacked to inject a crypto-miner into every site that pulled the update.
-            Security detected and blocked it; this Docket opens to seek accountability.
+            A maintained dependency was hijacked to inject a crypto-miner into every site that
+            pulled the update. Security detected and blocked it; this Docket opens to seek
+            accountability.
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-text-muted" style={{ fontSize: 11 }}>
+          <div
+            className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-text-muted"
+            style={{ fontSize: 11 }}
+          >
             <span>
               <b className="text-text-silver">4</b> evidence
             </span>
@@ -134,7 +167,10 @@ export function JusticeHandoffPage() {
           <div className="flex items-center gap-[13px]">
             <div className="flex flex-col items-center gap-1">
               <DBHex size={36} />
-              <span className="font-mono uppercase text-text-muted" style={{ fontSize: 8, letterSpacing: '0.06em' }}>
+              <span
+                className="font-mono uppercase text-text-muted"
+                style={{ fontSize: 8, letterSpacing: '0.06em' }}
+              >
                 Security
               </span>
             </div>
@@ -142,25 +178,37 @@ export function JusticeHandoffPage() {
             <div className="flex flex-col items-center gap-1">
               <div
                 className="flex items-center justify-center rounded-full"
-                style={{ width: 36, height: 36, background: 'var(--bg-elevated, #0C0E12)', border: `2px solid ${DINGLEBERRY_COLOR}`, color: DINGLEBERRY_COLOR }}
+                style={{
+                  width: 36,
+                  height: 36,
+                  background: 'var(--bg-elevated, #0C0E12)',
+                  border: `2px solid ${DINGLEBERRY_COLOR}`,
+                  color: DINGLEBERRY_COLOR,
+                }}
               >
                 <Scale size={19} />
               </div>
-              <span className="font-mono uppercase text-text-muted" style={{ fontSize: 8, letterSpacing: '0.06em' }}>
+              <span
+                className="font-mono uppercase text-text-muted"
+                style={{ fontSize: 8, letterSpacing: '0.06em' }}
+              >
                 AtlasADVOCATE
               </span>
             </div>
           </div>
           <div className="min-w-[260px] flex-1">
             <Eyebrow>Detector → venue · the handoff</Eyebrow>
-            <h1 className="font-serif font-bold text-text" style={{ fontSize: 28, lineHeight: 1.05, margin: '3px 0 4px' }}>
+            <h1
+              className="font-serif font-bold text-text"
+              style={{ fontSize: 28, lineHeight: 1.05, margin: '3px 0 4px' }}
+            >
               Security found it. AtlasADVOCATE is where you act.
             </h1>
             <div className="text-text-silver" style={{ fontSize: 14.5, maxWidth: 580 }}>
-              1,204 members were hit by the same payload from the same source. Security packages the evidence and{' '}
-              <b>opens a class-action Docket</b> — affected members are pointed to it and <b>each opts in</b> (nobody is
-              enrolled). <b>AtlasADVOCATE</b> — the legal Astra — carries it forward; the docket record is auto-filed in
-              the Justice realm.
+              1,204 members were hit by the same payload from the same source. Security packages the
+              evidence and <b>opens a class-action Docket</b> — affected members are pointed to it
+              and <b>each opts in</b> (nobody is enrolled). <b>AtlasADVOCATE</b> — the legal Astra —
+              carries it forward; the docket record is auto-filed in the Justice realm.
             </div>
           </div>
         </div>
@@ -192,7 +240,13 @@ export function JusticeHandoffPage() {
                         </span>
                         <span
                           className="rounded-full font-mono uppercase"
-                          style={{ fontSize: 9, letterSpacing: '0.06em', padding: '1px 7px', color: DATA_BLUE, background: 'rgba(59,130,246,0.12)' }}
+                          style={{
+                            fontSize: 9,
+                            letterSpacing: '0.06em',
+                            padding: '1px 7px',
+                            color: DATA_BLUE,
+                            background: 'rgba(59,130,246,0.12)',
+                          }}
                         >
                           {e.note}
                         </span>
@@ -213,11 +267,12 @@ export function JusticeHandoffPage() {
           >
             <Shield size={16} style={{ color: DATA_BLUE, flex: 'none', marginTop: 1 }} />
             <div className="text-text-silver" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
-              <b>Security is the detector and the on-ramp — not the court.</b> It packages findings and surfaces the
-              affected class, then opens a <b>class-action Docket</b>. Affected members are pointed to it and{' '}
-              <b>each opts in</b> — nobody is enrolled. The case is carried forward in <b>AtlasADVOCATE</b>, the legal
-              Astra (justice system + attorney marketplace); the docket record is auto-filed in the Justice realm — a
-              permanent public record.{' '}
+              <b>Security is the detector and the on-ramp — not the court.</b> It packages findings
+              and surfaces the affected class, then opens a <b>class-action Docket</b>. Affected
+              members are pointed to it and <b>each opts in</b> — nobody is enrolled. The case is
+              carried forward in <b>AtlasADVOCATE</b>, the legal Astra (justice system + attorney
+              marketplace); the docket record is auto-filed in the Justice realm — a permanent
+              public record.{' '}
               <span className="font-mono text-text-muted">No finding is entered here.</span>
             </div>
           </div>
@@ -234,7 +289,10 @@ export function JusticeHandoffPage() {
 
           <DbCard className="p-5">
             <div className="mb-3 flex items-baseline gap-2">
-              <span className="font-serif font-bold" style={{ fontSize: 26, lineHeight: 1, color: DINGLEBERRY_COLOR }}>
+              <span
+                className="font-serif font-bold"
+                style={{ fontSize: 26, lineHeight: 1, color: DINGLEBERRY_COLOR }}
+              >
                 1,204
               </span>
               <span className="text-text-muted" style={{ fontSize: 13 }}>

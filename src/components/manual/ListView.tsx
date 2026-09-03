@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
-import type { Atom } from '@/types/manual';
-import { useManualStore } from '@/stores/useManualStore';
-import { useManualData } from '@/lib/useManualData';
 import { DiscoveryTierChip } from '@/components/ui/DiscoveryTierChip';
+import { useManualData } from '@/lib/useManualData';
 import { cn, formatCount } from '@/lib/utils';
+import { useManualStore } from '@/stores/useManualStore';
+import type { Atom } from '@/types/manual';
+import { useMemo } from 'react';
 
 export function ListView() {
   const { atoms } = useManualData();
@@ -19,10 +19,7 @@ export function ListView() {
       .filter((a) => {
         if (selectedRealmId && a.realmId !== selectedRealmId) return false;
         if (selectedKettle && a.kettle !== selectedKettle) return false;
-        if (
-          selectedTags.length > 0 &&
-          !selectedTags.every((t) => a.themeTags.includes(t))
-        )
+        if (selectedTags.length > 0 && !selectedTags.every((t) => a.themeTags.includes(t)))
           return false;
         if (q) {
           if (
@@ -39,11 +36,7 @@ export function ListView() {
 
   return (
     <div className="px-4 py-3 md:px-6 md:py-4">
-      <p
-        className="mb-3 font-mono text-text-muted"
-        style={{ fontSize: '12px' }}
-        data-size="meta"
-      >
+      <p className="mb-3 font-mono text-text-muted" style={{ fontSize: '12px' }} data-size="meta">
         Showing {formatCount(filtered.length)} of {formatCount(atoms.length)} atoms
         {filtered.length === 500 && ' (first 500)'}
       </p>
@@ -92,9 +85,7 @@ function ListRow({
     >
       <div className="min-w-0">
         <div className="flex items-baseline gap-2">
-          <span className="truncate text-sm font-medium text-text">
-            {atom.name}
-          </span>
+          <span className="truncate text-sm font-medium text-text">{atom.name}</span>
         </div>
         <div
           className="mt-0.5 truncate font-mono text-text-muted"

@@ -88,9 +88,7 @@ export function StandingPage() {
         <div>
           <div className="eyebrow">Your sovereign identity</div>
           <h1>Standing</h1>
-          <div className="sub">
-            Who you are here — held by you, earned by what you do.
-          </div>
+          <div className="sub">Who you are here — held by you, earned by what you do.</div>
         </div>
       </div>
 

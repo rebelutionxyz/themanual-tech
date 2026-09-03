@@ -3,11 +3,11 @@
 // Bee-facing TrendingAtoms — rank, vote count, total weight, full realm,
 // current_tier chip.
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import { DiscoveryTierChip } from '@/components/ui/DiscoveryTierChip';
 import type { DiscoveryTier } from '@/lib/discovery-ladder/colors';
+import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { useEffect, useState } from 'react';
 
 type Tab = '24h' | '7d' | '30d';
 const TABS: Tab[] = ['24h', '7d', '30d'];
@@ -94,13 +94,17 @@ export function TrendingAtomsAdmin() {
         .filter((x): x is Row => x !== null);
       setRows(flat);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [tab]);
 
   return (
     <div>
       <header className="mb-4">
-        <h2 className="font-display text-2xl font-semibold text-text-silver-bright">Trending Atoms</h2>
+        <h2 className="font-display text-2xl font-semibold text-text-silver-bright">
+          Trending Atoms
+        </h2>
         <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }}>
           from atom_trending_{tab} · top 20 by vote count
         </p>
@@ -132,7 +136,10 @@ export function TrendingAtomsAdmin() {
         </div>
       )}
       {rows !== null && rows.length === 0 && (
-        <div className="mt-4 rounded-md border border-border bg-bg-elevated/40 px-4 py-6 text-center text-text-dim" style={{ fontSize: '13px' }}>
+        <div
+          className="mt-4 rounded-md border border-border bg-bg-elevated/40 px-4 py-6 text-center text-text-dim"
+          style={{ fontSize: '13px' }}
+        >
           {error
             ? `Could not load trending atoms: ${error}`
             : 'No trending atoms yet — first kettle votes pending.'}

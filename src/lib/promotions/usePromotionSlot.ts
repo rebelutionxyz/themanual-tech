@@ -4,9 +4,9 @@
 //   2. AstraConfig fallbackContent
 //   3. nothing (caller hides slot — D-4)
 
-import { useEffect, useRef, useState } from 'react';
-import { resolveSlotConfig, type SlotKey } from '@/lib/astras/astra.types';
 import { useAstra } from '@/lib/astras/AstraContext';
+import { type SlotKey, resolveSlotConfig } from '@/lib/astras/astra.types';
+import { useEffect, useRef, useState } from 'react';
 import { queryPromotionForSlot } from './query';
 import type { Promotion, SlotResult } from './types';
 
@@ -89,15 +89,7 @@ export function usePromotionSlot(input: {
     return () => {
       cancelled = true;
     };
-  }, [
-    config.enabled,
-    slotKey,
-    astra,
-    realmSlug,
-    branchPath,
-    atomId,
-    geoCountry,
-  ]);
+  }, [config.enabled, slotKey, astra, realmSlug, branchPath, atomId, geoCountry]);
 
   const fallbackContent = config.fallbackContent ?? null;
 

@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import { Clock, ChevronDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TimeWindow } from '@/stores/useIntelStore';
+import { Check, ChevronDown, Clock } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 interface TimeWindowBarProps {
   value: TimeWindow;
@@ -87,10 +87,7 @@ export function TimeWindowBar({
         </span>
         <ChevronDown
           size={12}
-          className={cn(
-            'text-text-muted transition-transform',
-            open && 'rotate-180',
-          )}
+          className={cn('text-text-muted transition-transform', open && 'rotate-180')}
         />
       </button>
 
@@ -111,9 +108,7 @@ export function TimeWindowBar({
                 }}
                 className={cn(
                   'flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors',
-                  active
-                    ? 'bg-bg text-text'
-                    : 'text-text-silver hover:bg-bg',
+                  active ? 'bg-bg text-text' : 'text-text-silver hover:bg-bg',
                 )}
                 style={{ fontSize: '12px' }}
               >
@@ -123,9 +118,7 @@ export function TimeWindowBar({
                     {opt.label.toLowerCase()}
                   </span>
                 </span>
-                {active && (
-                  <Check size={12} style={{ color: accentColor }} />
-                )}
+                {active && <Check size={12} style={{ color: accentColor }} />}
               </button>
             );
           })}

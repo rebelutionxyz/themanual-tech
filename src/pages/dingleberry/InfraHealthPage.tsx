@@ -1,3 +1,13 @@
+import { dbIcon } from '@/components/dingleberry/icons';
+import {
+  ActionButton,
+  ActionCaption,
+  DbCard,
+  Eyebrow,
+  StatusPill,
+} from '@/components/dingleberry/primitives';
+import { STATUS_BLUE, TONE } from '@/components/dingleberry/tone';
+import type { Posture, Tone } from '@/lib/dingleberry/contract';
 /* DingleBERRY — Surface 01 · Platform & Infra Health (drill-in).
    ------------------------------------------------------------
    Up / degraded / down across the whole comb — one read. A posture-aware
@@ -12,10 +22,6 @@
    tiles up/degraded/down (no service is ever gated away). Action controls are
    inert + captioned. */
 import { useState } from 'react';
-import { dbIcon } from '@/components/dingleberry/icons';
-import { ActionButton, ActionCaption, DbCard, Eyebrow, StatusPill } from '@/components/dingleberry/primitives';
-import { STATUS_BLUE, TONE } from '@/components/dingleberry/tone';
-import type { Posture, Tone } from '@/lib/dingleberry/contract';
 import { useDingleberry } from './DingleberryLayout';
 
 /* contract/runtime mismatch: the contract types infraHealth.services as
@@ -24,7 +30,13 @@ import { useDingleberry } from './DingleberryLayout';
    contract with whatever the live infra source returns. STATE (which services
    degrade per posture) + WORSE (their degraded values) are baked demo content —
    not in the snapshot. */
-type ServiceTuple = readonly [name: string, group: string, metricLabel: string, value: string, backend: string];
+type ServiceTuple = readonly [
+  name: string,
+  group: string,
+  metricLabel: string,
+  value: string,
+  backend: string,
+];
 
 const DOMAINS = ['Spine', 'Astras', 'Mesh muscle'];
 const STATE: Record<Posture, { warn: number[]; crit: number[] }> = {
@@ -34,7 +46,13 @@ const STATE: Record<Posture, { warn: number[]; crit: number[] }> = {
 };
 const WORSE: Record<number, string> = { 6: '198', 14: '1.9%', 16: '97%', 5: 'HELD', 3: '38s' };
 
-const STATUS_LABEL: Record<Tone, string> = { secure: 'Up', watch: 'Degraded', critical: 'Down', info: 'Info', idle: 'Idle' };
+const STATUS_LABEL: Record<Tone, string> = {
+  secure: 'Up',
+  watch: 'Degraded',
+  critical: 'Down',
+  info: 'Info',
+  idle: 'Idle',
+};
 
 /* deterministic mini sparkline (tile) */
 function Spark({ seed, tone }: { seed: number; tone: Tone }) {
@@ -54,8 +72,20 @@ function Spark({ seed, tone }: { seed: number; tone: Tone }) {
     pts.push(`${((i / (n - 1)) * w).toFixed(1)},${y.toFixed(1)}`);
   }
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label="trend" preserveAspectRatio="none" style={{ width: '100%', height: h, display: 'block' }}>
-      <polyline points={pts.join(' ')} fill="none" stroke={TONE[tone].c} strokeWidth="1.8" strokeLinejoin="round" />
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      role="img"
+      aria-label="trend"
+      preserveAspectRatio="none"
+      style={{ width: '100%', height: h, display: 'block' }}
+    >
+      <polyline
+        points={pts.join(' ')}
+        fill="none"
+        stroke={TONE[tone].c}
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -78,11 +108,32 @@ function BigGraph({ seed, tone }: { seed: number; tone: Tone }) {
     pts.push(`${((i / (n - 1)) * w).toFixed(1)},${y.toFixed(1)}`);
   }
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label="service trend" preserveAspectRatio="none" style={{ width: '100%', height: 120, display: 'block' }}>
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      role="img"
+      aria-label="service trend"
+      preserveAspectRatio="none"
+      style={{ width: '100%', height: 120, display: 'block' }}
+    >
       <polygon points={`0,${h} ${pts.join(' ')} ${w},${h}`} fill={TONE[tone].c} opacity="0.08" />
-      <polyline points={pts.join(' ')} fill="none" stroke={TONE[tone].c} strokeWidth="2.2" strokeLinejoin="round" />
+      <polyline
+        points={pts.join(' ')}
+        fill="none"
+        stroke={TONE[tone].c}
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
       {tone !== 'secure' && (
-        <line x1="0" y1="36" x2={w} y2="36" stroke={TONE.critical.c} strokeWidth="1.3" strokeDasharray="5 5" opacity="0.55" />
+        <line
+          x1="0"
+          y1="36"
+          x2={w}
+          y2="36"
+          stroke={TONE.critical.c}
+          strokeWidth="1.3"
+          strokeDasharray="5 5"
+          opacity="0.55"
+        />
       )}
     </svg>
   );
@@ -113,7 +164,11 @@ function Tile({
         padding: '10px 11px',
         border: active ? '1.5px solid #DC2626' : '1px solid var(--border, #1F252C)',
         borderTop: `3px solid ${k.c}`,
-        background: active ? 'rgba(220,38,38,0.08)' : st === 'critical' ? k.tint : 'var(--bg-panel, #0F1217)',
+        background: active
+          ? 'rgba(220,38,38,0.08)'
+          : st === 'critical'
+            ? k.tint
+            : 'var(--bg-panel, #0F1217)',
       }}
     >
       <div className="flex items-center gap-[7px]">
@@ -127,14 +182,23 @@ function Tile({
       </div>
       <Spark seed={idx + 5} tone={st} />
       <div className="flex items-baseline justify-between">
-        <span className="font-mono uppercase text-text-muted" style={{ fontSize: 9.5, letterSpacing: '0.06em' }}>
+        <span
+          className="font-mono uppercase text-text-muted"
+          style={{ fontSize: 9.5, letterSpacing: '0.06em' }}
+        >
           {svc[2]}
         </span>
-        <span className="font-mono font-bold" style={{ fontSize: 12.5, color: st === 'secure' ? 'var(--text, #F8F9FA)' : k.c }}>
+        <span
+          className="font-mono font-bold"
+          style={{ fontSize: 12.5, color: st === 'secure' ? 'var(--text, #F8F9FA)' : k.c }}
+        >
           {val}
         </span>
       </div>
-      <div className="truncate font-mono text-text-muted" style={{ fontSize: 9, letterSpacing: '0.04em' }}>
+      <div
+        className="truncate font-mono text-text-muted"
+        style={{ fontSize: 9, letterSpacing: '0.04em' }}
+      >
         {svc[1] === 'Astras' ? `surface · ${svc[4]}` : svc[4]}
       </div>
     </button>
@@ -161,7 +225,8 @@ export function InfraHealthPage() {
     const m = STATE[posture];
     return m.crit.includes(i) ? 'critical' : m.warn.includes(i) ? 'watch' : 'secure';
   };
-  const valFor = (i: number): string => (stFor(i) === 'secure' ? services[i][3] : (WORSE[i] ?? services[i][3]));
+  const valFor = (i: number): string =>
+    stFor(i) === 'secure' ? services[i][3] : (WORSE[i] ?? services[i][3]);
 
   const counts = services.reduce(
     (acc, _s, i) => {
@@ -189,9 +254,21 @@ export function InfraHealthPage() {
 
   const healthChecks: [string, Tone, string][] = [
     ['/healthz liveness', 'secure', '200 · 12ms'],
-    ['/readyz readiness', st === 'critical' ? 'critical' : 'secure', st === 'critical' ? 'timeout' : '200 · 18ms'],
-    ['dependency probes', st === 'secure' ? 'secure' : 'watch', st === 'secure' ? 'all green' : '1 slow'],
-    ['resource headroom', st === 'critical' ? 'critical' : st === 'watch' ? 'watch' : 'secure', st === 'critical' ? 'exhausted' : 'within bounds'],
+    [
+      '/readyz readiness',
+      st === 'critical' ? 'critical' : 'secure',
+      st === 'critical' ? 'timeout' : '200 · 18ms',
+    ],
+    [
+      'dependency probes',
+      st === 'secure' ? 'secure' : 'watch',
+      st === 'secure' ? 'all green' : '1 slow',
+    ],
+    [
+      'resource headroom',
+      st === 'critical' ? 'critical' : st === 'watch' ? 'watch' : 'secure',
+      st === 'critical' ? 'exhausted' : 'within bounds',
+    ],
   ];
 
   return (
@@ -199,26 +276,42 @@ export function InfraHealthPage() {
       {/* header */}
       <DbCard className="mb-[18px] p-5">
         <div className="flex flex-wrap items-start gap-[18px]">
-          <div className="flex flex-none items-center justify-center rounded-md" style={{ width: 46, height: 46, background: 'rgba(220,38,38,0.12)', color: '#DC2626' }}>
+          <div
+            className="flex flex-none items-center justify-center rounded-md"
+            style={{ width: 46, height: 46, background: 'rgba(220,38,38,0.12)', color: '#DC2626' }}
+          >
             <Server size={23} />
           </div>
           <div className="min-w-[280px] flex-1">
             <Eyebrow>Surface 01 · platform &amp; infrastructure</Eyebrow>
-            <h1 className="font-serif font-bold text-text" style={{ fontSize: 30, lineHeight: 1.05, margin: '3px 0 4px' }}>
+            <h1
+              className="font-serif font-bold text-text"
+              style={{ fontSize: 30, lineHeight: 1.05, margin: '3px 0 4px' }}
+            >
               Platform &amp; infra health
             </h1>
             <div className="text-text-silver" style={{ fontSize: 14.5, maxWidth: 540 }}>
-              Up, degraded or down across the platform — <b>Spine</b>, the <b>Astras</b>, and the <b>mesh muscle</b>, in one
-              read.
+              Up, degraded or down across the platform — <b>Spine</b>, the <b>Astras</b>, and the{' '}
+              <b>mesh muscle</b>, in one read.
             </div>
           </div>
           <div className="flex flex-wrap gap-[10px]">
             {headerStats.map(([cap, n, tn]) => (
-              <div key={cap} className="rounded-md border border-border bg-bg-elevated" style={{ padding: '10px 14px', minWidth: 80 }}>
-                <div className="mb-1 font-mono uppercase text-text-muted" style={{ fontSize: 9.5, letterSpacing: '0.08em' }}>
+              <div
+                key={cap}
+                className="rounded-md border border-border bg-bg-elevated"
+                style={{ padding: '10px 14px', minWidth: 80 }}
+              >
+                <div
+                  className="mb-1 font-mono uppercase text-text-muted"
+                  style={{ fontSize: 9.5, letterSpacing: '0.08em' }}
+                >
                   {cap}
                 </div>
-                <div className="font-serif font-bold" style={{ fontSize: 24, lineHeight: 1, color: TONE[tn].c }}>
+                <div
+                  className="font-serif font-bold"
+                  style={{ fontSize: 24, lineHeight: 1, color: TONE[tn].c }}
+                >
                   {n}
                 </div>
               </div>
@@ -236,10 +329,21 @@ export function InfraHealthPage() {
                 <Eyebrow>{dom}</Eyebrow>
                 <span className="h-px flex-1 bg-border" />
               </div>
-              <div className="grid gap-[10px]" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
+              <div
+                className="grid gap-[10px]"
+                style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}
+              >
                 {services.map((s, idx) =>
                   s[1] === dom ? (
-                    <Tile key={s[0]} svc={s} idx={idx} st={stFor(idx)} val={valFor(idx)} active={idx === i} onClick={() => setSelI(idx)} />
+                    <Tile
+                      key={s[0]}
+                      svc={s}
+                      idx={idx}
+                      st={stFor(idx)}
+                      val={valFor(idx)}
+                      active={idx === i}
+                      onClick={() => setSelI(idx)}
+                    />
                   ) : null,
                 )}
               </div>
@@ -261,17 +365,26 @@ export function InfraHealthPage() {
                 {svc[1]}
               </span>
             </div>
-            <h2 className="font-serif font-bold text-text" style={{ fontSize: 22, lineHeight: 1.05, margin: '0 0 12px' }}>
+            <h2
+              className="font-serif font-bold text-text"
+              style={{ fontSize: 22, lineHeight: 1.05, margin: '0 0 12px' }}
+            >
               {svc[0]}
             </h2>
 
             <div className="mb-2 flex justify-between">
               <Eyebrow>{svc[2]} · last 6h</Eyebrow>
-              <span className="font-mono font-bold" style={{ fontSize: 12, color: st === 'secure' ? 'var(--text, #F8F9FA)' : k.c }}>
+              <span
+                className="font-mono font-bold"
+                style={{ fontSize: 12, color: st === 'secure' ? 'var(--text, #F8F9FA)' : k.c }}
+              >
                 {valFor(i)}
               </span>
             </div>
-            <div className="mb-[14px] rounded-md border border-border" style={{ padding: '6px 6px 0' }}>
+            <div
+              className="mb-[14px] rounded-md border border-border"
+              style={{ padding: '6px 6px 0' }}
+            >
               <BigGraph seed={i + 11} tone={st} />
             </div>
 
@@ -281,9 +394,20 @@ export function InfraHealthPage() {
                 <div
                   key={nm}
                   className="flex items-center gap-[9px]"
-                  style={{ padding: '7px 0', borderBottom: idx < 3 ? '1px dashed var(--border, #1F252C)' : 'none' }}
+                  style={{
+                    padding: '7px 0',
+                    borderBottom: idx < 3 ? '1px dashed var(--border, #1F252C)' : 'none',
+                  }}
                 >
-                  <span style={{ width: 8, height: 8, flex: 'none', borderRadius: 99, background: TONE[s2].c }} />
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      flex: 'none',
+                      borderRadius: 99,
+                      background: TONE[s2].c,
+                    }}
+                  />
                   <span className="flex-1 text-text-silver" style={{ fontSize: 13 }}>
                     {nm}
                   </span>
@@ -303,7 +427,12 @@ export function InfraHealthPage() {
                   style={{ padding: '4px 10px', fontSize: 12 }}
                 >
                   <span
-                    style={{ width: 7, height: 7, borderRadius: 99, background: idx === 0 && st !== 'secure' ? STATUS_BLUE : TONE.secure.c }}
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: 99,
+                      background: idx === 0 && st !== 'secure' ? STATUS_BLUE : TONE.secure.c,
+                    }}
                   />
                   <span className="font-mono text-text-silver">{dep}</span>
                 </span>

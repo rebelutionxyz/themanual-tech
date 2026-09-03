@@ -1,7 +1,7 @@
-import { Navigate } from 'react-router-dom';
 import { AdminLayout } from '@/admin/AdminLayout';
 import { getSectionsForTier } from '@/admin/registry';
 import { useUserRole } from '@/lib/useUserRole';
+import { Navigate } from 'react-router-dom';
 
 const PANEL_BG = '#0A1628';
 const TEXT_PRIMARY = '#F0F0F5';
@@ -34,9 +34,7 @@ export function NucleusPage() {
             style={{ background: PANEL_BG, color: TEXT_PRIMARY }}
           >
             <h1 className="font-display text-2xl font-semibold">Restricted</h1>
-            <p className="mt-3 text-sm">
-              The Nucleus is restricted to the Five Keyholders.
-            </p>
+            <p className="mt-3 text-sm">The Nucleus is restricted to the Five Keyholders.</p>
             <p className="mt-2 text-xs" style={{ color: TEXT_MUTED }}>
               See canon §31 — Three Switches & Five Keyholders.
             </p>

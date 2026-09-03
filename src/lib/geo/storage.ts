@@ -6,8 +6,8 @@
 // Anonymous Bees fully supported — these helpers do not depend on auth.
 
 import { isKnownCountryCode } from './countries';
-import { isKnownUsStateCode } from './us-states';
 import type { GeoBarState, GeoLocation, StoredSearchLocation } from './types';
+import { isKnownUsStateCode } from './us-states';
 
 export const STORAGE_KEYS = {
   searchLocation: 'honeycomb:geo:search-location',

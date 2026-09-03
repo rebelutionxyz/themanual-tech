@@ -1,7 +1,7 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured } from './supabase';
-import { isPwnedPassword, PWNED_PASSWORD_MESSAGE } from './security/pwnedPassword';
+import { type ReactNode, createContext, useContext, useEffect, useState } from 'react';
+import { PWNED_PASSWORD_MESSAGE, isPwnedPassword } from './security/pwnedPassword';
+import { isSupabaseConfigured, supabase } from './supabase';
 
 export interface Bee {
   id: string;

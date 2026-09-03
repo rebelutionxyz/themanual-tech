@@ -1,5 +1,6 @@
 import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useAuth } from '@/lib/auth';
+import { hintSeen, markHintSeen } from '@/lib/hints';
 import {
   type MediaAsset,
   assetUrl,
@@ -9,7 +10,6 @@ import {
   updateAssetMeta,
 } from '@/lib/media';
 import { cn } from '@/lib/utils';
-import { hintSeen, markHintSeen } from '@/lib/hints';
 import {
   ArrowLeft,
   Check,
@@ -659,7 +659,9 @@ export function VideoEditorPage() {
               title="Landscape 16:9"
               className={cn(
                 'flex items-center gap-1 rounded-sm px-2 py-1 text-[12px] disabled:opacity-50',
-                !portrait ? 'bg-amber-50 font-semibold text-amber-700' : 'text-zinc-500 hover:text-zinc-900',
+                !portrait
+                  ? 'bg-amber-50 font-semibold text-amber-700'
+                  : 'text-zinc-500 hover:text-zinc-900',
               )}
             >
               <Monitor size={13} /> 16:9
@@ -671,7 +673,9 @@ export function VideoEditorPage() {
               title="Vertical 9:16 — Shorts/Reels/TikTok, blur-padded"
               className={cn(
                 'flex items-center gap-1 rounded-sm px-2 py-1 text-[12px] disabled:opacity-50',
-                portrait ? 'bg-amber-50 font-semibold text-amber-700' : 'text-zinc-500 hover:text-zinc-900',
+                portrait
+                  ? 'bg-amber-50 font-semibold text-amber-700'
+                  : 'text-zinc-500 hover:text-zinc-900',
               )}
             >
               <Smartphone size={13} /> 9:16

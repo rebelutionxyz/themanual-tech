@@ -1,4 +1,3 @@
-import { supabase } from './supabase';
 import {
   computeSafetyNumber,
   decryptBody,
@@ -13,6 +12,7 @@ import {
   rekeyConversation,
   resealConversationKey,
 } from './e2ee';
+import { supabase } from './supabase';
 
 /**
  * COMMs v1 (text layer) — typed wrappers over the comms_* RPCs, now end-to-end
@@ -315,7 +315,10 @@ async function sendEncrypted(
 ): Promise<string> {
   const bee = await myBee();
   const ck = await getConversationKey(bee, conversationId);
-  if (!ck) throw new Error('Encryption is still setting up for this conversation — try again in a moment.');
+  if (!ck)
+    throw new Error(
+      'Encryption is still setting up for this conversation — try again in a moment.',
+    );
   const enc = await encryptBody(ck, plaintext);
   const { data, error } = await req().rpc('comms_send', {
     p_conversation_id: conversationId,
@@ -345,7 +348,10 @@ export async function editMessage(
 ): Promise<void> {
   const bee = await myBee();
   const ck = await getConversationKey(bee, conversationId);
-  if (!ck) throw new Error('Encryption is still setting up for this conversation — try again in a moment.');
+  if (!ck)
+    throw new Error(
+      'Encryption is still setting up for this conversation — try again in a moment.',
+    );
   const enc = await encryptBody(ck, newText);
   const { error } = await req().rpc('comms_edit_message', { p_message_id: messageId, p_body: enc });
   if (error) throw error;
@@ -492,7 +498,10 @@ export async function sendVoiceMessage(
 ): Promise<string> {
   const bee = await myBee();
   const ck = await getConversationKey(bee, conversationId);
-  if (!ck) throw new Error('Encryption is still setting up for this conversation — try again in a moment.');
+  if (!ck)
+    throw new Error(
+      'Encryption is still setting up for this conversation — try again in a moment.',
+    );
   const plain = new Uint8Array(await audio.arrayBuffer());
   const sealed = await encryptBytes(ck, plain);
   const uploadType = voiceUploadType(mime);
@@ -717,7 +726,9 @@ export async function callTimeout(roomId: string): Promise<void> {
 export async function getRoomToken(
   roomId: string,
 ): Promise<{ token: string; url: string; canPublish: boolean }> {
-  const { data, error } = await req().functions.invoke('livekit-token', { body: { room_id: roomId } });
+  const { data, error } = await req().functions.invoke('livekit-token', {
+    body: { room_id: roomId },
+  });
   if (error) throw error;
   const r = data as Row;
   if (!r?.token) throw new Error(r?.error || 'no token returned');
@@ -797,7 +808,12 @@ export async function enqueueRoulette(
   const { data, error } = await req().rpc('comms_roulette_enqueue', { p_mode: mode });
   if (error) throw error;
   const r = data as Row;
-  return { matched: !!r.matched, roomId: r.room_id, livekitRoom: r.livekit_room, partner: r.partner };
+  return {
+    matched: !!r.matched,
+    roomId: r.room_id,
+    livekitRoom: r.livekit_room,
+    partner: r.partner,
+  };
 }
 
 export async function cancelRoulette(): Promise<void> {
@@ -888,8 +904,10 @@ export function subscribeConversationList(
     .on('postgres_changes', { event: '*', schema: 'public', table: 'comms_participants' }, () =>
       onChange(),
     )
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'comms_conversations' }, () =>
-      onChange(),
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'comms_conversations' },
+      () => onChange(),
     )
     .subscribe();
   return {
@@ -1126,7 +1144,6 @@ export async function searchBees(
   return (data ?? []) as { id: string; handle: string; name: string | null }[];
 }
 
-
 // ── Pinned messages ──────────────────────────────────────────────────────────
 
 export type CommsPin = { messageId: string; pinnedBy: string; createdAt: string };
@@ -1184,7 +1201,12 @@ export async function listRoomParticipants(roomId: string): Promise<RoomParticip
     .is('left_at', null)
     .order('joined_at', { ascending: true });
   if (error) throw error;
-  type R = { bee_id: string; role: string; left_at: string | null; bees: { handle: string } | { handle: string }[] | null };
+  type R = {
+    bee_id: string;
+    role: string;
+    left_at: string | null;
+    bees: { handle: string } | { handle: string }[] | null;
+  };
   return ((data ?? []) as R[]).map((r) => ({
     beeId: r.bee_id,
     role: r.role,
@@ -1203,7 +1225,12 @@ export function subscribeRoomParticipants(
     .channel(`room-parts:${roomId}`)
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'comms_room_participants', filter: `room_id=eq.${roomId}` },
+      {
+        event: '*',
+        schema: 'public',
+        table: 'comms_room_participants',
+        filter: `room_id=eq.${roomId}`,
+      },
       onChange,
     )
     .subscribe();

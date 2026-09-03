@@ -51,7 +51,8 @@ export function PremiumPage() {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {MEMBERSHIP_TIERS.map((tier) => {
-          const isCurrent = activeTier === tier.key || (tier.key === 'free' && activeTier === 'free');
+          const isCurrent =
+            activeTier === tier.key || (tier.key === 'free' && activeTier === 'free');
           const isTop = tier.key === 'royal_jelly';
           return (
             <div
@@ -60,11 +61,7 @@ export function PremiumPage() {
                 'relative flex flex-col rounded-xl border p-5',
                 isTop ? 'shadow-lg' : 'border-zinc-200 bg-white',
               )}
-              style={
-                isTop
-                  ? { borderColor: `${GOLD}70`, background: `${GOLD}0C` }
-                  : undefined
-              }
+              style={isTop ? { borderColor: `${GOLD}70`, background: `${GOLD}0C` } : undefined}
             >
               <p
                 className="font-display text-[17px] font-semibold"
@@ -99,7 +96,10 @@ export function PremiumPage() {
                   disabled
                   title="Monthly DONATIONS open with fiat rail activation"
                   className="mt-3 cursor-not-allowed rounded-md px-3 py-2 text-[12.5px] font-semibold opacity-60"
-                  style={{ background: isTop ? GOLD : '#E4E4E7', color: isTop ? '#18181b' : '#71717A' }}
+                  style={{
+                    background: isTop ? GOLD : '#E4E4E7',
+                    color: isTop ? '#18181b' : '#71717A',
+                  }}
                 >
                   DONATE monthly — opening soon
                 </button>
@@ -110,10 +110,7 @@ export function PremiumPage() {
       </div>
 
       {!bee && (
-        <p
-          className="mt-8 text-center font-mono text-[11.5px] text-zinc-500"
-          data-size="meta"
-        >
+        <p className="mt-8 text-center font-mono text-[11.5px] text-zinc-500" data-size="meta">
           Sign in to see your tier.
         </p>
       )}

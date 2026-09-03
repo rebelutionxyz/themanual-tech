@@ -1,5 +1,8 @@
 import { MediaPicker } from '@/components/studio/MediaPicker';
 import { useAuth } from '@/lib/auth';
+import type { BrandingConfig } from '@/lib/branding';
+import { hintSeen, markHintSeen } from '@/lib/hints';
+import { HoloCompositor } from '@/lib/holo';
 import {
   type MediaAsset,
   assetUrl,
@@ -7,11 +10,8 @@ import {
   getAsset,
   saveBlobToLibrary,
 } from '@/lib/media';
-import { cn } from '@/lib/utils';
-import { hintSeen, markHintSeen } from '@/lib/hints';
-import { HoloCompositor } from '@/lib/holo';
 import { drawWordmarkStamp, fetchMyKits, resolveSkin } from '@/lib/skins';
-import type { BrandingConfig } from '@/lib/branding';
+import { cn } from '@/lib/utils';
 import {
   ArrowLeft,
   Camera,
@@ -239,7 +239,9 @@ export function ResponseRecorderPage() {
       .then(() => setHoloReady(true))
       .catch(() => {
         holo.current = null;
-        setError('Holo mode could not load (model download blocked?) — pick another layout or retry.');
+        setError(
+          'Holo mode could not load (model download blocked?) — pick another layout or retry.',
+        );
         setLayout('pip');
         setBackdrop('none');
       });
@@ -259,13 +261,7 @@ export function ResponseRecorderPage() {
       const src = srcVideo.current;
       const mode = layoutRef.current;
 
-      const drawCam = (
-        el: HTMLVideoElement,
-        dx: number,
-        dy: number,
-        dw: number,
-        dh: number,
-      ) => {
+      const drawCam = (el: HTMLVideoElement, dx: number, dy: number, dw: number, dh: number) => {
         const f = camFilterRef.current;
         if (f === 'pixel') {
           // downscale → upscale with smoothing off = chunky anonymity
@@ -456,9 +452,9 @@ export function ResponseRecorderPage() {
       start: () => void;
       stop: () => void;
     };
-    const Ctor = (
-      window as unknown as { SpeechRecognition?: RecogCtor; webkitSpeechRecognition?: RecogCtor }
-    ).SpeechRecognition ??
+    const Ctor =
+      (window as unknown as { SpeechRecognition?: RecogCtor; webkitSpeechRecognition?: RecogCtor })
+        .SpeechRecognition ??
       (window as unknown as { webkitSpeechRecognition?: RecogCtor }).webkitSpeechRecognition;
     if (!Ctor) return;
     let alive = true;
@@ -857,7 +853,9 @@ export function ResponseRecorderPage() {
                 }}
                 className={cn(
                   'rounded-sm px-2 py-1 text-[11.5px] font-medium',
-                  backdrop === bd ? 'bg-amber-50 font-semibold text-amber-700' : 'text-zinc-500 hover:text-zinc-900',
+                  backdrop === bd
+                    ? 'bg-amber-50 font-semibold text-amber-700'
+                    : 'text-zinc-500 hover:text-zinc-900',
                 )}
                 title={
                   bd === 'none'
@@ -876,7 +874,11 @@ export function ResponseRecorderPage() {
           type="button"
           onClick={() => setPortrait((v) => !v)}
           disabled={recording || countdown !== null}
-          title={portrait ? 'Vertical 9:16 — tap for landscape' : 'Landscape 16:9 — tap for vertical (Shorts/Reels)'}
+          title={
+            portrait
+              ? 'Vertical 9:16 — tap for landscape'
+              : 'Landscape 16:9 — tap for vertical (Shorts/Reels)'
+          }
           className={cn(
             'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] disabled:opacity-40',
             portrait

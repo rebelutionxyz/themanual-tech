@@ -1,8 +1,8 @@
 // HQ §1 — Failed Logins
 // Reads failed_login_events (admin-only RLS). Time-range filter via dropdown.
 
-import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
 
 interface Row {
   id: string;
@@ -52,7 +52,9 @@ export function FailedLogins() {
       }
       setRows((data ?? []) as Row[]);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [range]);
 
   return (
@@ -96,13 +98,19 @@ export function FailedLogins() {
   );
 }
 
-function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+function Section({
+  title,
+  subtitle,
+  children,
+}: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
     <div>
       <header className="mb-4">
         <h2 className="font-display text-2xl font-semibold text-text-silver-bright">{title}</h2>
         {subtitle && (
-          <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }}>{subtitle}</p>
+          <p className="mt-1 font-mono text-text-muted" style={{ fontSize: '11px' }}>
+            {subtitle}
+          </p>
         )}
       </header>
       {children}
@@ -113,13 +121,19 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
 function RangeDropdown({ value, onChange }: { value: Range; onChange: (v: Range) => void }) {
   return (
     <label className="inline-flex items-center gap-2 text-sm text-text-silver">
-      <span className="font-mono uppercase text-text-muted" style={{ fontSize: '11px' }}>range:</span>
+      <span className="font-mono uppercase text-text-muted" style={{ fontSize: '11px' }}>
+        range:
+      </span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as Range)}
         className="rounded-md border border-border bg-bg px-2 py-1 text-sm text-text focus:border-text-silver/50 focus:outline-none"
       >
-        {RANGES.map((r) => <option key={r} value={r}>{r}</option>)}
+        {RANGES.map((r) => (
+          <option key={r} value={r}>
+            {r}
+          </option>
+        ))}
       </select>
     </label>
   );
@@ -137,7 +151,10 @@ function LoadingRows() {
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-4 rounded-md border border-border bg-bg-elevated/40 px-4 py-6 text-center text-text-dim" style={{ fontSize: '13px' }}>
+    <div
+      className="mt-4 rounded-md border border-border bg-bg-elevated/40 px-4 py-6 text-center text-text-dim"
+      style={{ fontSize: '13px' }}
+    >
       {children}
     </div>
   );

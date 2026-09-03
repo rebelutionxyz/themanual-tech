@@ -34,16 +34,12 @@ function Placeholder({ surfaceName, description }: PlaceholderProps) {
         className="mx-auto mb-6 h-1 w-16 rounded-full"
         style={{ background: accent }}
       />
-      <h1 className="font-display text-3xl font-semibold text-text-silver-bright">
-        {surfaceName}
-      </h1>
+      <h1 className="font-display text-3xl font-semibold text-text-silver-bright">{surfaceName}</h1>
       <p className="mt-4 text-base text-text-muted">
         Coming soon
         {astra ? ` on ${astra.wordmark}` : ''}.
       </p>
-      {description && (
-        <p className="mt-2 text-sm text-text-muted/80">{description}</p>
-      )}
+      {description && <p className="mt-2 text-sm text-text-muted/80">{description}</p>}
     </div>
   );
 }
