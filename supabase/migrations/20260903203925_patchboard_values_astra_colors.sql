@@ -61,12 +61,14 @@ alter table public.patchboard_values enable row level security;
 -- READ: a Bee reads the non-Bee scopes (Astra + Master defaults) and their own
 -- rows, and nobody else's. Colour is not secret, but a Bee's personal overrides
 -- are theirs; there is no reason for one Bee's palette to be readable by another.
+drop policy if exists patchboard_values_read_scoped on public.patchboard_values;
 create policy patchboard_values_read_scoped on public.patchboard_values
   for select to authenticated
   using (bee_id is null or bee_id = auth.uid());
 
 -- READ (anon): the shared scopes only, so a logged-out visitor still gets the
 -- astra's real colours rather than the code floor.
+drop policy if exists patchboard_values_read_anon on public.patchboard_values;
 create policy patchboard_values_read_anon on public.patchboard_values
   for select to anon
   using (bee_id is null);
@@ -88,7 +90,7 @@ create policy patchboard_values_read_anon on public.patchboard_values
 create or replace function public.patchboard_set_value(
   p_value_key text, p_bee_id uuid, p_astra_id uuid, p_value jsonb
 ) returns void
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public as $fn$
 begin
   if jsonb_typeof(p_value) is distinct from 'object' then
     raise exception 'value must be a jsonb object';
@@ -144,7 +146,7 @@ begin
     on conflict (value_key) where bee_id is null and astra_id is null
       do update set value = excluded.value, updated_at = now(), updated_by = auth.uid();
   end if;
-end $$;
+end $fn$;
 
 comment on function public.patchboard_set_value(text, uuid, uuid, jsonb) is
   'Sets a Patchboard value at the (bee_id, astra_id)-encoded scope. Authority: bee scope = that Bee only, while bee_override resolves ON; astra scope = that astra''s Director or a platform admin, while astra_override resolves ON; master scope = platform admin only, while master_override resolves ON.';
@@ -152,7 +154,7 @@ comment on function public.patchboard_set_value(text, uuid, uuid, jsonb) is
 create or replace function public.patchboard_clear_value(
   p_value_key text, p_bee_id uuid, p_astra_id uuid
 ) returns void
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public as $fn$
 begin
   if p_bee_id is not null then
     if auth.uid() is null or auth.uid() <> p_bee_id then
@@ -178,14 +180,18 @@ begin
    where value_key = p_value_key
      and bee_id is not distinct from p_bee_id
      and astra_id is not distinct from p_astra_id;
-end $$;
+end $fn$;
 
 comment on function public.patchboard_clear_value(text, uuid, uuid) is
   'Clears a Patchboard value at the (bee_id, astra_id)-encoded scope. Same authority as patchboard_set_value, but never gated by the level switch - removing an override cannot cause the accumulation problem the switch guards against.';
 
+-- Grants. REVOKE FROM PUBLIC is NOT enough in this project (ALTER DEFAULT PRIVILEGES grants anon
+-- explicitly) — lesson from 20260903202124. Revoke from anon explicitly.
 revoke all on function public.patchboard_set_value(text, uuid, uuid, jsonb) from public;
+revoke execute on function public.patchboard_set_value(text, uuid, uuid, jsonb) from anon;
 grant execute on function public.patchboard_set_value(text, uuid, uuid, jsonb) to authenticated;
 revoke all on function public.patchboard_clear_value(text, uuid, uuid) from public;
+revoke execute on function public.patchboard_clear_value(text, uuid, uuid) from anon;
 grant execute on function public.patchboard_clear_value(text, uuid, uuid) to authenticated;
 
 -- THE THREE LEVEL SWITCHES. Ordinary soft switches, so they default ON via

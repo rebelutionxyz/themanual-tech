@@ -74,9 +74,7 @@ CREATE TABLE IF NOT EXISTS public.patchboard_settings (
 CREATE INDEX IF NOT EXISTS patchboard_settings_lookup_idx
   ON public.patchboard_settings (switch_key, bee_id, astra_id);
 COMMENT ON TABLE public.patchboard_settings IS
-  'Patchboard switch values. (bee_id, astra_id) cardinality encodes scope: '
-  '(X,NULL)=Bee platform-wide, (X,Y)=Bee per-Astra, (NULL,Y)=Astra default, '
-  '(NULL,NULL)=Master default (patchboard-pattern §8.2).';
+  'Patchboard switch values. (bee_id, astra_id) cardinality encodes scope: (X,NULL)=Bee platform-wide, (X,Y)=Bee per-Astra, (NULL,Y)=Astra default, (NULL,NULL)=Master default (patchboard-pattern §8.2).';
 
 -- ── 3. provider registry (Master scope, §36.5) ─────────────────────────────
 CREATE TABLE IF NOT EXISTS public.patchboard_providers (
@@ -91,8 +89,7 @@ CREATE TABLE IF NOT EXISTS public.patchboard_providers (
   created_at   timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE public.patchboard_providers IS
-  'The closed set of integrations that may be connected anywhere (MMF §36.5). '
-  'Astras offer a subset; users connect from what their Astra offers.';
+  'The closed set of integrations that may be connected anywhere (MMF §36.5). Astras offer a subset; users connect from what their Astra offers.';
 
 -- ── 4. connection records (RLS-private account data, NEVER a switch, §36.4.1) ─
 CREATE TABLE IF NOT EXISTS public.connected_accounts (
@@ -106,11 +103,9 @@ CREATE TABLE IF NOT EXISTS public.connected_accounts (
   UNIQUE (bee_id, provider_id)
 );
 COMMENT ON TABLE public.connected_accounts IS
-  'A user connection record (OAuth token ref / account id / address). RLS-private. '
-  'Dormancy, not deletion (§36.4.2): Offer-off sets status=dormant, never DELETE.';
+  'A user connection record (OAuth token ref / account id / address). RLS-private. Dormancy, not deletion (§36.4.2): Offer-off sets status=dormant, never DELETE.';
 COMMENT ON COLUMN public.connected_accounts.secret_name IS
-  'Name/handle of the vault entry holding the credential — the credential itself '
-  'is NEVER stored in this table and NEVER read into the browser.';
+  'Name/handle of the vault entry holding the credential — the credential itself is NEVER stored in this table and NEVER read into the browser.';
 
 -- ── RLS ─────────────────────────────────────────────────────────────────────
 ALTER TABLE public.patchboard_switches  ENABLE ROW LEVEL SECURITY;
@@ -144,7 +139,7 @@ CREATE POLICY connected_accounts_own ON public.connected_accounts
 CREATE OR REPLACE FUNCTION public.get_effective_switch_state(
   p_bee_id uuid, p_astra_id uuid, p_switch_key text
 ) RETURNS boolean
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $fn$
 DECLARE v boolean;
 BEGIN
   -- Hard switches sit above the cascade — always ON.
@@ -174,14 +169,14 @@ BEGIN
     SELECT 1 FROM public.patchboard_switches
      WHERE switch_key = p_switch_key AND sensitive = true
   );
-END $$;
+END $fn$;
 
 -- ── Write RPCs (the front code's propose-first callsites) ───────────────────
 -- Bee-scope write: a user sets one of their own switches.
 CREATE OR REPLACE FUNCTION public.patchboard_set_bee_switch(
   p_switch_key text, p_astra_id uuid, p_enabled boolean
 ) RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $fn$
 BEGIN
   IF p_switch_key IN ('tos','kyc','age_18_plus','geo') THEN
     RAISE EXCEPTION 'hard switches are immutable';
@@ -191,14 +186,14 @@ BEGIN
   VALUES (p_switch_key, auth.uid(), p_astra_id, p_enabled, auth.uid())
   ON CONFLICT (switch_key, bee_id, astra_id)
     DO UPDATE SET enabled = EXCLUDED.enabled, set_at = now(), set_by = auth.uid();
-END $$;
+END $fn$;
 
 -- Master-scope write: HQ sets a platform default (also used for a provider's
 -- master offer, key connect_offer:<id>). is_admin gated.
 CREATE OR REPLACE FUNCTION public.patchboard_set_master_switch(
   p_switch_key text, p_enabled boolean
 ) RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $fn$
 BEGIN
   IF p_switch_key IN ('tos','kyc','age_18_plus','geo') THEN
     RAISE EXCEPTION 'hard switches are immutable floors';
@@ -208,45 +203,45 @@ BEGIN
   VALUES (p_switch_key, NULL, NULL, p_enabled, auth.uid())
   ON CONFLICT (switch_key, bee_id, astra_id)
     DO UPDATE SET enabled = EXCLUDED.enabled, set_at = now(), set_by = auth.uid();
-END $$;
+END $fn$;
 
 -- Connected Accounts: Use switch (surface my connection here).
 CREATE OR REPLACE FUNCTION public.patchboard_set_use(
   p_provider_id text, p_astra_id uuid, p_used boolean
 ) RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $fn$
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'auth required'; END IF;
   INSERT INTO public.patchboard_settings (switch_key, bee_id, astra_id, enabled, set_by)
   VALUES ('connect_use:' || p_provider_id, auth.uid(), p_astra_id, p_used, auth.uid())
   ON CONFLICT (switch_key, bee_id, astra_id)
     DO UPDATE SET enabled = EXCLUDED.enabled, set_at = now(), set_by = auth.uid();
-END $$;
+END $fn$;
 
 -- Connected Accounts: begin a connection flow. STUB — the real OAuth/redirect
 -- wiring is a follow-on db+edge dispatch; returns NULL redirect for now.
 CREATE OR REPLACE FUNCTION public.patchboard_connect_begin(
   p_provider_id text
 ) RETURNS json
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $fn$
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'auth required'; END IF;
   PERFORM 1 FROM public.patchboard_providers WHERE id = p_provider_id AND active;
   IF NOT FOUND THEN RAISE EXCEPTION 'unknown provider'; END IF;
   RETURN json_build_object('redirect_url', NULL);
-END $$;
+END $fn$;
 
 -- Connected Accounts: disconnect = dormate (never delete, §36.4.2).
 CREATE OR REPLACE FUNCTION public.patchboard_disconnect(
   p_provider_id text
 ) RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $fn$
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'auth required'; END IF;
   UPDATE public.connected_accounts
      SET status = 'dormant'
    WHERE bee_id = auth.uid() AND provider_id = p_provider_id;
-END $$;
+END $fn$;
 
 -- ── Seeds: hard switches + provider registry ────────────────────────────────
 INSERT INTO public.patchboard_switches (scope, switch_key, switch_class, default_state, label, description, sensitive)
