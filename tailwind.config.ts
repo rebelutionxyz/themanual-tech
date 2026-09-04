@@ -1,7 +1,12 @@
 import type { Config } from 'tailwindcss';
 
 export default {
-  content: ['./index.html', './src/**/*.{ts,tsx}', '../shared/shell/src/**/*.{ts,tsx}'],
+  content: [
+    './index.html',
+    './src/**/*.{ts,tsx}',
+    '../shared/shell/src/**/*.{ts,tsx}',
+    '../shared/profile/src/**/*.{ts,tsx}',
+  ],
   darkMode: 'class',
   theme: {
     extend: {

@@ -1,4 +1,3 @@
-import { ProfileLocationEditor } from '@/components/profile/ProfileLocationEditor';
 import { MediaLightbox } from '@/components/studio/MediaLightbox';
 import { useAuth } from '@/lib/auth';
 import {
@@ -9,62 +8,18 @@ import {
   listCollectionAssets,
   listPublicCollections,
 } from '@/lib/media';
-import { getOGDisplayLabel, getOGGeneration } from '@/lib/og-generation';
-import { cn } from '@/lib/utils';
-import { Crown, FileText, Globe, Layers, LogOut, Music, Sparkles, X } from 'lucide-react';
+import { ManualProfileHost } from '@/lib/profileHost';
+import { ProfileOwnPage } from '@honeycomb/profile';
+import { FileText, Globe, Layers, Music, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 
-export const BLING_RANK_NAMES = [
-  'Seed',
-  'Sprout',
-  'Sapling',
-  'Ranger',
-  'Scout',
-  'Squire',
-  'Knight',
-  'Protector',
-  'Defender',
-  'Guardian',
-  'Champion',
-  'Hero',
-  'Paladin',
-  'Sage',
-  'Wizard',
-  'Mystic',
-  'Oracle',
-  'Prophet',
-  'Luminary',
-  'Ascendant',
-  'Exalted',
-  'Sovereign',
-  'Radiant',
-  'Celestial',
-  'Divine',
-  'Archon',
-  'Demiurge',
-  'Eternal',
-  'Infinite',
-  'Transcendent',
-  'Absolute',
-  'Miraculous',
-  'Miracle',
-];
-
-export const RING_NAMES = [
-  'NewBee',
-  'Producer',
-  'Scout',
-  'Builder',
-  'Scholar',
-  'Sentinel',
-  'Guardian',
-  'Creator',
-  'Queen',
-];
-
-export const RING_THRESHOLDS = [0, 500, 2000, 6000, 15000, 35000, 75000, 150000, 300000];
-
+/**
+ * PROFILE_SHARED1 — thin adapter. The core (header, sign-out, rank/ring
+ * cards, location editor) now lives in @honeycomb/profile's ProfileOwnPage;
+ * this file supplies only what's roof-specific to TheMANUAL.tech: the
+ * Creator Studio Showcase and the contributions placeholder, as `children`.
+ */
 export function ProfilePage() {
   const { bee, loading, signOut, configured } = useAuth();
 
@@ -78,165 +33,46 @@ export function ProfilePage() {
 
   if (!bee) return <Navigate to="/login" replace />;
 
-  const blingRank = bee.blingRank ?? 0;
-  const ring = bee.honeycombRing ?? 0;
-  const rankName = BLING_RANK_NAMES[Math.min(blingRank, 32)];
-  const ringName = RING_NAMES[Math.min(ring, 8)];
-  const nextRingThreshold = ring < 8 ? RING_THRESHOLDS[ring + 1] : null;
-  const ogLabel = getOGDisplayLabel(getOGGeneration(bee.createdAt));
-
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10 md:px-8">
-      {/* Header */}
-      <div className="mb-10 flex items-center gap-5">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-text-silver/30 bg-bg-elevated">
-          <span className="font-display text-3xl text-text-silver-bright">
-            {bee.handle.slice(0, 1).toUpperCase()}
-          </span>
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="font-display text-3xl font-semibold text-text-silver-bright">
-            {bee.handle}
-          </h1>
+    <ManualProfileHost>
+      <ProfileOwnPage
+        bee={{
+          id: bee.id,
+          handle: bee.handle,
+          blingRank: bee.blingRank ?? 0,
+          honeycombRing: bee.honeycombRing ?? 0,
+          createdAt: bee.createdAt,
+        }}
+        configured={configured}
+        onSignOut={() => signOut()}
+      >
+        {/* Creator Studio Showcase — the Bee's PUBLIC shelves. The same
+            component renders for visitors on /@handle (PublicProfilePage); the
+            hive-read policies it relies on are deployed. */}
+        <ShowcaseSection beeId={bee.id} owner />
+
+        {/* Contributions placeholder */}
+        <div className="mt-10 rounded-lg border border-border bg-bg-elevated/40 p-6">
+          <h2 className="font-display text-xl font-semibold text-text-silver-bright">
+            Your contributions
+          </h2>
           <p
-            className="mt-1 font-mono text-text-muted"
-            style={{ fontSize: '12px' }}
+            className="mt-2 font-mono text-text-muted"
+            style={{ fontSize: '11px' }}
             data-size="meta"
           >
-            Ringbearer · {ringName}
+            Sources added · kettle votes · comments — coming soon
           </p>
-          <div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-honey/40 bg-honey/10 px-2 py-0.5">
-            <Sparkles size={11} className="text-honey" />
-            <span
-              className="font-mono uppercase tracking-wider text-honey"
-              style={{ fontSize: '10.5px' }}
-              data-size="meta"
-            >
-              {ogLabel}
-            </span>
-          </div>
+          <Link
+            to="/manual"
+            className="mt-4 inline-block font-mono text-text-silver hover:text-text-silver-bright"
+            style={{ fontSize: '12px' }}
+          >
+            → Explore the Manual
+          </Link>
         </div>
-        <button
-          type="button"
-          onClick={() => signOut()}
-          className={cn(
-            'flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm',
-            'text-text-dim hover:border-border-bright hover:bg-bg-elevated hover:text-text-silver',
-          )}
-        >
-          <LogOut size={14} />
-          <span>Sign out</span>
-        </button>
-      </div>
-
-      {/* Rank cards */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <RankCard
-          icon={<Sparkles size={16} />}
-          title="BLiNG! Rank"
-          subtitle="33 levels · 1.0x – 10.0x multiplier"
-          level={blingRank}
-          max={32}
-          name={rankName}
-          colorClass="text-honey"
-        />
-        <RankCard
-          icon={<Crown size={16} />}
-          title="The RiNG"
-          subtitle="9 levels · raw action count · cannot be bought"
-          level={ring}
-          max={8}
-          name={ringName}
-          colorClass="text-text-silver-bright"
-          nextThreshold={nextRingThreshold}
-        />
-      </div>
-
-      {/* Phase C Component C-4: location editor — reads/writes bee_profiles */}
-      <ProfileLocationEditor />
-
-      {/* Creator Studio Showcase — the Bee's PUBLIC shelves. The same
-          component renders for visitors on /@handle (PublicProfilePage); the
-          hive-read policies it relies on are deployed. */}
-      <ShowcaseSection beeId={bee.id} owner />
-
-      {/* Contributions placeholder */}
-      <div className="mt-10 rounded-lg border border-border bg-bg-elevated/40 p-6">
-        <h2 className="font-display text-xl font-semibold text-text-silver-bright">
-          Your contributions
-        </h2>
-        <p className="mt-2 font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
-          Sources added · kettle votes · comments — coming soon
-        </p>
-        <Link
-          to="/manual"
-          className="mt-4 inline-block font-mono text-text-silver hover:text-text-silver-bright"
-          style={{ fontSize: '12px' }}
-        >
-          → Explore the Manual
-        </Link>
-      </div>
-
-      {!configured && (
-        <div className="mt-6 rounded-md border border-kettle-contested/30 bg-kettle-contested/10 p-3">
-          <p className="text-kettle-contested" style={{ fontSize: '12px' }}>
-            Read-only mode: Supabase not configured.
-          </p>
-        </div>
-      )}
-    </main>
-  );
-}
-
-interface RankCardProps {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  level: number;
-  max: number;
-  name: string;
-  colorClass: string;
-  nextThreshold?: number | null;
-}
-
-export function RankCard({
-  icon,
-  title,
-  subtitle,
-  level,
-  max,
-  name,
-  colorClass,
-  nextThreshold,
-}: RankCardProps) {
-  const progress = (level / max) * 100;
-  return (
-    <div className="rounded-lg border border-border bg-bg-elevated/40 p-5">
-      <div className="flex items-center gap-2 text-text-silver">
-        <span className={colorClass}>{icon}</span>
-        <span className="font-mono" style={{ fontSize: '11px' }} data-size="meta">
-          {title}
-        </span>
-      </div>
-      <p className="mt-3 font-display text-2xl font-semibold text-text-silver-bright">{name}</p>
-      <p className="mt-0.5 font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
-        Level {level} / {max}
-      </p>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-bg">
-        <div
-          className={cn('h-full transition-all', colorClass.replace('text-', 'bg-'))}
-          style={{ width: `${progress}%` }}
-        />
-      </div>
-      <p className="mt-3 text-text-dim" style={{ fontSize: '12px' }}>
-        {subtitle}
-      </p>
-      {nextThreshold !== null && nextThreshold !== undefined && (
-        <p className="mt-2 font-mono text-text-muted" style={{ fontSize: '11px' }} data-size="meta">
-          next: {nextThreshold.toLocaleString()} actions
-        </p>
-      )}
-    </div>
+      </ProfileOwnPage>
+    </ManualProfileHost>
   );
 }
 

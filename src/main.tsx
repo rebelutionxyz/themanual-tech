@@ -6,6 +6,9 @@ import './index.css';
 // SHELL_PKG1 — the ONE shell (ONE_ROOF v2). Its scoped tokens + the Supabase
 // handle it reads through; the component itself is imported where it's mounted.
 import '@honeycomb/shell/shell.css';
+// PROFILE_SHARED1 — the ONE Bee profile's scoped tokens, extending the same
+// .astra-shell scope shell.css defines. Import after shell.css.
+import '@honeycomb/profile/profile.css';
 import { setShellSupabase } from '@honeycomb/shell';
 import { supabase } from '@/lib/supabase';
 // Scoped surface skin — every rule lives under [data-surface='freedomblings'],

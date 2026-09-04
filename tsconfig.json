@@ -19,6 +19,8 @@
       "@/*": ["./src/*"],
       "@honeycomb/shell": ["../shared/shell/src/index.ts"],
       "@honeycomb/shell/*": ["../shared/shell/src/*"],
+      "@honeycomb/profile": ["../shared/profile/src/index.ts"],
+      "@honeycomb/profile/*": ["../shared/profile/src/*"],
       "react": ["./node_modules/@types/react"],
       "react/*": ["./node_modules/@types/react/*"],
       "react-dom": ["./node_modules/@types/react-dom"],
@@ -26,5 +28,5 @@
       "@supabase/supabase-js": ["./node_modules/@supabase/supabase-js"]
     }
   },
-  "include": ["src", "server", "../shared/shell/src"]
+  "include": ["src", "server", "../shared/shell/src", "../shared/profile/src"]
 }

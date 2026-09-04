@@ -9,6 +9,8 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       // SHELL_PKG1 — the ONE shell lives in the monorepo, not in this app.
       '@honeycomb/shell': path.resolve(__dirname, '../shared/shell/src'),
+      // PROFILE_SHARED1 — the ONE Bee profile, same pattern as the shell.
+      '@honeycomb/profile': path.resolve(__dirname, '../shared/profile/src'),
       // The shared package has no node_modules of its own; its bare imports
       // resolve to THIS app's copies (one React, one lucide, one supabase).
       react: path.resolve(__dirname, './node_modules/react'),
