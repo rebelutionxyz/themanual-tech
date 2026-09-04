@@ -25,6 +25,89 @@ go at the top, under the header.
 
 ---
 
+## KNOW_DB1_APPLY — applied know_db1_v1 to production (2026-09-04)
+
+**Pass:** KNOW_DB1_APPLY | lane `db` | workdir `TheMANUAL.tech` | session `0f8e9763`
+(fallback id). Owner authorization: Butch, 2026-09-04, "apply db1 tonight." Blocked briefly
+on MIGRATION_RECONCILE1/2 below; resumed once `reconcile.mjs measure` returned exit 0.
+
+**What shipped:** `supabase/migrations/20260904053319_know_db1_v1.sql` (promoted from
+`_drafts/know_db1_v1.sql`, stamped version matches filename) — four new tables
+(`justice_watches`, `justice_collections`, `justice_collection_members`, `justice_boosts`),
+two additive columns (`justice_dockets.victim_crime` nullable, `justice_settings.
+contribution_premium_multiplier` NOT NULL DEFAULT 1.50), a `justice_boosts_victim_crime_gate`
+BEFORE INSERT trigger (DB-level backstop for the KNOW_DOCKET1 UI gate — binds service_role,
+unlike RLS), and one dormant `fee_schedule` row (`fee_key=know_boost`, `platform_pct=35`,
+`active=false`). Boosts are FIAT ONLY (CURRENCY_LAW v1.4/v1.6) — no column or statement
+touches `bling_transactions`/`bling_*`. Rollback stays a draft:
+`supabase/migrations/_drafts/know_db1_v1_rollback.sql`.
+
+**Pre-flight re-confirmed cheaply** (not redone blind) against KNOW_DB1_READBACK's numbers:
+0 of the 4 tables/column/function existed, no `know_boost` fee row, `justice_dockets` 1773
+rows, `justice_settings` 1 row, `fee_schedule` 14 rows — unchanged, rows at risk stayed zero.
+
+**Verify after apply (queried live, not assumed):** all 4 tables + both columns + the gate
+function + both triggers + 7 policies present; `fee_schedule` holds exactly one `know_boost`
+row (35%, dormant — not two); all 1773 `justice_dockets` rows still read `victim_crime`
+NULL (nothing backfilled to `false`); the gate was tested with a real `INSERT` against a
+NULL-`victim_crime` docket inside a `DO` block — correctly refused with `check_violation`,
+transaction rolled back on purpose, `justice_boosts` confirmed at 0 rows after.
+
+**Committed locally** (`4ff83b6`), not pushed, per instruction. `KNOW_COLLECTIONS1` and
+`KNOW_YOURS1`'s live providers are now unblocked (tables they were waiting on now exist) —
+their code was not touched in this pass.
+
+## MIGRATION_RECONCILE2 — closed the substantive anon-grant gap MIGRATION_RECONCILE1 found (2026-09-04)
+
+**Pass:** MIGRATION_RECONCILE2 | lane `db` | workdir `TheMANUAL.tech` | session `8967790a`.
+Minted at priority 1 to unblock `KNOW_DB1_APPLY`, which correctly held at the MIGRATION
+AMENDMENT gate rather than proceed over an unreconciled tree.
+
+**What shipped (file-only, production never touched):**
+`20260903202047_patchboard1_switch_system_v1.sql` — collapsed 4 multi-line `COMMENT ON ...
+IS` string literals to match the applied single-line form (SQL-identical either way; Postgres
+concatenates adjacent string constants across a newline) and swapped all 6 functions' `$$`
+dollar-quote tag to `$fn$` to match what's actually stored. `20260903203925_
+patchboard_values_astra_colors.sql` — same cosmetic tag swap plus two `DROP POLICY IF EXISTS`
+guards added to match applied, **and the substantive fix**: added the two
+`revoke execute on function ... from anon` lines (for `patchboard_set_value` and
+`patchboard_clear_value`) that ran live but were missing from the repo file — the same
+anon-grant class `20260903202124_patchboard1_revoke_anon_from_write_rpcs.sql` closed for
+PATCHBOARD1. Direction confirmed correct: the file moved to match the already-safe live
+state, nothing was applied/dropped/re-run against production.
+
+**Verify:** `reconcile.mjs measure` before → NOT RECONCILED, exit 1, 2 discrepancies
+on/after baseline; after → RECONCILED, exit 0. `has_function_privilege` re-checked post-edit:
+`patchboard_set_value`/`patchboard_clear_value` both `anon_can_execute=false`,
+`authenticated_can_execute=true` — unchanged, confirming production was never touched.
+Committed locally (`7a8b0f4`), not pushed. Full report on the rail (`ops_reports`, pass
+`MIGRATION_RECONCILE2`).
+
+## MIGRATION_RECONCILE1 — diagnosed the 2 DIVERGENT patchboard migrations (2026-09-04)
+
+**Pass:** MIGRATION_RECONCILE1 | lane `db` | workdir `TheMANUAL.tech` | session `0f8e9763`
+(fallback id). Diagnose-only per dispatch — no apply, no rewrite.
+
+**Finding:** `reconcile.mjs measure` reported 2 discrepancies on/after baseline
+(`20260903202047_patchboard1_switch_system_v1.sql`,
+`20260903203925_patchboard_values_astra_colors.sql`), both `rel=DIVERGENT`. Fetched the
+actual applied statement text from `supabase_migrations.schema_migrations` and line-diffed
+against the checked-in files. File 1: cosmetic only ($fn$/$$ dollar-quote tag swap +
+SQL-equivalent string-literal formatting) — verified live grants matched the file exactly.
+File 2: same cosmetics **plus** a real gap — two `revoke execute ... from anon` statements
+ran live against `patchboard_set_value`/`patchboard_clear_value` that were never written back
+into the repo file. Verified live directly (`has_function_privilege`): production is safe
+right now (`anon_can_execute=false` on both), but replaying the repo file as-is on a fresh
+environment would silently hand `anon` execute back on both RPCs via this project's
+`ALTER DEFAULT PRIVILEGES`.
+
+**Per the dispatch's own rule** ("IF EITHER IS SUBSTANTIVE: STOP, do not reconcile, do not
+rewrite either side"): neither file was touched this pass. Full diff filed as `ops_docs`
+`MIGRATION_RECONCILE1_DIFF v1`. Answered `KNOW_DB1_APPLY` may not proceed yet — closed by
+`MIGRATION_RECONCILE2` above.
+
+---
+
 ## ONE_SHELL3 — BrandosophicLayout → UniversalShell; retokenize zinc-literal surface pages (2026-09-03)
 
 **Pass:** ONE_SHELL3 | lane `front` | workdir `TheMANUAL.tech` | claimed via folder-matched claim
