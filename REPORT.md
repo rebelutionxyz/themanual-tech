@@ -25,6 +25,74 @@ go at the top, under the header.
 
 ---
 
+## PROFILE_SHARED1 — consumed the shared @honeycomb/profile core (2026-09-04)
+
+**Pass:** PROFILE_SHARED1 | lane `front` | workdir `shared` (this app is one of two
+consumers, not the dispatched workdir itself — noted here anyway since 10 files in
+this tree changed and R6 says report honestly regardless). Session `0f8e9763`.
+
+**What happened:** PROFILE3 (`ProfilePage.tsx` / `profile/ProfileView.tsx` /
+`profile/ProfileContentWindow.tsx` / `components/profile/ProfileLocationEditor.tsx`,
+~2,400 lines) was extracted into a new package, `shared/profile/` (identity, bio,
+avatar, location editor, rank/ring cards, follow, timeline, quick-look content
+window — everything PROFILE_SHARED1's dispatch calls "what every astra gets"), so
+REBELUTION.org's kNOW `/profile` can share the same core instead of forking it.
+This app now consumes it as a thin adapter:
+- `ProfilePage.tsx` wraps `@honeycomb/profile`'s `ProfileOwnPage`, supplying the
+  Creator Studio Showcase + contributions placeholder as `children` (both roof-only).
+- `pages/profile/ProfileView.tsx` wraps the shared `ProfileView`, supplying
+  `sections.tsx` (new file: forums/events/watching-bookmarks/campaigns/listings/
+  groups/rank/badges tabs + their quick-look cards — bazaar, campaigns, events,
+  groups all have their own tables/route namespaces on this astra, so none of it
+  moved into the shared package).
+- `ProfileContentWindow.tsx` and `components/profile/ProfileLocationEditor.tsx`
+  deleted (fully replaced; no other consumers, confirmed by grep before deleting).
+- `PublicProfilePage.tsx` untouched — the adapter re-exports the same `ProfileData`
+  type and `ProfileView` name it always imported.
+- New `src/lib/profileHost.tsx`: wires `@honeycomb/profile`'s injected `Link`
+  component to this app's own `react-router-dom` `Link` (the package never
+  renders `<a>` or a router `Link` itself — see shared/profile's `host.tsx`).
+- Wired `@honeycomb/profile` the same way `@honeycomb/shell` already is:
+  `tsconfig.json` paths, `vite.config.ts` alias, `tailwind.config.ts` content glob,
+  one CSS import (`main.tsx`, right after `shell.css`).
+
+**Styling note (a judgment call, not dispatch-explicit):** the shared package's
+components use inline `style` against CSS custom properties (a `PROFILE_THEME`
+token map in `theme.ts`), not this app's own named Tailwind color classes
+(`text-text-silver-bright`, `bg-bg-elevated`, etc.) — those tokens are hardcoded
+hex in this app's own `tailwind.config.ts` and are not defined in REBELUTION.org's
+Tailwind build at all (its `tailwind.config.ts` runs Tailwind for shared-package
+layout utilities only, preflight off, by design). Reused `@honeycomb/shell`'s
+existing `.astra-shell` CSS vars wherever an exact hex match confirmed the same
+color (7 of 10 tokens); added 3 new vars (`--profile-elevated`,
+`--profile-silver-bright`, `--profile-dim`, plus `--profile-display-face` for the
+Cormorant Garamond heading font) with fallbacks equal to this app's current look,
+so this app renders pixel-identical with zero override. Same convention
+`@honeycomb/shell/src/UniversalShell.tsx` already established (Tailwind for
+layout only, inline style + CSS var for every color/font token) — not a new
+pattern, matched to the existing one.
+
+**Verify:** `tsc -b --noEmit` clean on this app (re-run after a Biome formatting
+pass touched `shared/profile/src`, still clean) and on REBELUTION.org
+(`npm run typecheck`, both before and after that same formatting pass). Biome
+`check`/`--write` clean on every changed/added file in this app and in
+`shared/profile/src`. Not run: a full REBELUTION.org lint pass (no Biome there;
+`next lint` was not invoked) and no browser smoke test of either app (dev servers
+were already running on 3000/3001 for other work; typecheck-only verification per
+the no-build-while-dev-serves convention).
+
+**Git:** committed locally in this repo (`8e3fba7`), staged by name only — not
+pushed. The outer HONEYCOMB repo (`shared/profile/`) and REBELUTION.org (which
+lives inside that same outer repo, not a separate one) were deliberately left
+uncommitted: the dispatch says "Owner commits (root repo)," and REBELUTION.org's
+own CLAUDE.md independently forbids git commands entirely. Two untracked
+`supabase/migrations/_drafts/know_contribute1_v1*.sql` files sit in this repo's
+tree from a concurrent, unrelated pass — not touched, not staged, not mine.
+
+**Downstream:** REBELUTION.org's kNOW `/profile` (`ProfileScreen.tsx`) now also
+consumes `ProfileOwnPage` — its own report lives in that repo's `REPORT.md` /
+this session's `ops_reports` filing, not duplicated here.
+
 ## KNOW_DB1_APPLY — applied know_db1_v1 to production (2026-09-04)
 
 **Pass:** KNOW_DB1_APPLY | lane `db` | workdir `TheMANUAL.tech` | session `0f8e9763`
